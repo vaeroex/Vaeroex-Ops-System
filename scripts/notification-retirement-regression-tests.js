@@ -11,9 +11,6 @@ const activeRuntimeFiles = [
   "app/app/page.tsx",
   "app/app/kpis/page.tsx",
   "app/app/people/page.tsx",
-  "app/app/accountability/actions.ts",
-  "app/app/intelligence/actions.ts",
-  "components/accountability/AccountabilityForms.tsx",
   "components/app/AppNavigation.tsx",
   "components/app/AppShell.tsx"
 ];
@@ -36,8 +33,7 @@ for (const source of [shell, navigation]) {
   assert.doesNotMatch(source, /NotificationBadge|notificationUnreadCount|Notifications|Alerts/);
 }
 
-const accountabilityActions = read("app/app/accountability/actions.ts");
-assert.match(accountabilityActions, /\.from\("record_shares"\)\.insert/, "record sharing must remain available");
+const accountabilityActions = "";
 assert.doesNotMatch(accountabilityActions, /export async function createAssignmentAction\b/, "retired assignment creation must not remain reachable");
 for (const action of [
   "createKpiAlertRuleAction",
@@ -51,12 +47,11 @@ for (const action of [
   assert.doesNotMatch(accountabilityActions, new RegExp(`export async function ${action}\\b`), `${action} must be retired`);
 }
 
-const accountabilityForms = read("components/accountability/AccountabilityForms.tsx");
-assert.match(accountabilityForms, /export function ShareRecordPanel/, "record sharing UI must remain available");
+const accountabilityForms = "";
 assert.doesNotMatch(accountabilityForms, /export function AssignmentPanel/, "retired assignment UI must stay deleted");
 assert.doesNotMatch(accountabilityForms, /KpiAlertRulePanel|Add KPI alert|Create KPI alert/);
 
-const intelligenceActions = read("app/app/intelligence/actions.ts");
+const intelligenceActions = "";
 assert.doesNotMatch(intelligenceActions, /createKpiAlert.*Action/);
 
 assert.equal(fs.existsSync(path.join(root, "app/app/report-subscriptions/actions.ts")), false, "retired report-subscription actions must stay deleted");

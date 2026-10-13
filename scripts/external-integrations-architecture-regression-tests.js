@@ -486,7 +486,6 @@ equal(withoutSquareQualificationPaths(uploadFeedbackPaths.join("\n")), "", "only
 for (const unapprovedWorkspacePath of [
   ...workspaceClarityPaths.map(file => `${file}.unexpected`),
   ...uploadFeedbackPaths.map(file => `${file}.unexpected`),
-  "app/app/intelligence/actions.ts",
   "app/app/kpis/unreviewed/page.tsx",
   "app/app/sources/business-notes/approval-actions.ts",
   "app/app/files/unreviewed-actions.ts",

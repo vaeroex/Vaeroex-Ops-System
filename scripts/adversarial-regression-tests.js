@@ -771,7 +771,6 @@ function runLegacyCrmLanguageTests() {
   ];
   const publicExperienceFiles = [
     "components/motion/OperationsIntelligenceEngineDemo.tsx",
-    "components/intelligence/LeadershipDecisionJournal.tsx",
     "app/app/crm/page.tsx",
     "app/api/search/route.ts",
     "lib/search/types.ts",

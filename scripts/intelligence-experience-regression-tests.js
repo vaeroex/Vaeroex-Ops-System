@@ -607,10 +607,10 @@ assert.match(inboxSource, /expandedGroupKey.*showAllGroups.*expandedRecordLimit/
 assert.match(inboxSource, /View all supporting records/, "evidence view must link to the existing filtered record surface");
 assert.match(inboxSource, /Independent sources/, "evidence view must disclose independent-source count");
 assert.match(inboxSource, /insight\.contradictoryEvidence\.length \? \(/, "contradictory evidence must render only when it exists");
-assert.match(inboxSource, /xl:grid-cols-\[minmax\(0,1fr\)_minmax\(23rem,.82fr\)\]/, "desktop uses a master-detail layout while mobile stays single-column");
-assert.match(inboxSource, /grid gap-4 xl:grid-cols/, "finding layout remains single-column before the desktop breakpoint");
-assert.match(inboxSource, /xl:max-h-\[calc\(100dvh-8rem\)\].*xl:overflow-y-auto/, "desktop detail panel scrolls independently");
-assert.doesNotMatch(inboxSource, /(?<!xl:)max-h-\[calc\(100dvh|(?<!xl:)overflow-y-auto/, "mobile evidence flow must not create a nested viewport scroller");
+assert.match(inboxSource, /xl:grid-cols-\[minmax\(17rem,\.8fr\)_minmax\(0,1\.6fr\)\]/, "desktop gives the finding detail twice the list's share of available width");
+assert.match(inboxSource, /grid items-start gap-5 xl:grid-cols/, "finding layout remains single-column before the desktop breakpoint");
+assert.match(inboxSource, /xl:sticky xl:top-20 xl:self-start/, "desktop detail stays aligned without trapping its contents");
+assert.doesNotMatch(inboxSource, /max-h-\[calc\(100dvh|overflow-y-auto/, "finding list and detail must use page scrolling on desktop and mobile");
 assert.match(sourcesPageSource, /\.eq\("workspace_id", workspaceId\)/, "supporting Evidence destinations remain workspace scoped");
 assert.match(sourcesPageSource, /filterEligibleMemoryRowsByLifecycle/, "supporting Evidence destinations must validate lifecycle lineage");
 assert.equal(fs.existsSync(path.join(root, "app/app/reports/new/page.tsx")), false, "retired report-draft route must stay absent");

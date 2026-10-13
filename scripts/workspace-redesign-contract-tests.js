@@ -33,7 +33,8 @@ test("presentation scope excludes Admin while retaining customer workspace navig
   const shell = read("components/app/AppShell.tsx");
   assert.match(shell, /href: "\/app\/sources", label: "Files & Notes"/);
   for (const action of ["selectWorkspaceAction", "signOutAction"]) assert.match(shell, new RegExp(`action=\\{${action}\\}`));
-  for (const route of ["/app", "/app/intelligence", "/app/kpis", "/app/sources", "/app/reports", "/app/settings"]) assert.ok(shell.includes(`href: "${route}"`));
+  assert.ok(!shell.includes('href: "/app", label: "Overview"'));
+  for (const route of ["/app/intelligence", "/app/kpis", "/app/sources", "/app/reports", "/app/settings"]) assert.ok(shell.includes(`href: "${route}"`));
   assert.match(shell, /isVaeroexAdmin \? \[\.\.\.baseNavSections, adminNavSection\] : baseNavSections/);
 });
 

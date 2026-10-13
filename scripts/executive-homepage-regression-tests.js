@@ -338,7 +338,7 @@ const partial = buildExecutiveHomepageModel({
 assert.equal(partial.readiness.label, "Partial");
 assert.equal(partial.readiness.largestGap, "Financials");
 
-const loadingSource = fs.readFileSync(path.join(root, "app/app/loading.tsx"), "utf8");
+const loadingSource = fs.readFileSync(path.join(root, "app/app/intelligence/loading.tsx"), "utf8");
 const healthSnapshotSource = fs.readFileSync(path.join(root, "components/intelligence/IntelligenceHealthSnapshot.tsx"), "utf8");
 const homepageSource = fs.readFileSync(path.join(root, "components/intelligence/ExecutiveHomepage.tsx"), "utf8");
 const appShellSource = fs.readFileSync(path.join(root, "components/app/AppShell.tsx"), "utf8");
@@ -375,7 +375,8 @@ assert.doesNotMatch(homepageSource, /<ExecutiveBriefPanel/, "the Version 1 homep
 assert.doesNotMatch(homepageSource, /GlobalSearchTrigger|Ask Vaeroex|Help/, "executive header must not duplicate global navigation actions");
 assert.doesNotMatch(healthTrendSource, /buildDemoTrendPoints|Sample demo trend/, "Business Health must not fabricate a demo trend when history is insufficient");
 assert.doesNotMatch(homepageSource, /View full intelligence|Executive Brief/, "Overview must not expose redundant page actions or report generation");
-for (const label of ["Overview", "Intelligence", "Performance", "Files & Notes", "Saved Analyses", "Settings"]) {
+assert.doesNotMatch(appShellSource, /label: "Overview"/);
+for (const label of ["Intelligence", "Performance", "Files & Notes", "Saved Analyses", "Settings"]) {
   assert.match(appShellSource, new RegExp(`label: "${label}"`), `authenticated navigation must expose ${label} as a primary concept`);
 }
 assert.match(appShellSource, /label: "Primary",\s*collapsible: false/, "primary navigation must not be hidden in a workspace accordion");

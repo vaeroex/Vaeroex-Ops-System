@@ -50,8 +50,9 @@ function card(index, overrides = {}) {
 
 // Drive the actual component event handlers with stable hook slots. Browser
 // qualification separately checks layout, focus, and scrolling in a real DOM.
-function inboxHarness(props) {
+function inboxHarness(props, runEffects = false, mocks = {}) {
   const slots = [];
+  const effects = []; let mounted = false;
   let cursor = 0;
   const hooks = {
     ...React,
@@ -66,11 +67,11 @@ function inboxHarness(props) {
       return slots[index];
     },
     useMemo: (compute) => compute(),
-    useEffect: () => {},
+    useEffect: (effect) => { if (runEffects && !mounted) effects.push(effect); },
     useTransition: () => [false, (fn) => fn()],
   };
-  const { IntelligenceSignalInbox } = loadSource("components/intelligence/IntelligenceSignalInbox.tsx", { ...sharedMocks, react: hooks });
-  return () => { cursor = 0; return IntelligenceSignalInbox(props); };
+  const { IntelligenceSignalInbox } = loadSource("components/intelligence/IntelligenceSignalInbox.tsx", { ...sharedMocks, ...mocks, react: hooks });
+  return () => { cursor = 0; const tree = IntelligenceSignalInbox(props); if (!mounted) { mounted = true; effects.forEach(effect => effect()); } return tree; };
 }
 function nodes(tree, predicate) {
   const found = [];
@@ -135,7 +136,7 @@ test("Intelligence SSR dates match browser rendering across timezones and preser
       React.createElement(IntelligenceBriefingCards, { states: { weekly: state("weekly"), monthly: state("monthly") }, generationEnabled: false })));
     process.env.TZ = "UTC";
     const html = renderMarkup();
-    assert.match(html, /<p class="mt-2 text-xs text-slate-500">Jul 18, 2026 UTC<\/p>/);
+    assert.match(html, /<time dateTime="2026-07-18T00:00:00Z">Jul 18, 2026 UTC<\/time>/);
     assert.match(html, /Last generated Jul 18, 2026, 12:00 AM UTC/);
     process.env.TZ = "America/Los_Angeles";
     assert.equal(renderMarkup(), html, "the reproduced finding paragraph and briefing markup hydrate without text replacement");
@@ -207,7 +208,7 @@ test("mobile selection and Back restore the list without resetting filters, batc
     assert.deepEqual(rows(tree).map((node) => node.props["data-finding-key"]), before);
     assert.match(content(tree), /Showing 1-20 of 120/);
     assert.match(nodes(tree, (node) => node.type === "aside")[0].props.className, /^hidden xl:block/);
-    assert.equal(nodes(tree, (node) => node.props?.["aria-current"] === "true").length, 0, "Back must not silently select the first finding again");
+    assert.equal(rows(tree).find(node => node.props["aria-current"] === "true").props["data-finding-key"], selected.props["data-finding-key"], "Back preserves the selected row without reopening detail");
     assert.deepEqual(scrolls, [{ top: 930, behavior: "instant" }]);
     assert.equal(focusRestored, true);
   } finally { global.window = previousWindow; }
@@ -257,13 +258,13 @@ test("confidence-filter fallback becomes the selection and survives clearing the
     tree = render();
     button(tree, "← Back to list").props.onClick();
     tree = render();
-    assert.equal(rows(tree).some((node) => node.props["aria-current"] === "true"), false);
+    assert.equal(rows(tree)[0].props["aria-current"], "true");
     assert.match(nodes(tree, (node) => node.type === "aside")[0].props.className, /^hidden xl:block/);
-    assert.match(content(nodes(tree, (node) => node.type === "aside")[0]), /Select a finding/);
+    assert.match(content(nodes(tree, (node) => node.type === "aside")[0]), /Synthetic finding 0/);
     for (const checked of [true, false]) {
       nodes(tree, (node) => node.type === "input")[0].props.onChange({ currentTarget: { checked } });
       tree = render();
-      assert.equal(rows(tree).some((node) => node.props["aria-current"] === "true"), false, "an intentional Back-to-list empty selection remains empty across confidence changes");
+      assert.equal(rows(tree)[0].props["aria-current"], "true", "Back-to-list selection survives confidence changes without reopening detail");
       assert.match(nodes(tree, (node) => node.type === "aside")[0].props.className, /^hidden xl:block/);
     }
   } finally { global.window = previousWindow; }
@@ -307,4 +308,116 @@ test("the selected finding shows the complete approved investigation", () => {
   const html = renderToStaticMarkup(React.createElement(IntelligenceSignalInbox, { currentCards: [selected], historyCards: [], canManageLifecycle: false }));
   assert.match(html, /Confirm how the KPI counts reviews before treating its value as unique reviews/);
   assert.doesNotMatch(html, /Decide whether leadership should investigate/);
+});
+
+
+test("native Back/Forward restores workspace-local filter, batch, selection, panel and scroll", () => {
+  const previousWindow = global.window;
+  const listeners = new Map(); const entries = [{state: {next: "preserved"}, url: "https://example.test/app/intelligence?period=Monthly"}]; let position = 0;
+  const scrolls = [];
+  const location = {href: entries[0].url, search: "?period=Monthly"};
+  function move() { location.href = entries[position].url; location.search = new URL(location.href).search; listeners.get("popstate")?.(); }
+  global.window = {location, scrollY: 930, matchMedia: () => ({matches: false}), requestAnimationFrame: fn => fn(), scrollTo: v => scrolls.push(v), addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name), history: {
+    get state() { return entries[position].state; },
+    replaceState(state, _title, url) {entries[position] = {state, url: new URL(url, location.href).href}; location.href = entries[position].url; location.search = new URL(location.href).search;},
+    pushState(state, _title, url) { entries.splice(++position); entries.push({state, url: new URL(url, location.href).href}); location.href = entries[position].url; location.search = new URL(location.href).search; },
+    back() {if(position > 0) {position--; move();}}, forward() {if(position < entries.length - 1) {position++; move();}}
+  }};
+  try {
+    const props = {workspaceId: "workspace-a", currentCards: Array.from({length:320},(_,i)=>card(i)), historyCards: [], canManageLifecycle: false};
+    const render = inboxHarness(props, true); let tree = render();
+    button(tree,"Opportunities").props.onClick(); tree=render();
+    button(tree,"Load more").props.onClick(); tree=render();
+    const chosen=rows(tree)[15].props["data-finding-key"];
+    rows(tree)[15].props.onClick({currentTarget:{focus(){}}}); tree=render();
+    assert.equal(global.window.history.state.next,"preserved");
+    assert.match(location.search,/period=Monthly.*finding=id-/);
+    global.window.history.back(); tree=render();
+    assert.equal(rows(tree).length,20); assert.match(content(tree),/Showing 1-20 of 120/);
+    assert.equal(rows(tree).find(row=>row.props["aria-current"]==="true").props["data-finding-key"],chosen);
+    assert.match(nodes(tree,node=>node.type==="aside")[0].props.className,/^hidden xl:block/);
+    assert.deepEqual(scrolls.at(-1),{top:930,behavior:"instant"});
+    global.window.history.forward(); tree=render();
+    assert.doesNotMatch(nodes(tree,node=>node.type==="aside")[0].props.className,/^hidden/);
+    assert.equal(rows(tree).find(row=>row.props["aria-current"]==="true").props["data-finding-key"],chosen);
+    // A second workspace never restores the first workspace's UI state or finding IDs.
+    const other=inboxHarness({...props,workspaceId:"workspace-b",currentCards:[card(900)]},true); other();
+    const isolated=other(); assert.equal(rows(isolated).length,1); assert.match(content(isolated),/Synthetic finding 900/);
+    assert.doesNotMatch(nodes(isolated,node=>node.type==="aside")[0].props.className,/^block/);
+  } finally {global.window=previousWindow;}
+});
+
+
+test("Overview redirect retains query values and ordinary auth defaults preserve deliberate destinations", async () => {
+  const {safeAuthRedirectPath}=loadSource("lib/auth/safe-redirect.ts");
+  assert.equal(safeAuthRedirectPath(null),"/app/intelligence");
+  for(const target of ["/app/sources?file=test#review","/app/intelligence?finding=id-7","/onboarding","/checkout/legal","/app?view=Operations%20View"]) assert.equal(safeAuthRedirectPath(target),target);
+  let authorized=0;
+  const Overview=loadSource("app/app/page.tsx",{"@/lib/workspaces/page-context":{requireWorkspacePage:async()=>{authorized++;}},"next/navigation":{redirect: value=>{throw new Error(value);}}}).default;
+  await assert.rejects(Overview({}),{message:"/app/intelligence"});
+  await assert.rejects(Overview({searchParams:Promise.resolve({finding:"id-7",period:"Monthly",tag:["a","b"]})}),{message:"/app/intelligence?finding=id-7&period=Monthly&tag=a&tag=b"});
+  assert.equal(authorized,2,"legacy redirects retain the existing workspace guard");
+  const Denied=loadSource("app/app/page.tsx",{"@/lib/workspaces/page-context":{requireWorkspacePage:async()=>{throw new Error("access denied");}},"next/navigation":{redirect:()=>assert.fail("cannot redirect before workspace authorization")}}).default;
+  await assert.rejects(Denied({}),{message:"access denied"});
+  const shell=fs.readFileSync(path.join(root,"components/app/AppShell.tsx"),"utf8");
+  assert.doesNotMatch(shell,/href: "\/app", label: "Overview"/);
+  const page=fs.readFileSync(path.join(root,"app/app/intelligence/page.tsx"),"utf8");
+  assert.match(page,/await requireWorkspaceAccess\(\)/);
+  assert.ok(page.includes('key={`findings-${workspaceId}`}'), "workspace inbox key must be distinct from the integration sibling key");
+  assert.doesNotMatch(page, /from\("operational_assignments"\)/, "retired assignment panels must not add a database read to Intelligence");
+  assert.doesNotMatch(page, /record_shares|IntelligenceWorkspaceContext/);
+});
+
+test("readiness renders existing coverage and expandable source guidance without estimating missing scores", () => {
+  const {IntelligenceReadiness}=loadSource("components/intelligence/IntelligenceReadiness.tsx",sharedMocks);
+  const readiness={available:true,coverage:68,label:"Partial",strongestArea:"Operations",strongestCoverage:78,largestGap:"Financial history",recommendedNextSource:"Latest monthly financial summary",showAddInformation:true};
+  const html=renderToStaticMarkup(React.createElement(IntelligenceReadiness,{readiness}));
+  for(const text of ["68","Partial understanding","Operations","78%","Financial history","Latest monthly financial summary","Readiness details","Information coverage is separate from business performance."]) assert.ok(html.includes(text));
+  assert.match(html,/href="\/app\/sources"/); assert.match(html,/<details/);
+  const empty=renderToStaticMarkup(React.createElement(IntelligenceReadiness,{readiness:{...readiness,available:false,coverage:0}}));
+  assert.match(empty,/until enough eligible original evidence/); assert.doesNotMatch(empty,/0<span/);
+  const unavailable=renderToStaticMarkup(React.createElement(IntelligenceReadiness,{readiness:null}));
+  assert.match(unavailable,/No score has been estimated/);
+});
+
+
+test("finding controls retain token-bound actions and require the explicit dismissal confirmation", async () => {
+  const requests=[]; let refreshes=0;
+  const props={currentCards:[card(0,{lifecycleToken:"synthetic-workspace-bound-token"})],historyCards:[],canManageLifecycle:true};
+  const mocks={"next/navigation":{useRouter:()=>({refresh:()=>refreshes++})},"@/app/app/intelligence/lifecycle-actions":{mutateIntelligenceCardLifecycleAction:async request=>{requests.push(request);return {ok:true,message:"Synthetic success"};}}};
+  const render=inboxHarness(props,false,mocks); let tree=render();
+  button(tree,"Acknowledge").props.onClick(); await Promise.resolve(); tree=render();
+  button(tree,"Pin").props.onClick(); await Promise.resolve(); tree=render();
+  button(tree,"Dismiss").props.onClick(); tree=render(); assert.equal(requests.length,2,"opening dismissal is not a mutation");
+  nodes(tree,node=>node.type==="select")[0].props.onChange({currentTarget:{value:"duplicate"}});
+  nodes(tree,node=>node.type==="textarea")[0].props.onChange({currentTarget:{value:"Synthetic duplicated observation"}}); tree=render();
+  button(tree,"Move to History").props.onClick(); await Promise.resolve();
+  assert.deepEqual(requests,[
+    {token:"synthetic-workspace-bound-token",action:"acknowledge",reasonCode:null,reasonText:null},
+    {token:"synthetic-workspace-bound-token",action:"pin",reasonCode:null,reasonText:null},
+    {token:"synthetic-workspace-bound-token",action:"dismiss",reasonCode:"duplicate",reasonText:"Synthetic duplicated observation"}
+  ]); assert.equal(refreshes,3);
+  const pinned=inboxHarness({...props,currentCards:[card(0,{pinned:true,lifecycleToken:"synthetic-workspace-bound-token"})]},false,mocks)();
+  button(pinned,"Unpin").props.onClick(); await Promise.resolve(); assert.equal(requests.at(-1).action,"unpin");
+  for(const restricted of [{...props,canManageLifecycle:false},{...props,currentCards:[card(0)]}]) {
+    const tree=inboxHarness(restricted)(); for(const label of ["Acknowledge","Pin","Dismiss"]) assert.equal(button(tree,label),undefined);
+  }
+});
+
+test("workspace selection keeps active membership and authentication checks before changing the default destination", async () => {
+  let membership={id:"member-a",workspaces:{id:"workspace-a",name:"Synthetic workspace",subscription_status:"active"}};
+  let user={id:"user-a",email:"synthetic@example.invalid"}; const filters=[]; const cookies=[];
+  const query={select:()=>query,eq:(...args)=>{filters.push(args);return query;},maybeSingle:async()=>({data:membership})};
+  const {selectWorkspaceAction}=loadSource("lib/workspaces/actions.ts",{
+    "next/navigation":{redirect:value=>{throw new Error(value);}},
+    "next/headers":{cookies:async()=>({set:(...args)=>cookies.push(args)})},
+    "@/lib/admin/admin-emails":{isVaeroexAdminUser:()=>false},
+    "@/lib/workspaces/demo-compatibility":{isDemoWorkspaceRecord:()=>false},
+    "@/lib/supabase/server":{createSupabaseServerClient:async()=>({auth:{getUser:async()=>({data:{user}})},from:table=>{assert.equal(table,"workspace_members");return query;}})}
+  });
+  const form=new FormData();form.set("workspace_id","workspace-a");
+  await assert.rejects(selectWorkspaceAction(form),{message:"/app/intelligence?message=Switched%20to%20Synthetic%20workspace."});
+  assert.deepEqual(filters,[["workspace_id","workspace-a"],["user_id","user-a"],["status","active"]]);assert.equal(cookies.length,1);assert.equal(cookies[0][1],"workspace-a");
+  membership=null; await assert.rejects(selectWorkspaceAction(form),/only have access to workspaces where you are an active member/);assert.equal(cookies.length,1);
+  user=null; await assert.rejects(selectWorkspaceAction(form),{message:"/login"});assert.equal(cookies.length,1);
 });

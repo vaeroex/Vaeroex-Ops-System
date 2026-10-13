@@ -2,7 +2,7 @@
 import type { Database } from "../../lib/supabase/types";
 export const AS_OF = "2026-09-29T08:00:00.000Z";
 export const WORKSPACE_ID = "00000000-0000-4000-8000-000000000001";
-export type FixtureState = "populated" | "empty" | "loading" | "error";
+export type FixtureState = "populated" | "partial" | "empty" | "loading" | "error";
 export type FixtureRole = "owner" | "viewer";
 export function freeze<T>(value: T): T { if (value && typeof value === "object") { Object.freeze(value); Object.values(value).forEach(item => { if (item && typeof item === "object" && !Object.isFrozen(item)) freeze(item); }); } return value; }
 export const workspace = freeze({ id: WORKSPACE_ID, name: "Harbor Supply · Synthetic", business_type: "Retail", industry: "Retail", created_at: AS_OF, updated_at: AS_OF, subscription_status: "active", subscription_required: true, manually_unlocked: false });
@@ -98,9 +98,9 @@ export const analyses = freeze(Array.from({ length: 32 }, (_, index) => ({
   analysisType: index % 2 ? "weekly_briefing" : "business_health", generatedAt: AS_OF, savedAt: AS_OF, confidence: index % 3 ? "High" : "Medium", evidenceStatus: "Synthetic evidence", dateRange: "September 2026", businessHealthState: null,
 })));
 export const cards = freeze(Array.from({ length: 32 }, (_, index) => {
-  const type = index % 2 ? "Opportunity" : "Risk";
-  const title = ["Order fulfillment needs attention", "Retention is above target", "Inventory variance increased", "Repeat purchases are improving"][index % 4];
-  const snapshot = { version: "intelligence_card_lifecycle_v1", findingId: `fixture-${index}`, type, title: `${title}${index > 3 ? ` · ${index + 1}` : ""}`, summary: "Synthetic operating evidence suggests reviewing this area with the responsible team.", priority: index % 3 ? "Medium" : "High", confidence: index % 3 ? "High" : "Low", affectedArea: "Operations", lastUpdated: AS_OF };
+  const type = ["Risk", "Opportunity", "Anomaly", "Recommendation", "Forecast", "Bottleneck"][index % 6];
+  const title = ["Order fulfillment needs attention", "Retention is above target", "Inventory variance increased", "Review reorder thresholds", "Repeat purchases outlook", "Receiving delays limit capacity"][index % 6];
+  const snapshot = { version: "intelligence_card_lifecycle_v1", findingId: `fixture-${index}`, type, title: `${title}${index > 3 ? ` · ${index + 1}` : ""}`, summary: "Synthetic operating evidence suggests reviewing this area with the responsible team.", priority: ["High", "Medium", "Low"][index % 3], confidence: index % 3 ? "High" : "Low", affectedArea: "Operations", lastUpdated: AS_OF };
   return { findingKeyHash: String(index).padStart(4, "0"), materialSignature: `fixture-${index}`, findingId: snapshot.findingId, snapshot,
     insight: { ...snapshot, id: snapshot.findingId, why: "Synthetic operating evidence", impact: "Review the effect on service and capacity.", recommendedAction: "Inspect the supporting evidence before deciding what to change.", evidence: ["Recorded performance: 87%", "Target: 95%"], evidenceCount: 2, supportingRecords: [{ id: `kpi-${index}`, title: "Order fulfillment", recordType: "KPI record", date: "2026-09-29", value: "Actual 87% · Target 95%", support: "Synthetic record", href: "/app/kpis?metric=Order%20fulfillment&section=detail", classification: "Original", sourceKey: "fixture" }], independentSourceCount: 1, contradictoryEvidence: [], missingEvidence: [], sourceTypes: ["KPIs"], sourceHref: "/app/kpis", timePeriod: "September 2026", limitation: "Synthetic fixture only.", fingerprint: `fixture-${index}` },
     lifecycleState: "active", pinned: false, view: "current", currentFeedStatus: "surfaced", reopenReason: null, reopenedFrom: null, reasonCode: null, reasonText: null, dismissedBy: null, recheckAfter: null, stateChangedAt: null, lifecycleToken: null };

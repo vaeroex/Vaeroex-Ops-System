@@ -1,10 +1,12 @@
+import { IntelligenceReadiness } from "@/components/intelligence/IntelligenceReadiness";
+import { overviewComparisons, overviewPeriod } from "@/lib/presentation/overview-comparison";
 import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources } from "@/lib/integrations/google-sheets/read-authority";
 import Link from "next/link";
 import { unstable_rethrow } from "next/navigation";
 import { HealthSnapshotUnavailable } from "@/components/intelligence/HealthSnapshotUnavailable";
 import { CalendarRange } from "lucide-react";
 import { IntelligenceHealthSnapshot } from "@/components/intelligence/IntelligenceHealthSnapshot";
-import { loadWorkspaceHealth } from "@/lib/intelligence/workspace-health";
+import { buildWorkspaceHealthView, loadWorkspaceHealthEvidence } from "@/lib/intelligence/workspace-health";
 import { IntelligenceBriefingCards } from "@/components/intelligence/IntelligenceBriefingCards";
 import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -42,7 +44,7 @@ import { loadIntegrationDashboard } from "@/lib/integrations/dashboard/server";
 export const dynamic = "force-dynamic";
 
 type IntelligencePageProps = {
-  searchParams?: Promise<{ finding?: string }>;
+  searchParams?: Promise<{ finding?: string; period?: string; view?: string; error?: string; message?: string }>;
 };
 
 export default async function IntelligencePage({ searchParams }: IntelligencePageProps) {
@@ -70,7 +72,11 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
       workspaceId,
       workspace: context.activeWorkspace || {}
     }),
-    loadWorkspaceHealth({ supabase, workspaceId, workspace: context.activeWorkspace, userId: access.user.id }).catch(error => {
+    (async () => {
+      const evidence = await loadWorkspaceHealthEvidence({ supabase, workspaceId });
+      return buildWorkspaceHealthView({ supabase, workspaceId, workspace: context.activeWorkspace, userId: access.user.id, evidence,
+        comparisonTrends: overviewComparisons(evidence.intelligenceKpis, evidence.intelligenceKpiSettings, params?.period) });
+    })().catch(error => {
       unstable_rethrow(error);
       // Keep the established findings workflow available if the additional Health
       // dependency fails. Do not disclose raw database details or fabricate a score.
@@ -291,10 +297,13 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Leadership review</p>
           <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Intelligence</h1>
-          <p className="mt-2 text-sm text-slate-400">Review Business Health, current signals and leadership briefings.</p>
+          <p className="mt-2 text-sm text-slate-400">Business performance, evidence, and the decisions that deserve attention.</p>
+          {healthView?.latestEvidenceUpdate ? <p className="mt-1 text-xs text-slate-400">Latest evidence update: {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(healthView.latestEvidenceUpdate))} UTC</p> : null}
         </div>
       </header>
-      <ErrorNotice message={displayErrors[0]?.message || null} />
+      {params?.message ? <p role="status" className="rounded-lg border border-white/10 p-3 text-sm text-slate-200">{params.message}</p> : null}
+      <ErrorNotice message={params?.error || displayErrors[0]?.message || null} />
+      <div className="intelligence-summary-grid">
       {healthView ? <IntelligenceHealthSnapshot
         health={healthView.executiveHomepageModel.health}
         facts={healthView.businessHealthAnalysisPackage.facts}
@@ -304,8 +313,13 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
         historyError={healthView.businessHealthSnapshotResult.errorMessage}
         analysis={{ state: healthView.businessHealthAnalysisState, requestToken: healthView.businessHealthAnalysisToken }}
       /> : <HealthSnapshotUnavailable />}
+      <IntelligenceReadiness readiness={healthView?.executiveHomepageModel.readiness || null} />
+      </div>
+      {healthView ? <details className="intelligence-change-summary"><summary className="intelligence-disclosure">What changed <span className="font-normal text-slate-400">· {overviewPeriod(params?.period)} review</span></summary><form className="mb-3 flex flex-wrap items-end gap-2" action="/app/intelligence" method="get"><label className="text-xs text-slate-300">Comparison period<select name="period" defaultValue={overviewPeriod(params?.period)} className="ml-2 min-h-10 rounded border border-white/15 bg-slate-900 px-2 text-sm text-white">{["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"].map(period => <option key={period}>{period}</option>)}</select></label><button type="submit" className="min-h-10 rounded border border-white/15 px-3 text-sm text-slate-200">Review period</button></form>{healthView.executiveHomepageModel.changes.items.length ? <ul className="space-y-2 pb-3 text-sm leading-6 text-slate-300">{healthView.executiveHomepageModel.changes.items.map(item => <li key={item.id}><strong className="text-slate-100">{item.title}:</strong> {item.detail}</li>)}</ul> : <p className="pb-3 text-sm text-slate-300">{healthView.executiveHomepageModel.changes.message}</p>}</details> : null}
       <CurrentIntegrations key={workspaceId} initial={dashboard} />
       <IntelligenceSignalInbox
+        key={`findings-${workspaceId}`}
+        workspaceId={workspaceId}
         currentCards={lifecycleCards.current}
         historyCards={lifecycleCards.history}
         initialFindingId={params?.finding}

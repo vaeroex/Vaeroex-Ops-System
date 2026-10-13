@@ -26,7 +26,7 @@ export async function selectWorkspaceAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
 
   if (!workspaceId || !supabase) {
-    redirect("/app");
+    redirect("/app/intelligence");
   }
 
   const {
@@ -49,7 +49,7 @@ export async function selectWorkspaceAction(formData: FormData) {
     const workspace = normalizeWorkspace(data);
 
     if (isDemoWorkspaceRecord(workspace) && !isVaeroexAdminUser(user)) {
-      redirect("/app?error=The sample business environment is only available to authorized Vaeroex internal users." as Route);
+      redirect("/app/intelligence?error=The sample business environment is only available to authorized Vaeroex internal users." as Route);
     }
 
     const cookieStore = await cookies();
@@ -59,8 +59,8 @@ export async function selectWorkspaceAction(formData: FormData) {
       path: "/"
     });
 
-    redirect(`/app?message=${encodeURIComponent(`Switched to ${workspaceName(data)}.`)}` as Route);
+    redirect(`/app/intelligence?message=${encodeURIComponent(`Switched to ${workspaceName(data)}.`)}` as Route);
   }
 
-  redirect("/app?error=Workspace could not be switched. You only have access to workspaces where you are an active member." as Route);
+  redirect("/app/intelligence?error=Workspace could not be switched. You only have access to workspaces where you are an active member." as Route);
 }

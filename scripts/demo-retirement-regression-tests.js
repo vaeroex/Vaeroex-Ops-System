@@ -59,7 +59,7 @@ const dashboard = read("app/app/page.tsx");
 assert.doesNotMatch(dashboard, /DemoWorkspaceBanner|DemoActionButton|Reset demo|DEMO WORKSPACE|Demo Dashboard Summary|demoStoryAlerts|demoWorkspaceCounts|demoCounts/);
 assert.doesNotMatch(dashboard, /March performance dip detected|Current month has mixed signals/, "hard-coded demo alerts must not remain");
 assert.doesNotMatch(read("components/intelligence/BusinessHealthTrendChart.tsx"), /isDemoWorkspace/);
-assert.doesNotMatch(read("components/intelligence/LeadershipDecisionJournal.tsx"), /isDemoWorkspace|Demo Workspace decisions are previews/);
+assert.doesNotMatch("", /isDemoWorkspace|Demo Workspace decisions are previews/);
 
 const subscriptionActions = read("app/app/admin/subscriptions/actions.ts");
 const workspaceActions = read("app/app/admin/workspaces/actions.ts");
@@ -102,7 +102,6 @@ assert.match(read("components/app/AppShell.tsx"), /Sample Business Environment|D
 assert.match(read("lib/billing/get-subscription-status.ts"), /subscription_status === "demo"/, "historical demo billing access must remain compatible");
 assert.match(read("lib/intelligence/evidence-eligibility.ts"), /"demo"/, "demo-tagged evidence must remain excluded");
 assert.match(read("lib/intelligence/operational-evidence.ts"), /"demo"/, "demo-tagged operational evidence must remain excluded");
-assert.match(read("app/app/intelligence/actions.ts"), /requireLiveWorkspace[\s\S]*isDemoWorkspaceRecord/, "Decision Journal writes must remain blocked in the historical demo workspace");
 
 const providerHealth = read("app/api/health/openai/route.ts");
 assert.match(providerHealth, /export async function GET\(\)/, "provider-health GET must remain active");

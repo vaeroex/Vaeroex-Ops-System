@@ -1,5 +1,5 @@
 const AUTH_REDIRECT_BASE = "https://vaeroex.invalid";
-const DEFAULT_AUTH_REDIRECT_PATH = "/app";
+const DEFAULT_AUTH_REDIRECT_PATH = "/app/intelligence";
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 const SCHEME_AFTER_SLASH = /^\/[a-z][a-z0-9+.-]*:/i;
 

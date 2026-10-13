@@ -5,6 +5,7 @@ export function useSearchParams() { return new URLSearchParams(useSyncExternalSt
 export function navigate(href: string) {
   const url = new URL(href, window.location.origin);
   if (url.origin !== window.location.origin || !(url.pathname === "/app" || url.pathname.startsWith("/app/"))) throw new Error("Only synthetic workspace navigation is permitted.");
+  if (url.pathname === "/app") url.pathname = "/app/intelligence";
   for (const name of ["fixtureState", "fixtureRole"]) if (!url.searchParams.has(name)) {
     const value = new URLSearchParams(window.location.search).get(name); if (value) url.searchParams.set(name, value);
   }

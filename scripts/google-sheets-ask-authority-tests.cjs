@@ -48,11 +48,12 @@ const supabase = {
 const syntheticAnswer = { kind: 'business_answer', directAnswer: 'Synthetic reviewed amount is 123.', evidenceNote: 'Bounded current evidence.' };
 const reasoning = { rankedEvidenceCount: 1, catalog: [], modelWorkspaceSnapshot: {}, evidenceContextJson: {}, reasoningManifest: {}, signalSynthesis: { candidates: [], relationships: [] }, promptCompaction: {} };
 const unused = [
-  '@/lib/intelligence/checklist-retirement', '@/lib/intelligence/evidence-eligibility', '@/lib/intelligence/source-parent-eligibility',
+  '@/lib/intelligence/evidence-eligibility', '@/lib/intelligence/source-parent-eligibility',
   '@/lib/reports/release-channel', '@/lib/easter-egg/discovery', '@/lib/reports/saved-analysis'
 ];
 const dependencies = {
   ...Object.fromEntries(unused.map(name => [name, {}])), crypto,
+  '@/lib/search/retired-records': load('lib/search/retired-records.ts'),
   'next/server': { NextResponse: { json: (value, init) => Response.json(value, init) } },
   '@/lib/integrations/google-sheets/read-authority': authority,
   '@/lib/search/ask-session': session, '@/lib/search/ask-session-token': tokens,

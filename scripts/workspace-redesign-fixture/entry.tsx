@@ -49,10 +49,12 @@ document.addEventListener("submit", event => {
 }, true);
 
 function App() {
-  const pathname = usePathname(), search = useSearchParams().toString();
+  const pathname = usePathname(), allParams = useSearchParams();
+  const routeParams = new URLSearchParams(allParams); routeParams.delete("finding");
+  const search = routeParams.toString();
   const params = new URLSearchParams(search);
   const requestedState = params.get("fixtureState"), requestedRole = params.get("fixtureRole");
-  const state: FixtureState = ["populated", "empty", "loading", "error"].includes(requestedState || "") ? requestedState as FixtureState : "populated";
+  const state: FixtureState = ["populated", "partial", "empty", "loading", "error"].includes(requestedState || "") ? requestedState as FixtureState : "populated";
   const role: FixtureRole = requestedRole === "viewer" ? "viewer" : "owner";
   const [body, setBody] = useState<React.ReactNode>(() => loadingScreen(pathname));
   const [feedback, setFeedback] = useState("");
@@ -60,14 +62,14 @@ function App() {
   useEffect(() => {
     let active = true;
     setBody(loadingScreen(pathname));
-    renderScreen(pathname, state, role, new URLSearchParams(search), () => change("fixtureState", "populated"))
+    renderScreen(pathname, state, role, new URLSearchParams(window.location.search), () => change("fixtureState", "populated"))
       .then(result => { if (active) setBody(result); })
       .catch(error => { if (active) setBody(<div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-5 text-red-900"><h1 className="font-semibold">Fixture boundary needs an adapter</h1><p className="mt-2">{error.message}</p><p className="mt-2 text-xs">No backend request was made.</p></div>); });
     return () => { active = false; };
   }, [pathname, search, state, role, change]);
   useEffect(() => { const receive = (event: Event) => setFeedback((event as CustomEvent<string>).detail); window.addEventListener("fixture-action", receive); return () => window.removeEventListener("fixture-action", receive); }, []);
   return <><div className={`relative z-50 border-b border-amber-300 bg-amber-50 p-3 text-slate-950${pathname === "/app/settings/integrations/square" ? "" : " lg:ml-64"}`} data-fixture-toolbar>
-    <div className="flex flex-wrap items-center gap-3"><strong className="text-xs">ISOLATED SYNTHETIC PREVIEW</strong><label className="text-xs">State <select aria-label="Fixture state" className="ml-1 rounded border border-slate-400 bg-white p-1 text-slate-950" value={state} onChange={event => change("fixtureState", event.target.value)}>{["populated", "empty", "loading", "error"].map(value => <option key={value}>{value}</option>)}</select></label><label className="text-xs">Context <select aria-label="Fixture role" className="ml-1 rounded border border-slate-400 bg-white p-1 text-slate-950" value={role} onChange={event => change("fixtureRole", event.target.value)}><option value="owner">Owner</option><option value="viewer">Viewer</option></select></label></div>
+    <div className="flex flex-wrap items-center gap-3"><strong className="text-xs">ISOLATED SYNTHETIC PREVIEW</strong><label className="text-xs">State <select aria-label="Fixture state" className="ml-1 rounded border border-slate-400 bg-white p-1 text-slate-950" value={state} onChange={event => change("fixtureState", event.target.value)}>{["populated", "partial", "empty", "loading", "error"].map(value => <option key={value}>{value}</option>)}</select></label><label className="text-xs">Context <select aria-label="Fixture role" className="ml-1 rounded border border-slate-400 bg-white p-1 text-slate-950" value={role} onChange={event => change("fixtureRole", event.target.value)}><option value="owner">Owner</option><option value="viewer">Viewer</option></select></label></div>
     <p className="mt-1 text-xs">Real UI with synthetic inputs. No Supabase, provider, upload, billing or account changes. Roles and errors are simulations, not permission tests.</p>
     <nav aria-label="Preview screens" className="mt-2 flex flex-wrap gap-2">{routes.map(route => <button key={route.href} className="rounded border border-slate-300 bg-white px-2 py-1 text-xs" onClick={() => navigate(route.href)}>{route.label}</button>)}</nav>
     {feedback ? <p role="status" className="mt-2 text-xs font-semibold">{feedback}</p> : null}

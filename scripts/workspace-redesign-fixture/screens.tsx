@@ -1,7 +1,6 @@
 import React from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { ActivityProvider } from "@/components/app/ActivityProvider";
-import { ExecutiveHomepage } from "@/components/intelligence/ExecutiveHomepage";
 import { SquareDirectCustomerPanel } from "@/components/integrations/SquareDirectCustomerPanel";
 import KpisPage from "@/app/app/kpis/page";
 import { renderSourcesPage } from "@/app/app/sources/SourcesPage";
@@ -13,10 +12,10 @@ import KpisLoading from "@/app/app/kpis/loading";
 import SourcesLoading from "@/app/app/sources/loading";
 import ReportsLoading from "@/app/app/reports/loading";
 import AppError from "@/app/app/error";
-import { AS_OF, workspace, profile, executiveModel, businessHealthFacts, squareData, type FixtureState, type FixtureRole } from "./data";
+import { AS_OF, workspace, profile, squareData, type FixtureState, type FixtureRole } from "./data";
 import { setFixture } from "./read-adapters";
 export const routes = Object.freeze([
-  { href: "/app", label: "Overview" }, { href: "/app/intelligence", label: "Intelligence" },
+  { href: "/app/intelligence", label: "Intelligence" },
   { href: "/app/kpis", label: "Performance" }, { href: "/app/sources", label: "Files" },
   { href: "/app/reports", label: "Reports" }, { href: "/app/settings", label: "Settings" },
   { href: "/app/settings/integrations/square", label: "Square" },
@@ -37,11 +36,7 @@ export async function renderScreen(pathname: string, state: FixtureState, role: 
   if (state === "loading") return loadingScreen(pathname);
   if (state === "error") return <AppError error={new Error("Synthetic unavailable state. No live request was made; use Try again to return to populated data.")} reset={reset} />;
   const empty = state === "empty";
-  if (pathname === "/app") {
-    const props = { lastUpdatedLabel: "September 29, 2026", model: executiveModel(empty), healthHistory: [], healthHistoryAsOfDate: "2026-09-29", businessHealthAnalysis: { state: { status: "unavailable", artifact: null, message: "Analysis generation is unavailable in this isolated preview." }, requestToken: null, facts: businessHealthFacts(empty), citations: [] } } as unknown as React.ComponentProps<typeof ExecutiveHomepage>;
-    return <ExecutiveHomepage {...props} healthVisual={params.get("healthVisual") === "arc" ? "arc" : "scorecard"} />;
-  }
-  if (pathname === "/app/intelligence") return IntelligencePage({ searchParams: Promise.resolve(Object.fromEntries(params)) });
+  if (pathname === "/app" || pathname === "/app/intelligence") return IntelligencePage({ searchParams: Promise.resolve(Object.fromEntries(params)) });
   if (pathname.startsWith("/app/kpis")) return KpisPage({ searchParams: Promise.resolve(pageParams(params)) });
   if (pathname === "/app/sources" || pathname === "/app/files") return renderSourcesPage(Object.fromEntries(params));
   if (pathname.startsWith("/app/sources/")) return renderSourcesPage({ ...Object.fromEntries(params), file: decodeURIComponent(pathname.split("/").at(-1)!) }, { sourceDetail: true });

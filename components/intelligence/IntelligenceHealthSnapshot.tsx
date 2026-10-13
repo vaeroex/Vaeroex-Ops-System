@@ -52,15 +52,15 @@ export function IntelligenceHealthSnapshot({ health, facts, citations, history, 
   const status = businessHealthStatus(health.status);
   const citationsById = new Map(citations.map((citation) => [citation.citationId, citation]));
   return (
-    <section id="business-health" aria-labelledby="intelligence-health-heading" className="scroll-mt-24 rounded-xl border border-cyan-200/20 bg-vaeroex-navy p-4 text-white sm:p-5">
+    <section id="business-health" data-health-status={status} aria-labelledby="intelligence-health-heading" className="intelligence-summary-card scroll-mt-24 text-white">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="intelligence-health-heading" className="text-lg font-semibold">Business Health</h2>
+        <div><h2 id="intelligence-health-heading" className="text-base font-semibold">Business Health</h2><p className="mt-1 text-sm text-slate-400">How the business is performing.</p></div>
         <span className={`vaeroex-semantic-badge rounded-full border px-3 py-1 text-xs font-semibold ${semanticStatusClass(status)}`}>{health.status}</span>
       </div>
-      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(160px,.65fr)_minmax(0,1.35fr)]">
+      <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(130px,.6fr)_minmax(0,1.4fr)]">
         <div>
           <p aria-label={health.available ? `Business Health score ${health.score} out of 100` : "Business Health score unavailable"}>
-            <span className={health.available ? "text-4xl font-semibold tabular-nums" : "text-xl font-semibold"}>{health.available ? health.score : "Not yet evaluable"}</span>
+            <span className={health.available ? "text-3xl font-semibold tabular-nums" : "text-xl font-semibold"}>{health.available ? health.score : "Not yet evaluable"}</span>
             {health.available ? <span className="ml-2 text-sm text-slate-300">/ 100</span> : null}
           </p>
           <p className="mt-2 text-sm font-semibold text-cyan-100" data-health-comparison>{facts.comparison}</p>
@@ -80,8 +80,8 @@ export function IntelligenceHealthSnapshot({ health, facts, citations, history, 
         <Link href="/app/reports" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-cyan-100 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Saved analyses <ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
         <EligibleBusinessSignals total={health.memorySignals} categories={health.eligibleSignalCategories} />
       </div>
-      <details className="mt-4 border-t border-white/15 pt-2">
-        <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Contributing factors and evidence</summary>
+      <details className="mt-3 border-t border-white/10">
+        <summary className="min-h-11 cursor-pointer py-2.5 text-sm font-semibold text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Contributing factors and evidence</summary>
         {health.available ? <p className="mt-2 text-sm leading-6 text-slate-300">Performance baseline {facts.dataQualityBase} + positive performance {facts.opportunityAdjustment} − negative performance {facts.riskPenalty} = {health.score} out of 100. Confidence describes evidence coverage; it is not an extra score adjustment.</p> : <p className="mt-2 text-sm leading-6 text-slate-300">{health.summary}</p>}
         <ul className="mt-3 space-y-3">
           {facts.drivers.map((driver, index) => {
@@ -110,8 +110,8 @@ export function IntelligenceHealthSnapshot({ health, facts, citations, history, 
         </li>)}</ol> : <p className="mt-2 text-sm text-slate-300">No eligible supporting citations are available yet.</p>}
         <Link href="/app/sources" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-cyan-100 hover:underline">Review Files &amp; Notes</Link>
       </details>
-      <details className="mt-2 border-t border-white/15 pt-2">
-        <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Health history</summary>
+      <details className="border-t border-white/10">
+        <summary className="min-h-11 cursor-pointer py-2.5 text-sm font-semibold text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Health history</summary>
         <p className="mt-1 text-xs leading-5 text-slate-300">Daily stored reviews preserve the first score recorded that day. The current score above can change as evidence changes. Missing days are not zero scores.</p>
         <BusinessHealthTrendChart points={history} asOfDate={asOfDate} errorMessage={historyError} />
       </details>

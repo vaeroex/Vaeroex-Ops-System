@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Route } from "next";
-import { ChartNoAxesCombined, ChevronRight, FileText, FolderOpen, House, MessagesSquare, Plug, Settings2, Sparkles, type LucideIcon } from "lucide-react";
+import { ChartNoAxesCombined, ChevronRight, FileText, FolderOpen, MessagesSquare, Plug, Settings2, Sparkles, type LucideIcon } from "lucide-react";
 import { currentWorkspaceDestination, isWorkspacePathActive } from "@/lib/presentation/app-navigation";
 
 type NavItem = {
@@ -24,7 +24,6 @@ type AppNavigationProps = {
 };
 
 const destinationIcons: Record<string, LucideIcon> = {
-  "/app": House,
   "/app/intelligence": Sparkles,
   "/app/si": MessagesSquare,
   "/app/kpis": ChartNoAxesCombined,

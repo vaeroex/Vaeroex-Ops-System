@@ -26,7 +26,7 @@ import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { createWorkflowStageRecorder } from "@/lib/ai/workflow-timing";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { isAiRunUsageLimitReached } from "@/lib/billing/usage-limits";
-import { excludeChecklistDerivedRecords } from "@/lib/intelligence/checklist-retirement";
+import { isRetiredSearchSource } from "@/lib/search/retired-records";
 import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
@@ -59,10 +59,8 @@ type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
-type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Row"];
 type CrmLeadRow = Database["public"]["Tables"]["crm_leads"]["Row"];
 type SopRow = Database["public"]["Tables"]["sops"]["Row"];
-type DecisionRow = Database["public"]["Tables"]["business_decisions"]["Row"];
 type MemoryChunkRow = Database["public"]["Tables"]["business_memory_chunks"]["Row"];
 
 const GROUP_ORDER: GlobalSearchGroupLabel[] = [
@@ -71,7 +69,6 @@ const GROUP_ORDER: GlobalSearchGroupLabel[] = [
   "Saved Analyses",
   "Files",
   "Issues",
-  "Review Signals",
   "Customer Evidence",
   "SOPs",
   "Learned Knowledge"
@@ -138,20 +135,6 @@ async function safeResults<T>(request: PromiseLike<{ data: T[] | null; error: { 
 
 async function scopedResults<T>(enabled: boolean, request: () => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
   return enabled ? safeResults(request()) : [];
-}
-
-function sourceHref(sourceType: string | null, title: string | null) {
-  const normalized = (sourceType || "").toLowerCase();
-  const query = title || "";
-
-  if (normalized.includes("task") || normalized.includes("follow")) return hrefWithQuery("/app/sources", query);
-  if (normalized.includes("issue")) return hrefWithQuery("/app/issues", query);
-  if (normalized.includes("kpi")) return hrefWithQuery("/app/kpis", query);
-  if (normalized.includes("file")) return hrefWithQuery("/app/sources", query);
-  if (normalized.includes("sop")) return hrefWithQuery("/app/sops", query);
-  if (normalized.includes("crm") || normalized.includes("lead") || normalized.includes("customer")) return hrefWithQuery("/app/sources", query);
-
-  return "/app";
 }
 
 function questionLike(query: string) {
@@ -323,10 +306,8 @@ export async function GET(request: Request) {
     rawSavedAnalyses,
     files,
     issues,
-    assignments,
     rawCrmLeads,
     sops,
-    decisions,
     learnedKnowledgeCandidates
   ] = await Promise.all([
     scopedResults<KpiRow>(
@@ -378,22 +359,6 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(24)
     ).then((rows) => filterOriginalBusinessEvidence<IssueRow>(rows as IssueRow[]).slice(0, 6)),
-    scopedResults<AssignmentRow>(
-      includesDomain("operations", "priorities"),
-      () => supabase
-        .from("operational_assignments")
-        .select("*")
-        .eq("workspace_id", workspaceId)
-        .is("deleted_at", null)
-        .is("archived_at", null)
-        .or(orFilter(["title", "description", "status", "priority", "source_type", "source_title"], words))
-        .order("updated_at", { ascending: false })
-        .limit(24)
-    ).then((rows) =>
-      excludeChecklistDerivedRecords(rows)
-        .filter((row) => !row.source_type?.toLowerCase().includes("report"))
-        .slice(0, 6)
-    ),
     scopedResults<CrmLeadRow>(
       includesDomain("customers"),
       () => supabase
@@ -418,18 +383,6 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(24)
     ).then((rows) => filterOriginalBusinessEvidence<SopRow>(rows as SopRow[]).slice(0, 6)),
-    scopedResults<DecisionRow>(
-      includesDomain("decisions", "priorities"),
-      () => supabase
-        .from("business_decisions")
-        .select("*")
-        .eq("workspace_id", workspaceId)
-        .is("deleted_at", null)
-        .is("archived_at", null)
-        .or(orFilter(["title", "reason", "expected_outcome", "related_kpi", "owner", "status", "outcome_summary"], words))
-        .order("updated_at", { ascending: false })
-        .limit(6)
-    ),
     scopedResults<MemoryChunkRow>(
       includesDomain("business_memory", "reports", "files", "risks", "financials", "customers", "operations"),
       () => supabase
@@ -461,7 +414,7 @@ export async function GET(request: Request) {
   let learnedKnowledge = await filterEligibleMemoryRowsByLifecycle({
     supabase,
     workspaceId,
-    rows: learnedKnowledgePage
+    rows: learnedKnowledgePage.filter(row => !isRetiredSearchSource(row.source_type))
   }) as MemoryChunkRow[];
   let learnedKnowledgeOffset = learnedKnowledgePage.length;
   let learnedKnowledgePages = 1;
@@ -481,7 +434,7 @@ export async function GET(request: Request) {
     learnedKnowledgePage = nextPage || [];
     learnedKnowledgeOffset += learnedKnowledgePage.length;
     learnedKnowledgePages += 1;
-    const eligiblePage = await filterEligibleMemoryRowsByLifecycle({ supabase, workspaceId, rows: learnedKnowledgePage });
+    const eligiblePage = await filterEligibleMemoryRowsByLifecycle({ supabase, workspaceId, rows: learnedKnowledgePage.filter(row => !isRetiredSearchSource(row.source_type)) });
     learnedKnowledge = [...learnedKnowledge, ...eligiblePage];
   }
 
@@ -541,19 +494,6 @@ export async function GET(request: Request) {
 
   addGroup(
     groups,
-    "Review Signals",
-    assignments.map((assignment) => ({
-      id: assignment.id,
-      title: assignment.title,
-      sourceType: "Review Signal",
-      preview: truncate(assignment.description || assignment.source_title),
-      href: sourceHref(assignment.source_type, assignment.source_title || assignment.title),
-      meta: compact([assignment.status, assignment.priority, assignment.due_date])
-    }))
-  );
-
-  addGroup(
-    groups,
     "Customer Evidence",
     crmLeads.map((lead) => ({
       id: lead.id,
@@ -590,14 +530,6 @@ export async function GET(request: Request) {
         href: chunk.source_file_id ? `/app/sources/${encodeURIComponent(chunk.source_file_id)}` : "/app/sources?tab=knowledge",
         meta: compact([chunk.source_type.replace(/_/g, " "), chunk.confidence_score ? `Confidence ${Math.round(chunk.confidence_score)}%` : null])
       })),
-      ...decisions.map((decision) => ({
-        id: decision.id,
-        title: decision.title,
-        sourceType: "Decision Journal",
-        preview: truncate(decision.reason || decision.expected_outcome || decision.outcome_summary),
-        href: "/app?view=Intelligence%20View#decision-journal",
-        meta: compact([decision.status, decision.owner, decision.related_kpi])
-      }))
     ].slice(0, 6)
   );
 
@@ -606,7 +538,7 @@ export async function GET(request: Request) {
     results: groups.get(label) || []
   })).filter((group) => group.results.length);
 
-  return NextResponse.json({ query, groups: responseGroups });
+  return NextResponse.json({ query, groups: responseGroups }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(request: Request) {

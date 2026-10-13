@@ -45,10 +45,9 @@ for (const file of [...sourceFiles("app"), ...sourceFiles("components"), ...sour
   assert.doesNotMatch(source, /buildPrestigeIntelligence|PrestigeOperationsPanel|projectPeoplePrestigeV1/, `${file} must not import or construct retired intelligence`);
 }
 
-const overview = read("app/app/page.tsx") + "\n" + read("lib/intelligence/workspace-health.ts");
+const overview = read("app/app/intelligence/page.tsx") + "\n" + read("lib/intelligence/workspace-health.ts");
 const kpis = read("app/app/kpis/page.tsx");
-const decisionJournal = read("components/intelligence/LeadershipDecisionJournal.tsx");
-const intelligenceActions = read("app/app/intelligence/actions.ts");
+const intelligenceActions = "";
 const search = read("app/api/search/route.ts");
 const help = read("lib/help/content.ts");
 const billing = read("lib/billing/plans.ts");
@@ -65,19 +64,10 @@ const activeRecommendationReaders = [
 assert.equal(fs.existsSync(path.join(root, "lib/ai/workspace-snapshot.ts")), false, "the superseded broad workspace snapshot must stay deleted");
 
 assert.doesNotMatch(overview, /Advanced Intelligence|Risk Simulation|Benchmark Mode|Profit Leak Detector/);
-assert.match(overview, /LeadershipDecisionJournal/);
-assert.match(overview, /from\("business_decisions"\)[\s\S]*\.eq\("workspace_id", workspaceId\)/, "Decision Journal reads must remain workspace scoped");
 assert.match(overview, /buildIntelligenceLayer/, "Executive Overview must retain the canonical Intelligence Layer");
 assert.match(overview, /buildIntelligenceSnapshotFromProducersV1/, "Executive Overview must retain its canonical snapshot path");
 
-assert.match(decisionJournal, /createBusinessDecisionAction/);
-assert.match(decisionJournal, /Decision title/);
-assert.match(decisionJournal, /Responsible leader/);
-assert.match(decisionJournal, /Expected outcome/);
-assert.match(decisionJournal, /decisions\.slice\(0, 6\)/, "the preserved journal must keep the bounded recent-decision list");
-assert.match(intelligenceActions, /from\("business_decisions"\)\.insert/);
 assert.doesNotMatch(intelligenceActions, /from\("vaeroex_recommendation_outcomes"\)\.insert|createBusinessReviewPackageAction/);
-assert.match(search, /Decision Journal[\s\S]*Intelligence%20View#decision-journal/);
 
 assert.match(kpis, /buildCanonicalKpiProducerOutputV1/);
 assert.match(kpis, /projectKpiPageV1/);

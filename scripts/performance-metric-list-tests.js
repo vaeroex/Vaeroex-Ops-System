@@ -9,7 +9,12 @@ const { renderToStaticMarkup } = require("react-dom/server");
 const { build } = require("./workspace-redesign-preview.cjs");
 const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "app/app/kpis/page.tsx"), "utf8");
-const ast = ts.createSourceFile("page.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+let protectedSource = source;
+for (const {before, after} of require("./fixtures/context-retirement-kpi-exception.json").changes) {
+  assert.equal(protectedSource.split(after).length, 2, "Require exactly the reviewed metadata-sharing removal");
+  protectedSource = protectedSource.replace(after, before);
+}
+const ast = ts.createSourceFile("page.tsx", protectedSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const printer = ts.createPrinter({ removeComments: true });
 const print = (node) => printer.printNode(ts.EmitHint.Unspecified, node, ast);
 // The reviewed long-name fix only bounds an unset Y-axis form default. Keep
