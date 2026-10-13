@@ -20,7 +20,7 @@ export default function AboutPage() {
       <PublicSiteHeader />
       <PublicPageHero
         eyebrow="About Vaeroex"
-        title="Information is everywhere. Understanding is not."
+        title={"Information is everywhere. Under\u00adstanding is not."}
         description="Vaeroex helps business owners turn scattered records and everyday context into a clearer view of their operations—and a better starting point for decisions."
         actions={<Link href="/executive-intelligence" className={styles.primary}>Explore Executive Intelligence<ArrowRight size={17} aria-hidden="true" /></Link>}
       />
