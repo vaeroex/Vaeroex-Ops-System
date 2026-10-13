@@ -1,44 +1,66 @@
 # Actual workspace website captures
 
-## Provenance and scope
+## Provenance and isolation
 
-Application source: `3f5431207c43534caf2c4f3b9d4b9057c8583799` (main after #495 and #496). The public website imports only the final static WebP assets and the screenshot viewer. Workspace components, navigation, styles, calculations, billing, database and production configuration are unchanged.
+Application source: `3f5431207c43534caf2c4f3b9d4b9057c8583799` (main after #495/#496). This revision changes only marketing presentation, static images, capture documentation and script-only fixtures. Workspace components, calculations, navigation, billing and production configuration are unchanged. The main auto-deployment hold remains enabled.
 
-The capture environment renders the actual AppShell, Intelligence final JSX and client components, Performance server page and Files & Notes server page. `scripts/website-demo-preview.cjs` substitutes local read adapters for authentication/database/provider IO and makes server actions inert. Intelligence inputs pass through the normal operational-evidence producer, Intelligence layer, coverage calculation, snapshot composition/projections and consumers. Performance uses its normal page calculations. This is not an end-to-end import or provider test, and it is not a recreated dashboard.
+`scripts/website-demo-preview.cjs` renders the actual AppShell, Intelligence route's final JSX/client components, Performance page and Files & Notes page. Authentication/database reads are replaced by bounded local adapters; all actions are inert. The normal operational-evidence producer, Intelligence layer, coverage calculator, snapshot composition/projections and consumers calculate the displayed results. Performance uses its normal page logic. This is a real-component capture, not an end-to-end import/provider test or a recreated dashboard.
 
-No environment file, customer account, production database, merchant connection or paid provider call is used. The loopback server rejects writes and non-loopback hosts; CSP blocks connections and form submissions. The webpack dependency boundary rejects live Supabase clients and model providers. All fixtures/capture machinery live under `scripts/`, outside production imports. No fixture route ships in the application.
+No environment file, customer account, production workspace, merchant connection or paid provider is used. The loopback server rejects writes/non-loopback hosts; CSP blocks connections/form submissions. The webpack dependency boundary rejects live Supabase clients and model providers. No fixture route or fixture module ships in production runtime imports.
 
-## Fictional scenario
+## Coastal Kitchen scenario and calculations
 
-Juniper Table is a fictional 54-seat restaurant. Maya Rowan and Ellis are fictional people. Six authored CSV input series contain 28 Monday-ending weekly observations each, April 6–October 12, 2026: net sales, gross margin, labor cost share, ticket time, guest satisfaction and food waste share. The rows and corresponding local import/source metadata are in `scripts/website-demo/data.ts`; `csvContents` reconstructs the source CSV text.
+Coastal Kitchen is a fictional 54-seat restaurant. Maya Rowan, Harbor Produce, Bay Pantry and Cove Dairy are fictional. Source text lives in `scripts/website-demo/data.ts` and can be reconstructed from `sourceDocuments` / `csvContents`:
 
-Sales grew during summer and softened during the latest four weeks. Margin and ticket times worsened while satisfaction and waste measures show strengths. The fixture does not claim to establish causation. Normal logic produces Health 20/100 (At Risk), readiness 45% (Limited), three risks and two opportunities. It does not fabricate a previous Health snapshot. Medium-confidence sales evidence remains one independent source, and the missing-evidence warning is visible. No score, confidence, finding or recommended target is manually overridden.
+- 168 KPI observations: six metrics, 28 Monday-ending weeks, April 6–October 12, 2026. Monthly exports retain separate original dates; observations are not duplicated.
+- 64 source files: 42 monthly KPI exports, seven staffing ledgers, seven procedure reviews, seven risk reviews and one supplier invoice register.
+- 20 operational records: 14 role-cost observations plus six supplier invoices. Each monthly role-cost total reconciles to the same week's sales × labor percentage.
+- Latest values: sales $27,600 / $24,000 minimum; gross margin 70% / 68% minimum; labor 29.8% / 32% maximum; ticket time 16.2 / 18 minutes maximum; satisfaction 96% / 90% minimum; waste 3.5% / 5% maximum.
+- One seeded, reviewed Business Note in `context.ts` supplies operating context and the supplier follow-up. Its quote validation and contextual eligibility use the normal application contracts. It is explicitly an authored fixture, not a claimed provider-generated extraction. It contributes supporting context, not independent original evidence or extra health points.
 
-The Business Note is an unsubmitted draft. It is not represented as extracted, approved, or used by Intelligence. Its date is October 12, 2026. Desktop uses `noteDraft` from data.ts; mobile uses the shorter text below:
+**Health: 90/100, Strong.** The unchanged formula starts at 50; six supported target achievements reach the existing +50 positive cap. The Medium supplier risk subtracts 10. No score or finding is authored/overridden.
 
-> Juniper Table — Monday review
+**Readiness: 87%, Strong.** The unchanged ten-category coverage calculation produces Revenue 90, Financials 90, Operations 100, Customers 90, Customer Revenue Context 90, Processes/SOPs 68, Staffing/People 90, Issues/Risks 68, Historical Trends 90, Business Memory 90. Their mean is 86.6, rounded to 87. Process/risk coverage remains narrower and is not represented as perfect. This visible coverage percentage is distinct from the internal data-quality/confidence score.
+
+**Previous reviews:** `historicalReviews()` filters the source inputs to August 31, September 28 and October 5, runs the normal producers for each cutoff, then calls `recordDailyBusinessHealthSnapshot` against a closed in-memory upsert sink. The real recorder supplies calculation versions, date and retry-protected shape. No historical scores are typed into the fixture. The current UI truthfully shows a 10-point decrease from the prior stored review: the newly recorded supplier exception accounts for it. These are reproducible simulated historical reviews, not claims that a production workspace existed on those dates.
+
+## Showcased finding and limits
+
+The normal operational producer reads six invoice records; CK-410 (Harbor Produce, $420, due October 8) and CK-411 (Bay Pantry, $180, due October 9) are explicitly marked Overdue. It calculates two of six (33%), totaling $600. The app's existing investigation planner asks the owner to check invoice/supplier records, confirm payment status and supplier dependency. The evidence tab displays both original records, one independent source, Medium confidence and missing current payment status / supplier dependency.
+
+The register does not prove a cash shortage, delivery disruption, continuing unpaid balance or the cause. Those limitations remain visible. The reviewed note supplies the intended bank/statement reconciliation and says no disruption was recorded; it is not elevated into causal proof. The normal deterministic finding is useful without a paid model call. This local harness does not execute provider-backed finding analysis or VSI, so it cannot demonstrate richer generated causal synthesis. No answer is scripted or presented as generated, and no reasoning engine was changed.
+
+Performance's normal summary uses its performance-effect semantics: “Latest movement: unchanged” can appear while raw sales rise when both observations remain on target. The chart and recorded values remain unaltered.
+
+## Capture reproduction and quality
+
+1. Run `node scripts/website-demo-preview.cjs` with the lockfile dependencies. Open `http://127.0.0.1:3190/app/intelligence`. The local clock is fixed at `2026-10-12T18:00:00.000Z`.
+2. Use Chrome's native DevTools device toolbar, Responsive dimensions, **DPR 2**, height 1000. Read `innerWidth`, `devicePixelRatio`, `document.fonts.status` and the visible DOM bounds before export. Wait for settled UI and loaded fonts.
+3. Intelligence overview: 1200 CSS pixels wide; capture the actual Health/Readiness content. Mobile: 390 CSS pixels, both complete cards.
+4. Findings: 1440 desktop / 390 mobile. Open the real direct link `/app/intelligence?finding=operational-overdue-suppliers-source-file%3Acoastal-invoices`. Capture the complete Summary panel. Select Evidence and expand the supplier group; capture both records and missing evidence.
+5. Performance: 1200 desktop / 390 mobile. Open Weekly net sales via `/app/kpis?timeline=90D&metric=Weekly+net+sales&section=detail#kpi-detail`. Desktop captures the real KPI detail; mobile focuses on its chart and summary.
+6. Notes: 1200 desktop / 390 mobile. Add business note; fill `noteDraft` for desktop or the concise mobile draft below, date October 12. Do not submit. Scroll the page to the top so fixed headers cannot overlay captured content. Capture the actual editor, date and review action.
+7. Use **DevTools → More options → Capture full size screenshot**, which saves a native PNG at exactly twice the CSS width. Move the pointer outside the crop using normal UI controls before capture. The general browser screenshot API emits JPEG and is used only for review images, never these marketing assets.
+8. Apply the integer pixel crop in `scripts/website-demo/captures.json`, then encode **lossless WebP once**. No resizing, compositing, retouching, color/text/control changes or invented values. Verify hashes/dimensions and inspect every resulting image.
+
+Mobile draft (379 characters, unsubmitted):
+
+> Coastal Kitchen — Monday review
 >
-> Sales softened over the last four weeks while ticket times increased. Guest satisfaction remains above our 90% target.
+> Weekly sales reached $27,600 against our $24,000 target. Guest satisfaction is 96%.
 >
-> Maya and Ellis will review covers, staffing hours, and menu costs before deciding what to change. The October patio closure is context; its effect has not been measured.
+> The supplier register marks two invoices totaling $600 overdue. Maya will check bank settlement and supplier statements before approving another payment. No delivery disruption is recorded.
+>
+> Keep the smaller prep batches while monitoring waste and service time.
 
-## Screens and reproduction
+### Why the old images were soft
 
-1. Use the pinned application source above with this PR's `scripts/website-demo/` and launcher. Install the lockfile dependencies; run `node scripts/website-demo-preview.cjs`. Open `http://127.0.0.1:3190/app/intelligence` in Chrome. The clock is fixed to the fixture's `AS_OF`.
-2. At 1440px desktop width, capture the ordinary workspace navigation, Intelligence header, Health and Readiness cards. Mobile at 390px captures the complete two cards.
-3. In Current findings select **Weekly net sales remained below target for 4 periods**. Capture the five-item list and complete selected Summary. Mobile captures the selected detail with Back to list. Switch to Evidence for the homepage capture, retaining source count, dates and missing evidence.
-4. Open Performance, select **Weekly net sales**. Capture the actual current/target/history/trend/target recommendation. The mobile crop focuses on the complete chart and Vaeroex summary, as disclosed in its caption.
-5. Open Files & Notes, **Add business note**, fill the supplied draft and observation date. Blur the input. Do not submit. Capture the compact input explanations and full editor on desktop; the complete draft editor on mobile.
-6. Capture only settled UI with no overlays or browser chrome. Crop existing pixels only; convert to WebP quality 92. Do not change values, text, controls or findings. Revalidate dimensions and hashes in `scripts/website-demo/captures.json` after an intentional recapture.
+The previous browser API supplied JPEG originals, which were encoded again as lossy WebP quality 92. They were approximately 1× captures. The 719-pixel evidence image could render around 884 CSS pixels wide, enlarging it even before accounting for a high-density screen. Mobile sources were roughly 335 pixels wide for a ~329 CSS pixel display. A larger nominal export after the fact would not repair those originals.
 
-The ten final assets are in `public/images/workspace-demo/`. Their dimensions, byte counts and SHA-256 hashes are recorded in the capture manifest. Desktop and mobile files are different real captures, not rearranged pixels. Each published figure has a visible **Actual Vaeroex workspace · Demo data** label, descriptive alt text and an intrinsic size; the compact tab viewer prevents a repetitive gallery. The image opens full-size for inspection.
+The replacements are native 2× PNG → lossless WebP, with no intermediate resizing. The viewer now caps overviews at 900 CSS pixels and finding/evidence details at 720; mobile at 340 with separate real mobile captures. `srcSet` explicitly declares the 2× source, and width/height attributes describe CSS dimensions to reserve the correct aspect ratio. No optimizer or CDN resizing path is involved: the browser requests the static asset directly. The ten final files total approximately 581 KB, with individual files below 77 KB despite the sharper resolution.
 
-Privacy review: captures show only the fictional scenario; no emails, private account details, internal IDs, credentials, admin-only controls or customer records. Ordinary owner controls (such as editing a KPI or reviewing a note) are product UI, inert in the capture environment.
+## Privacy and qualification
 
-## VSI boundary
+All final images show only fictional business content and ordinary workspace controls. No real account details, emails, private identifiers, credentials, customer records or admin-only controls appear. Source invoice numbers are fictional business references, not system IDs.
 
-The isolated capture harness does not have an authenticated VSI/provider execution path. A genuine VSI conversation therefore cannot be captured here without separately provisioning a synthetic provider-backed environment. No response is scripted or presented as generated. The existing approved VSI section and all 3D experiences remain unchanged; this does not block the other screenshots.
-
-## Qualification
-
-`node scripts/website-workspace-imagery-tests.cjs` rebuilds the actual component harness, verifies the 168-input dataset and normal calculated outputs, enforces the dependency/write boundary, checks final asset integrity/size and confirms the main auto-deployment hold. It runs in the required public regression suite. Desktop, 390px and 320px website review additionally covers image loading, captions, tab keyboard navigation, responsive crops, CTAs and overflow. No workspace behavior or customer records are modified.
+`node scripts/website-workspace-imagery-tests.cjs` rebuilds the component harness and verifies source counts/bytes, calculated health/readiness, historical records, contextual evidence, supplier totals/limitations, asset hashes/density/size, the local write/network boundary and the main deployment hold. It runs in required public CI. Website review covers desktop, 390 and 320 CSS pixels at DPR 2, actual delivered sources, image loading/aspect ratio, tabs, keyboard navigation, overflow and existing CTA destinations. Public copy outside capture-specific captions, pricing, checkout, integration disclosures and all 3D scenes remain unchanged.

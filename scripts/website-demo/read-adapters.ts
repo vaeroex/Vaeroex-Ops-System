@@ -1,5 +1,6 @@
 import { AS_OF, WORKSPACE_ID, files, imports, kpis, performanceKpis, performanceKpiSettings, profile, workspace, freeze, briefings, type FixtureRole, type FixtureState } from "./data";
 import type { IntegrationDashboard } from "../../lib/integrations/dashboard/model";
+import { businessNotes } from "./context";
 import { calculatedIntelligence } from "./calculations";
 let current = { state: "populated" as FixtureState, role: "owner" as FixtureRole };
 export function setFixture(state: FixtureState, role: FixtureRole) { current = { state, role }; }
@@ -9,7 +10,7 @@ const fixtureClients = new WeakMap<object, FixtureState>();
 export function createFixtureClient(state: FixtureState) {
   const client = { from(table: string) {
     if (!tables.includes(table)) throw new Error(`Unreviewed synthetic table: ${table}`);
-    let rows: Record<string, unknown>[] = state === "empty" ? [] : table === "kpis" ? [...kpis] : table === "kpi_settings" ? [...performanceKpiSettings] : table === "file_uploads" ? [...files] : table === "reports" ? reportRows : table === "file_imports" ? [...imports] : [];
+    let rows: Record<string, unknown>[] = state === "empty" ? [] : table === "kpis" ? [...kpis] : table === "kpi_settings" ? [...performanceKpiSettings] : table === "file_uploads" ? [...files] : table === "business_notes" ? [...businessNotes] : table === "reports" ? reportRows : table === "file_imports" ? [...imports] : [];
     let scoped = false;
     const query = {
       select() { return query; },

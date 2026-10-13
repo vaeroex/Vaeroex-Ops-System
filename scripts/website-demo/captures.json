@@ -1,78 +1,238 @@
 {
   "applicationCommit": "3f5431207c43534caf2c4f3b9d4b9057c8583799",
   "asOf": "2026-10-12T18:00:00.000Z",
-  "scenario": "Juniper Table \u2014 fictional restaurant, 54 seats, 28 weekly observations for each of six metrics.",
-  "captureMethod": "Chrome actual application components in isolated local harness; crop only and WebP quality 92. No generated imagery, retouching, label changes or substituted output values.",
+  "scenario": "Coastal Kitchen \u2014 fictional 54-seat restaurant; 168 weekly KPI observations, 64 dated source files, 20 operational records and reviewed contextual notes.",
+  "captureMethod": "Chrome DevTools native full-size PNG capture at devicePixelRatio 2, after document.fonts.status=loaded. Crop existing pixels only, then encode lossless WebP once. No resizing, retouching, generated imagery, labels or value substitutions.",
   "assets": [
     {
       "file": "evidence-desktop.webp",
-      "width": 719,
-      "height": 836,
-      "bytes": 45874,
-      "sha256": "14cd45bb9b5ecc3598bd0f9f70ca0dc3d0e024604de23c0d5d56db88272b3237"
+      "width": 1472,
+      "height": 1680,
+      "bytes": 65738,
+      "sha256": "6d0758cd895ba2832ae6e6d5254fc0ee002c268da1b23cd5c61adff8266959ea",
+      "sourceDimensions": [
+        2880,
+        4584
+      ],
+      "crop": [
+        1320,
+        2296,
+        2792,
+        3976
+      ],
+      "dimensions": [
+        1472,
+        1680
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
     },
     {
       "file": "evidence-mobile.webp",
-      "width": 336,
-      "height": 1016,
-      "bytes": 51700,
-      "sha256": "e2f4ec8ba987d1becdec08df7d89d208b36557929c2a7ede839e82619a6d9064"
+      "width": 704,
+      "height": 2156,
+      "bytes": 64856,
+      "sha256": "6508867724f80cae01246bf228c8a7995aca18bdbfe5eb20fd9f389e6ac7eb55",
+      "sourceDimensions": [
+        780,
+        6554
+      ],
+      "crop": [
+        38,
+        3660,
+        742,
+        5816
+      ],
+      "dimensions": [
+        704,
+        2156
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
     },
     {
       "file": "findings-desktop.webp",
-      "width": 1140,
-      "height": 1311,
-      "bytes": 120780,
-      "sha256": "760ec8585725af3eb06e7e085a06aae3c8d8f914895dde397781f356b4cd90e2"
+      "width": 1472,
+      "height": 1056,
+      "bytes": 54980,
+      "sha256": "316189733caa685cbc6b2a24550bdd1f88c6a3bc2355dee8503073d5cb91f963",
+      "sourceDimensions": [
+        2880,
+        4126
+      ],
+      "crop": [
+        1320,
+        2256,
+        2792,
+        3312
+      ],
+      "dimensions": [
+        1472,
+        1056
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
     },
     {
       "file": "findings-mobile.webp",
-      "width": 336,
-      "height": 771,
-      "bytes": 57034,
-      "sha256": "8abaf2ef59055c0611ff36f5ed88e1d26f1bd4c7c0065177f9db68d906619e6f"
+      "width": 704,
+      "height": 1524,
+      "bytes": 54134,
+      "sha256": "f2a434a43e2b0e26b8b54724444d7e8fbed5111926b5de5da705a3019d8aaabd",
+      "sourceDimensions": [
+        780,
+        5922
+      ],
+      "crop": [
+        38,
+        3660,
+        742,
+        5184
+      ],
+      "dimensions": [
+        704,
+        1524
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
     },
     {
       "file": "intelligence-desktop.webp",
-      "width": 1410,
-      "height": 656,
-      "bytes": 66102,
-      "sha256": "6ccb15cbbbaba7c031fa0ecd80b830e24fb3f621306d15ce21fca8caf5a7abc2"
+      "width": 1840,
+      "height": 1444,
+      "bytes": 76732,
+      "sha256": "5556b80255952584acebbd84e272922355a045565659ba647b4ed2bf33a5f680",
+      "sourceDimensions": [
+        2400,
+        4668
+      ],
+      "crop": [
+        516,
+        0,
+        2356,
+        1444
+      ],
+      "dimensions": [
+        1840,
+        1444
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
     },
     {
       "file": "intelligence-mobile.webp",
-      "width": 335,
-      "height": 888,
-      "bytes": 39002,
-      "sha256": "339e896969fa0fced3fe3e53abb268c023cba2a1af42899f1e1d8f4d5a81f0fa"
+      "width": 756,
+      "height": 1858,
+      "bytes": 61548,
+      "sha256": "7e041c9e650f681dc4598faa7ea1dca1f2c304629c62d13d0c9cd50df709ef8b",
+      "sourceDimensions": [
+        780,
+        6262
+      ],
+      "crop": [
+        12,
+        596,
+        768,
+        2454
+      ],
+      "dimensions": [
+        756,
+        1858
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
     },
     {
       "file": "notes-desktop.webp",
-      "width": 1140,
-      "height": 1084,
-      "bytes": 99542,
-      "sha256": "6a184ca0b019741a55c5df653758ac753e9a0c5e888b79a189c2b55b3bc1ba79"
+      "width": 1832,
+      "height": 1580,
+      "bytes": 63458,
+      "sha256": "5f898a60778de3cf799f1fe219d5ccced15a389168463eb54e8c59a2db27df56",
+      "sourceDimensions": [
+        2400,
+        9328
+      ],
+      "crop": [
+        520,
+        780,
+        2352,
+        2360
+      ],
+      "dimensions": [
+        1832,
+        1580
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
     },
     {
       "file": "notes-mobile.webp",
-      "width": 361,
-      "height": 848,
-      "bytes": 44032,
-      "sha256": "1826e3e5ac35843f0e29292da1748663b7d7b18f07ef4bbc96ba8b7640b2eb3a"
+      "width": 756,
+      "height": 1592,
+      "bytes": 49078,
+      "sha256": "381daf049fdfee93063b11ccbb8349cb406b20942712114b408d75df527c393d",
+      "sourceDimensions": [
+        780,
+        15574
+      ],
+      "crop": [
+        12,
+        1348,
+        768,
+        2940
+      ],
+      "dimensions": [
+        756,
+        1592
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
     },
     {
       "file": "performance-desktop.webp",
-      "width": 1140,
-      "height": 947,
-      "bytes": 103000,
-      "sha256": "3c26fd66e4081bd974adef60ff5f35c9209234ff9c4174807bd0045be3d9f015"
+      "width": 1832,
+      "height": 1912,
+      "bytes": 66370,
+      "sha256": "b50ddbe138dd81f184ef26c95124704af98a930028b1bfd1c14ced12fe28ec32",
+      "sourceDimensions": [
+        2400,
+        4704
+      ],
+      "crop": [
+        520,
+        708,
+        2352,
+        2620
+      ],
+      "dimensions": [
+        1832,
+        1912
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
     },
     {
       "file": "performance-mobile.webp",
-      "width": 353,
-      "height": 428,
-      "bytes": 19032,
-      "sha256": "13534db6cb236c13f480abb080571d07caca356b97de54c3eed6b0bb34d946df"
+      "width": 692,
+      "height": 870,
+      "bytes": 23896,
+      "sha256": "30937a6cfc6ad6ff21831300fb85fbb9057545d0dbebbe94dd2adb990ec9ce00",
+      "sourceDimensions": [
+        780,
+        6304
+      ],
+      "crop": [
+        44,
+        2830,
+        736,
+        3700
+      ],
+      "dimensions": [
+        692,
+        870
+      ],
+      "dpr": 2,
+      "encoding": "PNG to lossless WebP, no resizing"
     }
   ]
 }
