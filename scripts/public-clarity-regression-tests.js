@@ -365,9 +365,10 @@ async function main() {
   );
   assert.match(
     executive,
-    /Actual Vaeroex workspace · Demo data/,
-    "Demonstration data must be visibly disclosed",
+    /<figcaption[^>]*>Coastal Kitchen · Fictional business example<\/figcaption>/,
+    "Fictional business information must be visibly disclosed beneath the image",
   );
+  assert.doesNotMatch(executive, /Demo data|Simulated integration data/, "Retired capture labels must not be displayed");
   assert.match(
     executive,
     /does not automatically create one/,

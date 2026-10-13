@@ -1,6 +1,6 @@
 # Coastal Kitchen: reusable fictional business
 
-Use Coastal Kitchen consistently for future Vaeroex screenshots, walkthroughs and marketing content. It is an isolated, reproducible local fixture dataset, **not a saved Supabase workspace, a customer account, or an authorized merchant connection**. The hosted website preview serves static screenshots only. No production account/workspace was created.
+Use Coastal Kitchen consistently for future Vaeroex screenshots, walkthroughs and marketing content. It is an isolated, reproducible local fixture dataset, **not a hosted Supabase workspace, a customer account, or an authorized merchant connection**. The hosted website preview serves static screenshots only. No production account/workspace was created.
 
 ## Scenario and canonical inputs
 
@@ -40,3 +40,5 @@ See also [workspace screenshot capture record](website-workspace-captures.md) fo
 ## Connected insights and VSI follow-up
 
 The focused [workflow review](coastal-kitchen-connected-insights-review.md) records the real retrieval boundary and the proposed smallest extension. Do not treat the disconnected provider-browser fixtures as connected analysis evidence or insert a scripted VSI answer. Use the visible caption “Coastal Kitchen · Fictional business example” beneath each image or shared group.
+
+A disposable loopback-only database copy was also prepared for actual VSI retrieval on October 13, 2026. Its 64 fictional originals used the normal reserved upload/finalize path; 168 KPI records, 20 operational records and the authored/reviewed Business Note fixture preserve the canonical business values. The current authenticated VSI authorization, source authority and bounded retrieval ran unchanged. This copy is synthetic seeding, not a claimed provider-generated import or note extraction. It has no merchant connections. Private configuration and reproduction notes are in `/private/tmp/vaeroex-closeout-assembly-coastal-vsi/README.md`, outside Git; no provider credential or generated answer is committed.
