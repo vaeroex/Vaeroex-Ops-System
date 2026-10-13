@@ -1,0 +1,78 @@
+{
+  "applicationCommit": "3f5431207c43534caf2c4f3b9d4b9057c8583799",
+  "asOf": "2026-10-12T18:00:00.000Z",
+  "scenario": "Juniper Table \u2014 fictional restaurant, 54 seats, 28 weekly observations for each of six metrics.",
+  "captureMethod": "Chrome actual application components in isolated local harness; crop only and WebP quality 92. No generated imagery, retouching, label changes or substituted output values.",
+  "assets": [
+    {
+      "file": "evidence-desktop.webp",
+      "width": 719,
+      "height": 836,
+      "bytes": 45874,
+      "sha256": "14cd45bb9b5ecc3598bd0f9f70ca0dc3d0e024604de23c0d5d56db88272b3237"
+    },
+    {
+      "file": "evidence-mobile.webp",
+      "width": 336,
+      "height": 1016,
+      "bytes": 51700,
+      "sha256": "e2f4ec8ba987d1becdec08df7d89d208b36557929c2a7ede839e82619a6d9064"
+    },
+    {
+      "file": "findings-desktop.webp",
+      "width": 1140,
+      "height": 1311,
+      "bytes": 120780,
+      "sha256": "760ec8585725af3eb06e7e085a06aae3c8d8f914895dde397781f356b4cd90e2"
+    },
+    {
+      "file": "findings-mobile.webp",
+      "width": 336,
+      "height": 771,
+      "bytes": 57034,
+      "sha256": "8abaf2ef59055c0611ff36f5ed88e1d26f1bd4c7c0065177f9db68d906619e6f"
+    },
+    {
+      "file": "intelligence-desktop.webp",
+      "width": 1410,
+      "height": 656,
+      "bytes": 66102,
+      "sha256": "6ccb15cbbbaba7c031fa0ecd80b830e24fb3f621306d15ce21fca8caf5a7abc2"
+    },
+    {
+      "file": "intelligence-mobile.webp",
+      "width": 335,
+      "height": 888,
+      "bytes": 39002,
+      "sha256": "339e896969fa0fced3fe3e53abb268c023cba2a1af42899f1e1d8f4d5a81f0fa"
+    },
+    {
+      "file": "notes-desktop.webp",
+      "width": 1140,
+      "height": 1084,
+      "bytes": 99542,
+      "sha256": "6a184ca0b019741a55c5df653758ac753e9a0c5e888b79a189c2b55b3bc1ba79"
+    },
+    {
+      "file": "notes-mobile.webp",
+      "width": 361,
+      "height": 848,
+      "bytes": 44032,
+      "sha256": "1826e3e5ac35843f0e29292da1748663b7d7b18f07ef4bbc96ba8b7640b2eb3a"
+    },
+    {
+      "file": "performance-desktop.webp",
+      "width": 1140,
+      "height": 947,
+      "bytes": 103000,
+      "sha256": "3c26fd66e4081bd974adef60ff5f35c9209234ff9c4174807bd0045be3d9f015"
+    },
+    {
+      "file": "performance-mobile.webp",
+      "width": 353,
+      "height": 428,
+      "bytes": 19032,
+      "sha256": "13534db6cb236c13f480abb080571d07caca356b97de54c3eed6b0bb34d946df"
+    }
+  ]
+}

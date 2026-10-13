@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
-import { OperationsIntelligenceEngineDemo } from "@/components/motion/OperationsIntelligenceEngineDemo";
+import { WorkspaceScreenshotTour } from "@/components/marketing/WorkspaceScreenshots";
 import story from "@/components/marketing/ExecutiveStory.module.css";
 import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
 import {
@@ -105,14 +105,9 @@ export default function OperationsIntelligencePage() {
             <div><p className={styles.sectionLabel}>Inside Executive Intelligence</p><h2 id="product-experience-title">From the overview<br />to the evidence behind it.</h2></div>
             <p className={styles.copy}>See what changed, investigate what matters, and keep useful analysis in one private workspace.</p>
           </div>
-          <div className={styles.productCaption}>
-            <span>Interactive product walkthrough</span>
-            <span>Illustrative sample information · No customer data</span>
+          <div data-executive-product-mount>
+            <WorkspaceScreenshotTour />
           </div>
-          <div className={styles.productFrame} data-executive-product-mount>
-            <OperationsIntelligenceEngineDemo />
-          </div>
-          <p className={styles.caption}>This walkthrough illustrates the product experience. Example findings are not live business results or promises of an outcome.</p>
           <div className={story.featureGrid}>
             {capabilities.map(([title, body]) => (
               <article key={title}><h3>{title}</h3><p>{body}</p></article>

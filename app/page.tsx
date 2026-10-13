@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
-import { EvidenceVisualization } from "@/components/marketing/EvidenceVisualization";
+import { WorkspaceCapture } from "@/components/marketing/WorkspaceScreenshots";
 import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
 import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
@@ -222,7 +222,7 @@ export default function HomePage() {
           </Link>
         </div>
         <div className={styles.evidenceVisual}>
-          <EvidenceVisualization />
+          <WorkspaceCapture view="evidence" />
         </div>
       </section>
       <section

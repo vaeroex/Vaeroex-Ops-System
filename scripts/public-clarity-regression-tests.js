@@ -23,7 +23,7 @@ const image = ({ src, alt, sizes, ...props }) => {
 const styles = new Proxy({}, { get: (_, name) => String(name) });
 
 // Authenticated infrastructure is outside this public-only rendering suite. Real route
-// bodies, shared product definitions, commerce link, and illustrative demo are rendered.
+// bodies, shared product definitions, commerce link, and actual-workspace screenshot viewer are rendered.
 function loadTs(file) {
   if (modules.has(file)) return modules.get(file).exports;
   const module = { exports: {} };
@@ -365,7 +365,7 @@ async function main() {
   );
   assert.match(
     executive,
-    /Illustrative sample information/,
+    /Actual Vaeroex workspace · Demo data/,
     "Demonstration data must be visibly disclosed",
   );
   assert.match(
