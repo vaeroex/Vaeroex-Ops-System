@@ -156,7 +156,7 @@ export default function OperationsIntelligencePage() {
         <div className={`${styles.container} ${story.vsiLayout}`}>
           <div>
             <p className={styles.sectionLabel}>Vaeroex Super Intelligence / VSI</p>
-            <p className={story.included}>Included with Executive Intelligence</p>
+            <p className={story.included}>Flagship feature included with Executive Intelligence</p>
             <h2 id="vsi-title" className={story.headline}>Ask deeper questions.<br /><em>See the bigger picture.</em></h2>
             <p className={story.aside}>A text conversation with room to investigate, imagine, and refine.</p>
           </div>

@@ -8,7 +8,6 @@ const platformLinks: Array<[string, Route]> = [
   ["Home", "/"],
   ["Our approach", "/intelligence-systems"],
   ["Executive Intelligence", "/executive-intelligence"],
-  ["Includes Vaeroex Super Intelligence", "/executive-intelligence#vsi"],
   ["Pricing", "/pricing"],
   ["Trust", "/trust"]
 ] as Array<[string, Route]>;
@@ -58,9 +57,18 @@ export function PublicFooter() {
             <p className="font-semibold text-slate-200">Intelligence</p>
             <div className="mt-2 grid gap-1.5">
               {platformLinks.map(([label, href]) => (
-                <Link key={href} href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-                  {label}
-                </Link>
+                href === "/executive-intelligence" ? (
+                  <div key={href} className="vx-footer-product">
+                    <Link href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+                      {label}
+                    </Link>
+                    <p className="vx-footer-product-description">Featuring Vaeroex Super Intelligence.</p>
+                  </div>
+                ) : (
+                  <Link key={href} href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+                    {label}
+                  </Link>
+                )
               ))}
             </div>
           </div>
