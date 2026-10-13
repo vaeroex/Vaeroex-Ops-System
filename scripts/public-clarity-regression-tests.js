@@ -431,7 +431,7 @@ async function main() {
   assert.match(executive, /Ask deeper questions/);
   assert.match(executive, /one authoritative source/);
   assert.match(executive, /not automatically consolidated or deduplicated/);
-  assert.match(executive, /Included with Executive Intelligence/);
+  assert.match(executive, /Flagship feature included with Executive Intelligence/);
   assert.match(executive, /VSI helps turn questions into insights/);
   assert.doesNotMatch(executive, /Plans and SOPs are drafts for your review/);
   assert.match(executive, /Refresh payments on request/);
@@ -492,7 +492,9 @@ async function main() {
   assert.equal(productGroups.length, 2, "Desktop and mobile group VSI under its included product");
   for (const [, group] of productGroups) {
     assert.match(group, /href="\/executive-intelligence"/);
-    assert.match(group, /href="\/executive-intelligence#vsi" class="vx-nav-included">Includes Vaeroex Super Intelligence/);
+    assert.equal((group.match(/<a /g) || []).length, 1, "Product and feature description share one clickable entry");
+    assert.match(group, /<small class="vx-nav-description">Featuring Vaeroex Super Intelligence, our flagship conversational AI feature\.<\/small><\/a>/);
+    assert.doesNotMatch(group, /AVAILABLE|vx-nav-included|#vsi/);
     assert.doesNotMatch(group, /The Vaeroex approach/, "The approach remains separate from the product group");
   }
   assert.doesNotMatch(navigation, retiredPromotion);

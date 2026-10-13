@@ -62,9 +62,8 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
               <div key={system.id} className="vx-nav-product" role="group" aria-label={system.name}>
                 <Link href={system.route}>
                   <strong>{system.name}</strong>
-                  <small>{system.statusLabel}</small>
+                  <small className="vx-nav-description">Featuring Vaeroex Super Intelligence, our flagship conversational AI feature.</small>
                 </Link>
-                <Link href="/executive-intelligence#vsi" className="vx-nav-included">Includes Vaeroex Super Intelligence</Link>
               </div>
             ))}
             <Link href="/intelligence-systems" className="vx-dropdown-overview">
@@ -114,9 +113,8 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
               <div key={system.id} className="vx-nav-product" role="group" aria-label={system.name}>
                 <Link href={system.route}>
                   {system.name}
-                  <small>{system.statusLabel}</small>
+                  <small className="vx-nav-description">Featuring Vaeroex Super Intelligence, our flagship conversational AI feature.</small>
                 </Link>
-                <Link href="/executive-intelligence#vsi" className="vx-nav-included">Includes Vaeroex Super Intelligence</Link>
               </div>
             ))}
             <Link href="/intelligence-systems">The Vaeroex approach</Link>
