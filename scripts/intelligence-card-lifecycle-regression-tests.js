@@ -186,8 +186,10 @@ assert.match(component, /What could improve the business further/, "deterministi
 assert.match(component, /requestedCard\?\.view \|\| "current"/, "direct links to dismissed cards open History");
 assert.match(component, /cursor-pointer/, "History cards expose a pointer cursor");
 assert.match(component, /View details.*ChevronRight/s, "History cards expose a visible navigation affordance");
-assert.match(component, /hover:border-cyan-300\/50.*hover:bg-cyan-950\/20/, "History cards expose a stronger hover state");
-assert.match(component, /ring-2 ring-cyan-300\/55/, "selected History cards have a distinct selected state");
+const inboxStyles = fs.readFileSync(path.join(root, "app/globals.css"), "utf8");
+assert.match(inboxStyles, /intelligence-finding-row:hover.*background/, "History rows expose a restrained hover surface");
+assert.match(component, /selected \? "is-selected"/, "selected History rows have a distinct selected state");
+assert.match(inboxStyles, /intelligence-finding-row.is-selected.*border-color/, "selected History rows retain a visible neutral border");
 assert.match(component, /Leadership disposition/, "History detail distinguishes lifecycle metadata from deterministic content");
 assert.match(component, /These actions only affect how this finding is presented\. They do not change your business data, Business Memory, or Business Health\./, "Leadership disposition explains its presentation-only authority boundary");
 assert.match(component, /dismissalReasonLabel\(card\.reasonCode\)/, "dismissal reasons render with customer-facing labels");

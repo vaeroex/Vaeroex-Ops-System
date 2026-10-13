@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { Check, History, Pin, PinOff, X } from "lucide-react";
+import { Check, ChevronRight, History, Pin, PinOff, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { explainFindingAction } from "@/app/app/finding-explanation/actions";
 import { mutateIntelligenceCardLifecycleAction } from "@/app/app/intelligence/lifecycle-actions";
@@ -680,8 +680,8 @@ export function IntelligenceSignalInbox({
     const selected = selectedCard?.findingKeyHash === card.findingKeyHash;
     const keyFigure = card.insight?.supportingRecords?.find(record => record.recordType === "KPI record")?.value;
     return (
-      <button key={card.findingKeyHash} type="button" data-finding-key={card.findingKeyHash} aria-current={selected ? "true" : undefined} onClick={(event) => selectCard(card, event.currentTarget)} className={`workspace-finding-card intelligence-finding-row ${selected ? "is-selected" : ""}`}>
-        <div className="flex items-start justify-between gap-3"><h3 className="min-w-0 text-sm font-semibold leading-6 text-white">{card.snapshot.title}</h3>{card.pinned ? <Pin aria-label="Pinned" className="mt-1 h-4 w-4 shrink-0 text-cyan-200" /> : null}</div>
+      <button key={card.findingKeyHash} type="button" data-finding-key={card.findingKeyHash} aria-current={selected ? "true" : undefined} onClick={(event) => selectCard(card, event.currentTarget)} className={`workspace-finding-card intelligence-finding-row cursor-pointer ${selected ? "is-selected" : ""}`}>
+        <div className="flex items-start justify-between gap-3"><h3 className="min-w-0 text-sm font-semibold leading-6 text-white">{card.snapshot.title}</h3><span className="mt-1 inline-flex shrink-0 gap-1">{card.pinned ? <Pin aria-label="Pinned" className="h-4 w-4 text-cyan-200" /> : null}<span className="sr-only">View details</span><ChevronRight aria-hidden="true" className="h-4 w-4 text-slate-400" /></span></div>
         {keyFigure ? <p className="mt-1 break-words text-sm font-medium tabular-nums text-slate-200">{keyFigure}</p> : null}
         <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-400">{compactText(card.snapshot.summary, 130)}</p>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5 text-slate-400">
