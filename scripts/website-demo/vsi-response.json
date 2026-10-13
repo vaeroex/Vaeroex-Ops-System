@@ -1,0 +1,61 @@
+{
+  "question": "Based on the business information available, which marketing campaign should Coastal Kitchen prioritize over the next two weeks? Explain your recommendation and build a practical plan with a proposed budget, preparation steps, sample messaging, and measures of success.",
+  "answer": "## Recommendation: run a small, trackable “Bring Someone New” campaign\n\nFor **October 14–27**, prioritize a guest-referral campaign that showcases the dining experience and encourages a first visit—rather than a broad discount. The latest recorded weekly net sales were **$27,600 against a $24,000 target** (15% above target), guest satisfaction was **96 against 90**, and gross margin was **70 against 68**. Those results support testing modest demand generation while protecting margin; they do **not** prove that satisfaction is driving referrals or that there is spare capacity. [B1] [B2] [B3]\n\nThe available records don’t establish Coastal Kitchen’s location, customer list, existing marketing channels, or campaign conversion history. So treat the budget and targets below as a pilot, confirm the channels you can use, and select any complimentary item only after checking its cost and availability.\n\n### Proposed two-week plan and budget\n\n**Budget cap: $500**, as a planning estimate—not a recorded or approved business budget.\n\n- **$250 — local paid social promotion**, only if Coastal Kitchen has an account and can target its actual service area.\n- **Up to $150 — capped cost of complimentary shared items** for qualifying visits. Choose an item after checking food cost and availability; stop the offer when this cap is reached.\n- **$50 — simple table cards or QR-code materials** directing guests to the campaign landing page, booking method, or social post.\n- **$50 — creative and contingency**, preferably using staff-shot photos and existing tools to keep production inexpensive.\n\nIf paid social or another channel isn’t available, don’t assume an account exists: move that spend to a channel the business already uses, or leave it unspent.\n\n**Preparation (October 14–16)**\n1. Confirm the service area, booking or ordering route, and channels already in use.\n2. Choose the eligible shared item; confirm its actual cost, stock, and any service limits before advertising it.\n3. Set a simple code—such as **COASTAL2**—and train staff to record its use, party size, and whether the guest is visiting for the first time. Don’t collect more personal information than needed.\n4. Record the prior 14 days of sales, covers, average check, and any available new-versus-returning guest counts as a comparison baseline.\n5. Prepare one photo-led post, a short follow-up post, and table cards. Keep the offer terms and end date consistent everywhere.\n\n**Run and review**\n- **October 17–23:** launch the post and table cards; check daily redemptions and item availability.\n- **October 24–27:** repeat the best-performing message, if there is one, and close the offer at the stated deadline or cost cap.\n- Review results after October 27 against the prior 14 days, taking weekday differences into account. The supplied records include weekly sales and operating measures, but not campaign or customer-level history, so those comparisons need to be gathered for this test.\n\n### Sample messaging\n\n> **Bring someone new to Coastal Kitchen.** Make it a meal together: when your party orders two entrées, ask your server about our complimentary shared [approved item]. Mention **COASTAL2** by October 27. While available; one per party. [Add booking or ordering details.]\n\nUse this only after confirming the item, terms, and service route. If a complimentary item isn’t practical, use the same message without the offer and track visits through the code.\n\n### Measures of success\n\nTrack **campaign-code visits and covers**, first-time-guest counts where guests voluntarily identify themselves, offer cost, average check, and gross profit after campaign spend. Compare total sales and covers with the prior 14 days, and note any meaningful weekday or operating differences. Set a continuation rule before launch—for example, extend only if campaign-attributed visits produce positive estimated gross profit after the $500 cap and service remains manageable.\n\nAverage ticket time was **16.2 minutes against an 18-minute target** on October 12, which is a useful operating guardrail, not proof that the restaurant can absorb more volume without strain. Monitor ticket time and guest feedback during the pilot; pause promotion if service deteriorates. [B4]",
+  "citations": [
+    {
+      "id": "B1",
+      "title": "Weekly net sales is on or above target",
+      "url": "/app/intelligence?finding=kpi-opportunity-0ec21016-a385-4927-8ebb-b8ac34a78f24",
+      "sourceType": "finding",
+      "sourceId": "kpi-opportunity-0ec21016-a385-4927-8ebb-b8ac34a78f24",
+      "evidenceDate": "2026-10-12T18:00:00+00:00",
+      "retrievedAt": "2026-10-13T20:43:19.064Z",
+      "excerpt": "Actual $27,600 vs target $24,000.",
+      "snapshotHash": "2724cbc9a5fa6e9c7b2e0161a2ffd94c70e99a998b707f61f798a3597ea9a360"
+    },
+    {
+      "id": "B2",
+      "title": "Guest satisfaction is on or above target",
+      "url": "/app/intelligence?finding=kpi-opportunity-2484d603-2399-4ac1-8187-c0b171f8611d",
+      "sourceType": "finding",
+      "sourceId": "kpi-opportunity-2484d603-2399-4ac1-8187-c0b171f8611d",
+      "evidenceDate": "2026-10-12T18:00:00+00:00",
+      "retrievedAt": "2026-10-13T20:43:19.064Z",
+      "excerpt": "Actual 96 vs target 90.",
+      "snapshotHash": "7251667747288bb05eb6a39a105372249af15eed68a3c48b834e61be5f20ef42"
+    },
+    {
+      "id": "B3",
+      "title": "Gross margin is on or above target",
+      "url": "/app/intelligence?finding=kpi-opportunity-36935b74-ae4b-4054-864b-e565f6dcd87e",
+      "sourceType": "finding",
+      "sourceId": "kpi-opportunity-36935b74-ae4b-4054-864b-e565f6dcd87e",
+      "evidenceDate": "2026-10-12T18:00:00+00:00",
+      "retrievedAt": "2026-10-13T20:43:19.064Z",
+      "excerpt": "Actual 70 vs target 68.",
+      "snapshotHash": "6328ef230fbd08369ad10b151ffc48e7bdb034c5a0411c9e04564db989842f38"
+    },
+    {
+      "id": "B4",
+      "title": "Average ticket time",
+      "url": "/app/kpis?q=Average%20ticket%20time",
+      "sourceType": "kpi",
+      "sourceId": "3345be9e-a8c9-414e-8309-b888f8eb9f95",
+      "evidenceDate": "2026-10-12",
+      "retrievedAt": "2026-10-13T20:43:19.064Z",
+      "excerpt": "Average ticket time: 16.2 minutes; target 18 minutes. Recorded 2026-10-12.",
+      "snapshotHash": "c2df8be8ceb2f8df26acda238a0e732e4d1bffba060c20e338c0b8397ceed8a8"
+    }
+  ],
+  "createdAt": "2026-10-13T20:43:19.064Z",
+  "provenance": {
+    "synthetic": true,
+    "applicationCommit": "f0ed69eaf4838c6321256043db65c3c1f9a7f26f",
+    "workflow": "runVsiAnswer with authenticated local authorizeVsiRead and source authority",
+    "model": "gpt-6-luna",
+    "providerCalls": 2,
+    "estimatedCostUsd": 0.0024996999999999997,
+    "citationStatus": "validated",
+    "contentSha256": "5f52fe81e9bb22d72854516c94f276e93aa74e7294c57291fa8e10c6280d1708"
+  }
+}

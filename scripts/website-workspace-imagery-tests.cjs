@@ -20,6 +20,18 @@ const {build, createServer} = require('./website-demo-preview.cjs');
   assert.deepEqual(preview.rows.at(-1), ['W28','2026-10-12','96']);
   assert.equal(demo.sheetsMapping.metrics[0].target, 90);
   assert.throws(() => demo.sheetsPreview(new URLSearchParams({connectionId:'other-workspace'})));
+  const recording = JSON.parse(fs.readFileSync('scripts/website-demo/vsi-response.json'));
+  assert.equal(require('node:crypto').createHash('sha256').update(recording.answer).digest('hex'), recording.provenance.contentSha256);
+  assert.equal(demo.vsiExchange.answer, recording.answer);
+  assert.deepEqual(demo.vsiExchange.citations, recording.citations);
+  assert.equal(recording.citations.length, 4);
+  assert.equal(recording.provenance.citationStatus, 'validated');
+  const localRead = new URL(`http://127.0.0.1:3190/api/vsi/conversations?workspaceId=${demo.kpis[0].workspace_id}`);
+  assert.equal(demo.vsiReadResponse(localRead).conversations.length, 1);
+  assert.throws(() => demo.vsiReadResponse(localRead, 'POST'));
+  assert.throws(() => demo.vsiReadResponse(new URL('http://127.0.0.1:3190/api/vsi/conversations?workspaceId=other')));
+  const transcript = fs.readFileSync('public/images/workspace-demo/coastal-kitchen-vsi-conversation.txt','utf8');
+  assert.ok(transcript.includes(recording.question) && transcript.includes(recording.answer));
   const originalNow = Date.now;
   Date.now = () => Date.parse(demo.AS_OF);
   const calculated = demo.calculatedIntelligence();
@@ -52,14 +64,15 @@ const {build, createServer} = require('./website-demo-preview.cjs');
   assert.ok(!boundary.moduleFiles.some(f=>/\/lib\/supabase\/(client|server|admin)\./.test(f)));
   const manifest = {assets: [
     ...JSON.parse(fs.readFileSync("scripts/website-demo/captures.json")).assets,
-    ...JSON.parse(fs.readFileSync("scripts/website-demo/integration-captures.json")).assets
+    ...JSON.parse(fs.readFileSync("scripts/website-demo/integration-captures.json")).assets,
+    ...JSON.parse(fs.readFileSync("scripts/website-demo/vsi-captures.json")).assets
   ]};
   for (const asset of manifest.assets) {
     const bytes = fs.readFileSync(path.join('public/images/workspace-demo',asset.file));
     assert.equal(asset.dpr, 2);
     assert.ok(asset.encoding.includes("lossless"));
     assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'), asset.sha256);
-    assert.ok(bytes.length < 220000, `${asset.file} must remain compact`);
+    assert.ok(bytes.length < (asset.file.startsWith('vsi-') ? 400000 : 220000), `${asset.file} must remain compact`);
   }
   // No network request is made: validate the static server's response boundary directly.
   const server = createServer({...result,port:3190});

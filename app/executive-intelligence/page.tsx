@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { VsiScreenshotTour } from "@/components/marketing/VsiScreenshots";
 import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
@@ -163,6 +164,7 @@ export default function OperationsIntelligencePage() {
             <p>Go beyond business, too—from everyday questions and learning to creative writing and brainstorming—all within your Vaeroex workspace.</p>
           </div>
         </div>
+        <div className={styles.container}><VsiScreenshotTour /></div>
       </section>
 
       <section id="executive-close" className={styles.closing} aria-labelledby="getting-started-title">

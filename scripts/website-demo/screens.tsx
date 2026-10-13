@@ -1,5 +1,7 @@
 import React from "react";
 import { integrationScreen } from "./integration-screens";
+import { VsiWorkspace } from "@/components/vsi/VsiWorkspace";
+import { vsiChat } from "./vsi-data";
 import { AppShell } from "@/components/app/AppShell";
 import { ActivityProvider } from "@/components/app/ActivityProvider";
 import KpisPage from "@/app/app/kpis/page";
@@ -33,6 +35,7 @@ export async function renderScreen(pathname: string, state: FixtureState, role: 
   if (state === "error") return <AppError error={new Error("Synthetic unavailable state. No live request was made; use Try again to return to populated data.")} reset={reset} />;
   const integration = integrationScreen(pathname);
   if (integration) return integration;
+  if (pathname === "/app/si") return <VsiWorkspace workspaceId={workspace.id} workspaceName={workspace.name} userId={profile.id} timeZone="UTC" initialConversationId={vsiChat.id} />;
   if (pathname === "/app" || pathname === "/app/intelligence") return IntelligencePage({ searchParams: Promise.resolve(Object.fromEntries(params)) });
   if (pathname.startsWith("/app/kpis")) return KpisPage({ searchParams: Promise.resolve(pageParams(params)) });
   if (pathname === "/app/sources" || pathname === "/app/files") return renderSourcesPage(Object.fromEntries(params));
@@ -52,3 +55,4 @@ export { calculatedIntelligence } from "./calculations";
 export { kpis, files, imports, metrics, csvContents, performanceKpiSettings } from "./data";
 
 export * from "./integration-data";
+export { vsiReadResponse, vsiExchange } from "./vsi-data";

@@ -1,4 +1,5 @@
 import { sheetsPreview } from "./integration-data";
+import { vsiReadResponse } from "./vsi-data";
 import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { renderScreen, wrapScreen, loadingScreen, routes, AS_OF } from "./screens";
@@ -17,6 +18,9 @@ globalThis.Date = FixedDate as unknown as DateConstructor;
 // The real search component can interact with a memory response, never a socket.
 window.fetch = async (input, init) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, window.location.origin);
+  if (url.origin === window.location.origin && url.pathname.startsWith("/api/vsi/")) {
+    return new Response(JSON.stringify(vsiReadResponse(url, init?.method)), { headers: { "Content-Type": "application/json" } });
+  }
   if (url.origin === window.location.origin && url.pathname === "/api/integrations/google-sheets/preview" && init?.method === "POST") {
     return new Response(JSON.stringify(sheetsPreview(init.body)), { headers: { "Content-Type": "application/json" } });
   }

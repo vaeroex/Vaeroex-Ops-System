@@ -1,0 +1,53 @@
+Coastal Kitchen · Fictional business example
+Actual VSI conversation · October 13, 2026
+
+You
+Based on the business information available, which marketing campaign should Coastal Kitchen prioritize over the next two weeks? Explain your recommendation and build a practical plan with a proposed budget, preparation steps, sample messaging, and measures of success.
+
+Vaeroex
+## Recommendation: run a small, trackable “Bring Someone New” campaign
+
+For **October 14–27**, prioritize a guest-referral campaign that showcases the dining experience and encourages a first visit—rather than a broad discount. The latest recorded weekly net sales were **$27,600 against a $24,000 target** (15% above target), guest satisfaction was **96 against 90**, and gross margin was **70 against 68**. Those results support testing modest demand generation while protecting margin; they do **not** prove that satisfaction is driving referrals or that there is spare capacity. [B1] [B2] [B3]
+
+The available records don’t establish Coastal Kitchen’s location, customer list, existing marketing channels, or campaign conversion history. So treat the budget and targets below as a pilot, confirm the channels you can use, and select any complimentary item only after checking its cost and availability.
+
+### Proposed two-week plan and budget
+
+**Budget cap: $500**, as a planning estimate—not a recorded or approved business budget.
+
+- **$250 — local paid social promotion**, only if Coastal Kitchen has an account and can target its actual service area.
+- **Up to $150 — capped cost of complimentary shared items** for qualifying visits. Choose an item after checking food cost and availability; stop the offer when this cap is reached.
+- **$50 — simple table cards or QR-code materials** directing guests to the campaign landing page, booking method, or social post.
+- **$50 — creative and contingency**, preferably using staff-shot photos and existing tools to keep production inexpensive.
+
+If paid social or another channel isn’t available, don’t assume an account exists: move that spend to a channel the business already uses, or leave it unspent.
+
+**Preparation (October 14–16)**
+1. Confirm the service area, booking or ordering route, and channels already in use.
+2. Choose the eligible shared item; confirm its actual cost, stock, and any service limits before advertising it.
+3. Set a simple code—such as **COASTAL2**—and train staff to record its use, party size, and whether the guest is visiting for the first time. Don’t collect more personal information than needed.
+4. Record the prior 14 days of sales, covers, average check, and any available new-versus-returning guest counts as a comparison baseline.
+5. Prepare one photo-led post, a short follow-up post, and table cards. Keep the offer terms and end date consistent everywhere.
+
+**Run and review**
+- **October 17–23:** launch the post and table cards; check daily redemptions and item availability.
+- **October 24–27:** repeat the best-performing message, if there is one, and close the offer at the stated deadline or cost cap.
+- Review results after October 27 against the prior 14 days, taking weekday differences into account. The supplied records include weekly sales and operating measures, but not campaign or customer-level history, so those comparisons need to be gathered for this test.
+
+### Sample messaging
+
+> **Bring someone new to Coastal Kitchen.** Make it a meal together: when your party orders two entrées, ask your server about our complimentary shared [approved item]. Mention **COASTAL2** by October 27. While available; one per party. [Add booking or ordering details.]
+
+Use this only after confirming the item, terms, and service route. If a complimentary item isn’t practical, use the same message without the offer and track visits through the code.
+
+### Measures of success
+
+Track **campaign-code visits and covers**, first-time-guest counts where guests voluntarily identify themselves, offer cost, average check, and gross profit after campaign spend. Compare total sales and covers with the prior 14 days, and note any meaningful weekday or operating differences. Set a continuation rule before launch—for example, extend only if campaign-attributed visits produce positive estimated gross profit after the $500 cap and service remains manageable.
+
+Average ticket time was **16.2 minutes against an 18-minute target** on October 12, which is a useful operating guardrail, not proof that the restaurant can absorb more volume without strain. Monitor ticket time and guest feedback during the pilot; pause promotion if service deteriorates. [B4]
+
+Sources
+[B1] Weekly net sales is on or above target — Actual $27,600 vs target $24,000. Evidence: 2026-10-12T18:00:00+00:00
+[B2] Guest satisfaction is on or above target — Actual 96 vs target 90. Evidence: 2026-10-12T18:00:00+00:00
+[B3] Gross margin is on or above target — Actual 70 vs target 68. Evidence: 2026-10-12T18:00:00+00:00
+[B4] Average ticket time — Average ticket time: 16.2 minutes; target 18 minutes. Recorded 2026-10-12. Evidence: 2026-10-12
