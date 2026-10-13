@@ -58,16 +58,19 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
             <ChevronDown size={12} aria-hidden="true" />
           </summary>
           <div className="vx-dropdown">
+            {PUBLIC_SYSTEMS.map((system) => (
+              <div key={system.id} className="vx-nav-product" role="group" aria-label={system.name}>
+                <Link href={system.route}>
+                  <strong>{system.name}</strong>
+                  <small>{system.statusLabel}</small>
+                </Link>
+                <Link href="/executive-intelligence#vsi" className="vx-nav-included">Includes Vaeroex Super Intelligence</Link>
+              </div>
+            ))}
             <Link href="/intelligence-systems" className="vx-dropdown-overview">
               The Vaeroex approach
               <ArrowUpRight size={14} aria-hidden="true" />
             </Link>
-            {PUBLIC_SYSTEMS.map((system) => (
-              <Link href={system.route} key={system.id}>
-                <strong>{system.name}</strong>
-                <small>{system.statusLabel}</small>
-              </Link>
-            ))}
           </div>
         </details>
         <Link
@@ -107,13 +110,16 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
           <nav className="vx-mobile-menu" aria-label="Public navigation mobile">
             <span>EXPLORE VAEROEX</span>
             <Link href="/">Home</Link>
-            <Link href="/intelligence-systems">Intelligence Systems</Link>
             {PUBLIC_SYSTEMS.map((system) => (
-              <Link key={system.id} href={system.route}>
-                {system.name}
-                <small>{system.statusLabel}</small>
-              </Link>
+              <div key={system.id} className="vx-nav-product" role="group" aria-label={system.name}>
+                <Link href={system.route}>
+                  {system.name}
+                  <small>{system.statusLabel}</small>
+                </Link>
+                <Link href="/executive-intelligence#vsi" className="vx-nav-included">Includes Vaeroex Super Intelligence</Link>
+              </div>
             ))}
+            <Link href="/intelligence-systems">The Vaeroex approach</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/trust">Trust Center</Link>
             {company.map(([label, href]) => (

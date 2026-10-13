@@ -49,7 +49,7 @@ export const organizationJsonLd = {
   legalName: "Vaeroex LLC",
   url: PUBLIC_SITE_URL,
   logo: `${PUBLIC_SITE_URL}/brand/vaeroex-logo-white-wordmark.png`,
-  description: "Vaeroex Intelligence Systems transforms complex information into visibility, awareness, prediction, and action across specialized domains.",
+  description: "Vaeroex develops software and analysis workflows that help businesses organize information, investigate performance, and make informed decisions.",
   address: {
     "@type": "PostalAddress",
     streetAddress: "5319 University Dr, Unit 762",
@@ -80,5 +80,5 @@ export const operationsIntelligenceJsonLd = {
     name: "Vaeroex",
     url: PUBLIC_SITE_URL
   },
-  description: "Executive Intelligence is Vaeroex's flagship evidence-backed platform for Business Health, prioritized Intelligence, Explain Finding, Evidence, and Saved Analyses."
+  description: "Executive Intelligence helps restaurants, breweries, retailers, and other businesses explore performance, inspect business evidence, and ask deeper questions with Vaeroex Super Intelligence."
 };

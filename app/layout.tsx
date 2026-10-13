@@ -7,11 +7,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || PUBLIC_SITE_URL),
-  title: "Vaeroex | Intelligence Systems",
-  description: "Vaeroex transforms complex information into visibility, awareness, prediction, and action across specialized intelligence domains.",
+  title: "Vaeroex | Executive Intelligence",
+  description: "Executive Intelligence for restaurants, breweries, retailers, and other businesses. Investigate performance with connected records, uploaded reports, business context, and Vaeroex Super Intelligence.",
   openGraph: {
-    title: "Vaeroex | Intelligence Systems",
-    description: "Vaeroex transforms complex information into visibility, awareness, prediction, and action across specialized intelligence domains.",
+    title: "Vaeroex | Executive Intelligence",
+    description: "Executive Intelligence for restaurants, breweries, retailers, and other businesses. Investigate performance with connected records, uploaded reports, business context, and Vaeroex Super Intelligence.",
     url: PUBLIC_SITE_URL,
     siteName: "Vaeroex",
     type: "website",

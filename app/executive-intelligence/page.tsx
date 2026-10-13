@@ -5,6 +5,7 @@ import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
 import { OperationsIntelligenceEngineDemo } from "@/components/motion/OperationsIntelligenceEngineDemo";
+import story from "@/components/marketing/ExecutiveStory.module.css";
 import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
 import {
   operationsIntelligenceJsonLd,
@@ -15,50 +16,14 @@ import styles from "@/components/marketing/IntelligencePages.module.css";
 export const metadata: Metadata = publicPageMetadata({
   title: "Executive Intelligence | Vaeroex",
   description:
-    "Turn fragmented business information into a clearer view of Business Health, performance, risks, opportunities, and what deserves leadership attention.",
+    "Executive Intelligence for restaurants, breweries, retailers, and other businesses. Explore connected records, uploads, Business Notes, and Vaeroex Super Intelligence (VSI).",
   path: "/executive-intelligence",
 });
 
 const capabilities = [
-  [
-    "Business Health and KPIs",
-    "See current business conditions, the measures behind them, and how performance is moving against the targets your business has confirmed.",
-  ],
-  [
-    "Prioritized Intelligence",
-    "Bring supported findings, risks, opportunities, and meaningful changes into one prioritized view of what deserves attention.",
-  ],
-  [
-    "Explain Finding",
-    "Investigate one finding in depth. Understand why it may matter, review its supporting context, and consider what to investigate next.",
-  ],
-  [
-    "Evidence",
-    "Trace important numbers and findings back to their supporting business information. Review sources, freshness, confidence, and limitations.",
-  ],
-  [
-    "Briefings and Saved Analyses",
-    "Generate eligible Weekly and Monthly Intelligence Briefings on demand. Preserve useful briefings and analyses for later review.",
-  ],
-] as const;
-
-const information = [
-  [
-    "What information can I bring?",
-    "Supported spreadsheets, PDFs, reports, screenshots, exports, photos, paper records, and handwritten business notes. Clear images can help bring offline information into the workspace. Recognition and analysis remain reviewable, with no guarantee that every source can be interpreted perfectly.",
-  ],
-  [
-    "What can Vaeroex help me notice?",
-    "KPI movement, missed targets, meaningful changes, risks, opportunities, and developing issues. For example, it can help investigate whether sales are improving while margins weaken, or whether separate records point toward the same operational problem.",
-  ],
-  [
-    "How do intelligence briefings work?",
-    "When enough supported business information is available, you can generate a Weekly Intelligence Briefing for the rolling last 7 days or a Monthly Intelligence Briefing for the rolling last 30 days. Briefings are generated on demand; an upload does not automatically create one.",
-  ],
-  [
-    "Does Vaeroex make decisions or change records for me?",
-    "Vaeroex provides drafts and recommendations for human review. Leadership decides what to investigate and what to do next. Vaeroex does not autonomously change customer systems or business records.",
-  ],
+  ["Business Health & KPIs", "See performance against confirmed targets and changes that deserve attention."],
+  ["Intelligence & Evidence", "Explore prioritized findings with Explain Finding. Review sources, freshness, uncertainty, and missing context."],
+  ["Briefings & Saved Analyses", "Generate eligible Weekly and Monthly Intelligence Briefings on demand. Reopen saved briefings and analyses when you need them."],
 ] as const;
 
 const evidenceJourney = [
@@ -104,49 +69,24 @@ const evidenceJourney = [
 export default function OperationsIntelligencePage() {
   return (
     <main className={`${styles.site} vaeroex-public-site`}>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(operationsIntelligenceJsonLd),
-        }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(operationsIntelligenceJsonLd) }} />
       <PublicSiteHeader />
       <section id="executive-opening" className={styles.hero}>
         <div className={styles.container}>
-          <p className={styles.eyebrow}>
-            Executive Intelligence{" "}
-            <span className={styles.status}>Available</span>
-          </p>
-          <h1>
-            See the business.
-            <br />
-            <em>Know what matters.</em>
-          </h1>
+          <p className={styles.eyebrow}>Executive Intelligence <span className={styles.status}>Available</span></p>
+          <h1>See the business.<br /><em>Know what matters.</em></h1>
           <div className={styles.heroGrid}>
             <div>
-              <p className={styles.heroLead}>
-                Your numbers, reports, and business context. Connected into a
-                clearer view of performance, risk, and what deserves your
-                attention.
-              </p>
+              <p className={styles.heroLead}>For restaurants, breweries, retailers, and other businesses. Understand performance, investigate change, and prepare clearer next steps with evidence you can review.</p>
               <div className={styles.actions}>
-                <StartWithVaeroexMenu
-                  className={styles.primary}
-                  label="Start Executive Intelligence"
-                />
-                <a href="#product-experience" className={styles.textLink}>
-                  Explore the experience
-                  <ArrowRight aria-hidden="true" />
-                </a>
+                <StartWithVaeroexMenu className={styles.primary} label="Start Executive Intelligence" />
+                <a href="#product-experience" className={styles.textLink}>Explore the workspace<ArrowRight aria-hidden="true" /></a>
               </div>
             </div>
             <div className={styles.heroSide}>
-              <strong>A second set of eyes on your business.</strong>
-              <p>
-                Vaeroex&apos;s flagship Executive Intelligence platform helps
-                owners and operations leaders make sense of information they
-                already have. Supporting evidence stays available for review.
-              </p>
+              <strong>Turn everyday records into useful questions.</strong>
+              <p>Ask questions, explore ideas, and work through challenges with VSI—from understanding your business to researching a topic or creating something new—all through natural conversation.</p>
+              <a href="#vsi" className={styles.textLink}>Explore included VSI<ArrowRight aria-hidden="true" /></a>
             </div>
           </div>
         </div>
@@ -159,23 +99,11 @@ export default function OperationsIntelligencePage() {
         stages={evidenceJourney}
       />
 
-      <section id="product-experience" className={styles.sectionTight}>
+      <section id="product-experience" className={styles.sectionTight} aria-labelledby="product-experience-title">
         <div className={styles.container}>
           <div className={styles.sectionHead}>
-            <div>
-              <p className={styles.sectionLabel}>
-                <span>02</span>The product experience
-              </p>
-              <h2>
-                From an overview
-                <br />
-                to the evidence behind it.
-              </h2>
-            </div>
-            <p className={styles.copy}>
-              Explore how Business Health, prioritized intelligence, and
-              supporting information connect.
-            </p>
+            <div><p className={styles.sectionLabel}>Inside Executive Intelligence</p><h2 id="product-experience-title">From the overview<br />to the evidence behind it.</h2></div>
+            <p className={styles.copy}>See what changed, investigate what matters, and keep useful analysis in one private workspace.</p>
           </div>
           <div className={styles.productCaption}>
             <span>Interactive product walkthrough</span>
@@ -184,103 +112,87 @@ export default function OperationsIntelligencePage() {
           <div className={styles.productFrame} data-executive-product-mount>
             <OperationsIntelligenceEngineDemo />
           </div>
-          <p className={styles.caption}>
-            This walkthrough illustrates the product experience. Example
-            findings are not live business results or promises of an outcome.
-          </p>
+          <p className={styles.caption}>This walkthrough illustrates the product experience. Example findings are not live business results or promises of an outcome.</p>
+          <div className={story.featureGrid}>
+            {capabilities.map(([title, body]) => (
+              <article key={title}><h3>{title}</h3><p>{body}</p></article>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section id="executive-capabilities" className={styles.section}>
+      <section id="business-information" className={styles.section} aria-labelledby="business-information-title">
         <div className={styles.container}>
           <div className={styles.sectionHead}>
-            <div>
-              <p className={styles.sectionLabel}>
-                <span>03</span>A connected leadership view
-              </p>
-              <h2>
-                Clarity at every
-                <br />
-                level of the decision.
-              </h2>
-            </div>
-            <p className={styles.copy}>
-              Start with the condition of the business. Follow what changed.
-              Investigate what matters.
-            </p>
+            <div><p className={styles.sectionLabel}>Your business information</p><h2 id="business-information-title">Connect what you use.<br />Bring what you know.</h2></div>
+            <p className={styles.copy}>Start with a connection or useful files. Add Business Notes for goals, locations, operating details, and meeting updates.</p>
           </div>
-          <div className={styles.capabilities}>
-            {capabilities.map(([title, body], index) => (
-              <article className={styles.capability} key={title}>
-                <span>0{index + 1}</span>
-                <h3>{title}</h3>
-                <p>{body}</p>
-              </article>
-            ))}
+          <div className={story.inputGrid}>
+            <article className={story.inputItem}>
+              <span>01 / PAYMENTS</span><h3>Square</h3>
+              <p>Connect a location’s payment records. Refresh payments on request or choose a supported historical date range.</p>
+              <p>Payment activity alone does not establish inventory, labor costs, or profit.</p>
+            </article>
+            <article className={story.inputItem}>
+              <span>02 / ACCOUNTING</span><h3>QuickBooks Online</h3>
+              <p>Bring supported invoices, sales receipts, bills, payments, and reports such as Profit and Loss and Balance Sheet.</p>
+              <p>Scheduled checks look for transaction changes every 15 minutes and refresh reports hourly. Check freshness and coverage; complete accounting history is not guaranteed.</p>
+            </article>
+            <article className={story.inputItem}>
+              <span>03 / FILES &amp; CONTEXT</span><h3>Uploads &amp; Business Notes</h3>
+              <p>Upload PDF and Word (.docx) documents, CSV and Excel (.xlsx) spreadsheets, and PNG/JPG photos of business records—up to 25 MiB per file.</p>
+              <p>Add Business Notes for context. Review and approve proposed information before it becomes business evidence; image recognition can miss details.</p>
+            </article>
+          </div>
+          <p className={story.sourceRule}>Each metric uses one authoritative source within a reporting scope. Overlapping connected, uploaded, and manual values are not automatically consolidated or deduplicated. Source changes require review.</p>
+          <div className={story.integrationStatus}>
+            <Link href="/pricing#google-sheets-availability" className={story.pilotLink}>Google Sheets · Limited pilot<ArrowRight size={15} aria-hidden="true" /></Link>
+            <p>Additional integrations are in development.</p>
           </div>
         </div>
       </section>
 
-      <section id="executive-method" className={styles.section}>
-        <div className={`${styles.container} ${styles.split}`}>
+      <section id="vsi" className={`${styles.section} ${story.vsi}`} aria-labelledby="vsi-title">
+        <div className={`${styles.container} ${story.vsiLayout}`}>
           <div>
-            <p className={styles.sectionLabel}>
-              <span>04</span>Start with what you have
-            </p>
-            <h2>Business information rarely arrives in perfect order.</h2>
-            <p className={styles.copy}>
-              Bring supported business information together in one private
-              workspace. Keep adding evidence as the business evolves and return
-              to the analyses that matter.
-            </p>
-            <div className={styles.note}>
-              Do not upload patient data, PHI, ePHI, Social Security numbers,
-              medical record numbers, insurance IDs, or regulated healthcare
-              data.
-            </div>
+            <p className={styles.sectionLabel}>Vaeroex Super Intelligence / VSI</p>
+            <p className={story.included}>Included with Executive Intelligence</p>
+            <h2 id="vsi-title" className={story.headline}>Ask deeper questions.<br /><em>See the bigger picture.</em></h2>
+            <p className={story.aside}>A text conversation with room to investigate, imagine, and refine.</p>
+          </div>
+          <div className={story.prose}>
+            <p className={story.lead}>Built with advanced artificial intelligence and Vaeroex-developed technology, VSI helps turn questions into insights, ideas into strategies, and complex information into clearer next steps—all through natural conversation.</p>
+            <p>Explore business performance, investigate the evidence behind an insight, research market trends, develop marketing ideas, and draft plans, SOPs, or meeting agendas. Ask follow-up questions and refine your thinking with relevant business context.</p>
+            <p>Go beyond business, too—from everyday questions and learning to creative writing and brainstorming—all within your Vaeroex workspace.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="executive-close" className={styles.closing} aria-labelledby="getting-started-title">
+        <div className={`${styles.container} ${story.gettingStarted}`}>
+          <div>
+            <p className={styles.sectionLabel}>Getting started</p>
+            <h2 id="getting-started-title">Build a clearer picture<br />of your business.</h2>
             <div className={styles.actions}>
-              <Link href="/trust" className={styles.textLink}>
-                Explore the Trust Center
-                <ArrowRight aria-hidden="true" />
-              </Link>
+              <Link href="/pricing" className={styles.primary}>View pricing<ArrowRight aria-hidden="true" /></Link>
+              <Link href="/contact" className={styles.secondary}>Talk with Vaeroex</Link>
             </div>
           </div>
-          <div>
-            {information.map(([title, body]) => (
-              <details key={title} className={styles.disclosure}>
-                <summary>{title}</summary>
-                <p>{body}</p>
-              </details>
-            ))}
-          </div>
+          <ol className={story.steps}>
+            <li><span>01</span><div><h3>Bring a starting point.</h3><p>Connect supported records, upload a useful report, or add a Business Note.</p></div></li>
+            <li><span>02</span><div><h3>Review your information.</h3><p>Confirm proposed facts and check source dates and coverage.</p></div></li>
+            <li><span>03</span><div><h3>Explore what matters.</h3><p>Investigate findings, ask VSI, and save useful analyses for later.</p></div></li>
+          </ol>
         </div>
-      </section>
-
-      <section id="executive-close" className={styles.closing}>
-        <div className={`${styles.container} ${styles.closingLayout}`}>
-          <div>
-            <p className={styles.sectionLabel}>
-              Executive Intelligence / Available now
-            </p>
-            <h2>
-              Build a clearer picture
-              <br />
-              of your business.
-            </h2>
-            <p className={styles.copy}>
-              One private workspace for the information, evidence, and decisions
-              leadership needs to connect.
-            </p>
-          </div>
-          <div className={styles.actions}>
-            <Link href="/pricing" className={styles.primary}>
-              View pricing
-              <ArrowRight aria-hidden="true" />
-            </Link>
-            <Link href="/contact" className={styles.secondary}>
-              Talk with Vaeroex
-            </Link>
-          </div>
+        <div className={`${styles.container} ${story.detailsGrid}`}>
+          <details className={styles.disclosure}>
+            <summary>How do intelligence briefings work?</summary>
+            <p>With enough supported business information, generate a Weekly Intelligence Briefing for the rolling last 7 days or a Monthly Intelligence Briefing for the rolling last 30 days. Briefings are generated on demand; an upload does not automatically create one.</p>
+          </details>
+          <details className={styles.disclosure}>
+            <summary>What information should I keep out?</summary>
+            <p>Do not upload patient data, PHI, ePHI, Social Security numbers, medical record numbers, insurance IDs, or regulated healthcare data. Visit the <Link href="/trust">Trust Center</Link> for review requirements, data boundaries, and limitations.</p>
+          </details>
         </div>
       </section>
       <PublicFooter />

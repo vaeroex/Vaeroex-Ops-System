@@ -44,7 +44,7 @@ function loadTs(file) {
     if (specifier === "next/image") return { __esModule: true, default: image };
     if (specifier === "next/dynamic")
       return { __esModule: true, default: () => () => null };
-    if (specifier === "next/navigation") return { usePathname: () => "/" };
+    if (specifier === "next/navigation") return { usePathname: () => "/", notFound: () => { throw new Error("NEXT_HTTP_ERROR_FALLBACK;404"); } };
     if (specifier === "@/components/legal/PublicSiteHeader")
       return { PublicSiteHeader: () => React.createElement("header", null) };
     if (specifier === "@/components/legal/PublicFooter")
@@ -81,8 +81,8 @@ async function main() {
   const systems = loadTs("lib/marketing/public-systems.ts").PUBLIC_SYSTEMS;
   assert.equal(
     systems.length,
-    3,
-    "The existing public product catalog must remain complete",
+    1,
+    "Only Executive Intelligence is publicly offered",
   );
   const available = systems.filter(
     (system) => system.availability === "available",
@@ -114,9 +114,18 @@ async function main() {
     "/drug-discovery-intelligence",
     "/biological-intelligence",
   ];
+  const retiredRoutes = new Set(["/drug-discovery-intelligence", "/biological-intelligence"]);
+  for (const route of retiredRoutes) {
+    const page = loadTs(`app${route}/page.tsx`);
+    assert.throws(() => page.default(), /NEXT_HTTP_ERROR_FALLBACK;404/, `${route} must return not found`);
+    assert.equal(page.metadata.robots.index, false);
+    assert.doesNotMatch(read(`app${route}/page.tsx`), /_archived-page|redirect|PublicSiteHeader|ClarityJourney/,
+      "Retired routes must not render or expose the preserved implementation");
+  }
   const htmlByRoute = new Map();
   for (const route of routes) {
-    const file = route === "/" ? "app/page.tsx" : `app${route}/page.tsx`;
+    // Archived pages stay testable as preserved source, never as public routes.
+    const file = route === "/" ? "app/page.tsx" : `app${route}/${retiredRoutes.has(route) ? "_archived-page" : "page"}.tsx`;
     const page = loadTs(file);
     const html = await renderPage(file);
     htmlByRoute.set(route, html);
@@ -413,7 +422,41 @@ async function main() {
   assert.match(biological, /[Gg]eneric eukaryotic cell/);
   assert.match(biological, /[Nn]ot to scale|NOT TO SCALE/);
 
+  const about = await renderPage("app/about/page.tsx");
+  assert.match(about, /Isaac Vizcarra/);
+  assert.match(about, /Founder &amp; CEO/);
+  assert.match(about, /operational leadership in hospital and emergency medical services settings, business operations/);
+  assert.match(about, /U.S. Air Force service/);
+  assert.match(executive, /Vaeroex Super Intelligence \/ VSI/);
+  assert.match(executive, /Ask deeper questions/);
+  assert.match(executive, /one authoritative source/);
+  assert.match(executive, /not automatically consolidated or deduplicated/);
+  assert.match(executive, /Included with Executive Intelligence/);
+  assert.match(executive, /VSI helps turn questions into insights/);
+  assert.doesNotMatch(executive, /Plans and SOPs are drafts for your review/);
+  assert.match(executive, /Refresh payments on request/);
+  assert.match(executive, /transaction changes every 15 minutes/);
+  assert.match(executive, /PDF and Word \(\.docx\)/);
+  assert.match(executive, /CSV and Excel \(\.xlsx\)/);
+  assert.match(executive, /PNG\/JPG/);
+  assert.match(executive, /Google Sheets · Limited pilot/);
+  assert.match(executive, /href="\/pricing#google-sheets-availability"/);
+  assert.doesNotMatch(executive, /Your Google account must be an approved test user/);
+  assert.match(pricing, /id="google-sheets-availability"/);
+  assert.match(pricing, /15 GB of uploaded-file storage and 500 file slots/);
+  assert.match(pricing, /\$5\/month each for another 10 GB and 500 slots/);
+  const retiredPromotion = /Biological Intelligence|Drug Discovery|drug-discovery-intelligence|biological-intelligence/i;
+  for (const [route, html] of htmlByRoute) {
+    if (!retiredRoutes.has(route)) assert.doesNotMatch(html, retiredPromotion, `${route} must not promote retired products`);
+  }
+  assert.doesNotMatch(about, retiredPromotion);
+  assert.doesNotMatch(read("components/legal/PublicFooter.tsx") + read("lib/seo/public-seo.ts") + read("app/sitemap.ts"), retiredPromotion);
+
   const home = htmlByRoute.get("/");
+  const headline = home.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  assert.equal(headline, "The advantage of knowing first");
+  assert.match(home, /Veteran owned and operated/);
+
   assert.match(
     home,
     /data-clarity-poster/,
@@ -445,6 +488,14 @@ async function main() {
       navigation.includes(`href="${system.route}"`),
       `Navigation must reach ${system.route}`,
     );
+  const productGroups = [...navigation.matchAll(/<div class="vx-nav-product" role="group" aria-label="Executive Intelligence">([\s\S]*?)<\/div>/g)];
+  assert.equal(productGroups.length, 2, "Desktop and mobile group VSI under its included product");
+  for (const [, group] of productGroups) {
+    assert.match(group, /href="\/executive-intelligence"/);
+    assert.match(group, /href="\/executive-intelligence#vsi" class="vx-nav-included">Includes Vaeroex Super Intelligence/);
+    assert.doesNotMatch(group, /The Vaeroex approach/, "The approach remains separate from the product group");
+  }
+  assert.doesNotMatch(navigation, retiredPromotion);
   assert.match(navigation, /Open navigation menu/);
   assert.match(navigation, /href="\/login"/);
 
