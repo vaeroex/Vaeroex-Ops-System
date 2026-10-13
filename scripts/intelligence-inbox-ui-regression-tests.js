@@ -50,7 +50,7 @@ function card(index, overrides = {}) {
 
 // Drive the actual component event handlers with stable hook slots. Browser
 // qualification separately checks layout, focus, and scrolling in a real DOM.
-function inboxHarness(props, runEffects = false) {
+function inboxHarness(props, runEffects = false, mocks = {}) {
   const slots = [];
   const effects = []; let mounted = false;
   let cursor = 0;
@@ -70,7 +70,7 @@ function inboxHarness(props, runEffects = false) {
     useEffect: (effect) => { if (runEffects && !mounted) effects.push(effect); },
     useTransition: () => [false, (fn) => fn()],
   };
-  const { IntelligenceSignalInbox } = loadSource("components/intelligence/IntelligenceSignalInbox.tsx", { ...sharedMocks, react: hooks });
+  const { IntelligenceSignalInbox } = loadSource("components/intelligence/IntelligenceSignalInbox.tsx", { ...sharedMocks, ...mocks, react: hooks });
   return () => { cursor = 0; const tree = IntelligenceSignalInbox(props); if (!mounted) { mounted = true; effects.forEach(effect => effect()); } return tree; };
 }
 function nodes(tree, predicate) {
@@ -359,6 +359,7 @@ test("Overview redirect retains query values and ordinary auth defaults preserve
   assert.doesNotMatch(shell,/href: "\/app", label: "Overview"/);
   const page=fs.readFileSync(path.join(root,"app/app/intelligence/page.tsx"),"utf8");
   assert.match(page,/await requireWorkspaceAccess\(\)/);
+  assert.ok(page.includes('key={`findings-${workspaceId}`}'), "workspace inbox key must be distinct from the integration sibling key");
   for(const table of ["operational_assignments","record_shares"]) assert.ok(page.includes(`from("${table}").select("*").eq("workspace_id", workspaceId).is("deleted_at", null)`));
 });
 
@@ -372,4 +373,46 @@ test("readiness renders existing coverage and expandable source guidance without
   assert.match(empty,/until enough eligible original evidence/); assert.doesNotMatch(empty,/0<span/);
   const unavailable=renderToStaticMarkup(React.createElement(IntelligenceReadiness,{readiness:null}));
   assert.match(unavailable,/No score has been estimated/);
+});
+
+
+test("finding controls retain token-bound actions and require the explicit dismissal confirmation", async () => {
+  const requests=[]; let refreshes=0;
+  const props={currentCards:[card(0,{lifecycleToken:"synthetic-workspace-bound-token"})],historyCards:[],canManageLifecycle:true};
+  const mocks={"next/navigation":{useRouter:()=>({refresh:()=>refreshes++})},"@/app/app/intelligence/lifecycle-actions":{mutateIntelligenceCardLifecycleAction:async request=>{requests.push(request);return {ok:true,message:"Synthetic success"};}}};
+  const render=inboxHarness(props,false,mocks); let tree=render();
+  button(tree,"Acknowledge").props.onClick(); await Promise.resolve(); tree=render();
+  button(tree,"Pin").props.onClick(); await Promise.resolve(); tree=render();
+  button(tree,"Dismiss").props.onClick(); tree=render(); assert.equal(requests.length,2,"opening dismissal is not a mutation");
+  nodes(tree,node=>node.type==="select")[0].props.onChange({currentTarget:{value:"duplicate"}});
+  nodes(tree,node=>node.type==="textarea")[0].props.onChange({currentTarget:{value:"Synthetic duplicated observation"}}); tree=render();
+  button(tree,"Move to History").props.onClick(); await Promise.resolve();
+  assert.deepEqual(requests,[
+    {token:"synthetic-workspace-bound-token",action:"acknowledge",reasonCode:null,reasonText:null},
+    {token:"synthetic-workspace-bound-token",action:"pin",reasonCode:null,reasonText:null},
+    {token:"synthetic-workspace-bound-token",action:"dismiss",reasonCode:"duplicate",reasonText:"Synthetic duplicated observation"}
+  ]); assert.equal(refreshes,3);
+  const pinned=inboxHarness({...props,currentCards:[card(0,{pinned:true,lifecycleToken:"synthetic-workspace-bound-token"})]},false,mocks)();
+  button(pinned,"Unpin").props.onClick(); await Promise.resolve(); assert.equal(requests.at(-1).action,"unpin");
+  for(const restricted of [{...props,canManageLifecycle:false},{...props,currentCards:[card(0)]}]) {
+    const tree=inboxHarness(restricted)(); for(const label of ["Acknowledge","Pin","Dismiss"]) assert.equal(button(tree,label),undefined);
+  }
+});
+
+test("workspace selection keeps active membership and authentication checks before changing the default destination", async () => {
+  let membership={id:"member-a",workspaces:{id:"workspace-a",name:"Synthetic workspace",subscription_status:"active"}};
+  let user={id:"user-a",email:"synthetic@example.invalid"}; const filters=[]; const cookies=[];
+  const query={select:()=>query,eq:(...args)=>{filters.push(args);return query;},maybeSingle:async()=>({data:membership})};
+  const {selectWorkspaceAction}=loadSource("lib/workspaces/actions.ts",{
+    "next/navigation":{redirect:value=>{throw new Error(value);}},
+    "next/headers":{cookies:async()=>({set:(...args)=>cookies.push(args)})},
+    "@/lib/admin/admin-emails":{isVaeroexAdminUser:()=>false},
+    "@/lib/workspaces/demo-compatibility":{isDemoWorkspaceRecord:()=>false},
+    "@/lib/supabase/server":{createSupabaseServerClient:async()=>({auth:{getUser:async()=>({data:{user}})},from:table=>{assert.equal(table,"workspace_members");return query;}})}
+  });
+  const form=new FormData();form.set("workspace_id","workspace-a");
+  await assert.rejects(selectWorkspaceAction(form),{message:"/app/intelligence?message=Switched%20to%20Synthetic%20workspace."});
+  assert.deepEqual(filters,[["workspace_id","workspace-a"],["user_id","user-a"],["status","active"]]);assert.equal(cookies.length,1);assert.equal(cookies[0][1],"workspace-a");
+  membership=null; await assert.rejects(selectWorkspaceAction(form),/only have access to workspaces where you are an active member/);assert.equal(cookies.length,1);
+  user=null; await assert.rejects(selectWorkspaceAction(form),{message:"/login"});assert.equal(cookies.length,1);
 });

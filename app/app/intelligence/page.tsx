@@ -322,7 +322,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
       {healthView ? <details className="intelligence-change-summary"><summary className="intelligence-disclosure">What changed <span className="font-normal text-slate-400">· {overviewPeriod(params?.period)} review</span></summary><form className="mb-3 flex flex-wrap items-end gap-2" action="/app/intelligence" method="get"><label className="text-xs text-slate-300">Comparison period<select name="period" defaultValue={overviewPeriod(params?.period)} className="ml-2 min-h-10 rounded border border-white/15 bg-slate-900 px-2 text-sm text-white">{["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"].map(period => <option key={period}>{period}</option>)}</select></label><button type="submit" className="min-h-10 rounded border border-white/15 px-3 text-sm text-slate-200">Review period</button></form>{healthView.executiveHomepageModel.changes.items.length ? <ul className="space-y-2 pb-3 text-sm leading-6 text-slate-300">{healthView.executiveHomepageModel.changes.items.map(item => <li key={item.id}><strong className="text-slate-100">{item.title}:</strong> {item.detail}</li>)}</ul> : <p className="pb-3 text-sm text-slate-300">{healthView.executiveHomepageModel.changes.message}</p>}</details> : null}
       <CurrentIntegrations key={workspaceId} initial={dashboard} />
       <IntelligenceSignalInbox
-        key={workspaceId}
+        key={`findings-${workspaceId}`}
         workspaceId={workspaceId}
         currentCards={lifecycleCards.current}
         historyCards={lifecycleCards.history}
