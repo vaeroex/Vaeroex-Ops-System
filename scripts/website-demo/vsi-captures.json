@@ -114,6 +114,62 @@
       "sha256": "a76e9dfc34068d8024c991f57c260f044f624f8802777ae2ff63ae26a71523d5",
       "sourceScreen": "/app/si",
       "bytes": 106438
+    },
+    {
+      "original": "127.0.0.1_3190_app_si (5).png",
+      "sourceDimensions": [
+        640,
+        2400
+      ],
+      "crop": [
+        18,
+        732,
+        622,
+        1942
+      ],
+      "dimensions": [
+        604,
+        1210
+      ],
+      "viewport": [
+        320,
+        1200
+      ],
+      "transcriptScrollTop": 271,
+      "dpr": 2,
+      "encoding": "Native PNG to lossless WebP, integer crop, no resizing",
+      "file": "vsi-recommendation-narrow.webp",
+      "sha256": "e72940a041b1c206b91dd8f217472e7b14eaaf6a548993d810816889f20b6080",
+      "sourceScreen": "/app/si",
+      "bytes": 118768
+    },
+    {
+      "original": "127.0.0.1_3190_app_si (6).png",
+      "sourceDimensions": [
+        640,
+        2400
+      ],
+      "crop": [
+        18,
+        740,
+        622,
+        1982
+      ],
+      "dimensions": [
+        604,
+        1242
+      ],
+      "viewport": [
+        320,
+        1200
+      ],
+      "transcriptScrollTop": 871,
+      "dpr": 2,
+      "encoding": "Native PNG to lossless WebP, integer crop, no resizing",
+      "file": "vsi-plan-narrow.webp",
+      "sha256": "c38958fc0910ff5f98c8a11176a0899d79bdc0d0f976d3c1f223e6d009f79f10",
+      "sourceScreen": "/app/si",
+      "bytes": 225014
     }
   ]
 }

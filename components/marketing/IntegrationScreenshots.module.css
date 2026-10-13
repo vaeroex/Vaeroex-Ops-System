@@ -12,3 +12,8 @@
 @media (max-width: 600px) { .tour { max-width: 358px; margin-block: 24px; } .tabs { gap: 6px; } .tabs button { padding: 8px 10px; font-size: 12px; } .imageLink { padding: 6px; } }
 .transcriptLink { color: #bed3ff; text-decoration: underline; text-underline-offset: 3px; }
 .transcriptLink:focus-visible { outline: 2px solid #9ebfff; outline-offset: 4px; }
+
+@media (max-width: 600px) {
+  .vsiTour { width: calc(100vw - 32px); max-width: 372px; position: relative; left: 50%; transform: translateX(-50%); margin-inline: 0; }
+  .vsiTour .imageLink { padding: 0; }
+}
