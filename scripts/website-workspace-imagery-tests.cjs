@@ -6,6 +6,20 @@ const {build, createServer} = require('./website-demo-preview.cjs');
 (async () => {
   const result = await build({test:true});
   const demo = require(path.join(result.output, 'render.cjs'));
+  assert.equal(demo.squareBrowser.totalCount, 3);
+  assert.equal(demo.squareBrowser.currentConnection, null);
+  assert.ok(demo.squareBrowser.connections.every(row => row.state === 'disconnected'));
+  assert.equal(demo.squarePaymentInputs.reduce((sum, row) => sum + Number(row.amountMinor), 0), 35100);
+  assert.equal(demo.accountingAmounts.sales, demo.metrics[0].values.at(-1));
+  assert.equal(demo.accountingAmounts.grossProfit / demo.accountingAmounts.sales, .7);
+  assert.equal(demo.accountingAmounts.netIncome, 8695.2);
+  assert.equal(demo.qboBrowser.additive, false);
+  assert.equal(demo.qboBrowser.detail.value.reportType, 'ProfitAndLoss');
+  const preview = demo.sheetsPreview(new URLSearchParams({connectionId:demo.sheetsConnectionId,fieldMapping:JSON.stringify(demo.sheetsMapping)}));
+  assert.equal(preview.rows.length, 3);
+  assert.deepEqual(preview.rows.at(-1), ['W28','2026-10-12','96']);
+  assert.equal(demo.sheetsMapping.metrics[0].target, 90);
+  assert.throws(() => demo.sheetsPreview(new URLSearchParams({connectionId:'other-workspace'})));
   const originalNow = Date.now;
   Date.now = () => Date.parse(demo.AS_OF);
   const calculated = demo.calculatedIntelligence();
@@ -36,7 +50,10 @@ const {build, createServer} = require('./website-demo-preview.cjs');
   assert.ok(boundary.moduleFiles.some(f=>f.endsWith('/components/intelligence/IntelligenceSignalInbox.tsx')));
   assert.ok(boundary.moduleFiles.some(f=>f.endsWith('/app/app/kpis/page.tsx')));
   assert.ok(!boundary.moduleFiles.some(f=>/\/lib\/supabase\/(client|server|admin)\./.test(f)));
-  const manifest = JSON.parse(fs.readFileSync('scripts/website-demo/captures.json'));
+  const manifest = {assets: [
+    ...JSON.parse(fs.readFileSync("scripts/website-demo/captures.json")).assets,
+    ...JSON.parse(fs.readFileSync("scripts/website-demo/integration-captures.json")).assets
+  ]};
   for (const asset of manifest.assets) {
     const bytes = fs.readFileSync(path.join('public/images/workspace-demo',asset.file));
     assert.equal(asset.dpr, 2);

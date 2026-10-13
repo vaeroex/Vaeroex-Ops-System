@@ -64,3 +64,7 @@ The replacements are native 2× PNG → lossless WebP, with no intermediate resi
 All final images show only fictional business content and ordinary workspace controls. No real account details, emails, private identifiers, credentials, customer records or admin-only controls appear. Source invoice numbers are fictional business references, not system IDs.
 
 `node scripts/website-workspace-imagery-tests.cjs` rebuilds the component harness and verifies source counts/bytes, calculated health/readiness, historical records, contextual evidence, supplier totals/limitations, asset hashes/density/size, the local write/network boundary and the main deployment hold. It runs in required public CI. Website review covers desktop, 390 and 320 CSS pixels at DPR 2, actual delivered sources, image loading/aspect ratio, tabs, keyboard navigation, overflow and existing CTA destinations. Public copy outside capture-specific captions, pricing, checkout, integration disclosures and all 3D scenes remain unchanged.
+
+## Integration imagery extension
+
+The approved ten overview/detail assets remain unchanged. Six new native 2× lossless captures show the actual Square saved-Payments browser, QuickBooks report observation, and Google Sheets selected-cell preview. See [Coastal Kitchen reusable scenario](coastal-kitchen-demo.md) and `scripts/website-demo/integration-captures.json` for provider relationships, capture provenance and reproduction. No live connection, account, import or production mutation is involved.

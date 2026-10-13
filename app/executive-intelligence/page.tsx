@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
+import { IntegrationScreenshotTour } from "@/components/marketing/IntegrationScreenshots";
 import { WorkspaceScreenshotTour } from "@/components/marketing/WorkspaceScreenshots";
 import story from "@/components/marketing/ExecutiveStory.module.css";
 import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
@@ -139,6 +140,7 @@ export default function OperationsIntelligencePage() {
               <p>Add Business Notes for context. Review and approve proposed information before it becomes business evidence; image recognition can miss details.</p>
             </article>
           </div>
+          <IntegrationScreenshotTour />
           <p className={story.sourceRule}>Each metric uses one authoritative source within a reporting scope. Overlapping connected, uploaded, and manual values are not automatically consolidated or deduplicated. Source changes require review.</p>
           <div className={story.integrationStatus}>
             <Link href="/pricing#google-sheets-availability" className={story.pilotLink}>Google Sheets · Limited pilot<ArrowRight size={15} aria-hidden="true" /></Link>
