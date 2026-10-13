@@ -203,7 +203,23 @@ function withoutGoogleSheetsAuthority(source) {
   return source;
 }
 
+// The requested navigation refinement has independent behavioral tests. Reverse
+// only its exact reviewed hunks before checking the original data/action hashes.
+// A scope, token, handler or new-state substitution inside a hunk is rejected;
+// all untouched logic remains covered by the original frozen fingerprints.
+const intelligenceRefinement = require("./fixtures/intelligence-refinement-presentation-exception.json");
+function withoutIntelligenceRefinement(file, source) {
+  const entry = intelligenceRefinement.files.find(item => item.file === file);
+  if (!entry) return source;
+  for (const {before, after} of entry.changes) {
+    assert.equal(source.split(after).length, 2, "Require exactly the reviewed Intelligence refinement binding");
+    source = source.replace(after, before);
+  }
+  return source;
+}
+
 function withoutIntegrationResults(source) {
+  source = withoutIntelligenceRefinement(intelligenceFile, source);
   source = withoutHealthConsolidation(intelligenceFile, withoutGoogleSheetsAuthority(source));
   // Strip only the reviewed dashboard bindings and restore the exact former
   // access binding. The original 75c3d61 workflow hashes stay frozen.
@@ -248,6 +264,7 @@ for (const [file, count, actionsDigest, logicDigest] of contracts) {
       }
     }
     if (file === intelligenceFile) source = withoutIntegrationResults(source);
+    if (file === "components/intelligence/IntelligenceSignalInbox.tsx") source = withoutIntelligenceRefinement(file, source);
     const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const actions = actionInventory(tree);
     assert.equal(actions.length, count, "No existing action or protected form binding may be lost or added by this presentation change");
@@ -406,11 +423,32 @@ test("source-parent completeness exception rejects missing, duplicate and extra 
 
 test("Health relocation exception rejects missing, duplicate and altered reviewed hunks", () => {
   for (const { file, changes } of healthConsolidation.files) {
-    const source = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
+    const source = withoutIntelligenceRefinement(file, fs.readFileSync(path.join(__dirname, "..", file), "utf8"));
     for (const { after } of changes) {
       for (const replacement of ["", after + after, after.replace(/\S/, "!")]) {
         assert.throws(() => withoutHealthConsolidation(file, source.replace(after, replacement)), assert.AssertionError);
       }
     }
+  }
+});
+
+
+test("Intelligence refinement exception rejects missing, duplicate and altered reviewed hunks", () => {
+  for (const {file, changes} of intelligenceRefinement.files) {
+    const source = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
+    for (const {after} of changes) {
+      for (const replacement of ["", after + after, after.replace(/\S/, "!")]) {
+        assert.throws(() => withoutIntelligenceRefinement(file, source.replace(after, replacement)), assert.AssertionError);
+      }
+    }
+  }
+});
+
+test("relocated Overview period calculations match the original implementation exactly", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "lib/presentation/overview-comparison.ts"), "utf8");
+  const tree = ts.createSourceFile("comparison.ts", source, ts.ScriptTarget.Latest, true);
+  const functions = new Map(tree.statements.filter(ts.isFunctionDeclaration).map(node => [node.name.text, printer.printNode(ts.EmitHint.Unspecified, node, tree)]));
+  for (const {name, digest: expected} of intelligenceRefinement.comparisonFunctions) {
+    assert.equal(digest(functions.get(name)), expected, `${name} must preserve its former Overview calculation`);
   }
 });
