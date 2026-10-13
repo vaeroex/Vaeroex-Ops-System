@@ -38,12 +38,12 @@ export function WorkspaceScreenshotTour() {
   const tabs = useRef<Array<HTMLButtonElement | null>>([]);
   return <div className={styles.tour}>
     <div role="tablist" aria-label="Workspace screenshot views" className={styles.tabs}>
-      {views.map((key, index) => <button key={key} ref={element => { tabs.current[index] = element; }} type="button" role="tab" id={`workspace-shot-tab-${key}`} aria-controls={`workspace-shot-panel-${key}`} aria-selected={view === key} tabIndex={view === key ? 0 : -1} onClick={() => setView(key)} onKeyDown={event => {
+      {views.map((key, index) => <button key={key} ref={element => { tabs.current[index] = element; }} type="button" role="tab" id={`workspace-shot-tab-${key}`} aria-controls="workspace-shot-panel" aria-selected={view === key} tabIndex={view === key ? 0 : -1} onClick={() => setView(key)} onKeyDown={event => {
         const next = event.key === "ArrowRight" ? (index + 1) % views.length : event.key === "ArrowLeft" ? (index + views.length - 1) % views.length : event.key === "Home" ? 0 : event.key === "End" ? views.length - 1 : null;
         if (next !== null) { event.preventDefault(); setView(views[next]); tabs.current[next]?.focus(); }
       }}>{captures[key].label}</button>)}
     </div>
-    <div role="tabpanel" id={`workspace-shot-panel-${view}`} aria-labelledby={`workspace-shot-tab-${view}`} tabIndex={0}>
+    <div role="tabpanel" id="workspace-shot-panel" aria-labelledby={`workspace-shot-tab-${view}`} tabIndex={0}>
       <WorkspaceCapture view={view} />
     </div>
   </div>;

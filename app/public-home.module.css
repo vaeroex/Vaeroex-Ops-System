@@ -821,13 +821,13 @@
   }
 }
 
-/* Evidence section: a source-to-interpretation diagram, independent of the journey. */
+/* Actual workspace evidence capture, independent of the 3D journey. */
 .material {
   height: auto;
   padding: 95px max(32px, calc((100vw - 1328px) / 2));
   display: grid;
   grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.7fr);
-  align-items: center;
+  align-items: start;
   gap: 55px;
   background:
     radial-gradient(ellipse at 80% 45%, #13203a52, transparent 65%), #0a0c10;
