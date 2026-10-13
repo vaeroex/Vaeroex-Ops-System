@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { Check, ChevronRight, History, Pin, PinOff, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { explainFindingAction } from "@/app/app/finding-explanation/actions";
 import { mutateIntelligenceCardLifecycleAction } from "@/app/app/intelligence/lifecycle-actions";
 import { SaveAnalysisButton } from "@/components/reports/SaveAnalysisButton";
@@ -31,9 +31,11 @@ import {
   semanticStatusClass
 } from "@/lib/presentation/semantic-status";
 
+import { findingPage, findingPageNumbers, findingPageSize, repeatsFindingFigures } from "@/lib/presentation/finding-pagination";
+
 const signalTypes: IntelligenceInsightType[] = ["Risk", "Opportunity", "Forecast", "Bottleneck", "Recommendation", "Anomaly"];
 type SignalView = "All" | IntelligenceInsightType;
-const pageSize = 10;
+const pageSize = findingPageSize;
 
 type PanelMode = "summary" | "evidence" | "analysis";
 type LifecycleView = "current" | "history";
@@ -460,13 +462,17 @@ export function IntelligenceSignalInbox({
   blockedState?: IntelligenceBlockedState | null;
 }) {
   const router = useRouter();
+  const pageForCard = useCallback((card: IntelligenceLifecycleCardV1) => {
+    const ordered = sortIntelligenceLifecycleCardsV1(card.view === "current" ? currentCards : historyCards);
+    return Math.floor(ordered.findIndex(item => item.findingKeyHash === card.findingKeyHash) / pageSize) + 1;
+  }, [currentCards, historyCards]);
   const requestedCard = initialFindingId ? [...currentCards, ...historyCards].find((card) => card.findingId === initialFindingId) : null;
   const [lifecycleView, setLifecycleView] = useState<LifecycleView>(requestedCard?.view || "current");
   const [activeType, setActiveType] = useState<SignalView>("All");
   const [selectedKey, setSelectedKey] = useState<string>(() => requestedCard?.findingKeyHash || sortIntelligenceLifecycleCardsV1(currentCards)[0]?.findingKeyHash || "");
   const [mobileDetailOpen, setMobileDetailOpen] = useState(Boolean(requestedCard));
   const [hideLowConfidence, setHideLowConfidence] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(pageSize);
+  const [page, setPage] = useState(() => requestedCard ? pageForCard(requestedCard) : 1);
   const [panelMode, setPanelMode] = useState<PanelMode>("summary");
   const [explanationStates, setExplanationStates] = useState<Record<string, FindingExplanationState>>({});
   const [dismissOpen, setDismissOpen] = useState(false);
@@ -477,6 +483,8 @@ export function IntelligenceSignalInbox({
   const [isLifecyclePending, startLifecycleTransition] = useTransition();
   const explanationInFlight = useRef<Set<string>>(new Set());
   const detailRef = useRef<HTMLElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const listReturnRef = useRef<{ top: number; trigger: HTMLButtonElement | null }>({ top: 0, trigger: null });
 
   useEffect(() => {
@@ -487,12 +495,12 @@ export function IntelligenceSignalInbox({
 
   // UI-only history belongs to this workspace. Native history integrates with
   // Next without a server navigation or regenerating evidence on selection.
-  type NavigationState = { workspaceId: string; lifecycleView: LifecycleView; activeType: SignalView; selectedKey: string; mobileDetailOpen: boolean; hideLowConfidence: boolean; visibleCount: number; panelMode: PanelMode; listTop: number; returnEntry: boolean };
+  type NavigationState = { workspaceId: string; lifecycleView: LifecycleView; activeType: SignalView; selectedKey: string; mobileDetailOpen: boolean; hideLowConfidence: boolean; page: number; panelMode: PanelMode; listTop: number; returnEntry: boolean };
   const navigationRef = useRef<NavigationState | null>(null);
   const returnEntryRef = useRef(false);
-  navigationRef.current = { workspaceId, lifecycleView, activeType, selectedKey, mobileDetailOpen, hideLowConfidence, visibleCount, panelMode, listTop: listReturnRef.current.top, returnEntry: returnEntryRef.current };
+  navigationRef.current = { workspaceId, lifecycleView, activeType, selectedKey, mobileDetailOpen, hideLowConfidence, page, panelMode, listTop: listReturnRef.current.top, returnEntry: returnEntryRef.current };
 
-  function commitNavigation(overrides: Partial<NavigationState>, push = false) {
+  const commitNavigation = useCallback((overrides: Partial<NavigationState>, push = false) => {
     if (typeof window === "undefined" || !window.history || !window.location) return;
     const state = { ...navigationRef.current!, ...overrides };
     const url = new URL(window.location.href);
@@ -500,36 +508,38 @@ export function IntelligenceSignalInbox({
     if (state.mobileDetailOpen && card) url.searchParams.set("finding", card.findingId);
     else url.searchParams.delete("finding");
     window.history[push ? "pushState" : "replaceState"]({ ...window.history.state, vaeroexFindings: state }, "", `${url.pathname}${url.search}${url.hash}`);
+    navigationRef.current = state;
     returnEntryRef.current = state.returnEntry;
-  }
+  }, [currentCards, historyCards]);
 
   useEffect(() => {
     function restore() {
       const candidate = window.history.state?.vaeroexFindings as NavigationState | undefined;
       const valid = candidate?.workspaceId === workspaceId && ["current", "history"].includes(candidate.lifecycleView)
         && ["All", ...signalTypes].includes(candidate.activeType) && ["summary", "evidence", "analysis"].includes(candidate.panelMode)
-        && Number.isSafeInteger(candidate.visibleCount) && candidate.visibleCount >= pageSize && Number.isFinite(candidate.listTop);
+        && Number.isSafeInteger(candidate.page) && candidate.page >= 1 && Number.isFinite(candidate.listTop);
       const requested = new URLSearchParams(window.location.search).get("finding");
       const linked = [...currentCards, ...historyCards].find(card => card.findingId === requested);
       if (valid && candidate) {
         setLifecycleView(candidate.lifecycleView); setActiveType(candidate.activeType); setHideLowConfidence(candidate.hideLowConfidence);
-        setVisibleCount(candidate.visibleCount); setSelectedKey(candidate.selectedKey); setMobileDetailOpen(candidate.mobileDetailOpen);
+        setPage(candidate.page); setSelectedKey(candidate.selectedKey); setMobileDetailOpen(candidate.mobileDetailOpen);
         setPanelMode(candidate.panelMode); returnEntryRef.current = candidate.returnEntry;
         listReturnRef.current.top = candidate.listTop;
         if (!candidate.mobileDetailOpen) window.requestAnimationFrame(() => {
-          listReturnRef.current.trigger?.focus({ preventScroll: true });
+          focusListSelection(candidate.selectedKey);
           window.scrollTo({ top: candidate.listTop, behavior: "instant" });
         });
       } else if (linked) {
-        setLifecycleView(linked.view); setActiveType("All"); setHideLowConfidence(false); setSelectedKey(linked.findingKeyHash); setMobileDetailOpen(true); setPanelMode("summary");
+        setPage(pageForCard(linked)); setLifecycleView(linked.view); setActiveType("All"); setHideLowConfidence(false); setSelectedKey(linked.findingKeyHash); setMobileDetailOpen(true); setPanelMode("summary");
         returnEntryRef.current = false;
       }
+      else { commitNavigation({}); }
       setDismissOpen(false);
     }
     restore();
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
-  }, [workspaceId, currentCards, historyCards]);
+  }, [workspaceId, currentCards, historyCards, commitNavigation, pageForCard]);
 
   const viewCards = lifecycleView === "current" ? currentCards : historyCards;
   const counts = useMemo(
@@ -543,56 +553,84 @@ export function IntelligenceSignalInbox({
       .filter((card) => !hideLowConfidence || card.snapshot.confidence !== "Low")),
     [activeType, hideLowConfidence, viewCards]
   );
-  const pagedCards = filteredCards.slice(0, visibleCount);
-  const selectedCard = selectedKey ? filteredCards.find((card) => card.findingKeyHash === selectedKey) || pagedCards[0] || null : null;
+  const pagination = findingPage(filteredCards, page);
+  const pagedCards = pagination.items;
+  const selectedCard = pagedCards.find(card => card.findingKeyHash === selectedKey) || pagedCards[0] || null;
   const selectedInsight = selectedCard?.insight || null;
-  const currentAttention = pagedCards.filter((card) => attentionTypes.has(card.snapshot.type));
-  const currentImprovements = pagedCards.filter((card) => improvementTypes.has(card.snapshot.type));
-  const remainingAttention = filteredCards.slice(visibleCount).some((card) => attentionTypes.has(card.snapshot.type));
-  const remainingImprovements = filteredCards.slice(visibleCount).some((card) => improvementTypes.has(card.snapshot.type));
-  const totalCurrentAttention = currentCards.filter((card) => attentionTypes.has(card.snapshot.type));
-  const totalCurrentImprovements = currentCards.filter((card) => improvementTypes.has(card.snapshot.type));
-  const surfacedAttention = [...currentCards, ...historyCards].filter((card) => card.currentFeedStatus === "surfaced" && attentionTypes.has(card.snapshot.type));
+  const currentAttention = pagedCards.filter(card => attentionTypes.has(card.snapshot.type));
+  const currentImprovements = pagedCards.filter(card => improvementTypes.has(card.snapshot.type));
+
+  // A refresh can remove the final row or change its order. Clamp immediately for
+  // rendering, then reconcile the stored page/selection and its history entry.
+  useEffect(() => {
+    const nextKey = selectedCard?.findingKeyHash || "";
+    if (page === pagination.page && selectedKey === nextKey) return;
+    setPage(pagination.page); setSelectedKey(nextKey); setMobileDetailOpen(false);
+    setPanelMode("summary"); setDismissOpen(false);
+    commitNavigation({ page: pagination.page, selectedKey: nextKey, mobileDetailOpen: false, panelMode: "summary", returnEntry: false });
+  }, [pagination.page, page, selectedKey, selectedCard?.findingKeyHash, commitNavigation]);
+
+  function focusListSelection(key: string) {
+    const trigger = Array.from(sectionRef.current?.querySelectorAll<HTMLButtonElement>("[data-finding-key]") || [])
+      .find(row => row.dataset.findingKey === key);
+    (trigger || listReturnRef.current.trigger)?.focus({ preventScroll: true });
+  }
+
+  function browse(overrides: Partial<NavigationState>) {
+    if (typeof window !== "undefined") commitNavigation({ listTop: window.scrollY });
+    commitNavigation({ ...overrides, mobileDetailOpen: false, panelMode: "summary", returnEntry: false }, true);
+    setMobileDetailOpen(false); setPanelMode("summary"); setDismissOpen(false);
+  }
 
   function selectView(view: LifecycleView) {
     const cards = sortIntelligenceLifecycleCardsV1((view === "current" ? currentCards : historyCards)
-      .filter((card) => !hideLowConfidence || card.snapshot.confidence !== "Low"));
-    commitNavigation({ lifecycleView: view, activeType: "All", selectedKey: cards[0]?.findingKeyHash || "", mobileDetailOpen: false, visibleCount: pageSize, panelMode: "summary", returnEntry: false });
-    setLifecycleView(view);
-    setActiveType("All");
-    setSelectedKey(cards[0]?.findingKeyHash || "");
-    setMobileDetailOpen(false);
-    setVisibleCount(pageSize);
-    setPanelMode("summary");
-    setDismissOpen(false);
+      .filter(card => !hideLowConfidence || card.snapshot.confidence !== "Low"));
+    browse({ lifecycleView: view, activeType: "All", selectedKey: cards[0]?.findingKeyHash || "", page: 1 });
+    setLifecycleView(view); setActiveType("All"); setSelectedKey(cards[0]?.findingKeyHash || ""); setPage(1);
   }
 
   function selectType(type: SignalView) {
     const firstCard = sortIntelligenceLifecycleCardsV1(viewCards
-      .filter((card) => type === "All" || card.snapshot.type === type)
-      .filter((card) => !hideLowConfidence || card.snapshot.confidence !== "Low"))[0];
-    commitNavigation({ activeType: type, selectedKey: firstCard?.findingKeyHash || "", mobileDetailOpen: false, visibleCount: pageSize, panelMode: "summary", returnEntry: false });
-    setActiveType(type);
-    setSelectedKey(firstCard?.findingKeyHash || "");
-    setMobileDetailOpen(false);
-    setVisibleCount(pageSize);
-    setPanelMode("summary");
-    setDismissOpen(false);
+      .filter(card => type === "All" || card.snapshot.type === type)
+      .filter(card => !hideLowConfidence || card.snapshot.confidence !== "Low"))[0];
+    browse({ activeType: type, selectedKey: firstCard?.findingKeyHash || "", page: 1 });
+    setActiveType(type); setSelectedKey(firstCard?.findingKeyHash || ""); setPage(1);
   }
 
   function changeConfidenceFilter(hide: boolean) {
-    const nextCards = sortIntelligenceLifecycleCardsV1(viewCards
-      .filter((card) => activeType === "All" || card.snapshot.type === activeType)
-      .filter((card) => !hide || card.snapshot.confidence !== "Low"));
-    if (selectedKey && !nextCards.some((card) => card.findingKeyHash === selectedKey) && nextCards[0]) {
-      setSelectedKey(nextCards[0].findingKeyHash);
-      setPanelMode("summary");
-      setDismissOpen(false);
-    }
-    commitNavigation({ hideLowConfidence: hide, selectedKey: nextCards.some(card => card.findingKeyHash === selectedKey) ? selectedKey : nextCards[0]?.findingKeyHash || "", mobileDetailOpen: false, visibleCount: pageSize, panelMode: "summary", returnEntry: false });
-    setHideLowConfidence(hide);
-    setVisibleCount(pageSize);
-    setMobileDetailOpen(false);
+    const firstCard = sortIntelligenceLifecycleCardsV1(viewCards
+      .filter(card => activeType === "All" || card.snapshot.type === activeType)
+      .filter(card => !hide || card.snapshot.confidence !== "Low"))[0];
+    browse({ hideLowConfidence: hide, selectedKey: firstCard?.findingKeyHash || "", page: 1 });
+    setHideLowConfidence(hide); setSelectedKey(firstCard?.findingKeyHash || ""); setPage(1);
+  }
+
+  function changePage(requestedPage: number) {
+    const next = findingPage(filteredCards, requestedPage);
+    if (next.page === pagination.page) return;
+    const key = next.items[0]?.findingKeyHash || "";
+    const top = typeof window === "undefined" ? 0 : Math.max(0, window.scrollY + (sectionRef.current?.getBoundingClientRect().top || 0) - 96);
+    browse({ page: next.page, selectedKey: key, listTop: top });
+    setPage(next.page); setSelectedKey(key);
+    listReturnRef.current = { top, trigger: null };
+    if (typeof window !== "undefined") window.requestAnimationFrame(() => {
+      headingRef.current?.focus({ preventScroll: true });
+      sectionRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
+    });
+  }
+
+  function paginationControls(position: "top" | "bottom") {
+    const buttonClass = "vaeroex-semantic-interactive min-h-9 rounded-md border border-white/10 px-2 text-xs font-semibold text-slate-200 hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed";
+    return <nav aria-label={`Findings pagination ${position}`} className="space-y-2 border-white/10 py-2">
+      <p role={position === "top" ? "status" : undefined} className="text-xs text-slate-400">Showing {pagination.start ? `${pagination.start}–${pagination.end}` : "0"} of {filteredCards.length}</p>
+      <div className="flex flex-wrap items-center gap-1">
+        <button type="button" disabled={pagination.page === 1} onClick={() => changePage(pagination.page - 1)} className={buttonClass}>Previous</button>
+        {findingPageNumbers(pagination.page, pagination.totalPages).map((number, index) => number === "…"
+          ? <span key={`gap-${index}`} aria-hidden="true" className="px-1 text-xs text-slate-400">…</span>
+          : <button key={number} type="button" aria-label={`Page ${number}`} aria-current={number === pagination.page ? "page" : undefined} onClick={() => changePage(number)} className={`${buttonClass} min-w-8 ${number === pagination.page ? "bg-white/10 text-white" : ""}`}>{number}</button>)}
+        <button type="button" disabled={pagination.page === pagination.totalPages} onClick={() => changePage(pagination.page + 1)} className={buttonClass}>Next</button>
+      </div>
+    </nav>;
   }
 
   function selectCard(card: IntelligenceLifecycleCardV1, trigger: HTMLButtonElement) {
@@ -607,12 +645,15 @@ export function IntelligenceSignalInbox({
 
   function backToList() {
     if (returnEntryRef.current && window.history) { window.history.back(); return; }
-    commitNavigation({ mobileDetailOpen: false, returnEntry: false });
+    if (!returnEntryRef.current && !listReturnRef.current.trigger) {
+      listReturnRef.current.top = Math.max(0, window.scrollY + (sectionRef.current?.getBoundingClientRect().top || 0) - 96);
+    }
+    commitNavigation({ mobileDetailOpen: false, returnEntry: false, listTop: listReturnRef.current.top });
     setMobileDetailOpen(false);
     setDismissOpen(false);
-    const { top, trigger } = listReturnRef.current;
+    const { top } = listReturnRef.current;
     window.requestAnimationFrame(() => {
-      trigger?.focus({ preventScroll: true });
+      focusListSelection(selectedKey);
       window.scrollTo({ top, behavior: "instant" });
     });
   }
@@ -683,7 +724,7 @@ export function IntelligenceSignalInbox({
       <button key={card.findingKeyHash} type="button" data-finding-key={card.findingKeyHash} data-finding-category={card.snapshot.type} aria-current={selected ? "true" : undefined} onClick={(event) => selectCard(card, event.currentTarget)} className={`workspace-finding-card intelligence-finding-row cursor-pointer ${selected ? "is-selected" : ""}`}>
         <div className="flex items-start justify-between gap-3"><h3 className="min-w-0 text-sm font-semibold leading-6 text-white">{card.snapshot.title}</h3><span className="mt-1 inline-flex shrink-0 gap-1">{card.pinned ? <Pin aria-label="Pinned" className="h-4 w-4 text-cyan-200" /> : null}<span className="sr-only">View details</span><ChevronRight aria-hidden="true" className="h-4 w-4 text-slate-400" /></span></div>
         {keyFigure ? <p className="mt-1 break-words text-sm font-medium tabular-nums text-slate-200">{keyFigure}</p> : null}
-        <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-400">{compactText(card.snapshot.summary, 130)}</p>
+        {!repeatsFindingFigures(card.snapshot.summary, keyFigure) ? <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-400">{compactText(card.snapshot.summary, 130)}</p> : null}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5 text-slate-400">
           <span className="intelligence-category-badge" data-finding-category={card.snapshot.type}><CategoryIcon aria-hidden="true" className="h-3.5 w-3.5" />{card.snapshot.type}</span>
           <span className="intelligence-priority" data-priority={card.snapshot.priority}>{card.snapshot.priority === "Low" ? "Low priority" : priority.label}</span><span>{card.snapshot.confidence} confidence</span><time dateTime={card.snapshot.lastUpdated}>{formatSignalDate(card.snapshot.lastUpdated)}</time>
@@ -694,12 +735,11 @@ export function IntelligenceSignalInbox({
   }
 
   return (
-    <section className="workspace-findings vaeroex-intelligence-inbox rounded-xl border border-white/10 bg-[#10151f] p-3 text-slate-100 sm:p-5">
+    <section ref={sectionRef} className="scroll-mt-24 workspace-findings vaeroex-intelligence-inbox rounded-xl border border-white/10 bg-[#10151f] p-3 text-slate-100 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-white">Current findings and history</h2>
+          <h2 ref={headingRef} tabIndex={-1} className="text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300">Current findings and history</h2>
         </div>
-        <p className="text-xs text-slate-400">Showing {filteredCards.length ? `1-${pagedCards.length}` : "0"} of {filteredCards.length}.</p>
       </div>
 
       <div className="workspace-inbox-toolbar mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -728,39 +768,26 @@ export function IntelligenceSignalInbox({
 
       <div className="intelligence-findings-layout mt-4 grid items-start gap-5 xl:grid-cols-[minmax(17rem,.8fr)_minmax(0,1.6fr)]">
         <div data-finding-list className={`${mobileDetailOpen && selectedCard ? "hidden xl:block" : "block"} workspace-finding-list min-w-0 space-y-5`}>
-          {lifecycleView === "current" && activeType === "All" ? (
+          {paginationControls("top")}
+          {pagedCards.length ? lifecycleView === "current" && activeType === "All" ? (
             <>
-              <section className="space-y-1" aria-labelledby="attention-findings-heading">
-                <div>
-                  <h3 id="attention-findings-heading" className="text-base font-semibold text-white">What needs attention</h3>
-                  <p className="mt-1 text-xs text-slate-400">Risks, bottlenecks, and anomalies.</p>
-                </div>
-                {currentAttention.length ? currentAttention.map(renderCard) : (
-                  <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-5 text-sm leading-6 text-slate-300">
-                    {remainingAttention ? "More attention findings are available. Load more to view them." : hideLowConfidence && totalCurrentAttention.length
-                      ? "No current attention findings match the selected filter."
-                      : surfacedAttention.length
-                        ? "No undismissed issues are in the current feed. Dismissed findings remain in History."
-                        : blockedState?.description || "No active issues require attention."}
-                  </div>
-                )}
-              </section>
-              <section className="space-y-1 border-t border-white/10 pt-5" aria-labelledby="improvement-findings-heading">
-                <div>
-                  <h3 id="improvement-findings-heading" className="text-base font-semibold text-white">What could improve the business further</h3>
-                  <p className="mt-1 text-xs text-slate-400">Opportunities, recommendations, and forecasts.</p>
-                </div>
-                {currentImprovements.length ? currentImprovements.map(renderCard) : (
-                  <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-5 text-sm leading-6 text-slate-300">{remainingImprovements ? "More improvement findings are available. Load more to view them." : hideLowConfidence && totalCurrentImprovements.length ? "No improvement findings match the selected filter." : blockedState?.title || "No evidence-backed improvement finding is currently surfaced."}</div>
-                )}
-              </section>
+              {currentAttention.length ? <section className="space-y-1" aria-labelledby="attention-findings-heading">
+                <h3 id="attention-findings-heading" className="text-base font-semibold text-white">What needs attention</h3>
+                <p className="mt-1 text-xs text-slate-400">Risks, bottlenecks, and anomalies.</p>
+                {currentAttention.map(renderCard)}
+              </section> : null}
+              {currentImprovements.length ? <section className={`space-y-1 ${currentAttention.length ? "border-t border-white/10 pt-5" : ""}`} aria-labelledby="improvement-findings-heading">
+                <h3 id="improvement-findings-heading" className="text-base font-semibold text-white">What could improve the business further</h3>
+                <p className="mt-1 text-xs text-slate-400">Opportunities, recommendations, and forecasts.</p>
+                {currentImprovements.map(renderCard)}
+              </section> : null}
             </>
-          ) : pagedCards.length ? pagedCards.map(renderCard) : (
+          ) : pagedCards.map(renderCard) : (
             <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-5 text-sm leading-6 text-slate-300">
-              {lifecycleView === "history" ? "No lifecycle history matches these filters." : typeEmptyMessage(activeType)}
+              {lifecycleView === "history" ? "No lifecycle history matches these filters." : blockedState?.description || typeEmptyMessage(activeType)}
             </div>
           )}
-          {filteredCards.length > pagedCards.length ? <button type="button" onClick={() => { commitNavigation({ visibleCount: visibleCount + pageSize }); setVisibleCount((count) => count + pageSize); }} className="min-h-10 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">Load more</button> : null}
+          {paginationControls("bottom")}
         </div>
 
         <aside ref={detailRef} tabIndex={-1} aria-label="Selected finding" className={`${mobileDetailOpen && selectedCard ? "block" : "hidden xl:block"} workspace-finding-detail intelligence-finding-detail min-w-0 scroll-mt-24 rounded-lg border border-white/10 bg-[#151c28] p-4 sm:p-6 xl:sticky xl:top-20 xl:self-start`}>
