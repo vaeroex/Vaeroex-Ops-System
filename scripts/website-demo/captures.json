@@ -191,48 +191,62 @@
     {
       "file": "performance-desktop.webp",
       "width": 1832,
-      "height": 1912,
-      "bytes": 66370,
-      "sha256": "b50ddbe138dd81f184ef26c95124704af98a930028b1bfd1c14ced12fe28ec32",
+      "height": 2096,
+      "bytes": 77276,
+      "sha256": "debf74bf418d2fcd372fd501b17d766bb3db0369effd3a55df4482b7de3bc13b",
       "sourceDimensions": [
         2400,
-        4704
+        4888
       ],
       "crop": [
         520,
         708,
         2352,
-        2620
+        2804
       ],
       "dimensions": [
         1832,
-        1912
+        2096
       ],
       "dpr": 2,
-      "encoding": "PNG to lossless WebP, no resizing"
+      "encoding": "PNG to lossless WebP, no resizing",
+      "viewport": [
+        1200,
+        1000
+      ],
+      "applicationCommit": "dc3e650bb1d651046701ab4f72ba79e33b5272f5",
+      "sourceScreen": "/app/kpis?timeline=90D&metric=Weekly+net+sales&section=detail",
+      "scope": "Historical target hit rate 17/28 (60.71%); latest 12 recorded values in chart, all 12 meeting the unchanged $24,000 target."
     },
     {
       "file": "performance-mobile.webp",
       "width": 692,
-      "height": 870,
-      "bytes": 23896,
-      "sha256": "30937a6cfc6ad6ff21831300fb85fbb9057545d0dbebbe94dd2adb990ec9ce00",
+      "height": 1256,
+      "bytes": 30874,
+      "sha256": "9583a34f80f3e04d15d7966a6385c24a4f66f0639acc5b460f1bb1ce58c0255d",
       "sourceDimensions": [
         780,
-        6304
+        6496
       ],
       "crop": [
         44,
-        2830,
+        2294,
         736,
-        3700
+        3550
       ],
       "dimensions": [
         692,
-        870
+        1256
       ],
       "dpr": 2,
-      "encoding": "PNG to lossless WebP, no resizing"
+      "encoding": "PNG to lossless WebP, no resizing",
+      "viewport": [
+        390,
+        1000
+      ],
+      "applicationCommit": "dc3e650bb1d651046701ab4f72ba79e33b5272f5",
+      "sourceScreen": "/app/kpis?timeline=90D&metric=Weekly+net+sales&section=detail",
+      "scope": "Historical target hit rate 17/28 (60.71%); latest 12 recorded values in chart, all 12 meeting the unchanged $24,000 target."
     }
   ]
 }

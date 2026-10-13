@@ -2,7 +2,7 @@
 
 ## Provenance and isolation
 
-Application source: `3f5431207c43534caf2c4f3b9d4b9057c8583799` (main after #495/#496). This revision changes only marketing presentation, static images, capture documentation and script-only fixtures. Workspace components, calculations, navigation, billing and production configuration are unchanged. The main auto-deployment hold remains enabled.
+Application source: `3f5431207c43534caf2c4f3b9d4b9057c8583799` (main after #495/#496). The imagery work changes marketing presentation, static images, capture documentation and script-only fixtures. The separately requested Performance clarification uses application commit `dc3e650bb1d651046701ab4f72ba79e33b5272f5`: explicit historical target counts, chart scope and a read-only All history option. Calculations, metric inputs, data access, billing and production configuration remain unchanged. The main auto-deployment hold remains enabled.
 
 `scripts/website-demo-preview.cjs` renders the actual AppShell, Intelligence route's final JSX/client components, Performance page and Files & Notes page. Authentication/database reads are replaced by bounded local adapters; all actions are inert. The normal operational-evidence producer, Intelligence layer, coverage calculator, snapshot composition/projections and consumers calculate the displayed results. Performance uses its normal page logic. This is a real-component capture, not an end-to-end import/provider test or a recreated dashboard.
 
@@ -38,7 +38,7 @@ Performance's normal summary uses its performance-effect semantics: “Latest mo
 2. Use Chrome's native DevTools device toolbar, Responsive dimensions, **DPR 2**, height 1000. Read `innerWidth`, `devicePixelRatio`, `document.fonts.status` and the visible DOM bounds before export. Wait for settled UI and loaded fonts.
 3. Intelligence overview: 1200 CSS pixels wide; capture the actual Health/Readiness content. Mobile: 390 CSS pixels, both complete cards.
 4. Findings: 1440 desktop / 390 mobile. Open the real direct link `/app/intelligence?finding=operational-overdue-suppliers-source-file%3Acoastal-invoices`. Capture the complete Summary panel. Select Evidence and expand the supplier group; capture both records and missing evidence.
-5. Performance: 1200 desktop / 390 mobile. Open Weekly net sales via `/app/kpis?timeline=90D&metric=Weekly+net+sales&section=detail#kpi-detail`. Desktop captures the real KPI detail; mobile focuses on its chart and summary.
+5. Performance: 1200 desktop / 390 mobile. Open Weekly net sales via `/app/kpis?timeline=90D&metric=Weekly+net+sales&section=detail#kpi-detail`. Desktop captures the real KPI detail; mobile includes the historical target card, record count and scoped chart.
 6. Notes: 1200 desktop / 390 mobile. Add business note; fill `noteDraft` for desktop or the concise mobile draft below, date October 12. Do not submit. Scroll the page to the top so fixed headers cannot overlay captured content. Capture the actual editor, date and review action.
 7. Use **DevTools → More options → Capture full size screenshot**, which saves a native PNG at exactly twice the CSS width. Move the pointer outside the crop using normal UI controls before capture. The general browser screenshot API emits JPEG and is used only for review images, never these marketing assets.
 8. Apply the integer pixel crop in `scripts/website-demo/captures.json`, then encode **lossless WebP once**. No resizing, compositing, retouching, color/text/control changes or invented values. Verify hashes/dimensions and inspect every resulting image.
@@ -57,7 +57,7 @@ Mobile draft (379 characters, unsubmitted):
 
 The previous browser API supplied JPEG originals, which were encoded again as lossy WebP quality 92. They were approximately 1× captures. The 719-pixel evidence image could render around 884 CSS pixels wide, enlarging it even before accounting for a high-density screen. Mobile sources were roughly 335 pixels wide for a ~329 CSS pixel display. A larger nominal export after the fact would not repair those originals.
 
-The replacements are native 2× PNG → lossless WebP, with no intermediate resizing. The viewer now caps overviews at 900 CSS pixels and finding/evidence details at 720; mobile at 340 with separate real mobile captures. `srcSet` explicitly declares the 2× source, and width/height attributes describe CSS dimensions to reserve the correct aspect ratio. No optimizer or CDN resizing path is involved: the browser requests the static asset directly. The ten final files total approximately 581 KB, with individual files below 77 KB despite the sharper resolution.
+The replacements are native 2× PNG → lossless WebP, with no intermediate resizing. The viewer now caps overviews at 900 CSS pixels and finding/evidence details at 720; mobile at 340 with separate real mobile captures. `srcSet` explicitly declares the 2× source, and width/height attributes describe CSS dimensions to reserve the correct aspect ratio. No optimizer or CDN resizing path is involved: the browser requests the static asset directly. The ten overview/detail files total approximately 600 KB, with individual files below 85 KB despite the sharper resolution.
 
 ## Privacy and qualification
 
@@ -67,4 +67,14 @@ All final images show only fictional business content and ordinary workspace con
 
 ## Integration imagery extension
 
-The approved ten overview/detail assets remain unchanged. Six new native 2× lossless captures show the actual Square saved-Payments browser, QuickBooks report observation, and Google Sheets selected-cell preview. See [Coastal Kitchen reusable scenario](coastal-kitchen-demo.md) and `scripts/website-demo/integration-captures.json` for provider relationships, capture provenance and reproduction. No live connection, account, import or production mutation is involved.
+The ten overview/detail assets were preserved for the integration addition; the two Performance assets were subsequently recaptured for the requested history-scope clarification below. Six new native 2× lossless captures show the actual Square saved-Payments browser, QuickBooks report observation, and Google Sheets selected-cell preview. See [Coastal Kitchen reusable scenario](coastal-kitchen-demo.md) and `scripts/website-demo/integration-captures.json` for provider relationships, capture provenance and reproduction. No live connection, account, import or production mutation is involved.
+
+## Target history scope clarification — October 13
+
+The normal Performance calculation evaluates every eligible recorded value for the selected KPI, using its confirmed direction and target rules. For Coastal Kitchen weekly net sales this is **17 of 28 = 60.71%**. Eleven earlier observations missed the unchanged $24,000 target. The latest twelve observations (July 27–October 12) all met it. The values, dates, eligibility and mathematical result are unchanged.
+
+The actual workspace component now labels the card **Historical target hit rate**, gives the numerator and denominator, visibly labels **Latest 12 recorded values**, and offers **All history**. All history displays the same 28 values from April 6–October 12; it does not change the card or redefine the date-filtered comparison workflow. URL links retain the metric/list/date context and work with Back/Forward. Missing values or targets remain excluded and the supporting text reports exclusions.
+
+Only `performance-desktop.webp` and `performance-mobile.webp` were recaptured at native DPR 2 from that updated component. The mobile crop intentionally keeps the historical count and chart scope together. Their per-asset provenance, crops and hashes override the original manifest-level application commit. All other 20 approved workspace, integration and VSI images and the genuine VSI response remain byte-for-byte unchanged. No provider call or database write was needed.
+
+Focused verification covers normal target directions, ranges, zeros, missing values/targets, unknown direction, 12/all-28 rendering, unchanged percentages, preserved URL filters, Back/Forward, keyboard navigation and 390/320px overflow. The target-persistence runner also now resolves two existing imports in its isolated loader; KPI writes fail the test if they attempt to read Sheets.
