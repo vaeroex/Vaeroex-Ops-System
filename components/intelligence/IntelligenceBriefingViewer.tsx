@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ComparisonCharts } from "@/components/charts/ComparisonCharts";
+import { briefingComparisons } from "@/lib/charts/briefing";
 import { ArrowLeft, CalendarRange, ShieldCheck } from "lucide-react";
 import { BriefingEvidenceLimits } from "@/components/intelligence/BriefingEvidenceLimits";
 import { SaveAnalysisButton } from "@/components/reports/SaveAnalysisButton";
@@ -80,6 +82,7 @@ export function IntelligenceBriefingViewer({ artifact }: { artifact: Intelligenc
         </p>
       </section>
 
+      <ComparisonCharts charts={briefingComparisons(artifact)} heading="Measured changes in this briefing" />
       <div className="space-y-6">
         {supportedSections.map((section) => (
           <section key={section.section_id} className="border-b border-white/10 pb-6">

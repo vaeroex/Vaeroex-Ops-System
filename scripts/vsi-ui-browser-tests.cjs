@@ -3,7 +3,7 @@ const assert = require("node:assert/strict"), fs = require("node:fs"), os = requ
 const { chromium } = require("playwright"), postcss = require("postcss"), tailwind = require("tailwindcss");
 const { root, loadSource, React } = require("./integrations-ui-test-support");
 const { renderToString } = require("react-dom/server");
-const { VsiWorkspace } = loadSource("components/vsi/VsiWorkspace.tsx", { "next/link": { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) } });
+const { VsiWorkspace } = loadSource("components/vsi/VsiWorkspace.tsx", { "@/app/app/reports/save-vsi-analysis": { saveVsiAnalysis: async () => ({ message: "Synthetic fixture: no analysis was saved." }) }, "next/link": { __esModule: true, default: ({ children, ...props }) => React.createElement("a", props, children) } });
 const { safeSourceUrl, displayDate, usagePercent, monthlyResetAt } = loadSource("components/vsi/contracts.ts");
 const workspaceId = "10000000-0000-4000-8000-000000000001", now = "2026-10-08T18:00:00.000Z";
 const chat = (id, count = 1) => ({ id, title: id === "closed" ? "Long-running project" : id === "warning" ? "Planning history" : "Private planning", exchangeCount: count, createdAt: now, updatedAt: now });
@@ -37,11 +37,11 @@ async function main() {
   fs.writeFileSync(entry, 'import React from "react"; import { hydrateRoot } from "react-dom/client"; import { VsiWorkspace } from "@/components/vsi/VsiWorkspace"; const props = JSON.parse(document.getElementById("props")!.textContent!); const app = hydrateRoot(document.getElementById("fixture")!, <VsiWorkspace {...props}/>); const originalReplace = history.replaceState.bind(history); history.replaceState = (...args) => { originalReplace(...args); queueMicrotask(() => app.render(<VsiWorkspace {...props} initialConversationId={new URL(location.href).searchParams.get("chat") || ""}/>)); };');
   const webpack = require("next/dist/compiled/webpack/webpack"); webpack.init();
   await new Promise((resolve, reject) => webpack.webpack({ mode: "production", context: root, target: "web", devtool: false, optimization: { minimize: false }, entry, output: { path: output, filename: "fixture.js" },
-    resolve: { extensions: [".tsx", ".ts", ".js"], modules: [path.join(root, "node_modules"), "node_modules"], alias: { "@": root, "next/link": path.join(root, "scripts/test-stubs/current-integrations-link.tsx") } },
+    resolve: { extensions: [".tsx", ".ts", ".js"], modules: [path.join(root, "node_modules"), "node_modules"], alias: { "@/app/app/reports/save-vsi-analysis$": path.join(root, "scripts/test-stubs/vsi-save-analysis.ts"), "@": root, "next/link": path.join(root, "scripts/test-stubs/current-integrations-link.tsx") } },
     module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, use: path.join(root, "scripts/test-stubs/qbo-browser-typescript-loader.cjs") }] }
   }, (error, stats) => error || stats.hasErrors() ? reject(error ?? new Error(stats.toString({ all: false, errors: true }))) : resolve()));
   const config = loadSource("tailwind.config.ts").default;
-  const css = (await postcss([tailwind({ ...config, content: [path.join(root, "components/vsi/**/*.{ts,tsx}")] })]).process(fs.readFileSync(path.join(root, "app/globals.css"), "utf8"), { from: path.join(root, "app/globals.css") })).css;
+  const css = (await postcss([tailwind({ ...config, content: [path.join(root, "components/vsi/**/*.{ts,tsx}"), path.join(root, "components/charts/**/*.{ts,tsx}")] })]).process(fs.readFileSync(path.join(root, "app/globals.css"), "utf8"), { from: path.join(root, "app/globals.css") })).css;
   stored.set("old", { conversation: { ...chat("old"), title: "Historical idea" }, exchanges: [] });
   stored.set("closed", { conversation: chat("closed", 250), exchanges: [exchange("closed-1")] });
   stored.set("warning", { conversation: chat("warning", 225), exchanges: [exchange("warning-1")] });

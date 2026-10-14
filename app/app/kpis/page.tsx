@@ -1,3 +1,5 @@
+import { ComparisonCharts } from "@/components/charts/ComparisonCharts";
+import { kpiComparisons } from "@/lib/charts/kpi";
 import type { Route } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -1920,6 +1922,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     detail="Historical KPI values stored"
                   />
                 </div>
+                <ComparisonCharts charts={kpiComparisons({ name: primaryMetric, rows: selectedMetricRows, semantics: selectedKpiSemantics, target: selectedManualTarget })} heading="Current KPI comparisons" />
                 <div id="kpi-trend" className="mt-4 scroll-mt-24">
                   <nav aria-label="Chart history" className="mb-3 flex flex-wrap gap-2">
                     {(["latest", "all"] as const).map((scope) => (

@@ -3,6 +3,7 @@
 import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, googleSheetsReadTicketFields } from "@/lib/integrations/google-sheets/read-authority";
 
 
+import { briefingComparisons } from "@/lib/charts/briefing";
 import { createHash } from "crypto";
 import { revalidatePath } from "next/cache";
 import {
@@ -360,6 +361,7 @@ export async function saveAnalysisAction(input: SaveAnalysisInput): Promise<Save
       date_range: metadata.dateRange,
       business_health_state: metadata.businessHealthState
     },
+    comparisons: "briefingType" in completed.artifact ? briefingComparisons(completed.artifact) : [],
     artifact: completed.artifact as unknown as Json
   };
   const { data: report, error } = await supabase

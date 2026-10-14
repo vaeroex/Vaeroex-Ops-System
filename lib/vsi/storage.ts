@@ -68,6 +68,12 @@ export function exchangeView(row: ExchangeRow) {
     publicResearchTopics: Array.isArray(row.public_research_topics) ? row.public_research_topics.filter((term): term is string => typeof term === "string" && term.length <= 160).slice(0, 12) : [],
     createdAt: row.created_at, rememberProposal: row.remember_proposal as { title: string; content: string } | null, savedNoteId: row.saved_note_id };
 }
+export async function loadVsiExchange(access: VsiAccess, id: string) {
+  if (!vsiUuid.safeParse(id).success) return null;
+  const client = access.supabase as SupabaseClient<VsiDatabase>;
+  const { data, error } = await client.from("vsi_exchanges").select("*").eq("workspace_id", access.workspaceId).eq("actor_user_id", access.userId).eq("id", id).maybeSingle();
+  return error || !data ? null : data;
+}
 export async function listVsiConversations(access: VsiAccess, before?: string | null) {
   const client = access.supabase as SupabaseClient<VsiDatabase>;
   let query = client.from("vsi_conversations").select("*").eq("workspace_id", access.workspaceId).eq("actor_user_id", access.userId);
