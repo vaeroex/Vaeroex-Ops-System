@@ -250,6 +250,8 @@ function assertProductionBaselineLedger(versions) {
     '881b0e53e1c1a8144aba0c6ff6d895ca859cfe62544f0808df991b3959685b84',
     'Production migration versions must match the independently captured hosted ledger');
 }
+// Shopify is approved for preview only; do not add it to the reviewed production candidate manifest.
+const previewOnlyMigrations = ['20261014002542_shopify_read_only_connector.sql'];
 const fixtureInclude = '\\ir fixtures/qbo-production-native.sql';
 
 function expandFixture(sql, fixture) {
@@ -390,7 +392,7 @@ async function main() {
     process.env.SQUARE_QUALIFICATION_PG_BIN = bin;
   }
   const canonical = fs.readdirSync(path.join(root, 'supabase/migrations'))
-    .filter(name => /^\d+_.+\.sql$/.test(name)).sort().map(name => snapshot(`supabase/migrations/${name}`));
+    .filter(name => /^\d+_.+\.sql$/.test(name) && !previewOnlyMigrations.includes(name)).sort().map(name => snapshot(`supabase/migrations/${name}`));
   const prefix = canonical.filter(item => item.version <= '20260902191325');
   assert.equal(canonical.length, 147, 'review the canonical migration manifest if it changes');
   assert.deepEqual(canonical.filter(item => item.version > '20260915040500').map(item => path.basename(item.file)), [
@@ -632,7 +634,7 @@ async function main() {
 }
 
 if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
-module.exports = { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
+module.exports = { previewOnlyMigrations, checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
   productionSquare, productionSheets, auditMigrations, capacityMigrations, storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, sheetsErasureMigrations, billingObservationMigration, assertProductionBaselineLedger,
   dashboardMigrations, dashboardSuites, dashboardPlan, checkDashboardAssertionNames, composeSquareIdentitySuite, executeDashboardSuite,
   preferenceAssertionNames, reportingTimezoneAssertionNames, squareIdentityAssertionNames, squareCatalog };

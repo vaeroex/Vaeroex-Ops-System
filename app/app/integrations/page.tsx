@@ -6,6 +6,7 @@ import { qboProductionCustomerConnectionsEnabled } from "@/lib/integrations/cont
 import { readSquareWorkspaceEvidence } from "@/lib/integrations/control-plane/square-workspace-evidence";
 import { squareDirectEnabled, squareDirectView, squareSettingsPath } from "@/lib/integrations/square-direct/server";
 import type { DirectView } from "@/lib/integrations/square-direct/contracts";
+import { shopifyEnabled } from "@/lib/integrations/shopify/server";
 import { sheetsEnabled } from "@/lib/integrations/google-sheets/server";
 import { GOOGLE_SHEETS_PILOT } from "@/lib/integrations/google-sheets/availability";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -61,6 +62,7 @@ export default async function IntegrationsPage() {
             href="/app/settings/integrations/google-sheets" action={googleSheetsEnabled ? "Manage Google Sheets" : "View Google Sheets setup"}>
             <Link href="/app/sources" prefetch={false} className="text-sm font-semibold text-vaeroex-blue underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Upload spreadsheet files instead</Link>
           </ProviderCard> : null}
+          {owner ? <ProviderCard name="Shopify" description="Online store order totals, refunds, and cancellations." statuses={[shopifyEnabled() ? "View connection status" : "Pilot setup in progress"]} href="/app/settings/integrations/shopify" action="View Shopify" /> : null}
           {squareEvidence ? <ProviderCard name="Square Sandbox" description="Verified non-economic observations."
             statuses={["Sync health unknown"]} href="/app/integrations/square" action="View Square Sandbox" /> : null}
         </div>

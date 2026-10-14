@@ -185,7 +185,8 @@
     "test:workspace-audit:browser": "node scripts/workspace-workflow-browser-tests.cjs && node scripts/workspace-action-completion-runtime-tests.cjs && node scripts/workspace-hydration-replay-tests.cjs",
     "test:vsi": "node scripts/vsi-engine-tests.cjs && node scripts/vsi-retrieval-tests.cjs && node scripts/vsi-product-context-tests.cjs && node scripts/vsi-request-boundary-tests.cjs && node scripts/vsi-http-accounting-tests.cjs && node scripts/vsi-sensitive-input-tests.cjs && node --test scripts/vsi-hosted-browser-qualification-tests.cjs",
     "test:vsi-ui": "node scripts/vsi-ui-browser-tests.cjs",
-    "test:vsi-database": "node scripts/vsi-database-tests.cjs"
+    "test:vsi-database": "node scripts/vsi-database-tests.cjs",
+    "test:shopify": "node scripts/shopify-connector-tests.cjs && node scripts/shopify-database-tests.cjs && node scripts/shopify-routes-tests.cjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "1.1.1",
