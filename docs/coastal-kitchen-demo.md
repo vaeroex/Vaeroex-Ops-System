@@ -57,3 +57,8 @@ A disposable loopback-only database copy was also prepared for actual VSI retrie
 ## Performance target history
 
 Weekly net sales keeps its original 28 observations and $24,000 target: 17 met target (60.71%); the latest 12 all met it. The workspace now calls this **Historical target hit rate** and labels the chart separately, with an **All history** link exposing the earlier misses. Reproduce and capture from application commit `dc3e650bb1d651046701ab4f72ba79e33b5272f5` or later using the unchanged fixtures. `captures.json` records the two replacement Performance crops. Do not adjust the dataset to make the historical card equal the recent chart.
+
+
+### Reusable financial charts and briefing capture
+
+The October 14 refresh uses the same isolated local Coastal Kitchen account/records, not a production workspace. PR #499's financial retrieval and PR #500's normal chart components now support the captured QuickBooks P&L conversation. See [capture provenance](website-workspace-captures.md#chart-and-quickbooks-refresh--october-14-2026), `scripts/website-demo/chart-response.json`, `monthly-briefing.json` and `chart-captures.json`. The original campaign-planning response remains reusable and unchanged. The local read-only harness replays both genuine responses; `?example=financial` selects the financial conversation. The dedicated development credential remains private at `~/.config/vaeroex/coastal-kitchen/provider.env`; capture replay needs no credential. Broader cross-provider reconciliation must not be inferred from this example.

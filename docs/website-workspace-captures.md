@@ -78,3 +78,29 @@ The actual workspace component now labels the card **Historical target hit rate*
 Only `performance-desktop.webp` and `performance-mobile.webp` were recaptured at native DPR 2 from that updated component. The mobile crop intentionally keeps the historical count and chart scope together. Their per-asset provenance, crops and hashes override the original manifest-level application commit. All other 20 approved workspace, integration and VSI images and the genuine VSI response remain byte-for-byte unchanged. No provider call or database write was needed.
 
 Focused verification covers normal target directions, ranges, zeros, missing values/targets, unknown direction, 12/all-28 rendering, unchanged percentages, preserved URL filters, Back/Forward, keyboard navigation and 390/320px overflow. The target-persistence runner also now resolves two existing imports in its isolated loader; KPI writes fail the test if they attempt to read Sheets.
+
+
+## Chart and QuickBooks refresh — October 14, 2026
+
+Application capture source: `8d6bb23b67cf6e03c3728bf9afa292c7fdea8d3e` (the final PR #500 comparison-chart tree, including PR #499 financial retrieval). Twelve additional images in `scripts/website-demo/chart-captures.json` preserve the previous approved assets unchanged. The website tour adds KPI comparisons and a monthly briefing; VSI leads with financial analysis while retaining the campaign-planning examples.
+
+The existing isolated Coastal Kitchen database was used for two real workflows. `scripts/coastal-kitchen-chart-capture-local.cjs --config-dir <owned-private-config-dir> --generate` runs the normal authorized VSI engine and monthly briefing service, with the same provider policy, retrieval, calculations and claim validator as the application. It verifies the loopback database belongs to the private local stack. It reads the development credential only from `~/.config/vaeroex/coastal-kitchen/provider.env` (owner-only, outside Git). Never copy credentials into this repository or documentation. The first attempt completed VSI but the opt-in briefing policy was unset; `--briefing-only` reused the completed VSI result and ran the briefing once with the normal policy selector. Existing output files block accidental paid replays.
+
+Provider spend: VSI $0.0020395 estimated, monthly briefing $0.09 estimated; total $0.0920395. The monthly validator accepted 17 claims and rejected five unsupported relationships before rendering. The omitted Business Updates section was not manually restored. The accepted artifact and unedited VSI answer/citations are recorded in `monthly-briefing.json` and `chart-response.json`; capture adapters replay only these outputs. They cannot make live requests or writes. The display timestamp is the recording assembly time; citation retrieval timestamps retain the actual retrieval time.
+
+### Evidence and limits
+
+- KPI comparison: gross margin 70% against 68%, prior observation 69.8%. All 168 KPI records, targets, health 90 and readiness 87 are unchanged.
+- Monthly briefing: September 13–October 12, 20 eligible records and seven independent sources. The normal chart selector compares first/latest observed ticket time 16.6 → 16.2 minutes, food waste 3.6 → 3.5%, and gross margin 69.3 → 70%. These are five observations within the briefing period, **not two monthly totals**. Desktop shows the accepted summary plus two charts; mobile focuses on the complete ticket-time chart, including its dates and limitation.
+- VSI: recorded QuickBooks accrual P&Ls for September 29–October 5 and October 6–12, USD. Revenue $27,200 → $27,600; COGS $8,214.40 → $8,280; operating expenses $9,932.80 → $10,624.80; net income $9,052.80 → $8,695.20. The validated citation snapshot supplies three real comparison charts. The answer recommends examining the $600 increase in other operating expenses and explicitly avoids causal certainty. This $600 is **not** the separate overdue supplier-invoice total. Profit is not cash flow; source coverage/reconciliation remain unestablished. No automatic cross-provider reconciliation or live merchant connection is claimed.
+
+### Reproduce the exact captures without model calls
+
+Run `WORKSPACE_PREVIEW_PORT=3212 node scripts/website-demo-preview.cjs` and capture at 1200, 390 and 320 CSS pixels, height 1000, DPR 2. Wait for loaded fonts and settled UI.
+
+1. `/app/kpis?timeline=90D&metric=Gross+margin&section=detail`: native full-page PNG; use the Performance crops in the manifest.
+2. `/app/intelligence/briefings/monthly`: actual `IntelligenceBriefingViewer` with the recorded accepted artifact; native full-page PNG and manifest crop.
+3. `/app/si?example=financial`: actual VSI conversation component, recorded authorized answer and validated chart snapshots. Home in the transcript for the question/answer crop. For desktop charts, scroll the transcript to 770 CSS pixels; 390px mobile to 1856; 320px to 2190. Use normal keyboard scrolling, check visible chart bounds, and move the pointer outside the capture before exporting.
+4. Export native Chrome DevTools PNG at DPR 2, crop at exactly twice `cropCssPixels`, encode lossless WebP once. Never resize, edit text, replace values or retouch controls. `sourceSha256` identifies each original PNG; `sha256` verifies the delivered WebP. All new assets are 79–296 KB, with separate 390/320px crops and explicit source dimensions. Original masters are retained in the private local capture folder.
+
+No production account, database, integration configuration, application component, 3D scene, billing behavior, Google Sheets disclosure or deployment hold is changed by this imagery refresh.

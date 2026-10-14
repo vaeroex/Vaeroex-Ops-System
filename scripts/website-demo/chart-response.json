@@ -1,0 +1,174 @@
+{
+  "applicationCommit": "8d6bb23b67cf6e03c3728bf9afa292c7fdea8d3e",
+  "synthetic": true,
+  "workflow": "Unchanged VSI engine and authorized retrieval; monthly briefing service and acceptance validator; isolated existing Coastal Kitchen database.",
+  "createdAt": "2026-10-14T03:26:33.317Z",
+  "question": "Sales have increased, but are we keeping more of that money? What changed in our costs and profitability, and what should I focus on next?",
+  "answer": "## Short answer\n\nSales rose, but you **did not keep more as net profit** in the latest week. Coastal Kitchen\u2019s accrual P&L shows revenue up **$400 (1.47%)**, while net income fell **$357.60 (3.95%)** week over week. Net margin slipped from **33.28% to 31.50%**, a **1.78 percentage-point decline**. [B1]\n\n## What changed\n\nComparing **Sep 29\u2013Oct 5** with **Oct 6\u201312, 2026**:\n\n- **Revenue:** $27,200 \u2192 $27,600 (**+$400**).\n- **Cost of goods sold:** $8,214.40 \u2192 $8,280 (**+$65.60**); as a share of revenue it eased from **30.20% to 30.00%**.\n- **Gross profit:** $18,985.60 \u2192 $19,320 (**+$334.40**); gross margin edged up from **69.80% to 70.00%**.\n- **Operating expenses:** $9,932.80 \u2192 $10,624.80 (**+$692**), growing faster than sales.\n- **Net income:** $9,052.80 \u2192 $8,695.20 (**\u2212$357.60**). [B1]\n\nWithin the expense lines, **other operating expenses increased $600** ($1,800 \u2192 $2,400), and labor expense increased **$92** ($8,132.80 \u2192 $8,224.80). Labor\u2019s share of revenue was nearly flat, **29.90% \u2192 29.80%**. These changes identify where to investigate; the records do not establish what caused them. [B1]\n\n## What to focus on next\n\n1. **Break down the $600 increase in other operating expenses** by account and transaction. Check for one-time items, timing changes, duplicate entries, or recurring cost increases before deciding what to cut.\n2. **Protect the gross-margin improvement** by monitoring food and beverage cost. The recorded food-waste KPI is **3.5 against a target of 5** for Oct 12, so it is currently within that recorded target; the KPI does not show what drove the result. [B4]\n3. **Maintain labor discipline.** Labor percentage is **29.8 against its recorded 32% maximum target** for Oct 12; the P&L also shows labor dollars rose slightly as sales increased. [B5]\n\nThese are two weekly reported P&Ls in USD on an accrual basis; coverage and reconciliation are not established, and P&L profit is not cash flow. Treat the comparison as a useful signal, not a complete profit bridge or proof of operating causes. [B1] [B2] [B3]",
+  "citations": [
+    {
+      "id": "B1",
+      "title": "P&L calculations: Coastal Kitchen",
+      "url": "/app/settings/integrations/quickbooks/data?connectionId=e9f00000-0000-4000-8000-000000000101&sourceId=7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681&kind=reports#source-detail",
+      "sourceType": "financial_calculation",
+      "sourceId": "7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681",
+      "evidenceDate": "2026-10-12",
+      "retrievedAt": "2026-10-14T03:24:25.555Z",
+      "excerpt": "Calculated from stored P&L rows. Inputs: 2026-10-06\u20132026-10-12 (7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681); 2026-09-29\u20132026-10-05 (843eb1da-e7c8-448b-87d0-686a2949203e). Inspect cited reports for row inputs.",
+      "snapshotHash": "33876812ddb7e030bb9e0f72b84cce224dcad04173714733e7ad927c5f30581b",
+      "comparisons": [
+        {
+          "version": 1,
+          "id": "7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681:revenue",
+          "title": "Revenue",
+          "unit": "",
+          "currency": "USD",
+          "before": {
+            "label": "Prior",
+            "value": 27200,
+            "context": "2026-09-29 \u2013 2026-10-05"
+          },
+          "after": {
+            "label": "Latest",
+            "value": 27600,
+            "context": "2026-10-06 \u2013 2026-10-12"
+          },
+          "kind": "period",
+          "direction": "maximize",
+          "context": "Coastal Kitchen \u00b7 USD \u00b7 accrual \u00b7 2026-09-29\u20132026-10-05 \u2192 2026-10-06\u20132026-10-12",
+          "limitations": [
+            "Reported P&L values; profit is not cash flow. Coverage and reconciliation are not established."
+          ],
+          "sources": [
+            {
+              "label": "Prior P&L \u00b7 row 3",
+              "href": "/app/settings/integrations/quickbooks/data?connectionId=e9f00000-0000-4000-8000-000000000101&sourceId=843eb1da-e7c8-448b-87d0-686a2949203e&kind=reports#source-detail"
+            },
+            {
+              "label": "Latest P&L \u00b7 row 3",
+              "href": "/app/settings/integrations/quickbooks/data?connectionId=e9f00000-0000-4000-8000-000000000101&sourceId=7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681&kind=reports#source-detail"
+            }
+          ]
+        },
+        {
+          "version": 1,
+          "id": "7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681:netIncome",
+          "title": "Net income",
+          "unit": "",
+          "currency": "USD",
+          "before": {
+            "label": "Prior",
+            "value": 9052.8,
+            "context": "2026-09-29 \u2013 2026-10-05"
+          },
+          "after": {
+            "label": "Latest",
+            "value": 8695.2,
+            "context": "2026-10-06 \u2013 2026-10-12"
+          },
+          "kind": "period",
+          "direction": "maximize",
+          "context": "Coastal Kitchen \u00b7 USD \u00b7 accrual \u00b7 2026-09-29\u20132026-10-05 \u2192 2026-10-06\u20132026-10-12",
+          "limitations": [
+            "Reported P&L values; profit is not cash flow. Coverage and reconciliation are not established."
+          ],
+          "sources": [
+            {
+              "label": "Prior P&L \u00b7 row 12",
+              "href": "/app/settings/integrations/quickbooks/data?connectionId=e9f00000-0000-4000-8000-000000000101&sourceId=843eb1da-e7c8-448b-87d0-686a2949203e&kind=reports#source-detail"
+            },
+            {
+              "label": "Latest P&L \u00b7 row 12",
+              "href": "/app/settings/integrations/quickbooks/data?connectionId=e9f00000-0000-4000-8000-000000000101&sourceId=7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681&kind=reports#source-detail"
+            }
+          ]
+        },
+        {
+          "version": 1,
+          "id": "7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681:operatingExpenses",
+          "title": "Operating expenses",
+          "unit": "",
+          "currency": "USD",
+          "before": {
+            "label": "Prior",
+            "value": 9932.8,
+            "context": "2026-09-29 \u2013 2026-10-05"
+          },
+          "after": {
+            "label": "Latest",
+            "value": 10624.8,
+            "context": "2026-10-06 \u2013 2026-10-12"
+          },
+          "kind": "period",
+          "direction": "neutral",
+          "context": "Coastal Kitchen \u00b7 USD \u00b7 accrual \u00b7 2026-09-29\u20132026-10-05 \u2192 2026-10-06\u20132026-10-12",
+          "limitations": [
+            "Reported P&L values; profit is not cash flow. Coverage and reconciliation are not established."
+          ],
+          "sources": [
+            {
+              "label": "Prior P&L \u00b7 row 11",
+              "href": "/app/settings/integrations/quickbooks/data?connectionId=e9f00000-0000-4000-8000-000000000101&sourceId=843eb1da-e7c8-448b-87d0-686a2949203e&kind=reports#source-detail"
+            },
+            {
+              "label": "Latest P&L \u00b7 row 11",
+              "href": "/app/settings/integrations/quickbooks/data?connectionId=e9f00000-0000-4000-8000-000000000101&sourceId=7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681&kind=reports#source-detail"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "B2",
+      "title": "QuickBooks P&L: Coastal Kitchen \u00b7 2026-10-06\u20132026-10-12",
+      "url": "/app/settings/integrations/quickbooks/data?connectionId=e9f00000-0000-4000-8000-000000000101&sourceId=7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681&kind=reports#source-detail",
+      "sourceType": "financial_report",
+      "sourceId": "7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681",
+      "evidenceDate": "2026-10-12",
+      "retrievedAt": "2026-10-14T03:24:25.555Z",
+      "excerpt": "USD \u00b7 accrual \u00b7 2026-10-06\u20132026-10-12. Reported P&L, not cash flow. Saved observation. Checked 2026-10-14T01:15:14.661+00:00.",
+      "snapshotHash": "620914e9509bca85dbab1760e5c04a1f80b340afcda2ae4c70e0fd96882fd8b6"
+    },
+    {
+      "id": "B3",
+      "title": "QuickBooks P&L: Coastal Kitchen \u00b7 2026-09-29\u20132026-10-05",
+      "url": "/app/settings/integrations/quickbooks/data?connectionId=e9f00000-0000-4000-8000-000000000101&sourceId=843eb1da-e7c8-448b-87d0-686a2949203e&kind=reports#source-detail",
+      "sourceType": "financial_report",
+      "sourceId": "843eb1da-e7c8-448b-87d0-686a2949203e",
+      "evidenceDate": "2026-10-05",
+      "retrievedAt": "2026-10-14T03:24:25.555Z",
+      "excerpt": "USD \u00b7 accrual \u00b7 2026-09-29\u20132026-10-05. Reported P&L, not cash flow. Saved observation. Checked 2026-10-14T01:15:14.661+00:00.",
+      "snapshotHash": "4c7516ad93a0827c91d83a4a2e1518e27d2025437ed132bc68146e917cf551e7"
+    },
+    {
+      "id": "B4",
+      "title": "Food waste share is on or below target",
+      "url": "/app/intelligence?finding=kpi-opportunity-3b792805-cbab-46d1-8acc-dd023739e03d",
+      "sourceType": "finding",
+      "sourceId": "kpi-opportunity-3b792805-cbab-46d1-8acc-dd023739e03d",
+      "evidenceDate": "2026-10-12T18:00:00+00:00",
+      "retrievedAt": "2026-10-14T03:24:25.555Z",
+      "excerpt": "Actual 3.5 vs target 5.",
+      "snapshotHash": "d418a4ca50bc42d9d32419ec2bb99662ee260f1c4c98b45406c1dd2280ee55ce"
+    },
+    {
+      "id": "B5",
+      "title": "Labor percentage",
+      "url": "/app/kpis?q=Labor%20percentage",
+      "sourceType": "kpi",
+      "sourceId": "47244208-124d-4baf-8310-4908923bdc68",
+      "evidenceDate": "2026-10-12",
+      "retrievedAt": "2026-10-14T03:24:25.555Z",
+      "excerpt": "Labor percentage: 29.8 percent; target 32 percent. Recorded 2026-10-12.",
+      "snapshotHash": "eef5b678ca2517e98bb5d3878d536571693e00c60876b61084c0254af3f769ea"
+    }
+  ],
+  "provenance": {
+    "answerSha256": "590231f8f5e1d9f91e25cbbbb52b7fea33223de7890746aac92d9a0699e63336",
+    "vsiEstimatedUsd": 0.0020395,
+    "briefingEstimatedUsd": 0.09,
+    "vsiModel": "gpt-6-luna",
+    "briefingModel": "gpt-5.6-sol",
+    "citationStatus": "validated"
+  }
+}

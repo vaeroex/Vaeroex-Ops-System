@@ -1,3 +1,4 @@
+import { chartReadResponse } from "./chart-data";
 import { sheetsPreview } from "./integration-data";
 import { vsiReadResponse } from "./vsi-data";
 import React, { useCallback, useEffect, useState } from "react";
@@ -19,7 +20,7 @@ globalThis.Date = FixedDate as unknown as DateConstructor;
 window.fetch = async (input, init) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, window.location.origin);
   if (url.origin === window.location.origin && url.pathname.startsWith("/api/vsi/")) {
-    return new Response(JSON.stringify(vsiReadResponse(url, init?.method)), { headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify(new URLSearchParams(location.search).get("example") === "financial" ? chartReadResponse(url, init?.method) : vsiReadResponse(url, init?.method)), { headers: { "Content-Type": "application/json" } });
   }
   if (url.origin === window.location.origin && url.pathname === "/api/integrations/google-sheets/preview" && init?.method === "POST") {
     return new Response(JSON.stringify(sheetsPreview(init.body)), { headers: { "Content-Type": "application/json" } });

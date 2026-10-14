@@ -17,3 +17,6 @@
   .vsiTour { width: calc(100vw - 32px); max-width: 372px; position: relative; left: 50%; transform: translateX(-50%); margin-inline: 0; }
   .vsiTour .imageLink { padding: 0; }
 }
+
+.financialTour { max-width: 900px; }
+.comparisonImage { margin-top: 12px; }
