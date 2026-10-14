@@ -22,6 +22,10 @@ const names: Record<string, RegExp> = {
   operatingExpenses: /^total (expenses|operating expenses)$/i,
   netIncome: /^net income$/i
 };
+const sections: Record<string, RegExp> = {
+  revenue: /^(income|revenue|sales)$/i, costOfGoodsSold: /^(cost of goods sold|cost of sales|cogs)$/i,
+  operatingExpenses: /^(expenses|operating expenses)$/i
+};
 /** Preserve report rows verbatim. Explicit totals only; never sum parents and children. */
 export function financialReport(browser: QboBrowser, url: string, stale: boolean): FinancialReport | null {
   const detail = browser.detail, source = detail?.source, preview = detail?.value;
@@ -42,7 +46,8 @@ export function financialReport(browser: QboBrowser, url: string, stale: boolean
   });
   const totals: FinancialReport["totals"] = {};
   if (!preview.truncated && supported) for (const [key, name] of Object.entries(names)) {
-    const matching = rows.filter(row => name.test(row.label) && row.amount !== null && (row.kind === "summary" || key === "revenue" && row.kind === "data" && /^net sales$/i.test(row.label)));
+    const matching = rows.filter(row => name.test(row.label) && row.amount !== null
+      && (row.path.length === 1 || row.path.length === 2 && sections[key]?.test(row.path[0])) && (row.kind === "summary" || key === "revenue" && row.kind === "data" && /^net sales$/i.test(row.label)));
     if (matching.length === 1) totals[key] = { amount: matching[0].amount!, row: matching[0].row };
     else limitations.push(`${key}: ${matching.length ? "ambiguous reported totals" : "no supported reported total"}; not treated as zero.`);
   }

@@ -44,6 +44,9 @@ assert.equal(leaf.change,'600.00');assert.equal(leaf.previousPercentOfRevenue.va
 leafNext.rows.push({...leafNext.rows.at(-1),row:7});assert.equal(calculateFinancials([leafOld,leafNext]).comparison.lineChanges.length,0);
 console.log('Financial decimal calculations: ratios, losses, missing inputs, mismatched scope, nonadditivity and bounded projections passed.');
 
+const nested=structuredClone(qboBrowser);
+nested.detail.value.rows=[{depth:0,rowType:'section',cells:[{columnKey:'account',value:'Expenses'}]},{depth:1,rowType:'summary',cells:[{columnKey:'account',value:'Net Income'},{columnKey:'amount',value:'99'}]}];
+assert.equal(financialReport(nested,'/app',false).totals.netIncome,undefined,'a similarly named nested account is not the report net income');
 const totalColumn=report('2026-09-29','2026-10-05',{'Total Income':'26000'},{columns:[{columnKey:'account',title:'Account'},{columnKey:'amount',title:'Total'}]});
 assert.equal(totalColumn.totals.revenue.amount,'26000');
 (async()=>{
