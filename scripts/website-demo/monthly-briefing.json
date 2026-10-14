@@ -1,0 +1,747 @@
+{
+  "contractId": "intelligence_briefing_v1",
+  "contractVersion": "intelligence_briefing_v1",
+  "schemaVersion": "intelligence_briefing_schema_v2",
+  "validatorVersion": "intelligence_briefing_validator_v6",
+  "promptVersion": "intelligence_briefing_prompt_v6",
+  "generationPolicyVersion": "intelligence_briefing_generation_policy_v6",
+  "materialityVersion": "intelligence_briefing_materiality_v1",
+  "language": {
+    "locale": "en-US",
+    "standardVersion": "intelligence_briefing_plain_language_v1"
+  },
+  "workspaceId": "00000000-0000-4000-8000-000000000101",
+  "briefingType": "monthly",
+  "period": {
+    "start": "2026-09-13",
+    "end": "2026-10-12",
+    "cutoff": "2026-10-12T18:00:00.000Z",
+    "dayCount": 30,
+    "timeZone": "UTC"
+  },
+  "eligibility": "sufficient",
+  "confidence": "High",
+  "evidenceCoverage": {
+    "supportingRecordCount": 20,
+    "independentSourceCount": 7,
+    "freshness": "current",
+    "latestEvidenceAt": "2026-10-12T00:00:00.000Z",
+    "overallCoverage": 87,
+    "coverageLabel": "Strong",
+    "includedDomains": [
+      "Financial Performance",
+      "Operations & Delivery",
+      "Customers & Market",
+      "Business Updates"
+    ],
+    "missingOrWeakDomains": []
+  },
+  "evidenceFingerprint": "5308b5959be8bc41d3411ed59d3bc40cbeb1a548f6f95f12b8fd5cf5ba459486",
+  "effectiveEvidenceFingerprint": "d6f46666ab84a8a55523f71218053bdc36bd18eb0900ee58ba633ad9602895e1",
+  "materialStateFingerprint": "e89ba9b947524024975219414c54ad87566c19f8b2953b6c6b802a838f3011c0",
+  "generationKey": "8f0a49db03fa35d7f99a6ca6b71b420dae5f4b74be53a968525a825b2de24bac",
+  "snapshotFingerprint": "sha256:04f2c72363d34e2b609edfe562f70cecbfdb6a55f4d4e5a183b43bcd98ccaade",
+  "generatedAt": "2026-10-14T03:26:33.317Z",
+  "businessHealth": {
+    "available": true,
+    "score": 90,
+    "status": "Strong",
+    "trajectory": "Improving",
+    "confidence": "High"
+  },
+  "analysis": {
+    "executive_summary": {
+      "text": "Gross margin was 70% on October 12, 2026. Food waste share was 3.5% on October 12, 2026. Leadership should check whether the average ticket time target achievement continued after October 12, 2026 and use the next verified records before deciding whether further action is needed.",
+      "support_refs": [
+        "K3",
+        "K2",
+        "K1"
+      ]
+    },
+    "sections": [
+      {
+        "section_id": "financial_performance",
+        "summary": "Weekly net sales reached its target during this briefing period.",
+        "support_refs": [
+          "K6"
+        ],
+        "claims": [
+          {
+            "text": "Gross margin was 70% on October 12, 2026.",
+            "support_refs": [
+              "K3"
+            ]
+          },
+          {
+            "text": "Labor percentage was 29.8% on October 12, 2026.",
+            "support_refs": [
+              "K5"
+            ]
+          },
+          {
+            "text": "Weekly net sales was $27,600 on October 12, 2026.",
+            "support_refs": [
+              "K6"
+            ]
+          },
+          {
+            "text": "The gross margin target achievement merits a repeatability check before adopting it as a practice.",
+            "support_refs": [
+              "F3"
+            ]
+          }
+        ]
+      },
+      {
+        "section_id": "operations_delivery",
+        "summary": "Average ticket time reached its target during this briefing period.",
+        "support_refs": [
+          "K1"
+        ],
+        "claims": [
+          {
+            "text": "Average ticket time was 16.2 minutes on October 12, 2026.",
+            "support_refs": [
+              "K1"
+            ]
+          },
+          {
+            "text": "The average ticket time target achievement merits a repeatability check before adopting it as a practice.",
+            "support_refs": [
+              "F1"
+            ]
+          },
+          {
+            "text": "Food waste share was 3.5% on October 12, 2026.",
+            "support_refs": [
+              "K2"
+            ]
+          },
+          {
+            "text": "Food waste share reached its target during this briefing period.",
+            "support_refs": [
+              "F2"
+            ]
+          },
+          {
+            "text": "During this briefing period, supplier records marked 2 invoices overdue, totaling $600.",
+            "support_refs": [
+              "F7"
+            ]
+          }
+        ]
+      },
+      {
+        "section_id": "customers_market",
+        "summary": "Guest satisfaction reached its target during this briefing period.",
+        "support_refs": [
+          "K4"
+        ],
+        "claims": [
+          {
+            "text": "Guest satisfaction was 96% on October 12, 2026.",
+            "support_refs": [
+              "K4"
+            ]
+          },
+          {
+            "text": "The guest satisfaction target achievement merits a repeatability check before adopting it as a practice.",
+            "support_refs": [
+              "F4"
+            ]
+          }
+        ]
+      }
+    ],
+    "leadership_considerations": [
+      {
+        "text": "Check whether the average ticket time target achievement continued after October 12, 2026.",
+        "support_refs": [
+          "K1"
+        ]
+      },
+      {
+        "text": "Review whether the gross margin target achievement is repeatable before adopting it as a practice.",
+        "support_refs": [
+          "F3"
+        ]
+      },
+      {
+        "text": "Confirm the current payment status of supplier obligations marked overdue.",
+        "support_refs": [
+          "F7"
+        ]
+      }
+    ],
+    "limitation_refs": [
+      "L1",
+      "L2",
+      "L3",
+      "L4",
+      "L-CLAIM-ACCEPTANCE"
+    ]
+  },
+  "sections": [
+    {
+      "id": "financial_performance",
+      "label": "Financial Performance",
+      "signalRefs": [
+        "K3",
+        "K5",
+        "K6",
+        "F3"
+      ]
+    },
+    {
+      "id": "operations_delivery",
+      "label": "Operations & Delivery",
+      "signalRefs": [
+        "K1",
+        "K2",
+        "F1",
+        "F2",
+        "F7"
+      ]
+    },
+    {
+      "id": "customers_market",
+      "label": "Customers & Market",
+      "signalRefs": [
+        "K4",
+        "F4"
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "ref": "K1",
+      "stableKey": "71052dfb02daca202138c71cf02870aa8367486d536d0b39c2e688dcb14062d9",
+      "kind": "kpi",
+      "authority": "measured_evidence",
+      "sectionId": "operations_delivery",
+      "label": "Average ticket time",
+      "fact": "Average ticket time was 16.2 minutes on October 12, 2026. During this briefing period, Average ticket time remained unchanged from 16.6 minutes on September 14, 2026 to 16.2 minutes on October 12, 2026 across five recorded dates. Average ticket time reached its target of 18 minutes. Lower Average ticket time is desirable.",
+      "confidence": "High",
+      "citationIds": [
+        4
+      ],
+      "evidenceReferenceIds": [
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-KPI-dbcb45be4d0e2a9edb291335"
+      ],
+      "limitation": null,
+      "periodRelation": "new_or_changed",
+      "periodContext": "briefing_period",
+      "temporalLineage": {
+        "startDate": "2026-09-14",
+        "endDate": "2026-10-12",
+        "startValue": 16.6,
+        "endValue": 16.2,
+        "observationCount": 5,
+        "fullyInsideBriefingPeriod": true,
+        "cadence": "recorded_dates"
+      },
+      "comparisonUnit": "minutes",
+      "semanticState": {
+        "desiredDirection": "minimize",
+        "targetStatus": "achieved",
+        "performanceEffect": "neutral",
+        "metricRole": "actual"
+      }
+    },
+    {
+      "ref": "K2",
+      "stableKey": "560423c239a38387905ba292a1603d07625c16b2aada325ca5152452a763ba54",
+      "kind": "kpi",
+      "authority": "measured_evidence",
+      "sectionId": "operations_delivery",
+      "label": "Food waste share",
+      "fact": "Food waste share was 3.5% on October 12, 2026. During this briefing period, Food waste share increased from 3.6% on September 14, 2026 to 3.5% on October 12, 2026 across five recorded dates. Food waste share reached its target of 5%. Lower Food waste share is desirable.",
+      "confidence": "High",
+      "citationIds": [
+        6
+      ],
+      "evidenceReferenceIds": [
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-KPI-602e7d7a482d5c817ce9a29e"
+      ],
+      "limitation": null,
+      "periodRelation": "new_or_changed",
+      "periodContext": "briefing_period",
+      "temporalLineage": {
+        "startDate": "2026-09-14",
+        "endDate": "2026-10-12",
+        "startValue": 3.6,
+        "endValue": 3.5,
+        "observationCount": 5,
+        "fullyInsideBriefingPeriod": true,
+        "cadence": "recorded_dates"
+      },
+      "comparisonUnit": "percent",
+      "semanticState": {
+        "desiredDirection": "minimize",
+        "targetStatus": "achieved",
+        "performanceEffect": "unfavorable",
+        "metricRole": "actual"
+      }
+    },
+    {
+      "ref": "K3",
+      "stableKey": "8547f9a486d1991a7e12b2ca15471d685abd18965f7ee0d62afce741b3c3394f",
+      "kind": "kpi",
+      "authority": "measured_evidence",
+      "sectionId": "financial_performance",
+      "label": "Gross margin",
+      "fact": "Gross margin was 70% on October 12, 2026. During this briefing period, Gross margin remained unchanged from 69.3% on September 14, 2026 to 70% on October 12, 2026 across five recorded dates. Gross margin reached its target of 68%. Higher Gross margin is desirable.",
+      "confidence": "High",
+      "citationIds": [
+        2
+      ],
+      "evidenceReferenceIds": [
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-KPI-a9bc79e9b35da50ba3717d6f"
+      ],
+      "limitation": null,
+      "periodRelation": "new_or_changed",
+      "periodContext": "briefing_period",
+      "temporalLineage": {
+        "startDate": "2026-09-14",
+        "endDate": "2026-10-12",
+        "startValue": 69.3,
+        "endValue": 70,
+        "observationCount": 5,
+        "fullyInsideBriefingPeriod": true,
+        "cadence": "recorded_dates"
+      },
+      "comparisonUnit": "percent",
+      "semanticState": {
+        "desiredDirection": "maximize",
+        "targetStatus": "achieved",
+        "performanceEffect": "neutral",
+        "metricRole": "actual"
+      }
+    },
+    {
+      "ref": "K4",
+      "stableKey": "03a6a4eb956aa73312799f1f45a771d1790013252397566178ae1079262571dd",
+      "kind": "kpi",
+      "authority": "measured_evidence",
+      "sectionId": "customers_market",
+      "label": "Guest satisfaction",
+      "fact": "Guest satisfaction was 96% on October 12, 2026. During this briefing period, Guest satisfaction remained unchanged from 95% on September 14, 2026 to 96% on October 12, 2026 across five recorded dates. Guest satisfaction reached its target of 90%. Higher Guest satisfaction is desirable.",
+      "confidence": "High",
+      "citationIds": [
+        5
+      ],
+      "evidenceReferenceIds": [
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-KPI-77231534b9b9462910ef1a69"
+      ],
+      "limitation": null,
+      "periodRelation": "new_or_changed",
+      "periodContext": "briefing_period",
+      "temporalLineage": {
+        "startDate": "2026-09-14",
+        "endDate": "2026-10-12",
+        "startValue": 95,
+        "endValue": 96,
+        "observationCount": 5,
+        "fullyInsideBriefingPeriod": true,
+        "cadence": "recorded_dates"
+      },
+      "comparisonUnit": "percent",
+      "semanticState": {
+        "desiredDirection": "maximize",
+        "targetStatus": "achieved",
+        "performanceEffect": "neutral",
+        "metricRole": "actual"
+      }
+    },
+    {
+      "ref": "K5",
+      "stableKey": "3761aa9684611c452e43f0d8a9dabd7655fbb1b06949e0726017da1727ede08f",
+      "kind": "kpi",
+      "authority": "measured_evidence",
+      "sectionId": "financial_performance",
+      "label": "Labor percentage",
+      "fact": "Labor percentage was 29.8% on October 12, 2026. During this briefing period, Labor percentage remained unchanged from 30.2% on September 14, 2026 to 29.8% on October 12, 2026 across five recorded dates. Labor percentage reached its target of 32%. Lower Labor percentage is desirable.",
+      "confidence": "High",
+      "citationIds": [
+        3
+      ],
+      "evidenceReferenceIds": [
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-KPI-fe4c51ef684f29e5641ca6dc"
+      ],
+      "limitation": null,
+      "periodRelation": "new_or_changed",
+      "periodContext": "briefing_period",
+      "temporalLineage": {
+        "startDate": "2026-09-14",
+        "endDate": "2026-10-12",
+        "startValue": 30.2,
+        "endValue": 29.8,
+        "observationCount": 5,
+        "fullyInsideBriefingPeriod": true,
+        "cadence": "recorded_dates"
+      },
+      "comparisonUnit": "percent",
+      "semanticState": {
+        "desiredDirection": "minimize",
+        "targetStatus": "achieved",
+        "performanceEffect": "neutral",
+        "metricRole": "actual"
+      }
+    },
+    {
+      "ref": "K6",
+      "stableKey": "85b2c5dc1dbf54903f715425adbff72e99384d3ceec03cde622f0a4e87797da6",
+      "kind": "kpi",
+      "authority": "measured_evidence",
+      "sectionId": "financial_performance",
+      "label": "Weekly net sales",
+      "fact": "Weekly net sales was $27,600 on October 12, 2026. During this briefing period, Weekly net sales remained unchanged from $26,200 on September 14, 2026 to $27,600 on October 12, 2026 across five recorded dates. Weekly net sales reached its target of $24,000. Higher Weekly net sales is desirable.",
+      "confidence": "High",
+      "citationIds": [
+        1
+      ],
+      "evidenceReferenceIds": [
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-KPI-a69194531bd93166b999213c"
+      ],
+      "limitation": null,
+      "periodRelation": "new_or_changed",
+      "periodContext": "briefing_period",
+      "temporalLineage": {
+        "startDate": "2026-09-14",
+        "endDate": "2026-10-12",
+        "startValue": 26200,
+        "endValue": 27600,
+        "observationCount": 5,
+        "fullyInsideBriefingPeriod": true,
+        "cadence": "recorded_dates"
+      },
+      "comparisonUnit": "currency",
+      "semanticState": {
+        "desiredDirection": "maximize",
+        "targetStatus": "achieved",
+        "performanceEffect": "neutral",
+        "metricRole": "actual"
+      }
+    },
+    {
+      "ref": "F1",
+      "stableKey": "9a2473b767b40a53f2365be70cccdece145383e2e3f9954f9d1ed0c632400f41",
+      "kind": "finding",
+      "authority": "deterministic_result",
+      "sectionId": "operations_delivery",
+      "label": "Average ticket time is on or below target",
+      "fact": "During this briefing period, Actual 16.2 vs target 18. The latest recorded value is on or below target under the confirmed metric definition. This target achievement has 28 recorded periods of context and merits a repeatability check before adopting it as a practice.",
+      "confidence": "High",
+      "citationIds": [
+        7,
+        8
+      ],
+      "evidenceReferenceIds": [
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-FINDING-6d7f654ec4b9c594370c0f54",
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-FINDING-15731b8b06c95fead9d7b20b"
+      ],
+      "limitation": "The KPI history confirms the result, but not what caused it.",
+      "periodRelation": "new_or_changed",
+      "periodContext": "briefing_period"
+    },
+    {
+      "ref": "F2",
+      "stableKey": "2bdc68c109e93685523ba436e1cc11334b36ca05028a588dda6ae50d83705bbe",
+      "kind": "finding",
+      "authority": "deterministic_result",
+      "sectionId": "operations_delivery",
+      "label": "Food waste share is on or below target",
+      "fact": "During this briefing period, Actual 3.5 vs target 5. The latest recorded value is on or below target under the confirmed metric definition. This target achievement has 28 recorded periods of context and merits a repeatability check before adopting it as a practice.",
+      "confidence": "High",
+      "citationIds": [
+        9,
+        10
+      ],
+      "evidenceReferenceIds": [
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-FINDING-12fa4743639bc113b90e2380",
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-FINDING-a1e01ab3e106f429db818723"
+      ],
+      "limitation": "The KPI history confirms the result, but not what caused it.",
+      "periodRelation": "new_or_changed",
+      "periodContext": "briefing_period"
+    },
+    {
+      "ref": "F3",
+      "stableKey": "7b0eee246db12d982f66f35959a26abfe6730a35a7416f550d87131714b46e23",
+      "kind": "finding",
+      "authority": "deterministic_result",
+      "sectionId": "financial_performance",
+      "label": "Gross margin is on or above target",
+      "fact": "During this briefing period, Actual 70 vs target 68. The latest recorded value is on or above target under the confirmed metric definition. This target achievement has 28 recorded periods of context and merits a repeatability check before adopting it as a practice.",
+      "confidence": "High",
+      "citationIds": [
+        11,
+        12
+      ],
+      "evidenceReferenceIds": [
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-FINDING-0ede28628b7772c2866ef985",
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-FINDING-7e2cb076226868a19387c8ca"
+      ],
+      "limitation": "The KPI history confirms the result, but not what caused it.",
+      "periodRelation": "new_or_changed",
+      "periodContext": "briefing_period"
+    },
+    {
+      "ref": "F4",
+      "stableKey": "5d9113a56a39d8fe5d99c419ab5c29d8b900058d46ca6d6af0d186670ebb349f",
+      "kind": "finding",
+      "authority": "deterministic_result",
+      "sectionId": "customers_market",
+      "label": "Guest satisfaction is on or above target",
+      "fact": "During this briefing period, Actual 96 vs target 90. The latest recorded value is on or above target under the confirmed metric definition. This target achievement has 28 recorded periods of context and merits a repeatability check before adopting it as a practice.",
+      "confidence": "High",
+      "citationIds": [
+        13,
+        14
+      ],
+      "evidenceReferenceIds": [
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-FINDING-21e9617aaf6e241311066d6d",
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-FINDING-a7ac92d9430b40d199129191"
+      ],
+      "limitation": "The KPI history confirms the result, but not what caused it.",
+      "periodRelation": "new_or_changed",
+      "periodContext": "briefing_period"
+    },
+    {
+      "ref": "F7",
+      "stableKey": "4e286966f636e26762a1b5379b50e9daace2950ef95705071eb6b6f19c091b9b",
+      "kind": "finding",
+      "authority": "deterministic_result",
+      "sectionId": "operations_delivery",
+      "label": "Supplier invoices include overdue obligations",
+      "fact": "During this briefing period, 2 supplier invoices explicitly marked overdue (33% of 6), totaling $600. The source records explicitly label these invoices as overdue. The records establish overdue obligations but do not confirm supplier disruption or cash-flow impact.",
+      "confidence": "Medium",
+      "citationIds": [
+        19,
+        20
+      ],
+      "evidenceReferenceIds": [
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-FINDING-af21afc234eb85374962e58d",
+        "manifest:2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1:IB-FINDING-361a4124df1ad4e1d8b0c7a3"
+      ],
+      "limitation": "An overdue label does not prove that payment remains outstanding today.",
+      "periodRelation": "new_or_changed",
+      "periodContext": "briefing_period"
+    }
+  ],
+  "limitations": [
+    {
+      "ref": "L1",
+      "text": "Authoritative evidence is complete, diverse, historically deep, and current enough for high-confidence interpretation."
+    },
+    {
+      "ref": "L2",
+      "text": "The KPI history confirms the result, but not what caused it."
+    },
+    {
+      "ref": "L3",
+      "text": "An overdue label does not prove that payment remains outstanding today."
+    },
+    {
+      "ref": "L4",
+      "text": "Business Updates provide context. They are not independently measured evidence."
+    },
+    {
+      "ref": "L-CLAIM-ACCEPTANCE",
+      "text": "This briefing reflects the evidence available for this period; unsupported or insufficiently grounded conclusions were excluded."
+    }
+  ],
+  "citations": [
+    {
+      "citationId": 1,
+      "title": "Weekly net sales",
+      "sourceLabel": "Weekly net sales \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Weekly net sales was $27,600 on October 12, 2026. During this briefing period, Weekly net sales remained unchanged from $26,200 on September 14, 2026 to $27,600 on October 12, 2026 across five recorded dates. Weekly net sales reached its target of $24,000. Higher Weekly net sales is desirable.",
+      "recordedAt": "2026-10-12T00:00:00.000Z",
+      "href": "/app/kpis?metric=Weekly%20net%20sales&section=detail#kpi-detail"
+    },
+    {
+      "citationId": 2,
+      "title": "Gross margin",
+      "sourceLabel": "Gross margin \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Gross margin was 70% on October 12, 2026. During this briefing period, Gross margin remained unchanged from 69.3% on September 14, 2026 to 70% on October 12, 2026 across five recorded dates. Gross margin reached its target of 68%. Higher Gross margin is desirable.",
+      "recordedAt": "2026-10-12T00:00:00.000Z",
+      "href": "/app/kpis?metric=Gross%20margin&section=detail#kpi-detail"
+    },
+    {
+      "citationId": 3,
+      "title": "Labor percentage",
+      "sourceLabel": "Labor percentage \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Labor percentage was 29.8% on October 12, 2026. During this briefing period, Labor percentage remained unchanged from 30.2% on September 14, 2026 to 29.8% on October 12, 2026 across five recorded dates. Labor percentage reached its target of 32%. Lower Labor percentage is desirable.",
+      "recordedAt": "2026-10-12T00:00:00.000Z",
+      "href": "/app/kpis?metric=Labor%20percentage&section=detail#kpi-detail"
+    },
+    {
+      "citationId": 4,
+      "title": "Average ticket time",
+      "sourceLabel": "Average ticket time \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Average ticket time was 16.2 minutes on October 12, 2026. During this briefing period, Average ticket time remained unchanged from 16.6 minutes on September 14, 2026 to 16.2 minutes on October 12, 2026 across five recorded dates. Average ticket time reached its target of 18 minutes. Lower Average ticket time is desirable.",
+      "recordedAt": "2026-10-12T00:00:00.000Z",
+      "href": "/app/kpis?metric=Average%20ticket%20time&section=detail#kpi-detail"
+    },
+    {
+      "citationId": 5,
+      "title": "Guest satisfaction",
+      "sourceLabel": "Guest satisfaction \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Guest satisfaction was 96% on October 12, 2026. During this briefing period, Guest satisfaction remained unchanged from 95% on September 14, 2026 to 96% on October 12, 2026 across five recorded dates. Guest satisfaction reached its target of 90%. Higher Guest satisfaction is desirable.",
+      "recordedAt": "2026-10-12T00:00:00.000Z",
+      "href": "/app/kpis?metric=Guest%20satisfaction&section=detail#kpi-detail"
+    },
+    {
+      "citationId": 6,
+      "title": "Food waste share",
+      "sourceLabel": "Food waste share \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Food waste share was 3.5% on October 12, 2026. During this briefing period, Food waste share increased from 3.6% on September 14, 2026 to 3.5% on October 12, 2026 across five recorded dates. Food waste share reached its target of 5%. Lower Food waste share is desirable.",
+      "recordedAt": "2026-10-12T00:00:00.000Z",
+      "href": "/app/kpis?metric=Food%20waste%20share&section=detail#kpi-detail"
+    },
+    {
+      "citationId": 7,
+      "title": "Average ticket time",
+      "sourceLabel": "Average ticket time \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Actual 16.2 \u00b7 Target 18. The latest value is on or below target.",
+      "recordedAt": "2026-10-12T00:00:00.000Z",
+      "href": "/app/sources/7b9999af-d621-4d05-8e13-28cf20972a3d"
+    },
+    {
+      "citationId": 8,
+      "title": "Average ticket time",
+      "sourceLabel": "Average ticket time \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Actual 16.3 \u00b7 Target 18. This prior value establishes the recent KPI history.",
+      "recordedAt": "2026-10-05T00:00:00.000Z",
+      "href": "/app/sources/7b9999af-d621-4d05-8e13-28cf20972a3d"
+    },
+    {
+      "citationId": 9,
+      "title": "Food waste share",
+      "sourceLabel": "Food waste share \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Actual 3.5 \u00b7 Target 5. The latest value is on or below target.",
+      "recordedAt": "2026-10-12T00:00:00.000Z",
+      "href": "/app/sources/c84d7a11-261b-4f05-ba0e-dffacce17d8c"
+    },
+    {
+      "citationId": 10,
+      "title": "Food waste share",
+      "sourceLabel": "Food waste share \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Actual 3.4 \u00b7 Target 5. This prior value establishes the recent KPI history.",
+      "recordedAt": "2026-10-05T00:00:00.000Z",
+      "href": "/app/sources/c84d7a11-261b-4f05-ba0e-dffacce17d8c"
+    },
+    {
+      "citationId": 11,
+      "title": "Gross margin",
+      "sourceLabel": "Gross margin \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Actual 70 \u00b7 Target 68. The latest value is on or above target.",
+      "recordedAt": "2026-10-12T00:00:00.000Z",
+      "href": "/app/sources/69794475-cf0e-4587-84f9-c7bf8aea9ba0"
+    },
+    {
+      "citationId": 12,
+      "title": "Gross margin",
+      "sourceLabel": "Gross margin \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Actual 69.8 \u00b7 Target 68. This prior value establishes the recent KPI history.",
+      "recordedAt": "2026-10-05T00:00:00.000Z",
+      "href": "/app/sources/69794475-cf0e-4587-84f9-c7bf8aea9ba0"
+    },
+    {
+      "citationId": 13,
+      "title": "Guest satisfaction",
+      "sourceLabel": "Guest satisfaction \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Actual 96 \u00b7 Target 90. The latest value is on or above target.",
+      "recordedAt": "2026-10-12T00:00:00.000Z",
+      "href": "/app/sources/6ceb17d0-4f33-4691-a906-fe01c1796228"
+    },
+    {
+      "citationId": 14,
+      "title": "Guest satisfaction",
+      "sourceLabel": "Guest satisfaction \u00b7 2026-10",
+      "sourceType": "Metric evidence",
+      "excerpt": "Actual 95 \u00b7 Target 90. This prior value establishes the recent KPI history.",
+      "recordedAt": "2026-10-05T00:00:00.000Z",
+      "href": "/app/sources/6ceb17d0-4f33-4691-a906-fe01c1796228"
+    },
+    {
+      "citationId": 19,
+      "title": "Business evidence",
+      "sourceLabel": "Supplier invoice register \u00b7 October 12",
+      "sourceType": "Imported operational record",
+      "excerpt": "CK-411 \u00b7 $180. The invoice status is explicitly recorded as overdue.",
+      "recordedAt": "2026-10-09T00:00:00.000Z",
+      "href": "/app/sources/8518d20e-0308-4eba-a789-e90885ebb625"
+    },
+    {
+      "citationId": 20,
+      "title": "Business evidence",
+      "sourceLabel": "Supplier invoice register \u00b7 October 12",
+      "sourceType": "Imported operational record",
+      "excerpt": "CK-410 \u00b7 $420. The invoice status is explicitly recorded as overdue.",
+      "recordedAt": "2026-10-08T00:00:00.000Z",
+      "href": "/app/sources/8518d20e-0308-4eba-a789-e90885ebb625"
+    }
+  ],
+  "contextReferences": [],
+  "providerAttribution": {
+    "provider": "openai",
+    "model": "gpt-5.6-sol",
+    "fallbackUsed": false,
+    "providerPolicyId": "intelligence_briefing_gpt56_sol_terra_v1"
+  },
+  "provenance": {
+    "snapshotContract": "intelligence_snapshot_v1",
+    "snapshotFingerprint": "sha256:04f2c72363d34e2b609edfe562f70cecbfdb6a55f4d4e5a183b43bcd98ccaade",
+    "evidenceManifestId": "2628c2acef53e105e456bdb025c269a801f8bcd862e61e4e79f74039c66c79c1",
+    "previousBriefingRunId": null,
+    "claimAcceptance": {
+      "version": "intelligence_briefing_claim_acceptance_v1",
+      "totalClaimsReturned": 22,
+      "acceptedClaimCount": 17,
+      "rejectedClaimCount": 5,
+      "acceptedMeasuredClaimCount": 14,
+      "retainedSections": [
+        "financial_performance",
+        "operations_delivery",
+        "customers_market"
+      ],
+      "omittedSections": [
+        "business_updates_context"
+      ],
+      "rejectionCategories": [
+        {
+          "reasonCode": "unsupported_relationship",
+          "stage": "relationship_support",
+          "sectionId": "business_updates_context",
+          "count": 4
+        },
+        {
+          "reasonCode": "invalid_relationship",
+          "stage": "relationship_support",
+          "sectionId": "executive_summary",
+          "count": 1
+        }
+      ],
+      "promptVersion": "intelligence_briefing_prompt_v6",
+      "schemaVersion": "intelligence_briefing_schema_v2",
+      "validatorVersion": "intelligence_briefing_validator_v6",
+      "generationPolicyVersion": "intelligence_briefing_generation_policy_v6",
+      "providerModel": "gpt-5.6-sol"
+    }
+  }
+}

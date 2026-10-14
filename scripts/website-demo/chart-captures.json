@@ -1,0 +1,283 @@
+{
+  "applicationCommit": "8d6bb23b67cf6e03c3728bf9afa292c7fdea8d3e",
+  "captureDate": "2026-10-14",
+  "scenario": "Coastal Kitchen",
+  "assets": [
+    {
+      "file": "performance-comparison-desktop.webp",
+      "sourceScreen": "Performance KPI detail",
+      "viewport": [
+        1200,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        278,
+        748,
+        880,
+        486
+      ],
+      "dimensions": [
+        1760,
+        972
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "6f33634245e9c4d3b9007339def5473e1d4695a2b7303fc9a63edda6ae0927e6",
+      "sha256": "1d8bbf9259ae7bb3c3f84fd441e170adc3ee092e4b41b8533687da81bbfc60ad",
+      "bytes": 179652
+    },
+    {
+      "file": "performance-comparison-mobile.webp",
+      "sourceScreen": "Performance KPI detail",
+      "viewport": [
+        390,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        25,
+        1871,
+        340,
+        400
+      ],
+      "dimensions": [
+        680,
+        800
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "ce9196684a4760b27afbb54c9820ab43cae0ba7bc76a8ccbda4248be9a786af5",
+      "sha256": "312db97e7a58d8f3e673641e46c90dea23f268e4d379c4fd6829c87b6280b0fb",
+      "bytes": 78836
+    },
+    {
+      "file": "performance-comparison-narrow.webp",
+      "sourceScreen": "Performance KPI detail",
+      "viewport": [
+        320,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        25,
+        1941,
+        270,
+        430
+      ],
+      "dimensions": [
+        540,
+        860
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "57cef740724e43bc3907fb320aa37e206b133e3a3c4fb968fe37c905977091ab",
+      "sha256": "329df3bbc93b172726450fe5aff1faecf96f78d54eb98310969762791de1d958",
+      "bytes": 78678
+    },
+    {
+      "file": "briefing-desktop.webp",
+      "sourceScreen": "Monthly Intelligence Briefing",
+      "viewport": [
+        1200,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        260,
+        156,
+        916,
+        879
+      ],
+      "dimensions": [
+        1832,
+        1758
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "cd1f8b667b1b183ff965f9ab67d7cf3d112de0b0be7f7b8314e1f9d96e58c351",
+      "sha256": "d13d3bee82f18b557bbcc17c3b5da0a0acaedec5ba91460303701e82c84d769f",
+      "bytes": 295468
+    },
+    {
+      "file": "briefing-mobile.webp",
+      "sourceScreen": "Monthly Intelligence Briefing",
+      "viewport": [
+        390,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        8,
+        822,
+        374,
+        470
+      ],
+      "dimensions": [
+        748,
+        940
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "a10d85255b84a20ed26b970bd7f381b61373e175d5a4e6f74bed89f444d0bea3",
+      "sha256": "c8ae36644cf3d539dd2b6a40cb9497e2ab2be3e22f5100516469d17e013fdfab",
+      "bytes": 105732
+    },
+    {
+      "file": "briefing-narrow.webp",
+      "sourceScreen": "Monthly Intelligence Briefing",
+      "viewport": [
+        320,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        8,
+        936,
+        304,
+        432
+      ],
+      "dimensions": [
+        608,
+        864
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "30284960b1a7be8e807506db5588f12d3a803d1ba8f0f8ec76a443f298fa4dbc",
+      "sha256": "39eadcd920f86a1becf5dc49b3b54bc7113667ef80f569699e8ce8356d5db6dc",
+      "bytes": 94800
+    },
+    {
+      "file": "vsi-financial-answer-desktop.webp",
+      "sourceScreen": "VSI financial conversation",
+      "viewport": [
+        1200,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        253,
+        304,
+        930,
+        233
+      ],
+      "dimensions": [
+        1860,
+        466
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "aea6b382966539c433c3f44932877bd72d16094e7ee28bdc31cbead890633e6b",
+      "sha256": "7c5139bbc80dc5ecf2aef80dbe63182689d1ab9c5b1d87605bf00b585dc3369b",
+      "bytes": 124860
+    },
+    {
+      "file": "vsi-financial-answer-mobile.webp",
+      "sourceScreen": "VSI financial conversation",
+      "viewport": [
+        390,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        15,
+        372,
+        360,
+        360
+      ],
+      "dimensions": [
+        720,
+        720
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "02d06fae20116b5c40b479b22608eaddc2c836722bc22501053bcdcbb96d00c8",
+      "sha256": "4721197f19516d11f8844fb943b4c506d3e0a2208faf94f851c21c34d3c18043",
+      "bytes": 121674
+    },
+    {
+      "file": "vsi-financial-answer-narrow.webp",
+      "sourceScreen": "VSI financial conversation",
+      "viewport": [
+        320,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        15,
+        372,
+        290,
+        408
+      ],
+      "dimensions": [
+        580,
+        816
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "0637682342b5577962df4db93381535f568c5499b07e42c1009ebd94cd59f482",
+      "sha256": "d404f8fe7645ad58f8fa09c8ee4b34b69719291e158b39878ac6163a787d98ca",
+      "bytes": 122748
+    },
+    {
+      "file": "vsi-financial-charts-desktop.webp",
+      "sourceScreen": "VSI financial conversation",
+      "viewport": [
+        1200,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        253,
+        318,
+        930,
+        518
+      ],
+      "dimensions": [
+        1860,
+        1036
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "7bb3012d01d4a07b607c6a8cb16b860d4e01b8589e90acb14583e0c8a8e070cb",
+      "sha256": "8cc2fa80a3dcecab32749245e4170c16ed7778d1e7308eba8280c22e4b7fc820",
+      "bytes": 235924
+    },
+    {
+      "file": "vsi-financial-charts-mobile.webp",
+      "sourceScreen": "VSI financial conversation",
+      "viewport": [
+        390,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        15,
+        390,
+        360,
+        430
+      ],
+      "dimensions": [
+        720,
+        860
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "c756b01fd654864329c9b9c514d0d5df95d0c59f20269789ee47c8e53b7ef886",
+      "sha256": "f5e802e5b8a74d0f59ae0797116d9a92c73907a4ed708d54951bf2c24a0b22e1",
+      "bytes": 108348
+    },
+    {
+      "file": "vsi-financial-charts-narrow.webp",
+      "sourceScreen": "VSI financial conversation",
+      "viewport": [
+        320,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        15,
+        394,
+        290,
+        431
+      ],
+      "dimensions": [
+        580,
+        862
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "54cb08a272ccf21011c77bdc39b7a66568ed602cd45a8ddfb925f8476f43fb5e",
+      "sha256": "2a149c90586c247888aa42aa74f4d9075ec85507e0a4fe4b5290b7dae1cd1434",
+      "bytes": 91688
+    }
+  ]
+}

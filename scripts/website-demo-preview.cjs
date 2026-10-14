@@ -85,7 +85,7 @@ async function build({ componentRoot = sourceRoot(), test = false, entryFile = n
   return { output, componentRoot };
 }
 function createServer({ output, componentRoot, port }) {
-  if (![3190, 3206].includes(port)) throw new Error("Only loopback capture ports 3190 and 3206 are permitted.");
+  if (![3190, 3206, 3212].includes(port)) throw new Error("Only loopback capture ports 3190, 3206 and 3212 are permitted.");
   const origin = `http://127.0.0.1:${port}`;
   const html = '<!doctype html><html lang="en" class="dark pulsar" data-theme="pulsar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vaeroex — isolated workspace preview</title><link rel="stylesheet" href="/preview.css"></head><body><div id="root"></div><script src="/preview.js"></script></body></html>';
   return http.createServer((request, response) => {

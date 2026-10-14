@@ -1,0 +1,34 @@
+Coastal Kitchen
+
+Sales have increased, but are we keeping more of that money? What changed in our costs and profitability, and what should I focus on next?
+
+## Short answer
+
+Sales rose, but you **did not keep more as net profit** in the latest week. Coastal Kitchen’s accrual P&L shows revenue up **$400 (1.47%)**, while net income fell **$357.60 (3.95%)** week over week. Net margin slipped from **33.28% to 31.50%**, a **1.78 percentage-point decline**. [B1]
+
+## What changed
+
+Comparing **Sep 29–Oct 5** with **Oct 6–12, 2026**:
+
+- **Revenue:** $27,200 → $27,600 (**+$400**).
+- **Cost of goods sold:** $8,214.40 → $8,280 (**+$65.60**); as a share of revenue it eased from **30.20% to 30.00%**.
+- **Gross profit:** $18,985.60 → $19,320 (**+$334.40**); gross margin edged up from **69.80% to 70.00%**.
+- **Operating expenses:** $9,932.80 → $10,624.80 (**+$692**), growing faster than sales.
+- **Net income:** $9,052.80 → $8,695.20 (**−$357.60**). [B1]
+
+Within the expense lines, **other operating expenses increased $600** ($1,800 → $2,400), and labor expense increased **$92** ($8,132.80 → $8,224.80). Labor’s share of revenue was nearly flat, **29.90% → 29.80%**. These changes identify where to investigate; the records do not establish what caused them. [B1]
+
+## What to focus on next
+
+1. **Break down the $600 increase in other operating expenses** by account and transaction. Check for one-time items, timing changes, duplicate entries, or recurring cost increases before deciding what to cut.
+2. **Protect the gross-margin improvement** by monitoring food and beverage cost. The recorded food-waste KPI is **3.5 against a target of 5** for Oct 12, so it is currently within that recorded target; the KPI does not show what drove the result. [B4]
+3. **Maintain labor discipline.** Labor percentage is **29.8 against its recorded 32% maximum target** for Oct 12; the P&L also shows labor dollars rose slightly as sales increased. [B5]
+
+These are two weekly reported P&Ls in USD on an accrual basis; coverage and reconciliation are not established, and P&L profit is not cash flow. Treat the comparison as a useful signal, not a complete profit bridge or proof of operating causes. [B1] [B2] [B3]
+
+Sources
+[B1] P&L calculations: Coastal Kitchen — Calculated from stored P&L rows. Inputs: 2026-10-06–2026-10-12 (7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681); 2026-09-29–2026-10-05 (843eb1da-e7c8-448b-87d0-686a2949203e). Inspect cited reports for row inputs.
+[B2] QuickBooks P&L: Coastal Kitchen · 2026-10-06–2026-10-12 — USD · accrual · 2026-10-06–2026-10-12. Reported P&L, not cash flow. Saved observation. Checked 2026-10-14T01:15:14.661+00:00.
+[B3] QuickBooks P&L: Coastal Kitchen · 2026-09-29–2026-10-05 — USD · accrual · 2026-09-29–2026-10-05. Reported P&L, not cash flow. Saved observation. Checked 2026-10-14T01:15:14.661+00:00.
+[B4] Food waste share is on or below target — Actual 3.5 vs target 5.
+[B5] Labor percentage — Labor percentage: 29.8 percent; target 32 percent. Recorded 2026-10-12.

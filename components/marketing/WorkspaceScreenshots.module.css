@@ -14,3 +14,7 @@
 .imageLink img { height: auto; }
 .enlarge { margin: 10px 0 0; color: #99a7bb; font-size: 12px; }
 @media(max-width:600px) { .capture { max-width: 340px; } .tabs { gap: 6px; } .tabs button { padding: 8px 10px; font-size: 12px; } .caption { font-size: 13px; } }
+
+.capture[data-workspace-capture="performance-comparison"] { max-width: 880px; }
+@media(max-width:600px) { .capture[data-workspace-capture="performance-comparison"] { max-width: 340px; } }
+@media(max-width:360px) { .capture[data-workspace-capture="performance-comparison"] { max-width: 270px; } }
