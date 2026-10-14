@@ -106,12 +106,6 @@ export function HomepageWorkspaceTour() {
               />
             </picture>
           </a>
-          <figcaption className={styles.attribution}>
-            Actual workspace capture · Coastal Kitchen fictional test business
-            <p className={styles.enlarge}>
-              Select the image to view it at full size.
-            </p>
-          </figcaption>
         </figure>
       </div>
       <p className={styles.attribution}>
