@@ -196,7 +196,7 @@ test("300 saved analyses render in 25-row batches without changing or skipping a
   assert.equal(analysisRows(tree).length, 25);
   const typeFilter = nodes(tree, node => node.type === "select" && node.props["aria-label"] === "Analysis type")[0];
   assert.ok(typeFilter, "the compact native filter retains an accessible label");
-  assert.deepEqual(nodes(typeFilter, node => node.type === "option").map(node => node.props.value), ["all", "business_health", "finding_explanation", "weekly_briefing", "monthly_briefing"]);
+  assert.deepEqual(nodes(typeFilter, node => node.type === "option").map(node => node.props.value), ["all", "vsi", "business_health", "finding_explanation", "weekly_briefing", "monthly_briefing"]);
   assert.ok(analysisRows(tree).every(row => row.props.className.includes("workspace-list-row")), "saved content renders as compact rows without dropping records");
   assert.match(content(tree), /Showing 25 of 300 matching loaded analyses/);
   assert.match(content(tree), /Search covers this loaded set \(up to 300 recent analyses\), not older history/);
