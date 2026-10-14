@@ -1,0 +1,120 @@
+{
+  "synthetic": true,
+  "workflow": "authenticated local API; persisted and reopened; idempotency verified",
+  "conversation": {
+    "id": "435a7294-2c2c-417b-9c07-8720f9483ac1",
+    "title": "Coastal Kitchen cost and profitability qualification",
+    "exchangeCount": 1,
+    "createdAt": "2026-10-14T01:31:01.76106+00:00",
+    "updatedAt": "2026-10-14T01:31:23.775272+00:00",
+    "parentConversationId": null
+  },
+  "exchange": {
+    "id": "99ddeec8-133f-4cdb-adfb-390d8042703a",
+    "userMessage": "Sales have increased, but are we keeping more of that money? What changed in our costs and profitability, and what should I focus on next?",
+    "answer": "## Short answer\n\nSales increased, but you kept less as net profit. In the two comparable seven-day QuickBooks P&Ls, revenue rose **$400 (1.47%)**, while net income fell **$357.60 (3.95%)**. Net margin declined from **33.28% to 31.50%**\u2014a **1.78 percentage-point** drop. [B1]\n\n## What changed\n\n- **Cost of goods sold:** increased **$65.60**, from $8,214.40 to $8,280.00. Its share of revenue improved slightly, from **30.20% to 30.00%**; gross margin rose from **69.80% to 70.00%**. [B1]\n- **Operating expenses:** increased **$692**, from $9,932.80 to $10,624.80. The listed detail shows **labor expense up $92** and **other operating expenses up $600**. Labor stayed nearly flat as a share of revenue\u201429.90% to 29.80%. [B1]\n- **Profitability:** gross profit increased **$334.40**, but the increase in operating expenses more than offset that gain in the reported P&L; net income went from **$9,052.80 to $8,695.20**. [B1]\n\nThe reports are in **USD, accrual basis**, for Coastal Kitchen, and are marked not stale. Their coverage is unknown, however, and the saved QuickBooks connection\u2019s freshness is also unknown; no fresh provider sync was performed. Treat this as a comparison of the saved reports, not a complete audit. P&L profit is not cash flow. [B2] [B3] [B4]\n\n## What to focus on next\n\n1. **Investigate the $600 increase in other operating expenses first.** Review the underlying accounts and transactions for one-offs, timing differences, misclassifications, or recurring increases. The reports show the change, not its cause. [B1]\n2. **Keep labor in view, but don\u2019t assume it drove the margin decline.** Labor expense rose in dollars, while its share of revenue edged down; the recorded labor KPI is **29.8% against a 32% maximum target**. [B1] [B5]\n3. **Protect the gross-margin improvement.** Gross margin is **70% against a recorded 68% target**. Food waste share is **3.5 against a target of 5**, slightly above its prior reading of 3.4 but still on or below target. These metrics don\u2019t establish what caused the P&L changes. [B6] [B7] [B8]\n4. **Check the next comparable week after verifying the expense detail and report coverage.** Track net margin alongside sales; rising sales alone aren\u2019t showing that more money is being kept as net profit. [B1]",
+    "citations": [
+      {
+        "id": "B1",
+        "url": "/app/settings/integrations/quickbooks/data?connectionId=e9f00000-0000-4000-8000-000000000101&sourceId=7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681&kind=reports#source-detail",
+        "title": "P&L calculations: Coastal Kitchen",
+        "excerpt": "Calculated from stored P&L rows. Inputs: 2026-10-06\u20132026-10-12 (7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681); 2026-09-29\u20132026-10-05 (843eb1da-e7c8-448b-87d0-686a2949203e). Inspect cited reports for row inputs.",
+        "sourceId": "7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681",
+        "sourceType": "financial_calculation",
+        "retrievedAt": "2026-10-14T01:31:08.393Z",
+        "evidenceDate": "2026-10-12",
+        "snapshotHash": "33876812ddb7e030bb9e0f72b84cce224dcad04173714733e7ad927c5f30581b"
+      },
+      {
+        "id": "B2",
+        "url": "/app/settings/integrations/quickbooks/data?connectionId=e9f00000-0000-4000-8000-000000000101&sourceId=7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681&kind=reports#source-detail",
+        "title": "QuickBooks P&L: Coastal Kitchen \u00b7 2026-10-06\u20132026-10-12",
+        "excerpt": "USD \u00b7 accrual \u00b7 2026-10-06\u20132026-10-12. Reported P&L, not cash flow. Saved observation. Checked 2026-10-14T01:15:14.661+00:00.",
+        "sourceId": "7b49afe7-e9b1-4e2c-a6f2-2beabf0a5681",
+        "sourceType": "financial_report",
+        "retrievedAt": "2026-10-14T01:31:08.393Z",
+        "evidenceDate": "2026-10-12",
+        "snapshotHash": "620914e9509bca85dbab1760e5c04a1f80b340afcda2ae4c70e0fd96882fd8b6"
+      },
+      {
+        "id": "B3",
+        "url": "/app/settings/integrations/quickbooks/data?connectionId=e9f00000-0000-4000-8000-000000000101&sourceId=843eb1da-e7c8-448b-87d0-686a2949203e&kind=reports#source-detail",
+        "title": "QuickBooks P&L: Coastal Kitchen \u00b7 2026-09-29\u20132026-10-05",
+        "excerpt": "USD \u00b7 accrual \u00b7 2026-09-29\u20132026-10-05. Reported P&L, not cash flow. Saved observation. Checked 2026-10-14T01:15:14.661+00:00.",
+        "sourceId": "843eb1da-e7c8-448b-87d0-686a2949203e",
+        "sourceType": "financial_report",
+        "retrievedAt": "2026-10-14T01:31:08.393Z",
+        "evidenceDate": "2026-10-05",
+        "snapshotHash": "4c7516ad93a0827c91d83a4a2e1518e27d2025437ed132bc68146e917cf551e7"
+      },
+      {
+        "id": "B4",
+        "url": "/app/settings/integrations/quickbooks",
+        "title": "QuickBooks: Coastal Kitchen / Synthetic QBO",
+        "excerpt": "connected; unknown",
+        "sourceId": "quickbooks_online:a77ebec6210ff1a9e1399860b1b9751a77a235c024e2f85a369210d33493cb06",
+        "sourceType": "integration",
+        "retrievedAt": "2026-10-14T01:31:08.393Z",
+        "evidenceDate": null,
+        "snapshotHash": "9413cd35965f27e041ec4ac3357a4737520e0391899987541af1e3d520cb2b9d"
+      },
+      {
+        "id": "B5",
+        "url": "/app/kpis?q=Labor%20percentage",
+        "title": "Labor percentage",
+        "excerpt": "Labor percentage: 29.8 percent; target 32 percent. Recorded 2026-10-12.",
+        "sourceId": "47244208-124d-4baf-8310-4908923bdc68",
+        "sourceType": "kpi",
+        "retrievedAt": "2026-10-14T01:31:08.393Z",
+        "evidenceDate": "2026-10-12",
+        "snapshotHash": "eef5b678ca2517e98bb5d3878d536571693e00c60876b61084c0254af3f769ea"
+      },
+      {
+        "id": "B6",
+        "url": "/app/intelligence?finding=kpi-opportunity-36935b74-ae4b-4054-864b-e565f6dcd87e",
+        "title": "Gross margin is on or above target",
+        "excerpt": "Actual 70 vs target 68.",
+        "sourceId": "kpi-opportunity-36935b74-ae4b-4054-864b-e565f6dcd87e",
+        "sourceType": "finding",
+        "retrievedAt": "2026-10-14T01:31:08.393Z",
+        "evidenceDate": "2026-10-12T18:00:00+00:00",
+        "snapshotHash": "6328ef230fbd08369ad10b151ffc48e7bdb034c5a0411c9e04564db989842f38"
+      },
+      {
+        "id": "B7",
+        "url": "/app/intelligence?finding=kpi-opportunity-3b792805-cbab-46d1-8acc-dd023739e03d",
+        "title": "Food waste share is on or below target",
+        "excerpt": "Actual 3.5 vs target 5.",
+        "sourceId": "kpi-opportunity-3b792805-cbab-46d1-8acc-dd023739e03d",
+        "sourceType": "finding",
+        "retrievedAt": "2026-10-14T01:31:08.393Z",
+        "evidenceDate": "2026-10-12T18:00:00+00:00",
+        "snapshotHash": "d418a4ca50bc42d9d32419ec2bb99662ee260f1c4c98b45406c1dd2280ee55ce"
+      },
+      {
+        "id": "B8",
+        "url": "/app/sources/c84d7a11-261b-4f05-ba0e-dffacce17d8c",
+        "title": "Food waste share \u00b7 2026-10",
+        "excerpt": "metric_date,name,actual_value,target\n2026-10-05,Food waste share,3.4,5\n2026-10-12,Food waste share,3.5,5\n",
+        "sourceId": "c84d7a11-261b-4f05-ba0e-dffacce17d8c",
+        "sourceType": "file",
+        "retrievedAt": "2026-10-14T01:31:08.393Z",
+        "evidenceDate": "2026-10-12T18:00:00+00:00",
+        "snapshotHash": "4b35108f0c5becabd5c282aa9b3299b90dfb7033a6d44e21f61f2fcdb3d21291"
+      }
+    ],
+    "publicResearchTopics": [],
+    "createdAt": "2026-10-14T01:31:23.778992+00:00",
+    "rememberProposal": null,
+    "savedNoteId": null
+  },
+  "verification": {
+    "authenticatedApi": true,
+    "persistedReopened": true,
+    "idempotentReplay": true,
+    "oneQuestion": true,
+    "foreignFinancialCode": "42501",
+    "wrongTenantStatus": 403,
+    "cost": 0.00220345
+  }
+}

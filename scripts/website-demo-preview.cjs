@@ -34,7 +34,7 @@ const readModules = Object.freeze([
 function sourceRoot() {
   return fs.realpathSync(process.env.WORKSPACE_PREVIEW_COMPONENT_ROOT || root);
 }
-async function build({ componentRoot = sourceRoot(), test = false } = {}) {
+async function build({ componentRoot = sourceRoot(), test = false, entryFile = null } = {}) {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), "vaeroex-website-demo-"));
   fs.chmodSync(output, 0o700);
   const navigation = path.join(fixture, "navigation.tsx");
@@ -65,7 +65,7 @@ async function build({ componentRoot = sourceRoot(), test = false } = {}) {
   await new Promise((resolve, reject) => webpack({
     mode: "development", target: test ? "node" : "web", devtool: false,
     externals: test ? Object.fromEntries(["react", "react/jsx-runtime", "react-dom"].map(name => [name, `commonjs ${require.resolve(name)}`])) : undefined,
-    entry: path.join(fixture, test ? "screens.tsx" : "entry.tsx"),
+    entry: entryFile || path.join(fixture, test ? "screens.tsx" : "entry.tsx"),
     output: { path: output, filename: test ? "render.cjs" : "preview.js", ...(test ? { library: { type: "commonjs2" } } : {}) },
     resolve: { extensions: [".tsx", ".ts", ".js"], alias: aliases, modules: [path.join(root, "node_modules"), "node_modules"] },
     module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, use: { loader: path.join(fixture, "loader.cjs"), options: { allowedActions, allowedActionExports, actionRuntime: path.join(fixture, "actions.ts"), intelligencePage: path.join(componentRoot, "app/app/intelligence/page.tsx"), readRuntime: path.join(fixture, "read-adapters.ts") } } }] },
@@ -85,7 +85,7 @@ async function build({ componentRoot = sourceRoot(), test = false } = {}) {
   return { output, componentRoot };
 }
 function createServer({ output, componentRoot, port }) {
-  if (![3190].includes(port)) throw new Error("Only loopback capture port 3190 is permitted.");
+  if (![3190, 3206].includes(port)) throw new Error("Only loopback capture ports 3190 and 3206 are permitted.");
   const origin = `http://127.0.0.1:${port}`;
   const html = '<!doctype html><html lang="en" class="dark pulsar" data-theme="pulsar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vaeroex — isolated workspace preview</title><link rel="stylesheet" href="/preview.css"></head><body><div id="root"></div><script src="/preview.js"></script></body></html>';
   return http.createServer((request, response) => {
