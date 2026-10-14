@@ -885,3 +885,13 @@
 
 /* Ownership is a separate text statement from the following membership attribution. */
 .ownership { margin: 32px 0 0; color: #a5b4d4; font-size: 12px; letter-spacing: .06em; }
+
+/* Homepage-only messaging; shared journeys and artwork remain unchanged. */
+.productIntro > .connectedStory { color: #e0e3e9; font-size: 18px; line-height: 1.7; max-width: 460px; }
+.closingCopy { max-width: 660px; color: #a1a9b8; font-size: 15px; line-height: 1.8; }
+.materialCopy > p + p { margin-top: 16px; }
+@media (min-width: 761px) and (max-width: 1150px) {
+  .materialCopy { display: block; }
+  .materialCopy > p:not(.eyebrow) { max-width: 640px; }
+  .materialCopy > a { margin-top: 24px; }
+}
