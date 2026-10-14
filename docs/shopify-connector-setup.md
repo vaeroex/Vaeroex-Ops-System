@@ -12,6 +12,42 @@ credentials, Shopify version release, real-store authorization, or customer
 launch has been performed by this code change. `shopify.app.toml` is the prepared
 configuration for the existing app, not evidence that these settings are live.
 
+## Preview migration verification — October 13, 2026 (Pacific)
+
+The owner approved migration `20261014002542` for preview project
+`zfpnhvcmuuvtswttmnjd` only. It was applied with Supabase CLI after the connector
+returned expired-request errors, and the exact version was recorded in the preview
+migration ledger. Production project `mdiianhfrojmxqpwrflh` was checked read-only:
+Shopify tables/functions and this migration record are absent. Production is not approved.
+
+`supabase/tests/shopify_preview_verification.sql` passed 23 assertions against the
+actual preview database under anon, authenticated and service roles. It covers
+permissions, cross-workspace/session rejection, one-time OAuth state, connection,
+refresh/sync leases, aggregate-only storage, data-request acknowledgement,
+customer erasure/stale-write denial, uninstall, disconnect and shop erasure.
+The transaction rolled back: zero test workspaces, connections or cutoffs remained.
+Synthetic credentials were used; this is not a live Shopify authorization test.
+
+Before/after fingerprints of existing public/private function definitions,
+function/table grants, table RLS flags and policies matched:
+`a284c2f95d01fddd4f86ef5b70768062`. The advisor added only two INFO notices for
+RLS without policies on the new private tables: intentional default-deny tables
+behind the service-only RPC. No new WARN/ERROR security findings were introduced.
+See [the advisor explanation](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+
+Local Shopify provider/database/route tests passed, as did Google Sheets, Square
+connection routes and shared provider authorization contracts. QuickBooks behavioral
+tests passed; its fixed production-candidate inventory was updated to exclude only
+this explicitly preview-only migration, retaining all existing count/hash guards.
+These are regression checks, not proof of fresh live provider synchronizations.
+No existing customer credentials were used or rotated and no real orders were changed.
+
+Preview credentials have been configured on branch `codex/shopify-integration`,
+and Shopify development store `Vaeroex Integration Test` was created with sample
+data. Keep the preview feature flag off until callback/scopes/webhooks are released
+and live deliveries have been tested. The migration verification does not complete
+those remaining external activation steps.
+
 ## Customer value and first release scope
 
 A workspace owner connects one Shopify store, approves a manual read, and sees

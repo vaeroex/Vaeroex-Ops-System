@@ -5,7 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
-const { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
+const { previewOnlyMigrations, checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
   productionSquare, productionSheets, auditMigrations, capacityMigrations, storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, sheetsErasureMigrations, billingObservationMigration, assertProductionBaselineLedger,
   dashboardMigrations, dashboardSuites, dashboardPlan, checkDashboardAssertionNames, composeSquareIdentitySuite, executeDashboardSuite,
   preferenceAssertionNames, reportingTimezoneAssertionNames, squareIdentityAssertionNames } = require('./run-qbo-production-candidate-database-tests.cjs');
@@ -32,7 +32,9 @@ assert.deepEqual(storageMigrations, [
   '20261012003920_workspace_storage_capacity_billing.sql',
   '20261012013508_workspace_storage_invoice_capacity.sql',
 ], 'only the three reviewed storage migrations extend the existing canonical baseline'); assertions++;
-const canonicalNames = fs.readdirSync(path.join(__dirname, '../supabase/migrations')).filter(name => /^\d+_.+\.sql$/.test(name)).sort();
+assert.deepEqual(previewOnlyMigrations, ['20261014002542_shopify_read_only_connector.sql'], 'only the explicitly preview-only Shopify migration is excluded'); assertions++;
+assert.match(candidateRunner, /!previewOnlyMigrations\.includes\(name\)/, 'production candidate runner excludes only the explicit preview list'); assertions++;
+const canonicalNames = fs.readdirSync(path.join(__dirname, '../supabase/migrations')).filter(name => /^\d+_.+\.sql$/.test(name) && !previewOnlyMigrations.includes(name)).sort();
 assert.equal(canonicalNames.filter(name => ![...storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, ...sheetsErasureMigrations, billingObservationMigration].includes(name)).length, 138, 'the reviewed pre-storage canonical baseline remains exact'); assertions++;
 assert.deepEqual(canonicalNames.filter(name => !sheetsErasureMigrations.includes(name)).slice(-7), [...storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, billingObservationMigration], 'the exact storage, price and legal boundary migrations are the final ordered tail'); assertions++;
 assert.equal(billingObservationMigration, '20261012201726_stripe_subscription_observation_fence.sql', 'base billing tail is exactly the reviewed observation fence'); assertions++;
