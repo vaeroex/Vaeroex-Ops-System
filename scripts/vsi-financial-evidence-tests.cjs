@@ -47,6 +47,9 @@ console.log('Financial decimal calculations: ratios, losses, missing inputs, mis
 const nested=structuredClone(qboBrowser);
 nested.detail.value.rows=[{depth:0,rowType:'section',cells:[{columnKey:'account',value:'Expenses'}]},{depth:1,rowType:'summary',cells:[{columnKey:'account',value:'Net Income'},{columnKey:'amount',value:'99'}]}];
 assert.equal(financialReport(nested,'/app',false).totals.netIncome,undefined,'a similarly named nested account is not the report net income');
+const accountOnly=structuredClone(qboBrowser);
+accountOnly.detail.value.rows=[{depth:0,rowType:'data',cells:[{columnKey:'account',value:'Net sales'},{columnKey:'amount',value:'99'}]}];
+assert.equal(financialReport(accountOnly,'/app',false).totals.revenue,undefined,'an ordinary account label is not a reported revenue total');
 const totalColumn=report('2026-09-29','2026-10-05',{'Total Income':'26000'},{columns:[{columnKey:'account',title:'Account'},{columnKey:'amount',title:'Total'}]});
 assert.equal(totalColumn.totals.revenue.amount,'26000');
 (async()=>{

@@ -47,7 +47,7 @@ export function financialReport(browser: QboBrowser, url: string, stale: boolean
   const totals: FinancialReport["totals"] = {};
   if (!preview.truncated && supported) for (const [key, name] of Object.entries(names)) {
     const matching = rows.filter(row => name.test(row.label) && row.amount !== null
-      && (row.path.length === 1 || row.path.length === 2 && sections[key]?.test(row.path[0])) && (row.kind === "summary" || key === "revenue" && row.kind === "data" && /^net sales$/i.test(row.label)));
+      && (row.path.length === 1 || row.path.length === 2 && sections[key]?.test(row.path[0])) && row.kind === "summary");
     if (matching.length === 1) totals[key] = { amount: matching[0].amount!, row: matching[0].row };
     else limitations.push(`${key}: ${matching.length ? "ambiguous reported totals" : "no supported reported total"}; not treated as zero.`);
   }
