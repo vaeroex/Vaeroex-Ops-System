@@ -77,6 +77,7 @@ function Poster() {
 }
 export function HomepageScene() {
   const element = useRef<HTMLDivElement>(null),
+    controlsElement = useRef<HTMLDivElement>(null),
     [interactive, setInteractive] = useState(false),
     [compact, setCompact] = useState(false),
     [ready, setReady] = useState(false),
@@ -123,6 +124,20 @@ export function HomepageScene() {
     const measure = () => {
       frame = 0;
       const bounds = root.getBoundingClientRect();
+      // Let the fixed stage leave with its owning section, before the footer
+      // enters its space. This also runs while the animation is paused.
+      if (element.current) {
+        const top = innerWidth <= 760 ? 70 : 86;
+        const exit = Math.max(
+          0,
+          top + element.current.offsetHeight - bounds.bottom,
+        );
+        element.current.style.setProperty("--assembly-exit", `${exit}px`);
+        controlsElement.current?.style.setProperty(
+          "--assembly-exit",
+          `${exit}px`,
+        );
+      }
       const visible =
         bounds.bottom > 100 &&
         bounds.top < innerHeight &&
@@ -173,77 +188,86 @@ export function HomepageScene() {
   };
   const shift = ease((progress - 0.3) / 0.13) * ease((0.72 - progress) / 0.13);
   return (
-    <div
-      ref={element}
-      className={styles.scene}
-      style={{ "--assembly-shift": shift } as CSSProperties}
-      data-home-assembly
-      data-stage={stage}
-      data-progress={progress.toFixed(4)}
-      data-mode={interactive && ready ? "interactive" : "static"}
-      data-active={active && !paused}
-      data-visible="true"
-    >
+    <>
       <div
-        className={`${styles.poster} ${ready ? styles.hidden : ""}`}
-        data-assembly-poster
+        ref={element}
+        className={styles.scene}
+        style={{ "--assembly-shift": shift } as CSSProperties}
+        data-home-assembly
+        data-stage={stage}
+        data-progress={progress.toFixed(4)}
+        data-mode={interactive && ready ? "interactive" : "static"}
+        data-active={active && !paused}
+        data-visible="true"
       >
-        <Poster />
-      </div>
-      {interactive ? (
         <div
-          className={`${styles.canvas} ${ready ? styles.ready : ""}`}
-          aria-hidden="true"
-          data-spatial-webgl
+          className={`${styles.poster} ${ready ? styles.hidden : ""}`}
+          data-assembly-poster
         >
-          <Boundary onFailure={onFailure}>
-            <Scene
-              progress={progress}
-              active={active && !paused}
-              compact={compact}
-              onReady={onReady}
-              onFailure={onFailure}
-            />
-          </Boundary>
+          <Poster />
         </div>
-      ) : null}
-      <div className={styles.controls}>
-        <span>
-          0{stage + 1} / {ASSEMBLY_STAGES[stage]}
-          <small>INFORMATION → UNDERSTANDING · CONCEPTUAL</small>
-        </span>
-        {interactive && ready ? (
-          <button
-            onClick={() => setPaused((p) => !p)}
-            aria-pressed={paused}
-            aria-label={
-              paused
-                ? "Resume information journey"
-                : "Pause information journey"
-            }
+        {interactive ? (
+          <div
+            className={`${styles.canvas} ${ready ? styles.ready : ""}`}
+            aria-hidden="true"
+            data-spatial-webgl
           >
-            {paused ? "Resume" : "Pause"}
-          </button>
-        ) : (
-          <span className={styles.staticLabel}>CONCEPT RENDER</span>
-        )}
+            <Boundary onFailure={onFailure}>
+              <Scene
+                progress={progress}
+                active={active && !paused}
+                compact={compact}
+                onReady={onReady}
+                onFailure={onFailure}
+              />
+            </Boundary>
+          </div>
+        ) : null}
       </div>
-      <nav
-        className={styles.chapters}
-        aria-label="Information journey chapters"
+      <div
+        ref={controlsElement}
+        className={`${styles.scene} ${styles.controlLayer}`}
+        style={{ "--assembly-shift": shift } as CSSProperties}
+        data-visible={String(active)}
       >
-        {ASSEMBLY_STAGES.map((label, i) => (
-          <a
-            key={label}
-            href={`#${anchors[i]}`}
-            aria-current={i === stage ? "step" : undefined}
-            aria-label={`${i + 1}. ${label}`}
-          >
-            <span>0{i + 1}</span>
-            <span>{label}</span>
-          </a>
-        ))}
-      </nav>
-    </div>
+        <div className={styles.controls}>
+          <span>
+            0{stage + 1} / {ASSEMBLY_STAGES[stage]}
+            <small>INFORMATION → UNDERSTANDING · CONCEPTUAL</small>
+          </span>
+          {interactive && ready ? (
+            <button
+              onClick={() => setPaused((p) => !p)}
+              aria-pressed={paused}
+              aria-label={
+                paused
+                  ? "Resume information journey"
+                  : "Pause information journey"
+              }
+            >
+              {paused ? "Resume" : "Pause"}
+            </button>
+          ) : (
+            <span className={styles.staticLabel}>CONCEPT RENDER</span>
+          )}
+        </div>
+        <nav
+          className={styles.chapters}
+          aria-label="Information journey chapters"
+        >
+          {ASSEMBLY_STAGES.map((label, i) => (
+            <a
+              key={label}
+              href={`#${anchors[i]}`}
+              aria-current={i === stage ? "step" : undefined}
+              aria-label={`${i + 1}. ${label}`}
+            >
+              <span>0{i + 1}</span>
+              <span>{label}</span>
+            </a>
+          ))}
+        </nav>
+      </div>
+    </>
   );
 }

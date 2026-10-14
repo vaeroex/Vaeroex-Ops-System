@@ -6,8 +6,9 @@
   right: max(0px, calc((100vw - 1440px) / 2));
   width: min(47vw, 680px);
   transform: translateX(
-    calc(var(--assembly-shift, 0) * -1 * min(calc(50vw - 32px), 700px))
-  );
+      calc(var(--assembly-shift, 0) * -1 * min(calc(50vw - 32px), 700px))
+    )
+    translateY(calc(-1 * var(--assembly-exit, 0px)));
   height: calc(100svh - 110px);
   transition: opacity 0.25s;
 }
@@ -105,7 +106,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .scene {
-    transform: none;
+    transform: translateY(calc(-1 * var(--assembly-exit, 0px)));
   }
   .scene,
   .canvas,
@@ -159,7 +160,16 @@
 
 @media (max-width: 760px) {
   .scene {
-    transform: none;
+    transform: translateY(calc(-1 * var(--assembly-exit, 0px)));
     right: 0;
   }
+}
+
+.controlLayer {
+  z-index: 4;
+  background: none;
+}
+.controlLayer .controls,
+.controlLayer .chapters {
+  background: #08090bf5;
 }
