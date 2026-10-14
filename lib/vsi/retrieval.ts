@@ -1,5 +1,6 @@
 import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
+import { retrieveFinancialEvidence } from "./financial-evidence";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 import { loadWorkspaceHealthEvidence } from "@/lib/intelligence/workspace-health";
@@ -158,6 +159,9 @@ export async function retrieveVsiEvidence(access: WorkspaceAccess, question: str
     JSON.stringify({ connectionState: entry.connectionState, freshness: entry.freshness, lastSuccessfulRefreshAt: entry.lastSuccessfulRefreshAt,
       currentUntil: entry.currentUntil, results: entry.results }), entry.lastSuccessfulRefreshAt, entry.href, "record");
   if (integrations.dashboard.unavailable.length) limitations.push(`${integrations.dashboard.unavailable.join(", ")} saved integration information is unavailable; no fresh provider sync was performed.`);
+  const financial = await retrieveFinancialEvidence(access, asOf);
+  candidates.push(...financial.sources);
+  limitations.push(...financial.limitations);
   // Same producer as Overview/Intelligence, without writing snapshots or invoking their models.
   if (!health.businessHealthSourceErrors.length && !excludedFileIds.size) {
     const operationalInsights = buildOperationalEvidenceInsights({ sourceParents: health.sourceParentResult.eligibility.records,
@@ -190,6 +194,7 @@ export async function retrieveVsiEvidence(access: WorkspaceAccess, question: str
   const ranked = candidates.sort((a, b) => relevance(question, `${b.title} ${b.text}`) - relevance(question, `${a.title} ${a.text}`)
     || String(b.evidenceDate).localeCompare(String(a.evidenceDate)));
   const selected: VsiEvidence[] = [];
+  for (const source of ranked.filter(source => source.sourceType === "financial_report" || source.sourceType === "financial_calculation")) selected.push(source);
   for (const kind of ["kpi", "business_note", "file", "finding", "saved_analysis", "integration", "business_health"]) {
     const match = ranked.find(source => source.sourceType === kind); if (match) selected.push(match);
   }

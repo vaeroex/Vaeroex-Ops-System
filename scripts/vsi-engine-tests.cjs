@@ -95,6 +95,10 @@ async function main(){
   const bounded=boundedVsiHistory(Array.from({length:500},(_,i)=>({role:i%2?'assistant':'user',content:`message ${i} `+'x'.repeat(2000)})));
   assert.ok(bounded.length<=24);assert.ok(bounded.reduce((sum,row)=>sum+row.content.length,0)<=16000);assert.ok(bounded.at(-1).content.startsWith('message 499'));
   assert.throws(()=>validateVsiAnswer({content:'[B2]',citationIds:['B2']},[source]));assert.throws(()=>validateVsiAnswer({content:'See https://evil.example',citationIds:[]},[]));
+  const calculation={...source,id:'B10',sourceType:'financial_calculation',inputSourceIds:['report-a','report-b']};
+  const inputA={...source,id:'B11',sourceType:'financial_report',sourceId:'report-a'},inputB={...source,id:'B12',sourceType:'financial_report',sourceId:'report-b'};
+  assert.equal(validateVsiAnswer({content:'Financial change [B10]',citationIds:['B10']},[calculation,inputA,inputB]).citations.length,3,'derived claims retain both authorized input links');
+  assert.throws(()=>validateVsiAnswer({content:'Financial change [B10]',citationIds:['B10']},[calculation,inputA]),/input source/);
   assert.equal('text' in validateVsiAnswer({content:'Supported [B1]',citationIds:['B1']},[source]).citations[0],false);
   assert.equal(validateVsiAnswer({content:'Product [P1]',citationIds:['P1']},[productSource]).citations[0].id,'P1');
   const lookedUpAt='2026-10-08T12:00:00Z',documentedSource={type:'web_search_call',status:'completed',action:{type:'search',sources:[{type:'url',url:'https://forecast.weather.gov/seattle'}]}};
