@@ -64,7 +64,7 @@ export async function retrieveFinancialEvidence(access: WorkspaceAccess, asOf: s
       }
       if (reports.length) {
         const calculations = calculateFinancials(reports);
-        result.sources.push({ id: "", sourceId: reports[0].sourceId, sourceType: "financial_calculation", title: `P&L calculations: ${reports[0].entity}`,
+        result.sources.push({ id: "", sourceId: reports[0].sourceId, sourceType: "financial_calculation", inputSourceIds: reports.map(report => report.sourceId), title: `P&L calculations: ${reports[0].entity}`,
           url: reports[0].url, evidenceDate: reports[0].periodEnd, retrievedAt: asOf, treatment: "derived", text: JSON.stringify(calculations),
           excerpt: `Calculated from stored P&L rows. Inputs: ${reports.map(report => `${report.periodStart}–${report.periodEnd} (${report.sourceId})`).join("; ")}. Inspect cited reports for row inputs.`,
           snapshotHash: createHash("sha256").update(JSON.stringify(calculations)).digest("hex") });

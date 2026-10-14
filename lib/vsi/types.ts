@@ -2,7 +2,7 @@ import type { GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/re
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 
-export type VsiCitation = { id: string; title: string; url: string; sourceType: string; sourceId: string | null;
+export type VsiCitation = { inputSourceIds?: string[]; id: string; title: string; url: string; sourceType: string; sourceId: string | null;
   evidenceDate: string | null; evidenceDateKind?: "publication" | "updated" | "observation" | "event"; evidenceDateText?: string; retrievedAt: string; excerpt?: string; snapshotHash?: string };
 export type VsiFailureCategory = "provider" | "timeout" | "output_validation" | "citation_validation" | "budget_block" | "context_block" | "evidence_unavailable" | "application";
 export type VsiUsage = { model: "gpt-6-luna"; inputTokens: number; cachedInputTokens: number; outputTokens: number;

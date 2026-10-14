@@ -148,6 +148,17 @@ export function validateVsiAnswer(value: unknown, sources: VsiCitation[]) {
   if ([...parsed.citationIds, ...inline].some(id => !byId.has(id))) throw new Error("Vaeroex could not verify the answer's citations. Please retry.");
   if (/https?:\/\//i.test(content)) throw new Error("Vaeroex could not verify a link in the answer. Please retry.");
   const ids = [...new Set([...parsed.citationIds, ...inline])];
+  // Calculated claims retain inspectable input reports even if the writer only
+  // cited the derived source. Dependencies come from authorized retrieval.
+  for (const id of [...ids]) {
+    const source = byId.get(id)!;
+    if (source.sourceType !== "financial_calculation") continue;
+    for (const inputId of source.inputSourceIds || []) {
+      const input = sources.find(candidate => candidate.sourceType === "financial_report" && candidate.sourceId === inputId);
+      if (!input) throw new Error("Vaeroex could not verify a financial calculation's input source. Please retry.");
+      if (!ids.includes(input.id)) ids.push(input.id);
+    }
+  }
   const compact = new Map<string, string>(), counters: Record<string, number> = {};
   for (const id of ids) { const prefix = id[0]; counters[prefix] = (counters[prefix] || 0) + 1; compact.set(id, `${prefix}${counters[prefix]}`); }
   return { content: content.replace(/\[([BWP]\d+)\]/g, (_, id: string) => `[${compact.get(id)}]`), citations: ids.map(id => {
@@ -341,6 +352,8 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     researchStatus: { tier: plan.mode === "research" ? plan.tier : null, rounds: researchRounds, partial: researchPartial, toolAllowanceExceeded: usage.toolAllowanceExceeded === true, limitations: [...new Set(researchLimitations)].slice(-8) } };
   // Bound whole records, not serialized fragments. Preserve the newest conversation and its source snapshot.
   while (JSON.stringify(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars && payload.businessSources.length > 2) payload.businessSources.pop();
+  payload.businessSources = payload.businessSources.filter(source => source.sourceType !== "financial_calculation"
+    || source.inputSourceIds?.every(id => payload.businessSources.some(input => input.sourceType === "financial_report" && input.sourceId === id)));
   while (JSON.stringify(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars && payload.recentConversation.length > 2) payload.recentConversation.shift();
   while (JSON.stringify(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars && payload.historicalSources.length > 4) payload.historicalSources.pop();
   if (JSON.stringify(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars) payload.recentConversation = payload.recentConversation.map(message => ({ ...message, content: message.content.slice(0, 3000) }));
