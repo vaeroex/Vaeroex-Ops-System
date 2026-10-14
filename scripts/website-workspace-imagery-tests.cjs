@@ -95,7 +95,7 @@ const {build, createServer} = require('./website-demo-preview.cjs');
     assert.ok(bytes.length < (asset.file.startsWith('vsi-') ? 400000 : asset.file.startsWith('briefing-') ? 350000 : 220000), `${asset.file} must remain compact`);
   }
   for (const asset of JSON.parse(fs.readFileSync('scripts/website-demo/homepage-captures.json')).assets) {
-    const bytes = fs.readFileSync(path.join('public/images/coastal-home', asset.file));
+    const bytes = fs.readFileSync(path.join('public/images', asset.file));
     assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'), asset.sha256);
     assert.ok(bytes.length < 500000, `${asset.file} must remain compact`);
   }

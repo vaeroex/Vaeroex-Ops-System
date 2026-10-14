@@ -8,26 +8,28 @@ const views = [
     title: "Sales are up. Are you keeping more?",
     caption:
       "VSI connects Coastal Kitchen’s sales, costs, and net profit in one cited answer.",
-    desktop: [920, 485],
-    mobile: [350, 350],
-    alt: "Actual Coastal Kitchen VSI conversation: revenue increased $400, net income fell $357.60, and net margin declined from 33.28% to 31.50%. The desktop excerpt includes the cost breakdown and saved-report limitations.",
+    desktop: [930, 233],
+    mobile: [360, 360],
+    narrow: [290, 408],
+    alt: "Actual Coastal Kitchen VSI conversation: revenue increased $400, net income fell $357.60, and net margin declined from 33.28% to 31.50%.",
   },
   {
     key: "comparison",
     label: "The evidence",
     title: "See the numbers behind the answer.",
     caption:
-      "Compare the saved reporting periods. Desktop shows revenue and operating expenses; mobile focuses on operating expenses.",
-    desktop: [930, 510],
+      "Compare the saved reporting periods. Desktop shows revenue and net income; mobile focuses on net income.",
+    desktop: [930, 518],
     mobile: [360, 430],
-    alt: "Actual VSI evidence comparison charts for Coastal Kitchen: revenue increases from $27,200 to $27,600 and operating expenses from $9,932.80 to $10,624.80. The mobile capture shows operating expenses. Reporting dates and coverage limitations are visible.",
+    narrow: [290, 431],
+    alt: "Actual VSI evidence comparison charts for Coastal Kitchen: revenue increases from $27,200 to $27,600 while net income falls from $9,052.80 to $8,695.20. The mobile capture shows net income. Reporting dates and coverage limitations are visible.",
   },
 ] as const;
 export function HomepageWorkspaceTour() {
   const [selected, setSelected] = useState(1);
   const tabs = useRef<Array<HTMLButtonElement | null>>([]);
   const view = views[selected];
-  const base = `/images/coastal-home/${view.key}`;
+  const base = `/images/workspace-demo/vsi-financial-${view.key === "answer" ? "answer" : "charts"}`;
   return (
     <div className={styles.tour} data-home-workspace-tour>
       <div
@@ -83,21 +85,23 @@ export function HomepageWorkspaceTour() {
           </div>
           <a
             className={styles.imageLink}
-            href={`${base}-desktop.png`}
+            href={`${base}-desktop.webp`}
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`Open full-size Coastal Kitchen ${view.label.toLowerCase()} screenshot`}
           >
             <picture>
+              <source media="(max-width:360px)" srcSet={`${base}-narrow.webp 2x`} width={view.narrow[0]} height={view.narrow[1]} />
               <source
                 media="(max-width:600px)"
-                srcSet={`${base}-mobile.png`}
+                srcSet={`${base}-mobile.webp 2x`}
                 width={view.mobile[0]}
                 height={view.mobile[1]}
               />
               <img
                 key={view.key}
-                src={`${base}-desktop.png`}
+                src={`${base}-desktop.webp`}
+                srcSet={`${base}-desktop.webp 2x`}
                 width={view.desktop[0]}
                 height={view.desktop[1]}
                 alt={view.alt}
