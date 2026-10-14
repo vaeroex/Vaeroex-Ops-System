@@ -1,0 +1,24 @@
+# Deployment target: existing Vaeroex Executive Intelligence app.
+# Release only after the HTTPS routes, credentials and migration are deployed.
+client_id = "619a697e05ce4287419abaf4c759995c"
+name = "Vaeroex Executive Intelligence"
+application_url = "https://www.vaeroex.com/app/settings/integrations/shopify"
+embedded = false
+
+[access_scopes]
+scopes = "read_orders"
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = ["https://www.vaeroex.com/api/integrations/shopify/callback"]
+
+[webhooks]
+api_version = "2026-10"
+
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "https://www.vaeroex.com/api/integrations/shopify/webhooks"
+
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "https://www.vaeroex.com/api/integrations/shopify/webhooks"
