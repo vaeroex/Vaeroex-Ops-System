@@ -105,12 +105,12 @@ export default function HomePage() {
               <span>of knowing first</span>
             </h1>
             <p className={styles.lede}>
-              A clearer view for restaurants, breweries, retailers—and the people who run them.
+              You wear every hat. Get support for every perspective.
             </p>
             <p className={styles.heroDescription}>
-              Turn everyday business information into a clearer view of performance.
-              Bring connected records, uploaded reports, and business context together
-              to recognize changes, investigate problems, and make informed decisions sooner.
+              Vaeroex Executive Intelligence brings a CEO’s strategic perspective,
+              a CFO’s financial lens, a COO’s operational focus, and a CMO’s
+              market perspective into one conversational workspace.
             </p>
             <div className={styles.actions}>
               <Link
@@ -125,6 +125,7 @@ export default function HomePage() {
                 <ArrowRight size={16} aria-hidden="true" />
               </Link>
             </div>
+            <p className={styles.heroDescription}>$250/month · Less time piecing information together. More time for what matters.</p>
           </div>
         }
       />
@@ -132,71 +133,19 @@ export default function HomePage() {
       <section className={styles.product} aria-labelledby="product-title">
         <div className={styles.productIntro}>
           <p className={styles.eyebrow}>02 / EXECUTIVE INTELLIGENCE</p>
-          <h2 id="product-title">
-            A wider view.
-            <br />A sharper focus.
-          </h2>
-          <p>
-            Investigate a quieter week at the restaurant, a change in tasting-room
-            sales, or a retailer’s performance against its targets. Start with
-            the records you have and see what they support. Executive Intelligence
-            also works for other businesses with information to explore.
-          </p>
+          <h2 id="product-title">Your business is connected.<br />Your intelligence should be, too.</h2>
+          <p className={styles.connectedStory}>A change in sales can affect staffing. Staffing can affect service. Service can affect repeat business. And growth can put pressure on margins.</p>
+          <p>VSI—Vaeroex Super Intelligence—helps you reason across those connections using what you connect, upload, and tell it. More relevant context means a more informed conversation.</p>
+          <p>Built for the people running cafés, restaurants, breweries, retail stores, warehouses, and growing businesses.</p>
           <Link href="/executive-intelligence" className="vx-text-link">
-            Meet Executive Intelligence
-            <ArrowUpRight size={18} aria-hidden="true" />
-          </Link>
-          <span className={styles.available}>
-            <span className={styles.signalDot} /> AVAILABLE NOW
-          </span>
-        </div>
-        <div className={styles.featureRows}>
-          {[
-            [
-              "01",
-              "Know where you stand.",
-              "Business Health & Performance",
-              "Understand current business conditions, KPI movement, and the targets your team has confirmed.",
-            ],
-            [
-              "02",
-              "Find what needs attention.",
-              "Intelligence & Explain Finding",
-              "Explore prioritized findings, supported risks, and opportunities. See why a change may matter.",
-            ],
-            [
-              "03",
-              "Keep the context.",
-              "Evidence & Saved Analyses",
-              "Trace important findings to their sources. Return to useful analyses and eligible intelligence briefings.",
-            ],
-          ].map(([n, title, label, copy]) => (
-            <div key={n}>
-              <span>{n}</span>
-              <div>
-                <small>{label}</small>
-                <h3>{title}</h3>
-                <p>{copy}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.product} aria-labelledby="information-title">
-        <div className={styles.productIntro}>
-          <p className={styles.eyebrow}>03 / START WITH WHAT YOU KNOW</p>
-          <h2 id="information-title">Your information.<br />A useful starting point.</h2>
-          <p>Use a supported connection, upload a report, or add the context only your team knows. Review and approve information before it becomes business evidence.</p>
-          <Link href="/executive-intelligence#business-information" className="vx-text-link">
-            Explore connections and uploads<ArrowUpRight size={18} aria-hidden="true" />
+            Meet Executive Intelligence<ArrowUpRight size={18} aria-hidden="true" />
           </Link>
         </div>
         <div className={styles.featureRows}>
           {[
-            ["01", "Connect business records.", "Square & QuickBooks Online", "Review Square payment activity with refreshes you start, or supported QuickBooks accounting records with scheduled updates."],
-            ["02", "Upload the reports you use.", "Files & Notes", "Bring PDF and Word (.docx) documents, CSV and Excel (.xlsx) spreadsheets, and PNG/JPG photos of business records."],
-            ["03", "Add the context behind the numbers.", "Business Notes", "Describe your locations, goals, operating hours, meeting decisions, and important changes. Give Vaeroex more context for the questions you ask."],
+            ["01", "Everyday conversation. Business-depth reasoning.", "VSI", "Ask anything from “What should I eat for breakfast?” to “Why did sales rise while profit fell?” Move from everyday help to complex business analysis in the same workspace."],
+            ["02", "Bring the context behind the numbers.", "Business Notes & Uploads", "Connect supported systems, upload reports, and share your goals. Capture meeting takeaways in Business Notes, or upload photos of a presentation so Vaeroex can extract useful information for business context. Review and approve it before it becomes business evidence."],
+            ["03", "Short on time? Get a brief.", "Business Health & Executive Analysis", "Get a quick assessment without starting a conversation. Save the analysis for later when you’re between meetings or on the go."],
           ].map(([n, title, label, copy]) => (
             <div key={n}><span>{n}</span><div><small>{label}</small><h3>{title}</h3><p>{copy}</p></div></div>
           ))}
@@ -205,16 +154,23 @@ export default function HomePage() {
 
       <section className={styles.material} aria-labelledby="trust-title">
         <div className={styles.materialCopy}>
-          <p className={styles.eyebrow}>04 / SOFTWARE, CONTEXT & ANALYSIS</p>
+          <p className={styles.eyebrow}>03 / BUILT TO BE INSPECTED</p>
           <h2 id="trust-title">
-            Built to connect information
+            Clarity you can
             <br />
-            with decisions.
+            look into.
           </h2>
           <p>
-            Vaeroex combines its own software and analysis workflows with advanced
-            AI technology to organize business evidence, surface meaningful
-            changes, and deliver insights you can explore.
+            <strong>Grounded answers. Not confident guesses.</strong>
+          </p>
+          <p>
+            Source citations and confidence indicators make the evidence behind
+            supported business findings clear and help guard against AI hallucinations.
+            When evidence is insufficient, Vaeroex holds back unsupported conclusions
+            and identifies the additional context needed.
+          </p>
+          <p>
+            Get clear insights, with supporting citations ready whenever you want a closer look.
           </p>
           <Link href="/trust" className="vx-text-link">
             Explore the Trust Center
@@ -256,7 +212,7 @@ export default function HomePage() {
 
       <section className={styles.domains} aria-labelledby="domains-title">
         <div className={styles.sectionLabel}>
-          <span>05 / CONTINUOUS DEVELOPMENT</span>
+          <span>04 / CONTINUOUS DEVELOPMENT</span>
           <Link href="/intelligence-systems">
             Explore our approach
             <ArrowUpRight size={14} aria-hidden="true" />
@@ -296,19 +252,20 @@ export default function HomePage() {
       </section>
 
       <section className={styles.closing}>
-        <p className={styles.eyebrow}>YOUR NEXT CHAPTER</p>
+        <p className={styles.eyebrow}>EXECUTIVE INTELLIGENCE · $250/MONTH</p>
         <h2>
-          See your business
+          Executive perspectives.
           <br />
-          <span>with fresh clarity.</span>
+          <span>An owner’s budget.</span>
         </h2>
+        <p className={styles.closingCopy}>For $250 per month, bring conversational intelligence, business analysis, and useful context into one workspace—helping reduce the time and cost of preparing analysis, so you can put more resources toward running and growing your business.</p>
         <div className={styles.actions}>
-          <Link href="/pricing" className="vx-button vx-button--primary">
-            Find your starting point
+          <Link href="/checkout/legal" className="vx-button vx-button--primary">
+            Get Executive Intelligence
             <ArrowUpRight size={18} aria-hidden="true" />
           </Link>
           <Link href="/contact" className="vx-text-link">
-            Let’s talk
+            Talk to us
             <ArrowRight size={18} aria-hidden="true" />
           </Link>
         </div>
