@@ -138,6 +138,9 @@ export function HomepageScene() {
           `${exit}px`,
         );
       }
+      // Fixed positioning is safe only once the section boundary is measured.
+      if (element.current) element.current.dataset.controlled = "true";
+      if (controlsElement.current) controlsElement.current.dataset.controlled = "true";
       const visible =
         bounds.bottom > 100 &&
         bounds.top < innerHeight &&
@@ -193,6 +196,7 @@ export function HomepageScene() {
         ref={element}
         className={styles.scene}
         style={{ "--assembly-shift": shift } as CSSProperties}
+        data-controlled="false"
         data-home-assembly
         data-stage={stage}
         data-progress={progress.toFixed(4)}
@@ -228,6 +232,7 @@ export function HomepageScene() {
         ref={controlsElement}
         className={`${styles.scene} ${styles.controlLayer}`}
         style={{ "--assembly-shift": shift } as CSSProperties}
+        data-controlled="false"
         data-visible={String(active)}
       >
         <div className={styles.controls}>

@@ -1,5 +1,5 @@
 .scene {
-  position: fixed;
+  position: absolute;
   z-index: 0;
   pointer-events: none;
   top: 86px;
@@ -11,6 +11,9 @@
     translateY(calc(-1 * var(--assembly-exit, 0px)));
   height: calc(100svh - 110px);
   transition: opacity 0.25s;
+}
+.scene[data-controlled="true"] {
+  position: fixed;
 }
 .scene[data-visible="false"] {
   opacity: 0;

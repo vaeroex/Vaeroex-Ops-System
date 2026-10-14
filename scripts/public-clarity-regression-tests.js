@@ -456,6 +456,10 @@ async function main() {
   assert.equal((home.match(/data-home-assembly=/g) || []).length, 1, "Homepage has one persistent scene");
   assert.doesNotMatch(home, /data-clarity-chapter=/, "Homepage uses real content rather than adding scroll chapters");
   for (const id of ["home-title", "product-title", "business-context", "trust-title", "closing-title"]) { assert.ok(home.includes(`id="${id}"`) && home.includes(`href="#${id}"`), "Each scene stage has an accessible content anchor"); }
+  assert.equal((home.match(/data-controlled="false"/g) || []).length, 2, "Server-rendered scene and controls remain section-bound before hydration");
+  const assemblyCss = read("components/marketing/assembly/HomepageScene.module.css");
+  assert.match(assemblyCss, /\.scene\s*\{\s*position: absolute;/, "Static poster must scroll with its owning section without JavaScript");
+  assert.match(assemblyCss, /\.scene\[data-controlled="true"\]\s*\{\s*position: fixed;/, "Only the mounted boundary controller may enable persistent positioning");
   const headline = home.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
   assert.equal(headline, "The advantage of knowing first");
   assert.match(home, /Veteran owned and operated/);
