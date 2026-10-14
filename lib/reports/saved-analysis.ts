@@ -1,8 +1,10 @@
+import { parseComparisons, type Comparison } from "@/lib/charts/comparison";
 import type { Json } from "@/lib/supabase/types";
 
 export const SAVED_ANALYSIS_ENVELOPE_VERSION = 1 as const;
 
 export const SAVED_ANALYSIS_TYPES = [
+  "vsi",
   "business_health",
   "finding_explanation",
   "weekly_briefing",
@@ -10,7 +12,7 @@ export const SAVED_ANALYSIS_TYPES = [
 ] as const;
 
 export type SavedAnalysisType = (typeof SAVED_ANALYSIS_TYPES)[number];
-export type SaveableAnalysisType = SavedAnalysisType;
+export type SaveableAnalysisType = Exclude<SavedAnalysisType, "vsi">;
 export type SavedAnalysisConfidence = "High" | "Medium" | "Low";
 export type SavedAnalysisFreshness = "current" | "stale" | "unavailable";
 export type SavedAnalysisReleaseChannel = "production" | "preview" | "development";
@@ -68,6 +70,7 @@ export type SavedAnalysisEnvelope = Readonly<{
     date_range: string | null;
     business_health_state?: string | null;
   }>;
+  comparisons?: readonly Comparison[];
   artifact: Json;
 }>;
 
@@ -211,11 +214,13 @@ export function parseSavedAnalysisEnvelope(value: unknown): SavedAnalysisEnvelop
       date_range: typeof display.date_range === "string" ? display.date_range : null,
       business_health_state: typeof display.business_health_state === "string" ? text(display.business_health_state) : null
     },
+    ...(envelope.comparisons === undefined ? {} : { comparisons: parseComparisons(envelope.comparisons) }),
     artifact: envelope.artifact as Json
   };
 }
 
 export function savedAnalysisTypeLabel(type: SavedAnalysisType) {
+  if (type === "vsi") return "VSI Analysis";
   if (type === "business_health") return "Business Health";
   if (type === "weekly_briefing") return "Weekly Briefing";
   if (type === "monthly_briefing") return "Monthly Briefing";

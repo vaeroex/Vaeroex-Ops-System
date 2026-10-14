@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { ComparisonCharts } from "@/components/charts/ComparisonCharts";
+import { parseComparisons } from "@/lib/charts/comparison";
+import { SaveVsiAnalysis } from "@/components/vsi/SaveVsiAnalysis";
 import { AnswerContent } from "@/components/vsi/AnswerContent";
 import { displayDate, safeSourceUrl, type VsiExchange } from "@/components/vsi/contracts";
 
@@ -24,6 +27,8 @@ export function Exchange({ exchange, canEditNotes, saving, disabled, workspaceNa
         <time dateTime={exchange.createdAt} className="text-xs text-slate-500">{displayDate(exchange.createdAt, true, timeZone)}</time>
       </div>
       <AnswerContent content={exchange.answer} />
+      <ComparisonCharts charts={exchange.citations.flatMap(source => source.sourceType === "financial_calculation" ? parseComparisons(source.comparisons) : [])} />
+      {exchange.citations.some(source => parseComparisons(source.comparisons).length) ? <SaveVsiAnalysis exchangeId={exchange.id} /> : null}
       {exchange.citations.length > 0 ? <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50">
         <summary className="min-h-11 cursor-pointer px-3 py-2.5 text-xs font-semibold text-slate-700">Sources ({exchange.citations.length})</summary>
         <ol className="grid gap-2 px-3 pb-3 sm:grid-cols-2">

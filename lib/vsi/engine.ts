@@ -165,7 +165,7 @@ export function validateVsiAnswer(value: unknown, sources: VsiCitation[]) {
     const source = byId.get(id)!;
     const allowExcerpt = source.sourceType !== "web";
     return { id: compact.get(id)!, title: source.title, url: source.url, sourceType: source.sourceType, sourceId: source.sourceId,
-      evidenceDate: source.evidenceDate, ...(source.evidenceDateKind ? { evidenceDateKind: source.evidenceDateKind } : {}), ...(source.evidenceDateText ? { evidenceDateText: source.evidenceDateText } : {}), retrievedAt: source.retrievedAt, ...(allowExcerpt && source.excerpt ? { excerpt: source.excerpt } : {}), ...(source.snapshotHash ? { snapshotHash: source.snapshotHash } : {}) };
+      evidenceDate: source.evidenceDate, ...(source.evidenceDateKind ? { evidenceDateKind: source.evidenceDateKind } : {}), ...(source.evidenceDateText ? { evidenceDateText: source.evidenceDateText } : {}), retrievedAt: source.retrievedAt, ...(allowExcerpt && source.excerpt ? { excerpt: source.excerpt } : {}), ...(source.snapshotHash ? { snapshotHash: source.snapshotHash } : {}), ...(source.sourceType === "financial_calculation" && source.comparisons ? { comparisons: source.comparisons } : {}) };
   }) };
 }
 

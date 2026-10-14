@@ -38,7 +38,7 @@ for (const field of [
   "provider_attribution", "generated_at", "saved_at", "confidence", "evidence_fingerprint",
   "citations", "evidence_lineage", "release_channel", "artifact", "saved_analysis_key", "business_health_state"
 ]) assert.match(contracts, new RegExp(field), `saved-analysis envelope must preserve ${field}`);
-assert.match(contracts, /SAVED_ANALYSIS_TYPES = \[\s*"business_health",\s*"finding_explanation",\s*"weekly_briefing",\s*"monthly_briefing"\s*\]/);
+assert.match(contracts, /SAVED_ANALYSIS_TYPES = \[\s*"vsi",\s*"business_health",\s*"finding_explanation",\s*"weekly_briefing",\s*"monthly_briefing"\s*\]/);
 assert.doesNotMatch(contracts, /executive_brief/);
 
 assert.match(actions, /artifact: completed\.artifact/);

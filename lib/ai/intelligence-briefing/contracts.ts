@@ -114,6 +114,7 @@ export type IntelligenceBriefingSignal = Readonly<{
   periodRelation: "new_or_changed" | "continuing" | "current_state" | "reported_context";
   periodContext: "briefing_period" | "historical_context";
   temporalLineage?: IntelligenceBriefingTemporalLineage;
+  comparisonUnit?: string;
   semanticState?: Readonly<{
     desiredDirection: string;
     targetStatus: string;

@@ -1,3 +1,5 @@
+import type { Comparison } from "@/lib/charts/comparison";
+
 export type VsiChat = {
   id: string;
   title: string;
@@ -18,6 +20,7 @@ export type VsiSource = {
   evidenceDateText?: string;
   retrievedAt: string;
   excerpt?: string;
+  comparisons?: Comparison[];
 };
 
 export type VsiExchange = {

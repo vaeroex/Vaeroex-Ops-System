@@ -230,7 +230,7 @@ function kpiSignals({
         : null,
       periodRelation: kpi.observations.previous ? "new_or_changed" : "current_state",
       periodContext: "briefing_period",
-      ...(temporalLineage ? { temporalLineage } : {}),
+      ...(temporalLineage ? { temporalLineage, ...(kpi.identity.unit ? { comparisonUnit: kpi.identity.unit } : {}) } : {}),
       semanticState: {
         desiredDirection: semantics.desiredDirection,
         targetStatus: performance.targetStatus,

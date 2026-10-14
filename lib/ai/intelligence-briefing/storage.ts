@@ -79,6 +79,7 @@ const signalSchema = z.object({
   limitation: z.string().trim().min(1).nullable(),
   periodRelation: z.enum(["new_or_changed", "continuing", "current_state", "reported_context"]),
   periodContext: z.enum(["briefing_period", "historical_context"]).default("briefing_period"),
+  comparisonUnit: z.string().max(40).optional(),
   temporalLineage: z.object({
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

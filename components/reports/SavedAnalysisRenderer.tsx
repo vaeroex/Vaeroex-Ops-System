@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { AnswerContent } from "@/components/vsi/AnswerContent";
+import { ComparisonCharts } from "@/components/charts/ComparisonCharts";
+import { briefingComparisons } from "@/lib/charts/briefing";
 import { Clock3, ShieldCheck } from "lucide-react";
 import {
   savedAnalysisTypeLabel,
@@ -55,10 +58,10 @@ export function SavedAnalysisRenderer({ envelope }: { envelope: SavedAnalysisEnv
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">{savedAnalysisTypeLabel(envelope.analysis_type)}</p>
         <h1 className="mt-2 text-2xl font-semibold leading-tight text-white sm:text-3xl">{envelope.title}</h1>
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-400">
-          <span className="inline-flex items-center gap-1"><ShieldCheck aria-hidden="true" className="h-3.5 w-3.5" /> Confidence: {envelope.confidence}</span>
+          <span className="inline-flex items-center gap-1"><ShieldCheck aria-hidden="true" className="h-3.5 w-3.5" /> {envelope.analysis_type === "vsi" ? "VSI response · review required" : `Confidence: ${envelope.confidence}`}</span>
           <span className="inline-flex items-center gap-1"><Clock3 aria-hidden="true" className="h-3.5 w-3.5" /> Generated {readableDate(envelope.generated_at)}</span>
           <span>Saved {readableDate(envelope.saved_at)}</span>
-          <span>Evidence {envelope.freshness}</span>
+          <span>{envelope.analysis_type === "vsi" ? "Saved snapshot · freshness not rechecked" : `Evidence ${envelope.freshness}`}</span>
         </div>
       </header>
 
@@ -74,6 +77,7 @@ export function SavedAnalysisRenderer({ envelope }: { envelope: SavedAnalysisEnv
         </p>
       </section>
 
+      <ComparisonCharts charts={envelope.comparisons ?? (briefingArtifact ? briefingComparisons(briefingArtifact) : [])} />
       <div className="space-y-5">
         {sections.map((section) => (
           <section
@@ -81,7 +85,7 @@ export function SavedAnalysisRenderer({ envelope }: { envelope: SavedAnalysisEnv
             className={section.tone === "limitation" ? "border-l-2 border-amber-300/45 pl-4" : "border-b border-white/10 pb-5"}
           >
             <h2 className="text-sm font-semibold text-white">{sectionLabel(section.label)}</h2>
-            {typeof section.body === "string" ? (
+            {envelope.analysis_type === "vsi" && section.id === "vsi-answer" && typeof section.body === "string" ? <div className="saved-vsi-answer"><AnswerContent content={section.body} /></div> : typeof section.body === "string" ? (
               <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-300">{customerText(section.body)}</p>
             ) : (
               <ul className="mt-2 space-y-2 text-sm leading-6 text-slate-300">

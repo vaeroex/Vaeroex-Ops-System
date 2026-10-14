@@ -76,6 +76,9 @@ jobs:
           node scripts/storage-capacity-ui-tests.cjs
           node scripts/storage-capacity-upload-client-tests.cjs
 
+      - name: Evidence-backed comparison charts
+        run: pnpm test:workspace-comparisons
+
       - name: Workspace navigation and bounded-list regressions
         run: pnpm test:workspace-clarity
 

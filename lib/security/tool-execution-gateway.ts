@@ -126,7 +126,7 @@ const kpiColorAssignmentSchema = z.object({ kpiCount: z.number().int().min(1).ma
 const completedAnalysisSaveSchema = z
   .object({
     sourceArtifactId: uuidSchema,
-    analysisType: z.enum(["business_health", "finding_explanation"]),
+    analysisType: z.enum(["business_health", "finding_explanation", "weekly_briefing", "monthly_briefing", "vsi"]),
     fingerprint: z.string().regex(/^[a-f0-9]{64}$/i)
   })
   .strict();

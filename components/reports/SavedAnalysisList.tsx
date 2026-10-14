@@ -15,6 +15,7 @@ type Filter = "all" | SavedAnalysisType;
 
 const filters: Array<{ value: Filter; label: string }> = [
   { value: "all", label: "All" },
+  { value: "vsi", label: "VSI" },
   { value: "business_health", label: "Business Health" },
   { value: "finding_explanation", label: "Finding Explanations" },
   { value: "weekly_briefing", label: "Weekly" },
@@ -151,7 +152,7 @@ export function SavedAnalysisList({ analyses, loadLimitReached = false }: { anal
                     <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-400">
                       <div><dt className="font-semibold text-slate-300">Generated</dt><dd className="mt-0.5">{readableDate(analysis.generatedAt)}</dd></div>
                       <div><dt className="font-semibold text-slate-300">Saved</dt><dd className="mt-0.5">{readableDate(analysis.savedAt)}</dd></div>
-                      <div><dt className="font-semibold text-slate-300">Confidence</dt><dd className="mt-0.5">{analysis.confidence}</dd></div>
+                      <div><dt className="font-semibold text-slate-300">{analysis.analysisType === "vsi" ? "Interpretation" : "Confidence"}</dt><dd className="mt-0.5">{analysis.analysisType === "vsi" ? "Review required" : analysis.confidence}</dd></div>
                       <div><dt className="font-semibold text-slate-300">Evidence</dt><dd className="mt-0.5">{analysis.evidenceStatus}</dd></div>
                     </dl>
                     {analysis.dateRange ? <p className="mt-2 text-xs text-slate-500">{analysis.dateRange}</p> : null}
