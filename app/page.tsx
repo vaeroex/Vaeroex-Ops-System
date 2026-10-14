@@ -10,8 +10,8 @@ import {
 } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
-import { WorkspaceCapture } from "@/components/marketing/WorkspaceScreenshots";
-import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
+import { HomepageWorkspaceTour } from "@/components/marketing/HomepageWorkspaceTour";
+import { HomepageScene } from "@/components/marketing/assembly/HomepageScene";
 import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 import styles from "./public-home.module.css";
@@ -27,90 +27,24 @@ export default function HomePage() {
   return (
     <main className={`vaeroex-public-site ${styles.home}`}>
       <PublicSiteHeader />
-      <ClarityJourney
-        id="the-signal"
-        variant="landing"
-        stages={[
-          {
-            label: "Source fragments",
-            title: "The advantage of knowing first",
-            description:
-              "Your business has the information. Vaeroex helps you see what it means.",
-          },
-          {
-            label: "Connected signals",
-            title: (
-              <>
-                Bring the fragments
-                <br />
-                together.
-              </>
-            ),
-            description:
-              "A spreadsheet tells one story. A report tells another. The important questions live between them.",
-            detail:
-              "Bring supported records and business notes into your private workspace. Preserve the context that gives each signal meaning.",
-          },
-          {
-            label: "An inspectable atlas",
-            title: (
-              <>
-                Look through
-                <br />
-                the layers.
-              </>
-            ),
-            description:
-              "An interpretation becomes more useful when you can examine the evidence beneath it.",
-            detail:
-              "Keep source information, supported patterns, and uncertainty distinct. Move between the wider picture and the detail behind a finding.",
-          },
-          {
-            label: "Business perspective",
-            title: (
-              <>
-                Your business.
-                <br />
-                A wider perspective.
-              </>
-            ),
-            description:
-              "A restaurant, brewery, or retailer has its own questions. Bring the context that makes your business different.",
-            detail:
-              "Explore performance with connected records, uploaded reports, and Business Notes. Useful for these industries and other businesses with evidence to investigate.",
-          },
-          {
-            label: "Clarity for people",
-            title: (
-              <>
-                A clearer view.
-                <br />
-                Your next decision.
-              </>
-            ),
-            description:
-              "Bring complexity into focus. See what deserves attention, investigate the context, and decide what happens next.",
-            detail:
-              "Recommendations remain drafts. People review the evidence and confirm before records are created or changed.",
-          },
-        ]}
-        intro={
+      <div id="home-information-journey" className={styles.informationJourney}>
+        <HomepageScene />
+        <section className={styles.assemblyHero} aria-labelledby="home-title">
           <div className={`${styles.heroCopy} ${styles.journeyHero}`}>
             <p className={styles.eyebrow}>
               <span className={styles.signalDot} /> EXECUTIVE INTELLIGENCE
             </p>
             <h1 id="home-title">
-              The advantage{" "}
-              <br />
+              The advantage <br />
               <span>of knowing first</span>
             </h1>
             <p className={styles.lede}>
               You wear every hat. Get support for every perspective.
             </p>
             <p className={styles.heroDescription}>
-              Vaeroex Executive Intelligence brings a CEO’s strategic perspective,
-              a CFO’s financial lens, a COO’s operational focus, and a CMO’s
-              market perspective into one conversational workspace.
+              Vaeroex Executive Intelligence brings a CEO’s strategic
+              perspective, a CFO’s financial lens, a COO’s operational focus,
+              and a CMO’s market perspective into one conversational workspace.
             </p>
             <div className={styles.actions}>
               <Link
@@ -125,152 +59,204 @@ export default function HomePage() {
                 <ArrowRight size={16} aria-hidden="true" />
               </Link>
             </div>
-            <p className={styles.heroDescription}>$250/month · Less time piecing information together. More time for what matters.</p>
+            <p className={styles.heroDescription}>
+              $250/month · Less time piecing information together. More time for
+              what matters.
+            </p>
           </div>
-        }
-      />
+        </section>
 
-      <section className={styles.product} aria-labelledby="product-title">
-        <div className={styles.productIntro}>
-          <p className={styles.eyebrow}>02 / EXECUTIVE INTELLIGENCE</p>
-          <h2 id="product-title">Your business is connected.<br />Your intelligence should be, too.</h2>
-          <p className={styles.connectedStory}>A change in sales can affect staffing. Staffing can affect service. Service can affect repeat business. And growth can put pressure on margins.</p>
-          <p>VSI—Vaeroex Super Intelligence—helps you reason across those connections using what you connect, upload, and tell it. More relevant context means a more informed conversation.</p>
-          <p>Built for the people running cafés, restaurants, breweries, retail stores, warehouses, and growing businesses.</p>
-          <Link href="/executive-intelligence" className="vx-text-link">
-            Meet Executive Intelligence<ArrowUpRight size={18} aria-hidden="true" />
-          </Link>
-        </div>
-        <div className={styles.featureRows}>
-          {[
-            ["01", "Everyday conversation. Business-depth reasoning.", "VSI", "Ask anything from “What should I eat for breakfast?” to “Why did sales rise while profit fell?” Move from everyday help to complex business analysis in the same workspace."],
-            ["02", "Bring the context behind the numbers.", "Business Notes & Uploads", "Connect supported systems, upload reports, and share your goals. Capture meeting takeaways in Business Notes, or upload photos of a presentation so Vaeroex can extract useful information for business context. Review and approve it before it becomes business evidence."],
-            ["03", "Short on time? Get a brief.", "Business Health & Executive Analysis", "Get a quick assessment without starting a conversation. Save the analysis for later when you’re between meetings or on the go."],
-          ].map(([n, title, label, copy]) => (
-            <div key={n}><span>{n}</span><div><small>{label}</small><h3>{title}</h3><p>{copy}</p></div></div>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.material} aria-labelledby="trust-title">
-        <div className={styles.materialCopy}>
-          <p className={styles.eyebrow}>03 / BUILT TO BE INSPECTED</p>
-          <h2 id="trust-title">
-            Clarity you can
-            <br />
-            look into.
-          </h2>
-          <p>
-            <strong>Grounded answers. Not confident guesses.</strong>
-          </p>
-          <p>
-            Source citations and confidence indicators make the evidence behind
-            supported business findings clear and help guard against AI hallucinations.
-            When evidence is insufficient, Vaeroex holds back unsupported conclusions
-            and identifies the additional context needed.
-          </p>
-          <p>
-            Get clear insights, with supporting citations ready whenever you want a closer look.
-          </p>
-          <Link href="/trust" className="vx-text-link">
-            Explore the Trust Center
-            <ArrowUpRight size={18} aria-hidden="true" />
-          </Link>
-        </div>
-        <div className={styles.evidenceVisual}>
-          <WorkspaceCapture view="evidence" />
-        </div>
-      </section>
-      <section
-        className={styles.trustPrinciples}
-        aria-label="Our approach to trust"
-      >
-        {[
-          [
-            FileText,
-            "Connected to evidence",
-            "Important findings remain connected to the business information that supports them.",
-          ],
-          [
-            ScanLine,
-            "Clear about its limits",
-            "Freshness, uncertainty, and missing context remain part of the picture.",
-          ],
-          [
-            ShieldCheck,
-            "Led by your judgment",
-            "Recommendations are drafts for review. You confirm before records are created or changed.",
-          ],
-        ].map(([Icon, title, text]) => (
-          <div key={String(title)}>
-            <Icon size={23} aria-hidden="true" />
-            <h3>{String(title)}</h3>
-            <p>{String(text)}</p>
-          </div>
-        ))}
-      </section>
-
-      <section className={styles.domains} aria-labelledby="domains-title">
-        <div className={styles.sectionLabel}>
-          <span>04 / CONTINUOUS DEVELOPMENT</span>
-          <Link href="/intelligence-systems">
-            Explore our approach
-            <ArrowUpRight size={14} aria-hidden="true" />
-          </Link>
-        </div>
-        <h2 id="domains-title">
-          Continuously developed.
-          <br />
-          <span>Carefully tested.</span>
-        </h2>
-        <div className={styles.domainList}>
-          {PUBLIC_SYSTEMS.map((system, index) => (
-            <Link
-              key={system.id}
-              href={system.route}
-              className={styles.domainRow}
-            >
-              <span className={styles.domainNumber}>0{index + 1}</span>
-              <h3>{system.name}</h3>
-              <span
-                className={
-                  system.availability === "available"
-                    ? styles.statusAvailable
-                    : styles.status
-                }
-              >
-                {system.statusLabel}
-              </span>
-              <ArrowUpRight aria-hidden="true" size={24} />
+        <section className={styles.product} aria-labelledby="product-title">
+          <div className={styles.productIntro}>
+            <p className={styles.eyebrow}>02 / EXECUTIVE INTELLIGENCE</p>
+            <h2 id="product-title">
+              Your business is connected.
+              <br />
+              Your intelligence should be, too.
+            </h2>
+            <p className={styles.connectedStory}>
+              A change in sales can affect staffing. Staffing can affect
+              service. Service can affect repeat business. And growth can put
+              pressure on margins.
+            </p>
+            <p>
+              VSI—Vaeroex Super Intelligence—helps you reason across those
+              connections using what you connect, upload, and tell it. More
+              relevant context means a more informed conversation.
+            </p>
+            <p>
+              Built for the people running cafés, restaurants, breweries, retail
+              stores, warehouses, and growing businesses.
+            </p>
+            <Link href="/executive-intelligence" className="vx-text-link">
+              Meet Executive Intelligence
+              <ArrowUpRight size={18} aria-hidden="true" />
             </Link>
-          ))}
-        </div>
-        <p className={styles.domainNote}>
-          We continue to refine Vaeroex’s intelligence tools, test their performance,
-          and expand how businesses can connect and understand their information.
-        </p>
-      </section>
+          </div>
+          <div className={styles.featureRows} id="business-context">
+            {[
+              [
+                "01",
+                "Everyday conversation. Business-depth reasoning.",
+                "VSI",
+                "Ask anything from “What should I eat for breakfast?” to “Why did sales rise while profit fell?” Move from everyday help to complex business analysis in the same workspace.",
+              ],
+              [
+                "02",
+                "Bring the context behind the numbers.",
+                "Business Notes & Uploads",
+                "Connect supported systems, upload reports, and share your goals. Capture meeting takeaways in Business Notes, or upload photos of a presentation so Vaeroex can extract useful information for business context. Review and approve it before it becomes business evidence.",
+              ],
+              [
+                "03",
+                "Short on time? Get a brief.",
+                "Business Health & Executive Analysis",
+                "Get a quick assessment without starting a conversation. Save the analysis for later when you’re between meetings or on the go.",
+              ],
+            ].map(([n, title, label, copy]) => (
+              <div key={n}>
+                <span>{n}</span>
+                <div>
+                  <small>{label}</small>
+                  <h3>{title}</h3>
+                  <p>{copy}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
 
-      <section className={styles.closing}>
-        <p className={styles.eyebrow}>EXECUTIVE INTELLIGENCE · $250/MONTH</p>
-        <h2>
-          Executive perspectives.
-          <br />
-          <span>An owner’s budget.</span>
-        </h2>
-        <p className={styles.closingCopy}>For $250 per month, bring conversational intelligence, business analysis, and useful context into one workspace—helping reduce the time and cost of preparing analysis, so you can put more resources toward running and growing your business.</p>
-        <div className={styles.actions}>
-          <Link href="/checkout/legal" className="vx-button vx-button--primary">
-            Get Executive Intelligence
-            <ArrowUpRight size={18} aria-hidden="true" />
-          </Link>
-          <Link href="/contact" className="vx-text-link">
-            Talk to us
-            <ArrowRight size={18} aria-hidden="true" />
-          </Link>
-        </div>
-        <p className={styles.ownership}>Veteran owned and operated</p>
-      </section>
+        <section className={styles.material} aria-labelledby="trust-title">
+          <div className={styles.materialCopy}>
+            <p className={styles.eyebrow}>03 / BUILT TO BE INSPECTED</p>
+            <h2 id="trust-title">
+              Clarity you can
+              <br />
+              look into.
+            </h2>
+            <p>
+              <strong>Grounded answers. Not confident guesses.</strong>
+            </p>
+            <p>
+              Source citations and confidence indicators make the evidence
+              behind supported business findings clear and help guard against AI
+              hallucinations. When evidence is insufficient, Vaeroex holds back
+              unsupported conclusions and identifies the additional context
+              needed.
+            </p>
+            <p>
+              Get clear insights, with supporting citations ready whenever you
+              want a closer look.
+            </p>
+            <Link href="/trust" className="vx-text-link">
+              Explore the Trust Center
+              <ArrowUpRight size={18} aria-hidden="true" />
+            </Link>
+          </div>
+          <div className={styles.evidenceVisual}>
+            <HomepageWorkspaceTour />
+          </div>
+        </section>
+        <section
+          className={styles.trustPrinciples}
+          aria-label="Our approach to trust"
+        >
+          {[
+            [
+              FileText,
+              "Connected to evidence",
+              "Important findings remain connected to the business information that supports them.",
+            ],
+            [
+              ScanLine,
+              "Clear about its limits",
+              "Freshness, uncertainty, and missing context remain part of the picture.",
+            ],
+            [
+              ShieldCheck,
+              "Led by your judgment",
+              "Recommendations are drafts for review. You confirm before records are created or changed.",
+            ],
+          ].map(([Icon, title, text]) => (
+            <div key={String(title)}>
+              <Icon size={23} aria-hidden="true" />
+              <h3>{String(title)}</h3>
+              <p>{String(text)}</p>
+            </div>
+          ))}
+        </section>
+
+        <section className={styles.domains} aria-labelledby="domains-title">
+          <div className={styles.sectionLabel}>
+            <span>04 / CONTINUOUS DEVELOPMENT</span>
+            <Link href="/intelligence-systems">
+              Explore our approach
+              <ArrowUpRight size={14} aria-hidden="true" />
+            </Link>
+          </div>
+          <h2 id="domains-title">
+            Continuously developed.
+            <br />
+            <span>Carefully tested.</span>
+          </h2>
+          <div className={styles.domainList}>
+            {PUBLIC_SYSTEMS.map((system, index) => (
+              <Link
+                key={system.id}
+                href={system.route}
+                className={styles.domainRow}
+              >
+                <span className={styles.domainNumber}>0{index + 1}</span>
+                <h3>{system.name}</h3>
+                <span
+                  className={
+                    system.availability === "available"
+                      ? styles.statusAvailable
+                      : styles.status
+                  }
+                >
+                  {system.statusLabel}
+                </span>
+                <ArrowUpRight aria-hidden="true" size={24} />
+              </Link>
+            ))}
+          </div>
+          <p className={styles.domainNote}>
+            We continue to refine Vaeroex’s intelligence tools, test their
+            performance, and expand how businesses can connect and understand
+            their information.
+          </p>
+        </section>
+
+        <section className={styles.closing}>
+          <p className={styles.eyebrow}>EXECUTIVE INTELLIGENCE · $250/MONTH</p>
+          <h2 id="closing-title">
+            Executive perspectives.
+            <br />
+            <span>An owner’s budget.</span>
+          </h2>
+          <p className={styles.closingCopy}>
+            For $250 per month, bring conversational intelligence, business
+            analysis, and useful context into one workspace—helping reduce the
+            time and cost of preparing analysis, so you can put more resources
+            toward running and growing your business.
+          </p>
+          <div className={styles.actions}>
+            <Link
+              href="/checkout/legal"
+              className="vx-button vx-button--primary"
+            >
+              Get Executive Intelligence
+              <ArrowUpRight size={18} aria-hidden="true" />
+            </Link>
+            <Link href="/contact" className="vx-text-link">
+              Talk to us
+              <ArrowRight size={18} aria-hidden="true" />
+            </Link>
+          </div>
+          <p className={styles.ownership}>Veteran owned and operated</p>
+        </section>
+      </div>
       <section
         className={styles.membership}
         aria-label="NVIDIA Inception membership"
