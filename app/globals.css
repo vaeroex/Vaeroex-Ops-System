@@ -3150,3 +3150,11 @@ html:not(.pulsar) .vaeroex-customer-workspace .workspace-saved-analyses .workspa
 @container (min-width: 640px) {
   [data-comparison-charts] .comparison-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Saved analysis detail uses a dark surface in every workspace theme. */
+.saved-vsi-answer { color: #cbd5e1; }
+.saved-vsi-answer .text-slate-800,
+.saved-vsi-answer .text-slate-700 { color: #cbd5e1 !important; }
+.saved-vsi-answer .text-slate-900 { color: #f1f5f9 !important; }
+.saved-vsi-answer .bg-slate-100,
+.saved-vsi-answer .bg-slate-50 { background-color: #1e293b !important; }

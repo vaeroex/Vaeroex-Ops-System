@@ -85,7 +85,7 @@ export function SavedAnalysisRenderer({ envelope }: { envelope: SavedAnalysisEnv
             className={section.tone === "limitation" ? "border-l-2 border-amber-300/45 pl-4" : "border-b border-white/10 pb-5"}
           >
             <h2 className="text-sm font-semibold text-white">{sectionLabel(section.label)}</h2>
-            {envelope.analysis_type === "vsi" && section.id === "vsi-answer" && typeof section.body === "string" ? <AnswerContent content={section.body} /> : typeof section.body === "string" ? (
+            {envelope.analysis_type === "vsi" && section.id === "vsi-answer" && typeof section.body === "string" ? <div className="saved-vsi-answer"><AnswerContent content={section.body} /></div> : typeof section.body === "string" ? (
               <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-300">{customerText(section.body)}</p>
             ) : (
               <ul className="mt-2 space-y-2 text-sm leading-6 text-slate-300">

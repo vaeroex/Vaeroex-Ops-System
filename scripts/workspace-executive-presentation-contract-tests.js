@@ -272,6 +272,16 @@ for (const [file, count, actionsDigest, logicDigest] of contracts) {
         source = source.replace(declaration, "");
       }
     }
+    if (file === "components/intelligence/IntelligenceBriefingViewer.tsx") {
+      // The approved chart is read-only; preserve the original workflow digest.
+      for (const addition of [
+        'import { ComparisonCharts } from "@/components/charts/ComparisonCharts";\n',
+        'import { briefingComparisons } from "@/lib/charts/briefing";\n',
+      ]) {
+        assert.equal(source.split(addition).length, 2);
+        source = source.replace(addition, "");
+      }
+    }
     if (file === intelligenceFile) source = withoutIntegrationResults(source);
     if (file === "components/intelligence/IntelligenceSignalInbox.tsx") source = withoutIntelligenceRefinement(file, withoutPagination(file, source));
     const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);

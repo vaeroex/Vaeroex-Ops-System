@@ -1,6 +1,6 @@
 # Evidence-backed workspace comparisons
 
-Review-only implementation, stacked on financial-evidence PR #499. Do not merge or deploy without review. No database migration, production data change, connector privilege expansion, public website change, or 3D change is required.
+Approved for production release after CI. Financial-evidence PR #499 is merged. The focused VSI deletion migration adds only the new analysis type to the existing soft-delete function; no customer data rewrite, connector privilege expansion, public website change, or 3D change is required.
 
 ## Where charts appear
 
