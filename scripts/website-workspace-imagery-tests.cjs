@@ -94,6 +94,11 @@ const {build, createServer} = require('./website-demo-preview.cjs');
     assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'), asset.sha256);
     assert.ok(bytes.length < (asset.file.startsWith('vsi-') ? 400000 : asset.file.startsWith('briefing-') ? 350000 : 220000), `${asset.file} must remain compact`);
   }
+  for (const asset of JSON.parse(fs.readFileSync('scripts/website-demo/homepage-captures.json')).assets) {
+    const bytes = fs.readFileSync(path.join('public/images/coastal-home', asset.file));
+    assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'), asset.sha256);
+    assert.ok(bytes.length < 500000, `${asset.file} must remain compact`);
+  }
   // No network request is made: validate the static server's response boundary directly.
   const server = createServer({...result,port:3190});
   for (const [method,host,expected] of [['POST','127.0.0.1:3190',405],['GET','other.invalid',403]]) {

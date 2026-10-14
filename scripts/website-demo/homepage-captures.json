@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-14",
+  "workspace": "Coastal Kitchen fictional test business",
+  "source": "Actual /app/si conversation aab8ad8e-3aef-4470-9858-084a2b60c2bb, local isolated test workspace. Recorded financial response displayed by current application. No new answer generated.",
+  "method": "Native browser screenshots cropped at capture time; no pixel changes, recreation, resizing, or invented values. Desktop 1200x1000; mobile 390x1000.",
+  "assets": [
+    {
+      "file": "answer-desktop.png",
+      "sha256": "ec21c90e9102916d014cc9af07fa419c5118e38ea3912e72fa8c676c69cfdc9b"
+    },
+    {
+      "file": "answer-mobile.png",
+      "sha256": "b51b65f280a263fd454e80e28bd4d49da1a189820caa94fcf3220572f48ee458"
+    },
+    {
+      "file": "comparison-desktop.png",
+      "sha256": "c8ae0b63f0ff91904cb8836f09ab9d5524139643f89a2f29fd9e6e89e272431f"
+    },
+    {
+      "file": "comparison-mobile.png",
+      "sha256": "2abbeb71dd42e935d151246f662c06094ff4cb0006bf8214b7fccd4e7c81b26d"
+    }
+  ]
+}
