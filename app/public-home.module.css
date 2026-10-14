@@ -884,14 +884,203 @@
 }
 
 /* Ownership is a separate text statement from the following membership attribution. */
-.ownership { margin: 32px 0 0; color: #a5b4d4; font-size: 12px; letter-spacing: .06em; }
+.ownership {
+  margin: 32px 0 0;
+  color: #a5b4d4;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
 
 /* Homepage-only messaging; shared journeys and artwork remain unchanged. */
-.productIntro > .connectedStory { color: #e0e3e9; font-size: 18px; line-height: 1.7; max-width: 460px; }
-.closingCopy { max-width: 660px; color: #a1a9b8; font-size: 15px; line-height: 1.8; }
-.materialCopy > p + p { margin-top: 16px; }
+.productIntro > .connectedStory {
+  color: #e0e3e9;
+  font-size: 18px;
+  line-height: 1.7;
+  max-width: 460px;
+}
+.closingCopy {
+  max-width: 660px;
+  color: #a1a9b8;
+  font-size: 15px;
+  line-height: 1.8;
+}
+.materialCopy > p + p {
+  margin-top: 16px;
+}
 @media (min-width: 761px) and (max-width: 1150px) {
-  .materialCopy { display: block; }
-  .materialCopy > p:not(.eyebrow) { max-width: 640px; }
-  .materialCopy > a { margin-top: 24px; }
+  .materialCopy {
+    display: block;
+  }
+  .materialCopy > p:not(.eyebrow) {
+    max-width: 640px;
+  }
+  .materialCopy > a {
+    margin-top: 24px;
+  }
+}
+
+/* The homepage scene occupies a dedicated visual rail through the real content. */
+.informationJourney {
+  position: relative;
+  isolation: isolate;
+}
+.assemblyHero {
+  position: relative;
+  z-index: 1;
+  min-height: calc(100svh - 86px);
+  display: flex;
+  align-items: center;
+  margin: 0 max(32px, calc((100vw - 1328px) / 2));
+  width: 48%;
+  padding: 70px 0;
+}
+.informationJourney .product,
+.informationJourney .trustPrinciples,
+.informationJourney .domains,
+.informationJourney .closing {
+  position: relative;
+  z-index: 1;
+  width: 47%;
+  margin-left: max(32px, calc((100vw - 1328px) / 2));
+  margin-right: 0;
+}
+.informationJourney .product {
+  grid-template-columns: 1fr;
+  gap: 64px;
+  padding: 70px 0;
+}
+.informationJourney .product h2 {
+  font-size: clamp(38px, 3.6vw, 54px);
+}
+.informationJourney .productIntro > p:not(.eyebrow),
+.informationJourney .featureRows p {
+  max-width: 540px;
+}
+.informationJourney .featureRows {
+  scroll-margin-top: 140px;
+}
+.informationJourney .featureRows > div {
+  gap: 24px;
+  padding: 25px 0;
+}
+.informationJourney .material {
+  z-index: 1;
+  width: 49%;
+  margin-left: max(32px, calc((100vw - 1328px) / 2));
+  padding: 65px 0;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  background: none;
+}
+.informationJourney .materialCopy {
+  display: block;
+}
+.informationJourney .materialCopy > p:not(.eyebrow) {
+  max-width: 510px;
+}
+.informationJourney .material h2 {
+  margin-top: 22px;
+}
+.informationJourney .trustPrinciples {
+  gap: 22px;
+}
+.informationJourney .trustPrinciples svg {
+  margin-bottom: 18px;
+}
+.informationJourney .domains {
+  padding: 60px 0;
+}
+.informationJourney .domains h2 {
+  font-size: 42px;
+}
+.informationJourney .domainRow {
+  grid-template-columns: 28px 1fr 90px 20px;
+}
+.informationJourney .domainRow h3 {
+  font-size: 22px;
+}
+.informationJourney .closing {
+  padding: 60px 0 110px;
+}
+.informationJourney .closing h2 {
+  font-size: clamp(44px, 4.5vw, 68px);
+}
+.informationJourney :is(h1, h2) {
+  scroll-margin-top: 130px;
+}
+@media (max-width: 760px) {
+  .assemblyHero {
+    width: auto;
+    margin: 0 24px;
+    padding: 34svh 0 55px;
+    min-height: 0;
+  }
+  .informationJourney .product,
+  .informationJourney .material,
+  .informationJourney .trustPrinciples,
+  .informationJourney .domains,
+  .informationJourney .closing {
+    width: auto;
+    margin: 0 24px;
+    background: #08090bf5;
+    box-shadow: 0 0 35px 22px #08090b;
+  }
+  .informationJourney .product {
+    gap: 36px;
+    padding: 42px 0;
+  }
+  .informationJourney .product h2 {
+    font-size: 36px;
+  }
+  .informationJourney .material {
+    padding: 45px 0;
+  }
+  .informationJourney .material h2 {
+    font-size: 42px;
+  }
+  .informationJourney .trustPrinciples {
+    grid-template-columns: 1fr;
+    gap: 25px;
+    padding: 25px 0;
+  }
+  .informationJourney .domains h2 {
+    font-size: 36px;
+  }
+  .informationJourney .closing h2 {
+    font-size: 43px;
+  }
+  .informationJourney .journeyHero {
+    background: #08090bf5;
+    box-shadow: 0 0 35px 22px #08090b;
+  }
+  .informationJourney .closing {
+    padding: 45px 0 70px;
+  }
+}
+
+@media (max-width: 760px) {
+  .informationJourney :is(h1, h2),
+  .informationJourney .featureRows {
+    scroll-margin-top: calc(70px + 34svh);
+  }
+}
+
+@media (min-width: 761px) {
+  .assemblyHero,
+  .informationJourney .product,
+  .informationJourney .material,
+  .informationJourney .trustPrinciples,
+  .informationJourney .domains,
+  .informationJourney .closing {
+    width: min(43vw, 600px);
+  }
+  .informationJourney .featureRows {
+    margin-left: calc(100% + 64px);
+    width: 100%;
+  }
+  .informationJourney .productIntro,
+  .informationJourney .featureRows {
+    background: #08090bf5;
+    box-shadow: 0 0 28px 15px #08090b;
+  }
 }

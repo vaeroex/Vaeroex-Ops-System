@@ -159,7 +159,6 @@ async function main() {
   // Validate the real server output: chapter text and native links work before
   // hydration, and each page owns one persistent scene instead of stacked canvases.
   for (const [route, variant] of [
-    ["/", "landing"],
     ["/executive-intelligence", "business"],
     ["/intelligence-systems", "systems"],
     ["/drug-discovery-intelligence", "drug-discovery"],
@@ -454,13 +453,16 @@ async function main() {
   assert.doesNotMatch(read("components/legal/PublicFooter.tsx") + read("lib/seo/public-seo.ts") + read("app/sitemap.ts"), retiredPromotion);
 
   const home = htmlByRoute.get("/");
+  assert.equal((home.match(/data-home-assembly=/g) || []).length, 1, "Homepage has one persistent scene");
+  assert.doesNotMatch(home, /data-clarity-chapter=/, "Homepage uses real content rather than adding scroll chapters");
+  for (const id of ["home-title", "product-title", "business-context", "trust-title", "closing-title"]) { assert.ok(home.includes(`id="${id}"`) && home.includes(`href="#${id}"`), "Each scene stage has an accessible content anchor"); }
   const headline = home.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
   assert.equal(headline, "The advantage of knowing first");
   assert.match(home, /Veteran owned and operated/);
 
   assert.match(
     home,
-    /data-clarity-poster/,
+    /data-assembly-poster/,
     "An image fallback must exist in server HTML before JavaScript or WebGL loads",
   );
   assert.match(

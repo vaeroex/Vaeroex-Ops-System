@@ -1,0 +1,144 @@
+{
+  "date": "2026-10-14",
+  "source": "Lossless native 2x captures of the same recorded Coastal Kitchen financial conversation. Original capture provenance: chart-captures.json.",
+  "assets": [
+    {
+      "file": "workspace-demo/vsi-financial-answer-desktop.webp",
+      "sourceScreen": "VSI financial conversation",
+      "viewport": [
+        1200,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        253,
+        304,
+        930,
+        233
+      ],
+      "dimensions": [
+        1860,
+        466
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "aea6b382966539c433c3f44932877bd72d16094e7ee28bdc31cbead890633e6b",
+      "sha256": "7c5139bbc80dc5ecf2aef80dbe63182689d1ab9c5b1d87605bf00b585dc3369b",
+      "bytes": 124860
+    },
+    {
+      "file": "workspace-demo/vsi-financial-answer-mobile.webp",
+      "sourceScreen": "VSI financial conversation",
+      "viewport": [
+        390,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        15,
+        372,
+        360,
+        360
+      ],
+      "dimensions": [
+        720,
+        720
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "02d06fae20116b5c40b479b22608eaddc2c836722bc22501053bcdcbb96d00c8",
+      "sha256": "4721197f19516d11f8844fb943b4c506d3e0a2208faf94f851c21c34d3c18043",
+      "bytes": 121674
+    },
+    {
+      "file": "workspace-demo/vsi-financial-answer-narrow.webp",
+      "sourceScreen": "VSI financial conversation",
+      "viewport": [
+        320,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        15,
+        372,
+        290,
+        408
+      ],
+      "dimensions": [
+        580,
+        816
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "0637682342b5577962df4db93381535f568c5499b07e42c1009ebd94cd59f482",
+      "sha256": "d404f8fe7645ad58f8fa09c8ee4b34b69719291e158b39878ac6163a787d98ca",
+      "bytes": 122748
+    },
+    {
+      "file": "workspace-demo/vsi-financial-charts-desktop.webp",
+      "sourceScreen": "VSI financial conversation",
+      "viewport": [
+        1200,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        253,
+        318,
+        930,
+        518
+      ],
+      "dimensions": [
+        1860,
+        1036
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "7bb3012d01d4a07b607c6a8cb16b860d4e01b8589e90acb14583e0c8a8e070cb",
+      "sha256": "8cc2fa80a3dcecab32749245e4170c16ed7778d1e7308eba8280c22e4b7fc820",
+      "bytes": 235924
+    },
+    {
+      "file": "workspace-demo/vsi-financial-charts-mobile.webp",
+      "sourceScreen": "VSI financial conversation",
+      "viewport": [
+        390,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        15,
+        390,
+        360,
+        430
+      ],
+      "dimensions": [
+        720,
+        860
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "c756b01fd654864329c9b9c514d0d5df95d0c59f20269789ee47c8e53b7ef886",
+      "sha256": "f5e802e5b8a74d0f59ae0797116d9a92c73907a4ed708d54951bf2c24a0b22e1",
+      "bytes": 108348
+    },
+    {
+      "file": "workspace-demo/vsi-financial-charts-narrow.webp",
+      "sourceScreen": "VSI financial conversation",
+      "viewport": [
+        320,
+        1000
+      ],
+      "dpr": 2,
+      "cropCssPixels": [
+        15,
+        394,
+        290,
+        431
+      ],
+      "dimensions": [
+        580,
+        862
+      ],
+      "encoding": "native 2x PNG \u2192 integer crop \u2192 lossless WebP; no resizing or pixel edits",
+      "sourceSha256": "54cb08a272ccf21011c77bdc39b7a66568ed602cd45a8ddfb925f8476f43fb5e",
+      "sha256": "2a149c90586c247888aa42aa74f4d9075ec85507e0a4fe4b5290b7dae1cd1434",
+      "bytes": 91688
+    }
+  ]
+}
