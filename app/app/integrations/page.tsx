@@ -87,7 +87,7 @@ export default async function IntegrationsPage() {
             href="/app/integrations/zoho-books" action={owner && !zoho?.data?.length ? "Connect Zoho Books" : "Manage Zoho Books"} /> : null}
           {owner || wixAvailable ? <ProviderCard name="Wix online orders" description="Read-only order counts and totals for the last seven days."
             reads="Order dates, totals, currency, and payment status; no customer details or items are stored."
-            requires="A Wix site with online orders enabled and a Wix plan that supports payments. Wix Restaurants Orders must be installed for restaurant orders."
+            requires="A U.S. Wix site with online orders enabled and a Wix plan that supports payments. Wix Restaurants Orders must be installed for restaurant orders."
             statuses={!wixAvailable ? ["Setup in progress"] : wix?.error ? ["Status unavailable"] : wix?.data?.length
               ? [...new Set(wix.data.map((connection) => connection.status === "connected" ? "Connected" :
                 connection.status === "pending" ? "Waiting for Wix installation" : "Reconnect required"))]

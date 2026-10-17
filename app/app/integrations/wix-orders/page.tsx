@@ -44,7 +44,7 @@ export default async function WixOrdersPage({ searchParams }: { searchParams?: P
     <SectionCard title="What this connection uses" description="For Wix sites that accept online orders.">
       <div className="space-y-2 text-sm leading-6 text-slate-700">
         <p><strong>Reads:</strong> order dates, order totals, currency, and payment status from Wix eCommerce. Vaeroex saves only these fields and an order ID for deduplication. It does not save customer names, contact details, addresses, notes, or items.</p>
-        <p><strong>Requires:</strong> a Wix site with online ordering enabled, the appropriate Wix site plan to accept payments, and the site owner&apos;s permission to install the Vaeroex Wix app. Wix Restaurants users need Wix Restaurants Orders installed. The Wix site owner pays Wix for their site plan; this connector does not add a Vaeroex API fee.</p>
+        <p><strong>Requires:</strong> a U.S. Wix site with online ordering enabled, the appropriate Wix site plan to accept payments, and the site owner&apos;s permission to install the Vaeroex Wix app. Wix Restaurants users need Wix Restaurants Orders installed. The Wix site owner pays Wix for their site plan; this connector does not add a Vaeroex API fee.</p>
         <p>Order totals are the values shown on orders. They are not net deposits, settled payments, or accounting revenue. Refund transactions are not included in this first version.</p>
       </div>
     </SectionCard>
