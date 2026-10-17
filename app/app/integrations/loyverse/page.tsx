@@ -43,7 +43,7 @@ export default async function LoyversePage({ searchParams }: PageProps) {
     <PageHeader eyebrow="Integrations" title="Loyverse" description="Read only point of sale totals for your workspace."
       actions={<Link href="/app/integrations" aria-label="Back to integrations" className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-line bg-white"><ArrowLeft aria-hidden="true" className="h-4 w-4" /></Link>} />
     {resultMessage ? <p role={params?.result === "error" ? "alert" : "status"} className="rounded-md border border-line p-3 text-sm">{resultMessage}</p> : null}
-    <SectionCard title="Connection" description="Loyverse grants merchant and receipt read permissions only.">
+    <SectionCard title="Connection" description="For U.S. Loyverse merchants. Vaeroex requests merchant and receipt read permissions only.">
       {!available ? <p className="text-sm text-slate-600">Loyverse setup is not complete yet.</p> :
         connectionError ? <p role="alert" className="text-sm text-red-700">Connection status is unavailable.</p> :
         connection ? <div className="space-y-4">

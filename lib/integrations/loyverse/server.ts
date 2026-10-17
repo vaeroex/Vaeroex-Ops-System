@@ -20,6 +20,7 @@ const savedToken = z.object({
 }).strict();
 const merchantResponse = z.object({
   id: z.string().uuid(), business_name: z.string().min(1).max(200),
+  country: z.literal("US"),
   currency: z.object({ code: z.string().regex(/^[A-Z]{3}$/) })
 }).passthrough();
 const receiptResponse = z.object({
