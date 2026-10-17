@@ -410,7 +410,7 @@ async function main() {
     sheetsErasureMigrations[1],
     billingObservationMigration,
     vsiDeletionMigration,
-    '20261017013603_loyverse_read_only_connection.sql',
+    '20261017013603_loyverse_read_only_connection.sql', '20261017023221_zoho_books_read_only_connection.sql',
   ], 'the canonical extension contains the reviewed Sheets, dashboard, audit, capacity and independently qualified VSI migrations');
   assert.equal(prefix.length, 104, 'exact reviewed Production prefix');
   const square = productionSquare.map(name => snapshot(`supabase/production-migrations/${name}`));
@@ -432,7 +432,7 @@ async function main() {
     assert.equal(item.sha256, canonical.find(saved => path.basename(saved.file) === path.basename(item.file))?.sha256,
       'shared canonical and Production migration SQL must match exactly');
   }
-  const canonicalBaseline = canonical.filter(item => ![...auditMigrations, ...capacityMigrations, vsiMigration, vsiResearchMigration, ...storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, ...sheetsErasureMigrations, billingObservationMigration, vsiDeletionMigration, '20261017013603_loyverse_read_only_connection.sql'].includes(path.basename(item.file)));
+  const canonicalBaseline = canonical.filter(item => ![...auditMigrations, ...capacityMigrations, vsiMigration, vsiResearchMigration, ...storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, ...sheetsErasureMigrations, billingObservationMigration, vsiDeletionMigration, '20261017013603_loyverse_read_only_connection.sql', '20261017023221_zoho_books_read_only_connection.sql'].includes(path.basename(item.file)));
   assert.equal(canonicalBaseline.length, 123, 'audit, capacity and VSI tails must be applied exactly once after provider setup');
   assert.equal(dashboard[0].sha256, canonical.find(item => path.basename(item.file) === dashboardMigrations.preferences)?.sha256,
     'canonical and Production preference SQL must match exactly');

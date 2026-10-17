@@ -230,6 +230,8 @@ async function migrationQualification(target, administrator) {
   equal(vsiDeletionTail.length, 1, "separately qualified VSI saved-analysis deletion migration present");
   const loyverseTail = files.filter(name => name === "20261017013603_loyverse_read_only_connection.sql");
   equal(loyverseTail.length, 1, "separately qualified Loyverse read-only migration present");
+  const zohoBooksTail = files.filter(name => name === "20261017023221_zoho_books_read_only_connection.sql");
+  equal(zohoBooksTail.length, 1, "separately qualified Zoho Books read-only migration present");
   const billingObservationTail = files.filter(name => name === "20261012201726_stripe_subscription_observation_fence.sql");
   equal(billingObservationTail.length, 1, "separately qualified base billing observation fence migration present");
   const adminTelemetryTail = files.filter(name => name === "20261012091842_admin_usage_trust_support_telemetry.sql");
