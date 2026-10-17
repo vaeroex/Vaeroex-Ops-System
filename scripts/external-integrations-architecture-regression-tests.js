@@ -422,6 +422,7 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026100502201
   currentMigrations.filter(name => name !== "20261012191836_google_sheets_restricted_erasure_retention.sql"),
   currentMigrations.filter(name => name !== "20261012201726_stripe_subscription_observation_fence.sql"),
   currentMigrations.filter(name => name !== "20261014031409_vsi_saved_analysis_deletion.sql"),
+  currentMigrations.filter(name => name !== "20261017013603_loyverse_read_only_connection.sql"),
   currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
   currentMigrations.filter(name => name !== "20260902191325_square_production_internal_pilot_runtime.sql"),
   currentMigrations.filter(name => name !== "20260907225626_square_remote_sandbox_binding.sql"),

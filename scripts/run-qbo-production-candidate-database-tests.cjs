@@ -393,7 +393,7 @@ async function main() {
   const canonical = fs.readdirSync(path.join(root, 'supabase/migrations'))
     .filter(name => /^\d+_.+\.sql$/.test(name)).sort().map(name => snapshot(`supabase/migrations/${name}`));
   const prefix = canonical.filter(item => item.version <= '20260902191325');
-  assert.equal(canonical.length, 148, 'review the canonical migration manifest if it changes');
+  assert.equal(canonical.length, 149, 'review the canonical migration manifest if it changes');
   assert.deepEqual(canonical.filter(item => item.version > '20260915040500').map(item => path.basename(item.file)), [
     '20261002040024_google_sheets_complete.sql',
     '20261002040031_google_sheets_lifecycle.sql',
@@ -410,6 +410,7 @@ async function main() {
     sheetsErasureMigrations[1],
     billingObservationMigration,
     vsiDeletionMigration,
+    '20261017013603_loyverse_read_only_connection.sql',
   ], 'the canonical extension contains the reviewed Sheets, dashboard, audit, capacity and independently qualified VSI migrations');
   assert.equal(prefix.length, 104, 'exact reviewed Production prefix');
   const square = productionSquare.map(name => snapshot(`supabase/production-migrations/${name}`));
@@ -431,7 +432,7 @@ async function main() {
     assert.equal(item.sha256, canonical.find(saved => path.basename(saved.file) === path.basename(item.file))?.sha256,
       'shared canonical and Production migration SQL must match exactly');
   }
-  const canonicalBaseline = canonical.filter(item => ![...auditMigrations, ...capacityMigrations, vsiMigration, vsiResearchMigration, ...storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, ...sheetsErasureMigrations, billingObservationMigration, vsiDeletionMigration].includes(path.basename(item.file)));
+  const canonicalBaseline = canonical.filter(item => ![...auditMigrations, ...capacityMigrations, vsiMigration, vsiResearchMigration, ...storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, ...sheetsErasureMigrations, billingObservationMigration, vsiDeletionMigration, '20261017013603_loyverse_read_only_connection.sql'].includes(path.basename(item.file)));
   assert.equal(canonicalBaseline.length, 123, 'audit, capacity and VSI tails must be applied exactly once after provider setup');
   assert.equal(dashboard[0].sha256, canonical.find(item => path.basename(item.file) === dashboardMigrations.preferences)?.sha256,
     'canonical and Production preference SQL must match exactly');
