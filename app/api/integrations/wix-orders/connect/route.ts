@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
-import { admin, assertOrigin, enabled, hash, installUrl, requireOwner } from "@/lib/integrations/wix-orders/server";
+import { admin, assertOrigin, enabled, hash, installHandoff, requireOwner } from "@/lib/integrations/wix-orders/server";
 
 export async function POST(request: Request) {
   try {
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       await db.from("wix_order_connections").delete().eq("workspace_id", access.workspaceId).eq("id", id);
       throw new Error("wix_database_unavailable");
     }
-    return Response.redirect(installUrl(state), 303);
+    return installHandoff(state);
   } catch {
     return Response.redirect("https://www.vaeroex.com/app/integrations/wix-orders?result=error", 303);
   }

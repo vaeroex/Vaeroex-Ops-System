@@ -62,6 +62,17 @@ export function installUrl(state: string) {
   return url.toString();
 }
 
+const installHandoffScript = 'const handoff=document.getElementById("wix-install-handoff");history.replaceState(null,"","/app/integrations/wix-orders");location.replace(handoff.dataset.target);';
+const installHandoffCsp = `default-src 'none'; script-src 'sha256-${createHash("sha256").update(installHandoffScript).digest("base64")}'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
+
+export function installHandoff(state: string) {
+  const target = installUrl(state).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>Opening Wix</title></head><body><p id="wix-install-handoff" data-target="${target}">Opening Wix installation.</p><a href="${target}">Continue to Wix</a><script>${installHandoffScript}</script></body></html>`, {
+    headers: { "content-type": "text/html; charset=utf-8", "content-security-policy": installHandoffCsp,
+      "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff" }
+  });
+}
+
 const signedPayload = z.object({
   instanceId: uuid,
   uid: z.string().min(1),
