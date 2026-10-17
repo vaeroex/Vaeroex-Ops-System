@@ -59,7 +59,7 @@ export default async function IntegrationsPage() {
       {squareEnabled || qboEnabled || squareEvidence || googleSheetsEnabled || loyverseAvailable || zohoAvailable || owner ? (
         <div className="grid items-stretch gap-4 md:grid-cols-2">
           {squareEnabled ? <ProviderCard name="Square" description="Payments and location connections."
-            reads="Connected Square locations and payment activity."
+            reads="Connected Square locations and payment IDs, dates, status, amounts, and currency."
             requires="A Square seller account; the workspace owner must authorize access."
             statuses={!square ? ["Status unavailable"] : squareStatuses?.length ? [...new Set(squareStatuses)] : ["Not connected"]}
             href={squareSettingsPath} action={square?.available && !square.connections.length ? "Connect Square" : "Manage Square"} /> : null}
