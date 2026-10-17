@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 
-const migration = new URL("../supabase/migrations/20261017050000_wix_orders_read_only_connection.sql", import.meta.url);
+const migration = new URL("../supabase/migrations/20261017051502_wix_orders_read_only_connection.sql", import.meta.url);
 
 test("Wix order data is tenant-isolated, credentials stay private, and disconnect removes facts", async () => {
   const db = new PGlite();
