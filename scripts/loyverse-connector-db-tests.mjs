@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 
-const migration = new URL("../supabase/migrations/20261017013000_loyverse_read_only_connection.sql", import.meta.url);
+const migration = new URL("../supabase/migrations/20261017013603_loyverse_read_only_connection.sql", import.meta.url);
 
 test("Loyverse migration isolates workspaces and atomically applies bounded receipts", async () => {
   const db = new PGlite();
