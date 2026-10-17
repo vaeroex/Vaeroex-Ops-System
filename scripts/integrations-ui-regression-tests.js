@@ -82,7 +82,7 @@ test("disabled integration gates skip provider queries; QBO management fails bef
     const h = harness({ role, qboEnabled: false, squareEnabled: false, sheetsEnabled: false });
     const html = await h.render(landing);
     if (role === "owner") {
-      assert.deepEqual([...html.matchAll(/<article aria-label="([^"]+)"/g)].map(match => match[1]), ["Google Sheets"]);
+      assert.deepEqual([...html.matchAll(/<article aria-label="([^"]+)"/g)].map(match => match[1]), ["Wix online orders", "Google Sheets"]);
       assert.match(html, /Configuration required/);
       assert.match(html, /href="\/app\/settings\/integrations\/google-sheets"/);
       assert.match(html, /View Google Sheets setup/);
@@ -113,7 +113,7 @@ test("provider cards are consistent links to management, never Connect forms", a
   for (const sheetsEnabled of [false, true]) {
     const h = harness({ sheetsEnabled });
     const html = await h.render(landing);
-    assert.deepEqual([...html.matchAll(/<article aria-label="([^"]+)"/g)].map(match => match[1]), ["Square", "QuickBooks Online", "Google Sheets"]);
+    assert.deepEqual([...html.matchAll(/<article aria-label="([^"]+)"/g)].map(match => match[1]), ["Square", "QuickBooks Online", "Wix online orders", "Google Sheets"]);
     assert.equal((html.match(/Not connected/g) || []).length, sheetsEnabled ? 3 : 2);
     assert.match(html, /href="\/app\/settings\/integrations\/square"/);
     assert.match(html, /href="\/app\/settings\/integrations\/quickbooks"/);
