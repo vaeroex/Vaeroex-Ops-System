@@ -1,10 +1,10 @@
 # Known Limitations
 
-This document records intentional MVP boundaries and launch risks. These are not all blockers, but they should be understood before the first beta customer uses Vaeroex Ops System.
+This document records intentional MVP boundaries and launch risks. These are not all blockers, but they should be understood before the first beta customer uses Executive Intelligence.
 
 ## Launch Status
 
-Vaeroex Ops System is ready for Customer #1 once the current branch is merged and the new pre-checkout legal-acceptance migration is applied. It is not ready for broad self-serve launch until support operations, production monitoring, broader security testing, and operational runbooks are hardened beyond the first-customer path.
+Executive Intelligence is ready for Customer #1 once the current branch is merged and the new pre-checkout legal-acceptance migration is applied. It is not ready for broad self-serve launch until support operations, production monitoring, broader security testing, and operational runbooks are hardened beyond the first-customer path.
 
 ## Technical Validation
 
@@ -62,7 +62,7 @@ Vaeroex Ops System is ready for Customer #1 once the current branch is merged an
 - RLS policies are present and source-reviewed, but should be tested with separate users in a live Supabase project.
 - Workspace data separation should be tested with at least two independent customer accounts before launch.
 - The compliance notice warns users not to enter regulated sensitive data unless proper requirements are in place.
-- Vaeroex Ops System should not be marketed as HIPAA-ready, SOC 2-ready, or regulated-data-ready without legal, security, infrastructure, and agreement review.
+- Executive Intelligence should not be marketed as HIPAA-ready, SOC 2-ready, or regulated-data-ready without legal, security, infrastructure, and agreement review.
 - No formal penetration test has been performed.
 - No production incident response process has been run in rehearsal.
 

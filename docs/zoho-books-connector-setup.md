@@ -1,6 +1,6 @@
 # Zoho Books connection
 
-Vaeroex Ops System offers a read-only Zoho Books connection for U.S. organizations. The workspace owner authorizes a Zoho Books account and, if more than one eligible organization is available, chooses which organization to use. A manual sync reads the last seven UTC calendar dates. It stores daily USD invoice and expense counts and totals, with no customer, vendor, document, or line-item details. Draft and void invoices are excluded. Invoices are amounts billed, not recognized revenue or cash received. Non-USD transactions are counted as omitted rather than combined with USD.
+Executive Intelligence offers a read-only Zoho Books connection for U.S. organizations. The workspace owner authorizes a Zoho Books account and, if more than one eligible organization is available, chooses which organization to use. A manual sync reads the last seven UTC calendar dates. It stores daily USD invoice and expense counts and totals, with no customer, vendor, document, or line-item details. Draft and void invoices are excluded. Invoices are amounts billed, not recognized revenue or cash received. Non-USD transactions are counted as omitted rather than combined with USD.
 
 ## Provider setup
 

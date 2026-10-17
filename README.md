@@ -1,6 +1,6 @@
-# Vaeroex Ops System
+# Executive Intelligence
 
-Vaeroex Ops System powers Vaeroex Executive Intelligence, an AI-assisted operations intelligence platform for small and mid-sized businesses.
+Executive Intelligence is Vaeroex's operations intelligence platform for small and mid-sized businesses.
 
 Vaeroex helps business owners and managers improve visibility, accountability, and execution across key operational workflows, including forms, checklists, SOPs, follow-ups, issue tracking, asset readiness, CRM visibility, KPI reporting, and executive-level recommendations.
 
@@ -45,7 +45,7 @@ The platform focuses on structured inputs, evidence-based analysis, dashboard vi
 
 ## Status
 
-This repository represents the active development foundation for Vaeroex Ops System and Executive Intelligence.
+This repository represents the active development foundation for Executive Intelligence.
 ## Google Sheets
 
 Read-only spreadsheet connections, reviewed metric mapping, and automatic refresh every 15 minutes: see [setup guide](docs/google-sheets-connector-setup.md). The connector stays disabled until server configuration is complete.
