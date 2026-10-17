@@ -5,7 +5,7 @@ Status: source-ready for a limited beta, pending live manual testing in a real S
 ## Launch Decision Summary
 
 1. Ready for launch:
-   - Core Vaeroex Ops System MVP source is ready for a controlled beta.
+   - Core Executive Intelligence MVP source is ready for a controlled beta.
    - Customer workspace setup, Executive Intelligence surfaces, subscription access, admin tools, and support request flow are present in source.
    - The main Vaeroex system prompt exists and is guarded against blank prompt usage.
 

@@ -40,7 +40,7 @@ export default async function GoogleSheetsErasurePage({ params }: { params: Prom
       <div className="min-w-0"><dt className="font-medium text-ink">Request ID</dt><dd className="mt-1 break-all font-mono text-xs leading-6 text-slate-600">{scope.requestId}</dd></div>
     </dl>
     <section aria-label="Erasure scope" className="space-y-3 text-sm leading-6 text-slate-600">
-      <p>This scope covers permanent erasure of the Google-derived imports and history listed below from Vaeroex Ops System. Erasure cannot be undone. The source must stop syncing and remain disconnected.</p>
+      <p>This scope covers permanent erasure of the Google-derived imports and history listed below from Executive Intelligence. Erasure cannot be undone. The source must stop syncing and remain disconnected.</p>
       <p>Any selected analysis that combines Google Sheets with other sources will be deleted in full only with your approval. Its underlying unrelated sources are preserved, along with the items marked to keep.</p>
       <p>Your Google spreadsheet will not be modified. Revoking the Google access grant is required before erasure and may affect other connections using the same Google account.</p>
       <p>This page records your scope approval only. Erasure requires a separate execution step. Opening this page or approving the request does not execute erasure.</p>

@@ -1,8 +1,8 @@
-# Vaeroex Ops System - Agent Instructions
+# Executive Intelligence - Agent Instructions
 
 This project is a SaaS-style operations system for small and mid-sized businesses.
 
-The product name is Vaeroex Ops System.
+The product name is Executive Intelligence. Vaeroex is the company name.
 
 The in-app AI assistant name is Vaeroex.
 

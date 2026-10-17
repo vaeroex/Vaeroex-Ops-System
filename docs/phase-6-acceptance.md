@@ -1,6 +1,6 @@
 # Phase 6 Acceptance Review
 
-Phase 6 originally added Squarespace subscription access for Vaeroex Ops System. The later Stripe billing migration supersedes Squarespace for new customer checkout while preserving Squarespace and manual records for legacy/admin support. The Vaeroex app controls account access, workspace creation, usage limits, and manual activation.
+Phase 6 originally added Squarespace subscription access for Executive Intelligence. The later Stripe billing migration supersedes Squarespace for new customer checkout while preserving Squarespace and manual records for legacy/admin support. The Vaeroex app controls account access, workspace creation, usage limits, and manual activation.
 
 ## Source-Verified Acceptance Criteria
 
