@@ -54,8 +54,8 @@ async function connectionContext(access: WorkspaceAccess, observedAt: string, re
       lastSuccessfulRefreshAt: entry.lastSuccessfulRefreshAt
     })), interpretation: [
       "Saved states, not a fresh sync. Missing entries do not prove no connection; access or hidden records may apply.",
-      ...(permitted.length > 4 ? ["Additional permitted connections are omitted from this bounded summary; check Integrations for the full list."] : []),
-      ...(parsed.data.unavailable.length ? ["Some saved connections are unavailable; check Integrations."] : [])
+      ...(permitted.length > 4 ? ["Additional permitted connections are omitted from this bounded summary; check Plug-ins for the full list."] : []),
+      ...(parsed.data.unavailable.length ? ["Some saved connections are unavailable; check Plug-ins."] : [])
     ].join(" ") };
   } catch { return unknown; }
 }
@@ -107,7 +107,7 @@ export async function loadVsiProductContext(access: WorkspaceAccess, inheritedTi
       "Published subscription offer, features and limits; not an actual invoice."),
     source("P3", "Current workspace subscription", "/app/account/subscription",
       `Current access: ${subscription.allowed ? "allowed" : "blocked"}; status: ${subscription.status}; source: ${subscription.source}.`),
-    source("P4", "Current workspace and saved integrations", "/app/integrations",
+    source("P4", "Current workspace and saved plug-ins", "/app/integrations",
       "Current permitted workspace, role and saved connection states."),
     source("P5", "Vaeroex feature help", "/app/help", "Maintained feature help and navigation."),
     source("P6", "Vaeroex Super Intelligence", "/app/help?q=Vaeroex%20Super%20Intelligence", "Current Vaeroex capabilities and VSI allowance safeguards.")

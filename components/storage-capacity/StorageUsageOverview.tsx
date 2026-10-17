@@ -62,7 +62,7 @@ export function StorageUsageOverview({ usage }: { usage: WorkspaceStorageUsage }
     </section>
     <section aria-labelledby="separate-data-heading" className="rounded-lg border border-line bg-white p-4 sm:p-5">
       <h2 id="separate-data-heading" className="text-base font-semibold text-ink">Other workspace data</h2>
-      <p className="mt-1 text-sm text-muted">Synced integration data, chats, saved analyses, extracted text, and derived database records are outside the paid uploaded-file quota. No file-storage overage charge applies to this data.</p>
+      <p className="mt-1 text-sm text-muted">Synced plug-in data, chats, saved analyses, extracted text, and derived database records are outside the paid uploaded-file quota. No file-storage overage charge applies to this data.</p>
       <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm">
         <caption className="sr-only">Separately measured database data, excluded from uploaded-file capacity</caption>
         <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="pb-2 font-medium">Category</th><th scope="col" className="px-3 pb-2 text-right font-medium">Records</th><th scope="col" className="pb-2 text-right font-medium">Estimated data size</th></tr></thead>
@@ -73,10 +73,10 @@ export function StorageUsageOverview({ usage }: { usage: WorkspaceStorageUsage }
         </tr>)}</tbody>
       </table></div>
       {usage.separateData.length === 0 ? <p className="mt-3 text-sm text-muted">Database usage has not been measured yet. It is not zero usage.</p> : null}
-      <p className="mt-3 text-xs leading-5 text-muted">Estimates describe attributed data payloads, not physical database disk, indexes, or backups. Private chat contents are never shown here. Integration sync and processing limits remain separate.</p>
+      <p className="mt-3 text-xs leading-5 text-muted">Estimates describe attributed data payloads, not physical database disk, indexes, or backups. Private chat contents are never shown here. Plug-in sync and processing limits remain separate.</p>
     </section>
     <section className="text-sm text-muted" aria-label="What remains available at the limit">
-      <p>At the allowance, existing files remain available to view, download, search, export, and restore. You can delete files, use ordinary workspace features, and continue integrations and analyses within their separate limits. Only new uploads that need unavailable capacity are blocked.</p>
+      <p>At the allowance, existing files remain available to view, download, search, export, and restore. You can delete files, use ordinary workspace features, and continue plug-ins and analyses within their separate limits. Only new uploads that need unavailable capacity are blocked.</p>
       <p className="mt-2">There are no automatic purchases or overage charges. <Link href="/app/sources" className="font-semibold text-vaeroex-blue underline underline-offset-2">Manage source files</Link>.</p>
     </section>
   </div>;

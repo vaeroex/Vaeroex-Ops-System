@@ -158,7 +158,7 @@ export async function retrieveVsiEvidence(access: WorkspaceAccess, question: str
   for (const entry of integrations.dashboard.entries.filter(entry => !entry.hidden)) add("integration", entry.key, `${entry.provider}: ${entry.name}`,
     JSON.stringify({ connectionState: entry.connectionState, freshness: entry.freshness, lastSuccessfulRefreshAt: entry.lastSuccessfulRefreshAt,
       currentUntil: entry.currentUntil, results: entry.results }), entry.lastSuccessfulRefreshAt, entry.href, "record");
-  if (integrations.dashboard.unavailable.length) limitations.push(`${integrations.dashboard.unavailable.join(", ")} saved integration information is unavailable; no fresh provider sync was performed.`);
+  if (integrations.dashboard.unavailable.length) limitations.push(`${integrations.dashboard.unavailable.join(", ")} saved plug-in information is unavailable; no fresh provider sync was performed.`);
   const financial = await retrieveFinancialEvidence(access, asOf);
   candidates.push(...financial.sources);
   limitations.push(...financial.limitations);

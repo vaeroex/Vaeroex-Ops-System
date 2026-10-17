@@ -38,8 +38,8 @@ export default async function WixOrdersPage({ searchParams }: { searchParams?: P
     result === "error" ? "The Wix action did not complete. Please try again." : null;
 
   return <div className="workspace-page mx-auto max-w-5xl space-y-5">
-    <PageHeader eyebrow="Integrations" title="Wix online orders" description="Read-only order counts and totals for this workspace."
-      actions={<Link href="/app/integrations" aria-label="Back to integrations" className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-line bg-white"><ArrowLeft aria-hidden="true" className="h-4 w-4" /></Link>} />
+    <PageHeader eyebrow="Plug-ins" title="Wix online orders" description="Read-only order counts and totals for this workspace."
+      actions={<Link href="/app/integrations" aria-label="Back to plug-ins" className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-line bg-white"><ArrowLeft aria-hidden="true" className="h-4 w-4" /></Link>} />
     {message ? <p role={result === "error" ? "alert" : "status"} className="rounded-md border border-line p-3 text-sm">{message}</p> : null}
     <SectionCard title="What this connection uses" description="For Wix sites that accept online orders.">
       <div className="space-y-2 text-sm leading-6 text-slate-700">

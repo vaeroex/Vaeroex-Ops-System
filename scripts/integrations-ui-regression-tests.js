@@ -86,9 +86,9 @@ test("disabled integration gates skip provider queries; QBO management fails bef
       assert.match(html, /Configuration required/);
       assert.match(html, /href="\/app\/settings\/integrations\/google-sheets"/);
       assert.match(html, /View Google Sheets setup/);
-      assert.doesNotMatch(html, /No integrations are available/);
+      assert.doesNotMatch(html, /No plug-ins are available/);
     } else {
-      assert.match(html, /No integrations are available/);
+      assert.match(html, /No plug-ins are available/);
       assert.doesNotMatch(html, /Google Sheets|<article/);
     }
     assert.doesNotMatch(html, /Connect QuickBooks|Manage QuickBooks|Connect Square|Manage Square|<form/);
@@ -197,7 +197,7 @@ test("management retains the real panel and owner entity selector, data and acco
   assert.match(html, /<button[^>]*disabled=""[^>]*>[\s\S]*?Connect QuickBooks<\/button>/);
   assert.match(html, /href="\/app\/settings\/integrations\/quickbooks\/data"/);
   assert.match(html, /href="\/app\/settings\/integrations\/quickbooks\/accounting"/);
-  assert.match(html, /aria-label="Back to integrations"/);
+  assert.match(html, /aria-label="Back to plug-ins"/);
   assert.equal(h.queries.filter(query => query.table === "business_entities").length, 1);
 });
 
@@ -223,7 +223,7 @@ test("Sandbox details move to management with the same authorized evidence reade
     const h = harness({ role, qboEnabled: false, squareEnabled: false, squareEvidence });
     const html = await h.render(landing);
     assert.match(html, /href="\/app\/integrations\/square"/);
-    assert.doesNotMatch(html, /Source-version provenance|Interpretation checkpoint|<table|No integrations are available/);
+    assert.doesNotMatch(html, /Source-version provenance|Interpretation checkpoint|<table|No plug-ins are available/);
     const details = await h.render(sandbox);
     assert.match(details, /Source-version provenance|Interpretation checkpoint/);
     assert.doesNotMatch(details, /<form|\/api\/integrations\//);
@@ -233,11 +233,11 @@ test("Sandbox details move to management with the same authorized evidence reade
 
 test("desktop/mobile navigation marks Integrations active for both providers and Settings remains separate", () => {
   const shell = fs.readFileSync(path.join(root, "components/app/AppShell.tsx"), "utf8");
-  assert.match(shell, /href: "\/app\/integrations", label: "Integrations"/);
+  assert.match(shell, /href: "\/app\/integrations", label: "Plug-ins"/);
   assert.match(shell, /<AppNavigation sections=\{navSections\} \/>/);
   assert.match(shell, /<AppNavigation sections=\{navSections\} mobile \/>/);
   const nav = loadSource("lib/presentation/app-navigation.ts");
-  const items = [{ href: "/app/integrations", label: "Integrations" }, { href: "/app/settings", label: "Settings" }];
+  const items = [{ href: "/app/integrations", label: "Plug-ins" }, { href: "/app/settings", label: "Settings" }];
   for (const pathname of ["/app/integrations", "/app/settings/integrations/quickbooks", "/app/settings/integrations/quickbooks/data", "/app/settings/integrations/square", "/app/settings/integrations/google-sheets"]) {
     const h = harness({ pathname });
     const { AppNavigation } = h.load("components/app/AppNavigation.tsx");
@@ -246,7 +246,7 @@ test("desktop/mobile navigation marks Integrations active for both providers and
       assert.equal((html.match(/aria-current="page"/g) || []).length, 1);
       assert.match(html, /href="\/app\/integrations" aria-current="page"/);
     }
-    assert.equal(nav.currentWorkspaceDestination(pathname, items).label, "Integrations");
+    assert.equal(nav.currentWorkspaceDestination(pathname, items).label, "Plug-ins");
   }
   assert.equal(nav.workspacePageTitle("/app/settings/integrations/quickbooks/data", items), "QuickBooks Online");
   assert.equal(nav.workspacePageTitle("/app/settings/integrations/square", items), "Square");

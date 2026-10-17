@@ -56,7 +56,7 @@ async function main() {
       scenario = url.searchParams.get("scenario") ?? "disconnected";
       const data = fixture(scenario, hidden);
       response.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" });
-      response.end(`<!doctype html><html lang="en" class="pulsar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Current integrations fixture</title><style>${css}</style></head><body class="vaeroex-customer-workspace"><main class="workspace-main workspace-intelligence mx-auto max-w-5xl p-4"><div id="fixture">${renderToString(React.createElement(CurrentIntegrations, { initial: data }))}</div></main><script id="fixture-data" type="application/json">${JSON.stringify(data)}</script><script src="/fixture.js"></script></body></html>`);
+      response.end(`<!doctype html><html lang="en" class="pulsar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Current plug-ins fixture</title><style>${css}</style></head><body class="vaeroex-customer-workspace"><main class="workspace-main workspace-intelligence mx-auto max-w-5xl p-4"><div id="fixture">${renderToString(React.createElement(CurrentIntegrations, { initial: data }))}</div></main><script id="fixture-data" type="application/json">${JSON.stringify(data)}</script><script src="/fixture.js"></script></body></html>`);
     } catch (error) { serverError = error; response.writeHead(500); response.end("Fixture failed"); }
   });
   let browser;
@@ -76,15 +76,15 @@ async function main() {
       await page.setViewportSize({ width, height: 1000 });
       for (const state of ["never", "current", "unchanged", "stale", "first-import", "reauthorization", "disconnected", "distinct"]) {
         await page.goto(`${origin}/?scenario=${state}`);
-        await page.getByRole("heading", { name: "Current integrations" }).waitFor();
+        await page.getByRole("heading", { name: "Current plug-ins" }).waitFor();
         if (state === "disconnected") {
-          assert.equal(await page.getByText("No active integrations", { exact: true }).count(), 1);
+          assert.equal(await page.getByText("No active plug-ins", { exact: true }).count(), 1);
           assert.equal(await page.getByText("USD 125.20", { exact: true }).count(), 0);
           await page.getByRole("button", { name: /Hide from this page/ }).click();
-          await page.getByText("Hidden integrations (1)", { exact: true }).waitFor();
+          await page.getByText("Hidden plug-ins (1)", { exact: true }).waitFor();
           await page.reload();
           assert.equal(await page.getByRole("heading", { name: "Previously connected" }).count(), 0);
-          await page.getByText("Hidden integrations (1)", { exact: true }).click();
+          await page.getByText("Hidden plug-ins (1)", { exact: true }).click();
           await page.getByRole("button", { name: /Restore/ }).click();
           await page.getByRole("heading", { name: "Previously connected" }).waitFor();
         }
@@ -108,15 +108,15 @@ async function main() {
     assert.equal(gets, 10, "automatic reads stop at the ten-check bound");
     await page.clock.runFor(2 * 60_000);
     assert.equal(gets, 10);
-    await page.getByRole("button", { name: "Refresh integration status" }).click();
+    await page.getByRole("button", { name: "Refresh plug-in status" }).click();
     await page.getByText("Checking saved status...").waitFor({ state: "hidden" });
     assert.equal(gets, 11, "manual refresh works without a reload");
     await page.clock.runFor(11_000); failed = true;
-    await page.getByRole("button", { name: "Refresh integration status" }).click();
+    await page.getByRole("button", { name: "Refresh plug-in status" }).click();
     await page.getByText("Status could not be refreshed. Values below are last-known data.", { exact: true }).waitFor();
     assert.equal(patches, 8); assert.equal(serverError, null); assert.deepEqual(errors, []);
     assert(requests.every(request => request.origin === origin && ["GET", "PATCH"].includes(request.method)), "no provider import, reconnect or model call");
-    console.log(`Current integrations browser PASS: 8 states x 4 widths, hydrated hide/restore persistence, 10-check bound, manual refresh, error state; screenshots ${output}`);
+    console.log(`Current plug-ins browser PASS: 8 states x 4 widths, hydrated hide/restore persistence, 10-check bound, manual refresh, error state; screenshots ${output}`);
   } finally { if (browser) await browser.close(); await new Promise(resolve => server.close(resolve)); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

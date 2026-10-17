@@ -30,11 +30,11 @@ async function main() {
         cancellations: [{ connection_id: "connection-a", can_cancel: true }] });
       const { AppNavigation } = h.load("components/app/AppNavigation.tsx");
       const sections = [{ label: "Primary", collapsible: false, items: [
-        { href: "/app/integrations", label: "Integrations" }, { href: "/app/settings", label: "Settings" }
+        { href: "/app/integrations", label: "Plug-ins" }, { href: "/app/settings", label: "Settings" }
       ] }];
       const nav = mobile => renderToStaticMarkup(React.createElement(AppNavigation, { sections, mobile }));
       response.writeHead(200, { "content-type": "text/html", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'none'" });
-      response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Integrations synthetic preview</title><style>${css}</style></head><body class="bg-white text-ink"><div class="hidden lg:block fixed inset-y-0 left-0 w-64 bg-vaeroex-navy p-3">${nav(false)}</div><div class="lg:pl-64"><nav class="lg:hidden p-3">${nav(true)}</nav><main class="p-3 sm:p-5">${await h.render(routes[url.pathname])}</main></div></body></html>`);
+      response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Plug-ins synthetic preview</title><style>${css}</style></head><body class="bg-white text-ink"><div class="hidden lg:block fixed inset-y-0 left-0 w-64 bg-vaeroex-navy p-3">${nav(false)}</div><div class="lg:pl-64"><nav class="lg:hidden p-3">${nav(true)}</nav><main class="p-3 sm:p-5">${await h.render(routes[url.pathname])}</main></div></body></html>`);
     } catch (error) { serverError = error; response.writeHead(500); response.end("Synthetic preview failed"); }
   });
   let browser;
@@ -50,8 +50,8 @@ async function main() {
     for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }, { width: 320, height: 740 }]) {
       await page.setViewportSize(viewport);
       await page.goto(`${origin}/app/settings`);
-      await page.getByRole("link", { name: "Manage integrations", exact: true }).click();
-      await page.getByRole("heading", { name: "Integrations", exact: true }).waitFor();
+      await page.getByRole("link", { name: "Manage plug-ins", exact: true }).click();
+      await page.getByRole("heading", { name: "Plug-ins", exact: true }).waitFor();
       assert.equal(await page.getByRole("article").count(), 4);
       assert.equal(await page.getByRole("article", { name: "Google Sheets", exact: true }).count(), 1);
       assert.equal(await page.getByText("Configuration required", { exact: true }).count(), 1);
@@ -78,10 +78,10 @@ async function main() {
       assert.deepEqual(await page.locator("main h1, main h2, main p, main button, main a").evaluateAll(elements => elements
         .filter(element => element.scrollWidth > element.clientWidth + 2).map(element => element.textContent)), []);
       await page.screenshot({ path: `/tmp/integrations-qbo-management-${viewport.width}.png`, fullPage: true });
-      await page.getByRole("link", { name: "Back to integrations", exact: true }).click();
+      await page.getByRole("link", { name: "Back to plug-ins", exact: true }).click();
       if (viewport.width < 1024) {
         await page.locator("summary").filter({ hasText: "Menu" }).click();
-        assert.equal(await page.getByRole("link", { name: "Integrations", exact: true }).filter({ visible: true }).getAttribute("aria-current"), "page");
+        assert.equal(await page.getByRole("link", { name: "Plug-ins", exact: true }).filter({ visible: true }).getAttribute("aria-current"), "page");
       }
       await page.goto(`${origin}/app/integrations?empty=1`);
       assert.equal(await page.getByRole("link", { name: "Connect QuickBooks", exact: true }).count(), 1);

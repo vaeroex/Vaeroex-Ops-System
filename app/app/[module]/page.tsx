@@ -57,7 +57,7 @@ const defaultCopy: ComingSoonCopy = {
   futureCapability: [
     "Workspace-specific records",
     "Search, filters, and record management",
-    "Dashboard and intelligence integration",
+    "Connected dashboard and intelligence",
     "Draft recommendations from Vaeroex where useful"
   ]
 };

@@ -15,8 +15,8 @@ export function integrationResultVisibility(evidence: IntegrationResultEvidence)
   const status = !visible ? null
     : evidence.connectionState === "disconnected" ? `Disconnected. New imports are stopped.${retainedData}`
       : requiresReconnect ? `Reconnect to resume imports.${retainedData}`
-        : evidence.connectionState === "setup" ? "Finish setup in Integrations."
-          : evidence.connectionState === "sync_error" ? "The latest sync failed. View Integrations for details."
+        : evidence.connectionState === "setup" ? "Finish setup in Plug-ins."
+          : evidence.connectionState === "sync_error" ? "The latest sync failed. View Plug-ins for details."
             : !evidence.hasImportedData && !evidence.lastSuccessfulSyncAt ? "Connected. A completed sync has not been recorded yet."
               : evidence.freshness === "stale" ? "Sync is delayed. Saved results may be out of date."
                 : evidence.freshness === "unknown" ? "Sync freshness is not yet confirmed." : null;

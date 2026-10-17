@@ -51,7 +51,7 @@ test("successful connections awaiting their first import show concise status wit
     assert.equal(state.lastSuccessfulSyncAt, null);
     assert.equal(state.requiresReconnect, false);
   }
-  assert.match(visibility("Square", { ...connectedSquare, state: "mapping_required" }).status, /Finish setup in Integrations/);
+  assert.match(visibility("Square", { ...connectedSquare, state: "mapping_required" }).status, /Finish setup in Plug-ins/);
 });
 
 test("actual access failures warn only with historical eligibility and persisted authorization failure", () => {
@@ -84,7 +84,7 @@ test("declining a replacement Sheets consent retains history without claiming th
     last_sync_fact_count: 12, spreadsheet_id: "previous-sheet", generation: 2 };
   assert.equal(googleSheetsResultVisibility(connection).visible, true);
   assert.equal(googleSheetsResultVisibility(connection).requiresReconnect, false);
-  assert.match(visibility("Google Sheets", connection).status, /Finish setup in Integrations/);
+  assert.match(visibility("Google Sheets", connection).status, /Finish setup in Plug-ins/);
 });
 
 test("intentional disconnect retains historical presentation without resurrecting active results", () => {

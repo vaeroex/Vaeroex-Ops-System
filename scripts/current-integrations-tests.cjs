@@ -37,19 +37,19 @@ test("first import, manual refresh, expired access and explicit disconnect remai
 });
 test("all-disconnected shows only compact reconnect entries, never values or historical coverage", () => {
   const html = render([entry({ connectionState: "disconnected" })]);
-  assert.match(html, /No active integrations/); assert.match(html, /Previously connected/);
-  assert.match(html, /Hide from this page/); assert.match(html, /Reconnect/); assert.match(html, /Manage integrations/);
+  assert.match(html, /No active plug-ins/); assert.match(html, /Previously connected/);
+  assert.match(html, /Hide from this page/); assert.match(html, /Reconnect/); assert.match(html, /Manage plug-ins/);
   assert.doesNotMatch(html, /USD 125.20|Approved result|2026-09-01|Partial coverage|Last successful refresh/);
 });
 test("hidden history can be restored and a hidden preference cannot hide a connected company", () => {
   const hidden = render([entry({ connectionState: "disconnected", hidden: true })]);
-  assert.doesNotMatch(hidden, /Previously connected/); assert.match(hidden, /Hidden integrations \(1\)/); assert.match(hidden, /Restore/);
+  assert.doesNotMatch(hidden, /Previously connected/); assert.match(hidden, /Hidden plug-ins \(1\)/); assert.match(hidden, /Restore/);
   const reconnected = render([entry({ hidden: true })]);
-  assert.match(reconnected, /Approved result/); assert.doesNotMatch(reconnected, /Hidden integrations|No active integrations/);
+  assert.match(reconnected, /Approved result/); assert.doesNotMatch(reconnected, /Hidden plug-ins|No active plug-ins/);
 });
 test("no established connections renders no provider-specific notice or discovery cards", () => {
   const html = render([]);
-  assert.match(html, /No active integrations/); assert.doesNotMatch(html, /QuickBooks|Square|Google Sheets|Reconnect|coverage/);
+  assert.match(html, /No active plug-ins/); assert.doesNotMatch(html, /QuickBooks|Square|Google Sheets|Reconnect|coverage/);
 });
 test("logical grouping selects an attempt without combining values, labels are never identity", () => {
   const old = { ...entry({ connectionState: "disconnected" }), createdAt: "2026-09-01", connectionId: "old", hasImportedData: true, amount: "10" };
@@ -209,7 +209,7 @@ test("stored Sheets facts are shown only for the exact valid current approval, n
   const unavailable = await loaderFixture({ sheets: [{ ...sheet, display_name: null }] }).run();
   assert.equal(unavailable.loadFailed, true); assert.deepEqual(unavailable.dashboard.entries, []);
   assert.deepEqual(unavailable.currentQboAccounting.kpis, []);
-  assert.match(renderToStaticMarkup(React.createElement(CurrentIntegrations, { initial: unavailable.dashboard })), /Active integration status is unavailable/);
+  assert.match(renderToStaticMarkup(React.createElement(CurrentIntegrations, { initial: unavailable.dashboard })), /Active plug-in status is unavailable/);
 });
 
 
@@ -249,5 +249,5 @@ test("active loader scopes metadata, avoids owner readers for viewers and marks 
   assert.equal(failed.loadFailed, false); assert.deepEqual(failed.dashboard.entries, []);
   assert(failed.dashboard.unavailable.includes("Square")); assert(failed.dashboard.unavailable.includes("Google Sheets"));
   const html = renderToStaticMarkup(React.createElement(CurrentIntegrations, { initial: failed.dashboard }));
-  assert.match(html, /Active integration status is unavailable/); assert.doesNotMatch(html, /private SQL|private provider/);
+  assert.match(html, /Active plug-in status is unavailable/); assert.doesNotMatch(html, /private SQL|private provider/);
 });

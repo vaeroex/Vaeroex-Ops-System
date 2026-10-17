@@ -28,7 +28,7 @@ export type IntegrationDashboard = z.infer<typeof IntegrationDashboardSchema>;
 export function integrationDashboardStatus(entry: DashboardEntry, asOf: string) {
   if (entry.connectionState === "disconnected") return { label: "Disconnected", current: false, tone: "neutral" } as const;
   if (entry.connectionState === "reauthorization_required") return { label: "Reconnect required", current: false, tone: "warning" } as const;
-  if (entry.connectionState === "setup") return { label: "Finish setup in Integrations", current: false, tone: "neutral" } as const;
+  if (entry.connectionState === "setup") return { label: "Finish setup in Plug-ins", current: false, tone: "neutral" } as const;
   if (!entry.lastSuccessfulRefreshAt) return { label: "Awaiting first successful import", current: false, tone: "neutral" } as const;
   if (entry.connectionState === "sync_error") return { label: "Refresh failed", current: false, tone: "warning" } as const;
   if (entry.freshness === "stale" || (entry.currentUntil && Date.parse(asOf) > Date.parse(entry.currentUntil)))

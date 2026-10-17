@@ -42,8 +42,8 @@ export default async function ZohoBooksPage({ searchParams }: PageProps) {
     "Choose an organization" : connection?.status === "reauthorization_required" ? "Reauthorization required" : "Waiting for authorization";
 
   return <div className="workspace-page mx-auto max-w-5xl space-y-5">
-    <PageHeader eyebrow="Integrations" title="Zoho Books" description="Recent invoice and expense totals for your workspace."
-      actions={<Link href="/app/integrations" aria-label="Back to integrations" className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-line bg-white"><ArrowLeft aria-hidden="true" className="h-4 w-4" /></Link>} />
+    <PageHeader eyebrow="Plug-ins" title="Zoho Books" description="Recent invoice and expense totals for your workspace."
+      actions={<Link href="/app/integrations" aria-label="Back to plug-ins" className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-line bg-white"><ArrowLeft aria-hidden="true" className="h-4 w-4" /></Link>} />
     {params?.result === "error" ? <p role="alert" className="rounded-md border border-line p-3 text-sm">The Zoho Books action did not complete. Check the organization and authorization, then try again.</p> : null}
     {params?.result === "disconnected" ? <p role="status" className="rounded-md border border-line p-3 text-sm">Zoho Books disconnected and stored summaries removed.</p> : null}
     <SectionCard title="Connection" description="For U.S. Zoho Books organizations. Vaeroex requests read-only access to organization settings, invoices, and expenses.">
