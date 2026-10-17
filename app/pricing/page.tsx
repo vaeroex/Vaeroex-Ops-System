@@ -28,7 +28,7 @@ const executiveInclusions = [
   "Evidence and trusted business context",
   "Saved Analyses and document analysis",
   "Vaeroex Super Intelligence (VSI)",
-  "File uploads, Business Notes, Square, QuickBooks, Zoho Books, and Loyverse connections",
+  "File uploads, Business Notes, and plug-ins for Square, QuickBooks Online, Zoho Books, and Loyverse",
 ] as const;
 
 type PricingPageProps = {

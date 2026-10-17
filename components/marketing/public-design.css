@@ -277,8 +277,8 @@
   max-width: 1328px;
 }
 .vx-footer > div:first-child {
-  grid-template-columns: 0.85fr 1.6fr;
-  gap: 60px;
+  grid-template-columns: 0.7fr 1.9fr;
+  gap: 48px;
 }
 .vx-footer-wordmark {
   font-size: 28px;
@@ -754,4 +754,14 @@
 /* Native validation and keyboard focus stay below the sticky public header. */
 .vaeroex-public-site :where(input, textarea, select, button) {
   scroll-margin-block: 110px;
+}
+
+@media (max-width: 760px) {
+  .vx-footer-links > .vx-footer-support {
+    grid-column: 1 / -1;
+  }
+  .vx-footer-support > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 20px !important;
+  }
 }

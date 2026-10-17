@@ -122,7 +122,7 @@ export default function OperationsIntelligencePage() {
         <div className={styles.container}>
           <div className={styles.sectionHead}>
             <div><p className={styles.sectionLabel}>Your business information</p><h2 id="business-information-title">Connect what you use.<br />Bring what you know.</h2></div>
-            <p className={styles.copy}>Start with a connection or useful files. Add Business Notes for goals, locations, operating details, and meeting updates.</p>
+            <p className={styles.copy}>Start with a plug-in or useful files. Add Business Notes for goals, locations, operating details, and meeting updates.</p>
           </div>
           <div className={story.inputGrid}>
             <article className={story.inputItem}>
@@ -141,16 +141,19 @@ export default function OperationsIntelligencePage() {
               <p>Add Business Notes for context. Review and approve proposed information before it becomes business evidence; image recognition can miss details.</p>
             </article>
           </div>
-          <IntegrationScreenshotTour />
-          <p className={story.sourceRule}>Each metric uses one authoritative source within a reporting scope. Overlapping connected, uploaded, and manual values are not automatically consolidated or deduplicated. Source changes require review.</p>
-          <div className={story.integrationStatus} aria-label="More supported connections">
-            <p>Also connect</p>
+          <div id="plug-ins" className={`${story.integrationStatus} scroll-mt-28`} aria-label="Supported plug-ins">
+            <p>Available plug-ins</p>
             <ul>
+              <li>Square</li>
+              <li>QuickBooks Online</li>
               <li>Zoho Books</li>
               <li>Loyverse</li>
-              <li>and more</li>
             </ul>
+            <p className="mt-4">Preview Square and QuickBooks examples below.</p>
           </div>
+          <IntegrationScreenshotTour />
+          <p className={story.sourceRule}>Each metric uses one authoritative source within a reporting scope. Overlapping connected, uploaded, and manual values are not automatically consolidated or deduplicated. Source changes require review.</p>
+
         </div>
       </section>
 

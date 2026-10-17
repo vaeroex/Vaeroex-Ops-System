@@ -20,7 +20,7 @@ export default async function HelpCenterPage({ searchParams }: HelpCenterPagePro
     <div className="space-y-6">
       <PageHeader
         eyebrow="Help Center"
-        title="Vaeroex customer education"
+        title="Help with your workspace"
         description="Guides for Executive Intelligence, trust, legal safety, billing, and support."
         actions={
           <>
@@ -76,7 +76,7 @@ export default async function HelpCenterPage({ searchParams }: HelpCenterPagePro
           <li className="rounded-lg border border-line bg-slate-50 p-4">
             <span className="text-xs font-semibold uppercase tracking-wide text-vaeroex-blue">Step 2</span>
             <p className="mt-2 font-semibold text-ink">Tap Share.</p>
-            <p className="mt-1">Use the Safari share button at the bottom of the screen.</p>
+            <p className="mt-1">Open Safari’s Share menu.</p>
           </li>
           <li className="rounded-lg border border-line bg-slate-50 p-4">
             <span className="text-xs font-semibold uppercase tracking-wide text-vaeroex-blue">Step 3</span>
