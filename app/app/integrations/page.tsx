@@ -10,6 +10,7 @@ import { sheetsEnabled } from "@/lib/integrations/google-sheets/server";
 import { GOOGLE_SHEETS_PILOT } from "@/lib/integrations/google-sheets/availability";
 import { admin as loyverseAdmin, enabled as loyverseEnabled } from "@/lib/integrations/loyverse/server";
 import { admin as zohoAdmin, enabled as zohoEnabled } from "@/lib/integrations/zoho-books/server";
+import { admin as bambooAdmin, enabled as bambooEnabled } from "@/lib/integrations/bamboohr/server";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import { ProviderCard } from "./_ProviderCard";
 import { readQuickBooksStatus } from "./_qbo";
@@ -35,13 +36,15 @@ export default async function IntegrationsPage() {
   const googleSheetsEnabled = sheetsEnabled();
   const loyverseAvailable = loyverseEnabled();
   const zohoAvailable = zohoEnabled();
-  const [square, qbo, squareEvidence, googleSheets, loyverse, zoho] = await Promise.all([
+  const bambooAvailable = bambooEnabled() && owner;
+  const [square, qbo, squareEvidence, googleSheets, loyverse, zoho, bamboo] = await Promise.all([
     squareEnabled ? squareDirectView() : null,
     qboEnabled ? readQuickBooksStatus(access) : null,
     readSquareWorkspaceEvidence(access.supabase, access.workspaceId, await headers()),
     googleSheetsEnabled ? access.supabase.from("google_sheets_connections").select("status, active_approval_id, revocation_pending, authorization_uncertain").eq("workspace_id", access.workspaceId) : null,
     loyverseAvailable ? loyverseAdmin().from("loyverse_connections").select("status").eq("workspace_id", access.workspaceId).neq("status", "disconnected") : null,
-    zohoAvailable ? zohoAdmin().from("zoho_books_connections").select("status").eq("workspace_id", access.workspaceId).neq("status", "disconnected") : null
+    zohoAvailable ? zohoAdmin().from("zoho_books_connections").select("status").eq("workspace_id", access.workspaceId).neq("status", "disconnected") : null,
+    bambooAvailable ? bambooAdmin().from("bamboohr_connections").select("status").eq("workspace_id", access.workspaceId).neq("status", "disconnected") : null
   ]);
   const squareStatuses = square?.connections.map((connection) =>
     connection.recoveryRequired ? "Connection recovery required"
@@ -53,7 +56,7 @@ export default async function IntegrationsPage() {
   return (
     <div className="workspace-page mx-auto max-w-5xl space-y-5">
       <PageHeader eyebrow="Workspace" title="Integrations" description="Connections and data status for this workspace." />
-      {squareEnabled || qboEnabled || squareEvidence || googleSheetsEnabled || loyverseAvailable || zohoAvailable || owner ? (
+      {squareEnabled || qboEnabled || squareEvidence || googleSheetsEnabled || loyverseAvailable || zohoAvailable || bambooAvailable || owner ? (
         <div className="grid items-stretch gap-4 md:grid-cols-2">
           {squareEnabled ? <ProviderCard name="Square" description="Payments and location connections."
             statuses={!square ? ["Status unavailable"] : squareStatuses?.length ? [...new Set(squareStatuses)] : ["Not connected"]}
@@ -74,6 +77,12 @@ export default async function IntegrationsPage() {
                 connection.status === "reauthorization_required" ? "Reauthorization required" : "Waiting for authorization"))]
               : ["Not connected"]}
             href="/app/integrations/zoho-books" action={owner && !zoho?.data?.length ? "Connect Zoho Books" : "Manage Zoho Books"} /> : null}
+          {bambooAvailable ? <ProviderCard name="BambooHR" description="Read-only staffing and time-off counts."
+            statuses={bamboo?.error ? ["Status unavailable"] : bamboo?.data?.length
+              ? [...new Set(bamboo.data.map((connection) => connection.status === "connected" ? "Connected" :
+                connection.status === "reauthorization_required" ? "Reauthorization required" : "Waiting for authorization"))]
+              : ["Not connected"]}
+            href="/app/integrations/bamboohr" action={!bamboo?.data?.length ? "Connect BambooHR" : "Manage BambooHR"} /> : null}
           {googleSheetsEnabled || owner ? <ProviderCard name="Google Sheets" description={GOOGLE_SHEETS_PILOT.catalog}
             statuses={!googleSheetsEnabled ? ["Configuration required"] : googleSheets?.error ? ["Status unavailable"] : googleSheets?.data?.length ? [...new Set(googleSheets.data.map((connection) =>
               connection.revocation_pending ? "Disconnect needs another attempt" : connection.authorization_uncertain ? "Authorization needs recovery" : connection.status === "connected" ? connection.active_approval_id ? "Connected" : "Mapping needs approval" : connection.status === "reauthorization_required" ? "Reauthorization required" : connection.status === "pending_authorization" ? "Waiting for Google authorization" : "Disconnected"))] : ["Not connected"]}
