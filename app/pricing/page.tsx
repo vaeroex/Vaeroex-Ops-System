@@ -4,7 +4,6 @@ import { ArrowRight, Check } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
-import { GoogleSheetsPilotNotice } from "@/components/integrations/google-sheets/GoogleSheetsPilotNotice";
 import { VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 import {
   VAEROEX_CONTACT_EMAILS,
@@ -17,7 +16,7 @@ import styles from "@/components/marketing/IntelligencePages.module.css";
 export const metadata: Metadata = publicPageMetadata({
   title: "Executive Intelligence Pricing | Vaeroex",
   description:
-    "Executive Intelligence at $250/month. Review workspace capabilities, storage options, and the current Google Sheets pilot restriction before subscribing.",
+    "Executive Intelligence at $250/month. Review workspace capabilities, supported connections, and storage options before subscribing.",
   path: "/pricing",
 });
 
@@ -29,7 +28,7 @@ const executiveInclusions = [
   "Evidence and trusted business context",
   "Saved Analyses and document analysis",
   "Vaeroex Super Intelligence (VSI)",
-  "File uploads, Business Notes, Square and QuickBooks connections",
+  "File uploads, Business Notes, Square, QuickBooks, Zoho Books, and Loyverse connections",
 ] as const;
 
 type PricingPageProps = {
@@ -125,7 +124,6 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
                     Optional capacity packs are $5/month each for another 10 GB and 500 slots,
                     purchased explicitly in Settings → Usage &amp; Storage. No automatic overage charges.
                   </p>
-                  <div id="google-sheets-availability"><GoogleSheetsPilotNotice className="mt-4" /></div>
                   <p className={styles.billingFine}>
                     Renews monthly unless canceled through Manage billing.
                     Cancellation takes effect at the end of the current paid

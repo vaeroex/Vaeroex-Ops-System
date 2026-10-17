@@ -143,9 +143,13 @@ export default function OperationsIntelligencePage() {
           </div>
           <IntegrationScreenshotTour />
           <p className={story.sourceRule}>Each metric uses one authoritative source within a reporting scope. Overlapping connected, uploaded, and manual values are not automatically consolidated or deduplicated. Source changes require review.</p>
-          <div className={story.integrationStatus}>
-            <Link href="/pricing#google-sheets-availability" className={story.pilotLink}>Google Sheets · Limited pilot<ArrowRight size={15} aria-hidden="true" /></Link>
-            <p>Additional integrations are in development.</p>
+          <div className={story.integrationStatus} aria-label="More supported connections">
+            <p>Also connect</p>
+            <ul>
+              <li>Zoho Books</li>
+              <li>Loyverse</li>
+              <li>and more</li>
+            </ul>
           </div>
         </div>
       </section>
