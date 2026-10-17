@@ -4,9 +4,11 @@ import type { ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 
-export function ProviderCard({ name, description, statuses, href, action, children }: {
+export function ProviderCard({ name, description, reads, requires, statuses, href, action, children }: {
   name: string;
   description: string;
+  reads?: string;
+  requires?: string;
   statuses: readonly string[];
   href: string;
   action: string;
@@ -21,6 +23,10 @@ export function ProviderCard({ name, description, statuses, href, action, childr
       <div role="status" className="flex flex-wrap gap-2">
         {statuses.map((status) => <StatusBadge key={status} value={status} />)}
       </div>
+      {reads || requires ? <dl className="space-y-2 text-sm leading-5 text-slate-600">
+        {reads ? <div><dt className="inline font-semibold text-ink">Reads: </dt><dd className="inline">{reads}</dd></div> : null}
+        {requires ? <div><dt className="inline font-semibold text-ink">Requires: </dt><dd className="inline">{requires}</dd></div> : null}
+      </dl> : null}
       {children}
       <Link href={href as Route} prefetch={false} className="mt-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-line px-4 py-2 text-sm font-semibold text-vaeroex-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vaeroex-blue">
         {action}<ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
