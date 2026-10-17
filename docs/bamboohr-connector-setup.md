@@ -20,6 +20,8 @@ The customer enters the subdomain from their BambooHR URL, for example `example`
 
 ## Release gate
 
-Before calling this production verified, connect a BambooHR test company with an owner-level account, complete OAuth, sync the roster and approved time-off count, test a restricted-permissions account, refresh an expired token, and disconnect. No BambooHR customer or test company was available when the first implementation was written.
+On October 16, 2026, a private provider-level smoke test with Vaeroex's seven-day BambooHR trial completed OAuth with read-only scopes, fetched the demo roster and approved time-off requests, and repeated the same aggregate snapshot after refreshing the token. The provider returned time-off statuses as nested objects, which the parser now accepts. This test used a temporary callback and a local script; it did not exercise the Vaeroex application's connect, sync, or disconnect screens or write to its database.
+
+Before calling this production verified, test the application's complete connect, sync, and disconnect flow with a BambooHR test company, including an account with restricted employee and time-off permissions. Keep `BAMBOOHR_ENABLED=false` until those checks pass and the production migration and server-only configuration are in place. The trial is temporary and does not imply a paid BambooHR subscription.
 
 References: [BambooHR OAuth](https://documentation.bamboohr.com/docs/getting-started), [employee list and partial-permission warning](https://documentation.bamboohr.com/reference/list-employees), [time-off requests and visibility warning](https://documentation.bamboohr.com/reference/list-time-off-requests).

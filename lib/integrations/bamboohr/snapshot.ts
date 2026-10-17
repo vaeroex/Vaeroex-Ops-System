@@ -10,7 +10,9 @@ const employeePage = z.object({
     page: z.object({ nextCursor: z.string().nullable().optional() }).passthrough()
   }).passthrough()
 }).passthrough();
-const timeOffRequests = z.array(z.object({ status: z.string() }).passthrough()).max(10_000);
+const timeOffRequests = z.array(z.object({
+  status: z.union([z.string(), z.object({ status: z.string() }).passthrough()])
+}).passthrough()).max(10_000);
 
 export type StaffingSnapshot = {
   activeHeadcount: number | null;
@@ -51,5 +53,6 @@ export async function collectStaffingSnapshot(get: (path: string) => Promise<unk
     status: "approved", excludeNote: "true" });
   const requests = timeOffRequests.parse(await get(`time_off/requests?${query}`));
   return { activeHeadcount: rosterReadable === rosterTotal ? active : null, rosterReadable, rosterTotal,
-    approvedTimeOffRequests: requests.filter((request) => request.status === "approved").length };
+    approvedTimeOffRequests: requests.filter((request) =>
+      (typeof request.status === "string" ? request.status : request.status.status) === "approved").length };
 }

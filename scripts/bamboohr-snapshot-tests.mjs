@@ -39,6 +39,17 @@ test("restricted employee status suppresses company headcount instead of showing
   assert.equal(result.rosterTotal, 2);
 });
 
+test("current BambooHR time-off status objects are counted without retaining their metadata", async () => {
+  const result = await collectStaffingSnapshot(async (path) => path.startsWith("employees?") ? {
+    data: [{ employeeId: "1", status: "Active" }], meta: { total: 1, page: {} }
+  } : [
+    { status: { status: "approved", lastChangedByUserId: "private-demo-id" } },
+    { status: { status: "requested", lastChangedByUserId: "private-demo-id" } }
+  ], now);
+  assert.equal(result.approvedTimeOffRequests, 1);
+  assert.equal(JSON.stringify(result).includes("private-demo-id"), false);
+});
+
 test("missing page rejects the snapshot before it can be saved", async () => {
   await assert.rejects(collectStaffingSnapshot(async () => ({
     data: [{ employeeId: "1", status: "Active" }], meta: { total: 2, page: {} }
