@@ -6,9 +6,8 @@ import styles from "./IntegrationScreenshots.module.css";
 const captures = {
   square: { label: "Square", desktop: [792, 653], mobile: [358, 903], alt: "Vaeroex saved Square payments for Coastal Kitchen: three completed payments of USD 162, 81 and 108 on October 11, 2026. Previous connection; browsing does not import or update payments." },
   qbo: { label: "QuickBooks", desktop: [740, 439], mobile: [362, 479], alt: "Vaeroex QuickBooks Profit and Loss observation for October 6–12: net sales USD 27,600, gross profit 19,320 and net income 8,695.20, on an accrual basis. Report totals are not added to document amounts." },
-  sheets: { label: "Google Sheets · Limited pilot", desktop: [740, 615], mobile: [362, 242], alt: "Vaeroex Google Sheets preview of weekly guest satisfaction: 95, 95 and 96 percent for September 28, October 5 and October 12. Preview does not import data." },
 } as const;
-const views = ["square", "qbo", "sheets"] as const;
+const views = ["square", "qbo"] as const;
 
 export function IntegrationScreenshotTour() {
   const [view, setView] = useState<(typeof views)[number]>("square");

@@ -30,11 +30,10 @@
 .featureGrid article { border-top: 1px solid #ffffff20; padding-top: 24px; }
 .featureGrid h3 { margin: 0 0 12px; color: #e0e5f0; font-size: 19px; font-weight: 500; line-height: 1.4; }
 .featureGrid p { margin: 0; color: #a5afc1; font-size: 14px; line-height: 1.85; }
-.integrationStatus { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 32px; margin-top: 24px; }
-.integrationStatus p { margin: 0; color: #a5afc1; font-size: 14px; line-height: 1.8; }
-.pilotLink { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; color: #b3c3ff; font-size: 14px; line-height: 1.7; text-decoration: underline; text-underline-offset: 4px; }
-.pilotLink svg { flex-shrink: 0; }
-.pilotLink:focus-visible { outline: 2px solid #95a8ff; outline-offset: 5px; }
+.integrationStatus { margin-top: 24px; }
+.integrationStatus p { margin: 0 0 12px; color: #a5afc1; font-size: 14px; line-height: 1.8; }
+.integrationStatus ul { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.integrationStatus li { border: 1px solid #ffffff30; border-radius: 999px; padding: 8px 14px; color: #dce4f5; font-size: 14px; line-height: 1.5; }
 .gettingStarted { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 72px; align-items: start; }
 .steps { list-style: none; margin: 0; padding: 0; }
 .steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 18px; padding: 20px 0; border-bottom: 1px solid #ffffff20; }
