@@ -52,7 +52,7 @@ async function main() {
       await page.goto(`${origin}/app/settings`);
       await page.getByRole("link", { name: "Manage integrations", exact: true }).click();
       await page.getByRole("heading", { name: "Integrations", exact: true }).waitFor();
-      assert.equal(await page.getByRole("article").count(), 3);
+      assert.equal(await page.getByRole("article").count(), 4);
       assert.equal(await page.getByRole("article", { name: "Google Sheets", exact: true }).count(), 1);
       assert.equal(await page.getByText("Configuration required", { exact: true }).count(), 1);
       assert.equal(await page.getByRole("link", { name: "View Google Sheets setup", exact: true }).getAttribute("href"), "/app/settings/integrations/google-sheets");
@@ -64,6 +64,7 @@ async function main() {
       if (viewport.width >= 768) {
         assert.equal(cards[0].y, cards[1].y); assert.equal(cards[0].height, cards[1].height);
         assert(cards[2].y >= cards[0].y + cards[0].height);
+        assert.equal(cards[2].y, cards[3].y); assert.equal(cards[2].height, cards[3].height);
       } else {
         for (let index = 1; index < cards.length; index++) assert(cards[index].y >= cards[index - 1].y + cards[index - 1].height);
       }
