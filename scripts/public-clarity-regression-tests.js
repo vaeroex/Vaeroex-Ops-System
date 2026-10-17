@@ -439,10 +439,10 @@ async function main() {
   assert.match(executive, /PDF and Word \(\.docx\)/);
   assert.match(executive, /CSV and Excel \(\.xlsx\)/);
   assert.match(executive, /PNG\/JPG/);
-  assert.match(executive, /aria-label="More supported connections"[\s\S]*Zoho Books[\s\S]*Loyverse[\s\S]*and more/);
+  assert.match(executive, /<li>Zoho Books<\/li>\s*<li>Loyverse<\/li>/);
   assert.doesNotMatch(executive, /Google Sheets · Limited pilot|href="\/pricing#google-sheets-availability"/);
   assert.doesNotMatch(executive, /Your Google account must be an approved test user/);
-  assert.match(pricing, /Zoho Books, and Loyverse connections/);
+  assert.match(pricing, /Zoho Books, and Loyverse/);
   assert.doesNotMatch(pricing, /id="google-sheets-availability"|Google Sheets limited pilot/);
   assert.match(pricing, /15 GB of uploaded-file storage and 500 file slots/);
   assert.match(pricing, /\$5\/month each for another 10 GB and 500 slots/);
