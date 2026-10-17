@@ -26,7 +26,7 @@ assert.match(candidateRunner, /outcome\.assertions = await require\('\.\/qbo-pen
   'eligibility tests use the owned per-suite database clone'); assertions++;
 assert.match(candidateRunner, /assert\.equal\(outcome\.assertions, suite\.expectedScenarios/, 'incomplete native coverage fails the candidate run'); assertions++;
 assert.match(candidateRunner, /result\.suites\.length === shapeSuites\.length \+ 4/, 'candidate success requires the registered dashboard suites and all four existing native suites'); assertions++;
-assert.match(candidateRunner, /assert\.equal\(canonical\.length, 149,/, 'canonical count remains exact'); assertions++;
+assert.match(candidateRunner, /assert\.equal\(canonical\.length, 150,/, 'canonical count remains exact'); assertions++;
 assert.deepEqual(storageMigrations, [
   '20261012003846_workspace_storage_capacity.sql',
   '20261012003920_workspace_storage_capacity_billing.sql',
