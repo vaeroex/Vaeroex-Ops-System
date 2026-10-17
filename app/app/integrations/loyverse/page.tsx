@@ -49,6 +49,14 @@ export default async function LoyversePage({ searchParams }: PageProps) {
         connection ? <div className="space-y-4">
           <div className="flex items-center gap-3"><StatusBadge value={connection.status === "connected" ? "Connected" : connection.status === "pending" ? "Waiting for authorization" : "Reauthorization required"} />
             <span className="text-sm text-slate-600">{connection.business_name ?? "Loyverse account"}</span></div>
+          {connection.status === "pending" && owner ? <div className="space-y-3">
+            <p className="text-sm text-slate-600">Finish authorization in Loyverse. If you closed that page, cancel this attempt and connect again.</p>
+            <form method="post" action="/api/integrations/loyverse/disconnect">
+              <input type="hidden" name="connectionId" value={connection.id} />
+              <input type="hidden" name="confirmation" value="disconnect" />
+              <button type="submit" className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-vaeroex-blue">Cancel connection attempt</button>
+            </form>
+          </div> : null}
           {connection.last_error_code ? <p role="status" className="text-sm text-amber-800">The last update failed. Try syncing again or reconnect if authorization has expired.</p> : null}
           {connection.status === "connected" && owner ? <div className="flex flex-wrap gap-3">
             <form method="post" action="/api/integrations/loyverse/sync">
