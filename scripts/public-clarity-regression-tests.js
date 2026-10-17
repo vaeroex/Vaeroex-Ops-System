@@ -439,10 +439,11 @@ async function main() {
   assert.match(executive, /PDF and Word \(\.docx\)/);
   assert.match(executive, /CSV and Excel \(\.xlsx\)/);
   assert.match(executive, /PNG\/JPG/);
-  assert.match(executive, /Google Sheets · Limited pilot/);
-  assert.match(executive, /href="\/pricing#google-sheets-availability"/);
+  assert.match(executive, /<li>Zoho Books<\/li>\s*<li>Loyverse<\/li>/);
+  assert.doesNotMatch(executive, /Google Sheets · Limited pilot|href="\/pricing#google-sheets-availability"/);
   assert.doesNotMatch(executive, /Your Google account must be an approved test user/);
-  assert.match(pricing, /id="google-sheets-availability"/);
+  assert.match(pricing, /Zoho Books, and Loyverse/);
+  assert.doesNotMatch(pricing, /id="google-sheets-availability"|Google Sheets limited pilot/);
   assert.match(pricing, /15 GB of uploaded-file storage and 500 file slots/);
   assert.match(pricing, /\$5\/month each for another 10 GB and 500 slots/);
   const retiredPromotion = /Biological Intelligence|Drug Discovery|drug-discovery-intelligence|biological-intelligence/i;
@@ -602,10 +603,15 @@ async function main() {
       `Image must be meaningful and bounded below 900 KB: ${asset}`,
     );
   }
-  assert.match(pricing, /Google Sheets limited pilot/);
-  assert.match(pricing, /Google account must be an approved test user/);
-  assert.match(pricing, /paid Vaeroex subscription does not grant pilot access/);
-  assert.match(pricing, /href="\/app\/sources"[^>]*>Upload supported spreadsheet files/);
+  const googlePilotNotice = renderToStaticMarkup(
+    React.createElement(loadTs("components/integrations/google-sheets/GoogleSheetsPilotNotice.tsx").GoogleSheetsPilotNotice),
+  );
+  assert.match(googlePilotNotice, /Google Sheets limited pilot/);
+  assert.match(googlePilotNotice, /Google account must be an approved test user/);
+  assert.match(googlePilotNotice, /paid Vaeroex subscription does not grant pilot access/);
+  assert.match(googlePilotNotice, /href="\/app\/sources"[^>]*>Upload supported spreadsheet files/);
+  assert.match(read("app/help/page.tsx"), /<GoogleSheetsPilotNotice/);
+  assert.match(read("app/checkout/legal/page.tsx"), /<GoogleSheetsPilotNotice/);
   process.stdout.write(
     "Public clarity rendering, commerce, availability, and fallback regressions passed.\n",
   );
