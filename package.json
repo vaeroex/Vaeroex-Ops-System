@@ -12,6 +12,7 @@
     "test:workspace-comparisons": "node scripts/workspace-comparison-tests.cjs && node scripts/vsi-save-analysis-tests.cjs && node scripts/vsi-saved-delete-tests.cjs",
     "typecheck": "tsc --noEmit",
     "test:loyverse-connector": "node --test scripts/loyverse-connector-db-tests.mjs",
+    "test:zoho-books-connector": "node --test scripts/zoho-books-connector-db-tests.mjs",
     "test:native-broker-provisioning": "node --test tools/native-broker-provisioning/tests/*.test.mjs",
     "test:native-broker-provisioning-db": "node tools/native-broker-provisioning/tests/qualify.cjs",
     "test:native-broker-production-catalog": "node tools/native-broker-provisioning/tests/production-catalog-qualify.cjs",
