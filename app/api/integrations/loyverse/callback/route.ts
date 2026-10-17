@@ -4,6 +4,7 @@ import { admin, assertOrigin, encryptToken, exchangeCode, merchant, redirect, re
 
 export async function GET(request: Request) {
   let cleanup: { workspaceId: string; connectionId: string } | null = null;
+  let merchantMismatch = false;
   try {
     assertOrigin(request, true);
     const url = new URL(request.url);
@@ -37,23 +38,21 @@ export async function GET(request: Request) {
     const tokens = await exchangeCode(code);
     const account = await merchant(tokens.accessToken);
     const ciphertext = encryptToken(access.workspaceId, pending.connection_id, tokens);
-    const { error: credentialError } = await db.from("loyverse_credentials").upsert({
-      workspace_id: access.workspaceId, connection_id: pending.connection_id,
-      token_ciphertext: ciphertext, access_expires_at: tokens.expiresAt,
-      scope: "MERCHANT_READ RECEIPTS_READ"
-    }, { onConflict: "connection_id" });
-    if (credentialError) throw new Error("credential_storage_failed");
-    const { data: connected, error: connectionError } = await db.from("loyverse_connections").update({
-      status: "connected", merchant_id: account.id, business_name: account.business_name,
-      currency_code: account.currency.code, updated_at: new Date().toISOString()
-    }).eq("workspace_id", access.workspaceId).eq("id", pending.connection_id).eq("status", "pending").select("id").maybeSingle();
-    if (connectionError || !connected) throw new Error("connection_storage_failed");
+    const { data: connected, error: connectionError } = await db.rpc("complete_loyverse_oauth", {
+      p_workspace_id: access.workspaceId, p_connection_id: pending.connection_id,
+      p_merchant_id: account.id, p_business_name: account.business_name,
+      p_currency_code: account.currency.code, p_token_ciphertext: ciphertext,
+      p_access_expires_at: tokens.expiresAt
+    });
+    if (connectionError || !connected) {
+      merchantMismatch = Boolean(connectionError && /loyverse_(merchant|currency)_mismatch/.test(connectionError.message));
+      throw new Error("connection_storage_failed");
+    }
     cleanup = null;
     return redirect("connected");
   } catch {
     if (cleanup) {
       const db = admin();
-      await db.from("loyverse_credentials").delete().eq("workspace_id", cleanup.workspaceId).eq("connection_id", cleanup.connectionId);
       await db.from("loyverse_connections").update({ status: "reauthorization_required" })
         .eq("workspace_id", cleanup.workspaceId).eq("id", cleanup.connectionId).eq("status", "pending")
         .not("merchant_id", "is", null);
@@ -61,6 +60,6 @@ export async function GET(request: Request) {
         .eq("workspace_id", cleanup.workspaceId).eq("id", cleanup.connectionId).eq("status", "pending")
         .is("merchant_id", null);
     }
-    return Response.redirect("https://www.vaeroex.com/app/integrations/loyverse?result=error", 303);
+    return Response.redirect(`https://www.vaeroex.com/app/integrations/loyverse?result=error${merchantMismatch ? "&error=merchant_mismatch" : ""}`, 303);
   }
 }

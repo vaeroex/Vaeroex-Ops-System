@@ -8,7 +8,7 @@ import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 export const dynamic = "force-dynamic";
 
-type PageProps = { searchParams?: Promise<{ result?: string }> };
+type PageProps = { searchParams?: Promise<{ result?: string; error?: string }> };
 
 export default async function LoyversePage({ searchParams }: PageProps) {
   const access = await requireWorkspacePage();
@@ -37,7 +37,9 @@ export default async function LoyversePage({ searchParams }: PageProps) {
   const resultMessage = params?.result === "connected" ? "Loyverse connected. Sync to load recent sales." :
     params?.result === "synced" ? "Recent sales updated." :
     params?.result === "disconnected" ? "Loyverse disconnected and stored sales removed." :
-    params?.result === "error" ? "The Loyverse action did not complete. Please try again." : null;
+    params?.result === "error" && params?.error === "merchant_mismatch"
+      ? "This Loyverse merchant or its currency differs from the saved connection. Disconnect and remove saved sales before connecting it."
+      : params?.result === "error" ? "The Loyverse action did not complete. Please try again." : null;
 
   return <div className="workspace-page mx-auto max-w-5xl space-y-5">
     <PageHeader eyebrow="Integrations" title="Loyverse" description="Read only point of sale totals for your workspace."

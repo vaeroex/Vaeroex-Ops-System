@@ -588,6 +588,7 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20261012201726_stripe_subscription_observation_fence.sql",
   "supabase/migrations/20261017023221_zoho_books_read_only_connection.sql",
   "supabase/migrations/20261017051502_wix_orders_read_only_connection.sql",
+  "supabase/migrations/20261017184954_loyverse_merchant_reconnect_guard.sql",
   "supabase/migrations/20260820233007_external_integrations_phase_1_canonical_foundation.sql",
   "supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql",
   "supabase/migrations/20260821064333_external_integrations_phase_2_reconciliation.sql",
