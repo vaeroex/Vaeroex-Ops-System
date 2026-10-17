@@ -32,7 +32,7 @@ export default function HomePage() {
         <section className={styles.assemblyHero} aria-labelledby="home-title">
           <div className={`${styles.heroCopy} ${styles.journeyHero}`}>
             <p className={styles.eyebrow}>
-              <span className={styles.signalDot} /> EXECUTIVE INTELLIGENCE
+              <span className={styles.signalDot} /> SUPER INTELLIGENCE
             </p>
             <h1 id="home-title">
               The advantage <br />
@@ -66,6 +66,37 @@ export default function HomePage() {
           </div>
         </section>
 
+        <section className={styles.problems} aria-labelledby="problems-title">
+          <p className={styles.eyebrow}>THE PROBLEMS WE HELP SOLVE</p>
+          <h2 id="problems-title">Sales are up.<br />Why aren’t profits?</h2>
+          <p className={styles.problemsLead}>
+            A simple question can mean hours comparing reports. An answer you
+            can’t trust adds more work. And even when you find the issue, you
+            still have to decide what to do first.
+          </p>
+          <div className={styles.problemRows}>
+            <div>
+              <h3>Hallucinated answers</h3>
+              <p>VSI helps prevent hallucinated answers by checking the evidence.
+                When information is missing, it tells you what to provide.</p>
+            </div>
+            <div>
+              <h3>Hours of manual comparison</h3>
+              <p>Bring sales, costs, staffing, and business notes together to
+                help explain what’s happening across your business.</p>
+            </div>
+            <div>
+              <h3>Too much to do. What comes first?</h3>
+              <p>Identify priorities, review what changed, and spot what needs
+                attention as your business grows.</p>
+            </div>
+          </div>
+          <Link href="/about/why-vaeroex" className="vx-text-link">
+            See how Vaeroex helps at every step
+            <ArrowUpRight size={18} aria-hidden="true" />
+          </Link>
+        </section>
+
         <section className={styles.product} aria-labelledby="product-title">
           <div className={styles.productIntro}>
             <p className={styles.eyebrow}>02 / EXECUTIVE INTELLIGENCE</p>
@@ -88,6 +119,7 @@ export default function HomePage() {
               Built for the people running cafés, restaurants, breweries, retail
               stores, warehouses, and growing businesses.
             </p>
+            <p>Plug-ins for Square, QuickBooks Online, Zoho Books, and Loyverse.</p>
             <Link href="/executive-intelligence" className="vx-text-link">
               Meet Executive Intelligence
               <ArrowUpRight size={18} aria-hidden="true" />

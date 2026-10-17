@@ -13,7 +13,7 @@ function trustSection(title: (typeof trustSections)[number][0]) {
 const trustGroups = [
   {
     title: "Workspace and data protection",
-    summary: "How customer information is separated, protected, and kept under authorized control.",
+    summary: "Who can access your workspace and how your information is protected.",
     icon: FileLock2,
     items: [
       trustSection("Workspace Isolation"),
@@ -24,7 +24,7 @@ const trustGroups = [
   },
   {
     title: "Evidence and intelligence quality",
-    summary: "How Vaeroex keeps business facts, supporting evidence, and executive interpretation distinct.",
+    summary: "How VSI checks business answers against evidence and explains what is missing.",
     icon: Database,
     items: [
       trustSection("Evidence-Backed Intelligence"),
@@ -34,7 +34,7 @@ const trustGroups = [
   },
   {
     title: "Explainability, review, and accountability",
-    summary: "How recommendations remain inspectable, advisory, and subject to leadership control.",
+    summary: "How to check an answer and stay in control of business decisions.",
     icon: ShieldCheck,
     items: [
       trustSection("Source Content Safeguards"),
@@ -44,10 +44,10 @@ const trustGroups = [
   },
   {
     title: "Current boundaries and customer responsibility",
-    summary: "Where customer judgment, data choices, and account administration remain required.",
+    summary: "What to review, what not to upload, and where to get help.",
     icon: UserRoundCheck,
     items: [
-      trustSection("Advanced Reasoning Boundaries"),
+      trustSection("Reviewing Important Answers"),
       trustSection("Sensitive Data Boundaries"),
       trustSection("Customer Responsibility"),
       trustSection("Security Contact")
@@ -61,8 +61,8 @@ function TrustContent({ inApp }: { inApp: boolean }) {
       {inApp ? (
         <header className="border-b border-line/80 pb-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Trust Center</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-ink">How Vaeroex builds trustworthy intelligence systems.</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">A factual view of workspace protection, evidence-backed intelligence, explainable reasoning, and the boundaries customers should understand.</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-ink">Your information. Your evidence. Your decisions.</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">Learn how workspace access works, how answers use evidence, and what you should review.</p>
         </header>
       ) : null}
 
@@ -100,10 +100,10 @@ function TrustContent({ inApp }: { inApp: boolean }) {
       <section className={`rounded-lg border p-5 ${inApp ? "border-line bg-white" : "border-amber-300/20 bg-amber-950/10"}`}>
         <h2 className={`text-base font-semibold ${inApp ? "text-ink" : "text-white"}`}>Important trust notes</h2>
         <ul className={`mt-3 grid gap-2 text-sm leading-6 ${inApp ? "text-muted" : "text-slate-400"}`}>
-          <li>Supported upload types are allowlisted, but Vaeroex does not currently claim malware scanning, DLP scanning, file sandboxing, or regulated-data detection.</li>
+          <li>Only supported file types can be uploaded. Vaeroex does not currently claim malware scanning or automatic detection of sensitive data in uploads. Check files before sharing them.</li>
           <li>No online service can guarantee absolute security. Customers remain responsible for account access, workspace roles, and the data they enter.</li>
           <li>Vaeroex outputs may be incomplete or inaccurate and require human review before important business action.</li>
-          <li>Vaeroex is not intended for unrestricted regulated sensitive data unless appropriate legal, security, and compliance controls are in place.</li>
+          <li>Do not enter patient data, PHI/ePHI, medical record numbers, insurance IDs, Social Security numbers, or other prohibited sensitive data in files, notes, chats, or support requests.</li>
         </ul>
         {inApp ? (
           <Link href="/app/support" className="mt-5 inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Contact Support</Link>
@@ -126,7 +126,7 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
       <PublicPageHero
         eyebrow="Trust at Vaeroex"
         title="Intelligence you can inspect, understand, and control."
-        description="See how Vaeroex supports trustworthy intelligence through secure workspaces, evidence-backed conclusions, deterministic business intelligence, explainable reasoning, and human control."
+        description="VSI is the intelligence behind Vaeroex. Its safeguards help prevent hallucinated answers and keep findings grounded in business evidence. Learn how to check its findings, protect your information, and stay in control."
       />
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-7xl">

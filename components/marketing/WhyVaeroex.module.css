@@ -1,0 +1,5 @@
+.page h2 { font-weight: 450; letter-spacing: -.045em; text-wrap: balance; }
+.page h3 { font-weight: 500; letter-spacing: -.02em; }
+.page :global(section[id]) { scroll-margin-top: 100px; }
+.solution { align-self: start; border-top: 1px solid #8299ff66; padding: 28px; background: linear-gradient(130deg, #0e1424, #0b0e14); }
+@media (max-width: 600px) { .solution { padding: 24px 20px; } }

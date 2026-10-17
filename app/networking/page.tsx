@@ -14,7 +14,7 @@ export const metadata: Metadata = publicPageMetadata({
 
 const relationshipTypes = [
   ["Operators and domain experts", "Experienced leaders who understand evidence, operating performance, and executive decision rhythms."],
-  ["Technology and integration partners", "Organizations that can help connect Vaeroex with the external systems customers already use."],
+  ["Technology and plug-in partners", "Organizations that can help connect Vaeroex with the external systems customers already use."],
   ["Implementation relationships", "Qualified professionals who help organizations improve how they review and respond to intelligence."],
   ["Strategic relationships", "Industry experts and aligned organizations interested in the long-term Vaeroex direction."]
 ] as const;
@@ -46,7 +46,7 @@ export default function NetworkingPage() {
           <PublicSectionHeading
             eyebrow="Who should reach out"
             title="Focused relationships, not an open directory."
-            description="The Network is for people and organizations with a credible way to improve intelligence context, product quality, integrations, or customer understanding."
+            description="The Network is for people and organizations with a credible way to improve intelligence context, product quality, plug-ins, or customer understanding."
           />
           <div className="mt-8 grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 md:grid-cols-2">
             {relationshipTypes.map(([title, body]) => (

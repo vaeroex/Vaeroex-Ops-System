@@ -12,6 +12,7 @@ const publicPages = [
   "/contact",
   "/demo",
   "/about",
+  "/about/why-vaeroex",
   "/careers"
 ] as const;
 

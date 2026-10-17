@@ -7,6 +7,7 @@ import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
 
 const company = [
   ["About", "/about"],
+  ["Why Vaeroex", "/about/why-vaeroex"],
   ["Contact", "/contact"],
   ["Network", "/networking"],
   ["Careers", "/careers"],

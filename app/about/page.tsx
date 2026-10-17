@@ -39,6 +39,38 @@ export default function AboutPage() {
         </div>
       </section>
 
+      <section className={styles.section} aria-labelledby="vaeroex-name">
+        <div className={`${styles.container} ${story.vsiLayout}`}>
+          <div>
+            <p className={styles.sectionLabel}>Our name. Our philosophy.</p>
+            <h2 id="vaeroex-name" className={story.headline}>Vaeroex</h2>
+            <p className={story.founderRole}>Pronounced VAIR-oh-ex</p>
+            <dl className="mt-8 grid gap-6 border-t border-white/10 pt-6 sm:grid-cols-2">
+              <div><dt className="text-xl font-medium text-[#8299ff]">Vaero</dt><dd className="mt-2 text-base leading-7 text-[#aeb7c8]">Inspired by the Latin root <em>ver-</em>, meaning “true.”</dd></div>
+              <div><dt className="text-xl font-medium text-[#8299ff]">Ex</dt><dd className="mt-2 text-base leading-7 text-[#aeb7c8]">Drawn from “executive.”</dd></div>
+            </dl>
+          </div>
+          <div className={story.prose}>
+            <p className={story.lead}>A name inspired by truth and executive thinking.</p>
+            <p>We believe business decisions deserve clear explanations, reliable calculations, and evidence you can check.</p>
+            <p>That belief shapes Vaeroex: understand what the information supports, recognize what’s missing, and help people decide what to do next.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className={`${styles.section} ${story.vsi}`} aria-labelledby="vsi-foundation">
+        <div className={`${styles.container} ${story.vsiLayout}`}>
+          <div><p className={styles.sectionLabel}>Vaeroex Super Intelligence</p><h2 id="vsi-foundation" className={story.headline}>VSI—the intelligence behind Vaeroex.</h2></div>
+          <div className={story.prose}>
+            <p className={story.lead}>Vaeroex Super Intelligence, or VSI, is the foundation of Vaeroex.</p>
+            <p>It brings business calculations, evidence, and reasoning together to power analysis, explanations, and conversation across the platform.</p>
+            <p>Through Executive Intelligence, VSI helps you look at your business from several perspectives: finances, operations, customers, marketing, technology, and overall direction.</p>
+            <p>You bring the experience and judgment. Vaeroex helps you connect the information.</p>
+            <Link href="/about/why-vaeroex" className={styles.textLink}>Explore why Vaeroex<ArrowRight size={17} aria-hidden="true" /></Link>
+          </div>
+        </div>
+      </section>
+
       <section className={styles.section} aria-labelledby="purpose-title">
         <div className={`${styles.container} ${styles.split}`}>
           <div><p className={styles.sectionLabel}>Why we build</p><h2 id="purpose-title">Make information<br />useful to the people<br />running the business.</h2></div>

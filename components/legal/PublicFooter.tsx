@@ -14,6 +14,7 @@ const platformLinks: Array<[string, Route]> = [
 
 const companyLinks = [
   ["About", "/about"],
+  ["Why Vaeroex", "/about/why-vaeroex"],
   ["Contact", "/contact"],
   ["Careers", "/careers"],
   ["Network", "/networking"]
@@ -30,6 +31,20 @@ const emailLinks = [
   ["Billing", VAEROEX_CONTACT_EMAILS.billing, VAEROEX_MAILTO_LINKS.billing],
   ["Partners", VAEROEX_CONTACT_EMAILS.partners, VAEROEX_MAILTO_LINKS.partners]
 ] as const;
+
+const policyGroups = [
+  {
+    title: "Legal & Billing",
+    paths: ["/terms", "/subscription-billing-terms", "/refund-policy", "/workspace-capacity-terms", "/acceptable-use"]
+  },
+  {
+    title: "Privacy & Trust",
+    paths: ["/privacy", "/trust", "/sensitive-data-policy", "/data-retention", "/ai-disclaimer", "/human-review"]
+  }
+].map(({ title, paths }) => ({
+  title,
+  links: paths.flatMap((path) => legalLinks.filter((link) => link.href === path))
+}));
 
 export function PublicFooter() {
   return (
@@ -52,7 +67,7 @@ export function PublicFooter() {
             </address>
           </div>
         </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="vx-footer-links grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
           <div>
             <p className="font-semibold text-slate-200">Intelligence</p>
             <div className="mt-2 grid gap-1.5">
@@ -82,7 +97,7 @@ export function PublicFooter() {
               ))}
             </div>
           </div>
-          <div>
+          <div className="vx-footer-support">
             <p className="font-semibold text-slate-200">Support</p>
             <div className="mt-2 grid gap-1.5">
               {supportLinks.map(([label, href]) => (
@@ -97,16 +112,18 @@ export function PublicFooter() {
               ))}
             </div>
           </div>
-          <div>
-            <p className="font-semibold text-slate-200">Legal</p>
-            <nav className="mt-2 grid gap-1.5" aria-label="Legal links">
-              {legalLinks.map((link) => (
-                <Link key={link.href} href={link.href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-                  {link.label}
-                </Link>
-              ))}
+          {policyGroups.map(({ title, links }) => (
+            <nav key={title} aria-label={title}>
+              <p className="font-semibold text-slate-200">{title}</p>
+              <div className="mt-2 grid gap-1.5">
+                {links.map((link) => (
+                  <Link key={link.href} href={link.href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
             </nav>
-          </div>
+          ))}
         </div>
       </div>
       <div className="mx-auto mt-10 flex max-w-[86rem] flex-col gap-2 border-t border-white/10 pt-5 text-xs sm:flex-row sm:items-center sm:justify-between">
