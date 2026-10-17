@@ -168,13 +168,13 @@ async function main() {
           assert.equal(integrations.key, integrations.props.initial.workspaceId, "The dashboard retains its workspace remount key");
           for (const value of [integrations.props.initial, integrations.props.initial.entries, integrations.props.initial.unavailable]) assert.ok(Object.isFrozen(value));
           assert.match(html, /id="current-integrations-heading"/);
-          assert.match(html, /No active integrations/);
+          assert.match(html, /No active plug-ins/);
           assert.match(html, /href="\/app\/integrations"/);
-          assert.match(html, /aria-label="Refresh integration status"/);
+          assert.match(html, /aria-label="Refresh plug-in status"/);
           assert.match(html, /Current findings and history/);
           assert.match(html, /id="intelligence-briefings-heading"/);
           assert.match(html, /href="\/app\/intelligence\/briefings"/);
-          assert.doesNotMatch(html, /Previously connected|Hidden integrations|View supporting data/);
+          assert.doesNotMatch(html, /Previously connected|Hidden plug-ins|View supporting data/);
         }
       }
       if (route.href === "/app/settings" && (state !== "loading" && state !== "error")) {

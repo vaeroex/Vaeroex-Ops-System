@@ -55,8 +55,8 @@ export default async function GoogleSheetsSettingsPage({ searchParams }: PagePro
   const error = typeof params?.error === "string" ? params.error : undefined;
 
   return <div className="workspace-page mx-auto max-w-5xl space-y-5">
-    <PageHeader eyebrow="Integrations" title="Google Sheets" description="Keep Executive Intelligence up to date with the business metrics you approve."
-      actions={<Link href="/app/integrations" title="Back to integrations" aria-label="Back to integrations" className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-line bg-white text-ink hover:bg-slate-50"><ArrowLeft aria-hidden="true" className="h-4 w-4" /></Link>} />
+    <PageHeader eyebrow="Plug-ins" title="Google Sheets" description="Keep Executive Intelligence up to date with the business metrics you approve."
+      actions={<Link href="/app/integrations" title="Back to plug-ins" aria-label="Back to plug-ins" className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-line bg-white text-ink hover:bg-slate-50"><ArrowLeft aria-hidden="true" className="h-4 w-4" /></Link>} />
     <div role={error ? "alert" : "status"}><AuthMessage message={result && Object.hasOwn(googleSheetsResults, result) ? googleSheetsResults[result] : undefined} error={googleSheetsErrorMessage(error) ?? undefined} /></div>
     <GoogleSheetsPilotNotice showReconnect className="border-y border-line py-3 text-slate-600" />
     <SectionCard title={enabled ? "Read only connection" : "Google Sheets is not available yet"}>
@@ -77,7 +77,7 @@ export default async function GoogleSheetsSettingsPage({ searchParams }: PagePro
         </GoogleSheetsAuthorizationForm> : <p className="text-sm text-slate-600">Create an active business entity before connecting a spreadsheet.</p>}
       <details open={!entityResult.error && entities.length === 0} className="mt-5 border-t border-line pt-4">
         <summary className="min-h-8 cursor-pointer text-sm font-semibold text-ink">Add business entity</summary>
-        <p className="mt-2 text-sm leading-6 text-slate-600">Create the business or division that owns this spreadsheet’s metrics. You can use this entity for other integrations in the current workspace.</p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">Create the business or division that owns this spreadsheet’s metrics. You can use this entity for other plug-ins in the current workspace.</p>
         <form action="/api/integrations/google-sheets/entity" method="post" className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-medium text-ink">Entity display name<input name="displayName" required maxLength={120} placeholder="For example, Operations reporting" className={inputClass} /></label>
           <label className="text-sm font-medium text-ink">Entity type<select name="entityType" defaultValue="operating_company" required className={inputClass}><option value="operating_company">Operating company</option><option value="holding_company">Holding company</option><option value="division">Division</option><option value="consolidated_group">Consolidated group</option></select></label>

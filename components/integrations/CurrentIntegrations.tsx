@@ -100,10 +100,10 @@ export function CurrentIntegrations({ initial }: { initial: IntegrationDashboard
 
   return <section aria-labelledby="current-integrations-heading" className="min-w-0 space-y-4 border-t border-white/10 py-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 id="current-integrations-heading" className="text-lg font-semibold text-white">Current integrations</h2>
+      <h2 id="current-integrations-heading" className="text-lg font-semibold text-white">Current plug-ins</h2>
       <div className="flex items-center gap-4">
-        <Link href="/app/integrations" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-cyan-200 hover:underline">Manage integrations<ArrowUpRight aria-hidden="true" className="h-4 w-4" /></Link>
-        <button type="button" onClick={() => void refresh()} disabled={refreshing || saving !== null} aria-label="Refresh integration status" title="Refresh saved integration status"
+        <Link href="/app/integrations" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-cyan-200 hover:underline">Manage plug-ins<ArrowUpRight aria-hidden="true" className="h-4 w-4" /></Link>
+        <button type="button" onClick={() => void refresh()} disabled={refreshing || saving !== null} aria-label="Refresh plug-in status" title="Refresh saved plug-in status"
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/15 text-slate-200 hover:bg-white/5 disabled:opacity-50">
           <RefreshCw aria-hidden="true" className={`h-4 w-4 ${refreshing ? "animate-spin motion-reduce:animate-none" : ""}`} />
         </button>
@@ -114,11 +114,11 @@ export function CurrentIntegrations({ initial }: { initial: IntegrationDashboard
       {!dashboard.timeZoneConfirmed ? <p>Refresh times are shown in UTC. An owner can set the workspace timezone in <Link href="/app/settings" className="underline">Settings</Link>.</p> : null}
       {automaticPaused ? <p>Automatic status checks paused. Refresh status to check again.</p> : null}
       {refreshError ? <p className="text-amber-200">Status could not be refreshed. Values below are last-known data.</p> : null}
-      {dashboard.unavailable.length ? <p className="text-amber-200">{dashboard.unavailable.join(", ")} status is unavailable. Check Integrations.</p> : null}
+      {dashboard.unavailable.length ? <p className="text-amber-200">{dashboard.unavailable.join(", ")} status is unavailable. Check Plug-ins.</p> : null}
       {preferenceError ? <p role="alert" className="text-amber-200">{preferenceError}</p> : null}
       {!dashboard.preferencesAvailable ? <p>Personal display preferences are temporarily unavailable.</p> : null}
     </div>
-    {!active.length ? <div className="py-3"><p className="font-medium text-white">{dashboard.unavailable.length ? "Active integration status is unavailable" : "No active integrations"}</p></div> :
+    {!active.length ? <div className="py-3"><p className="font-medium text-white">{dashboard.unavailable.length ? "Active plug-in status is unavailable" : "No active plug-ins"}</p></div> :
       <div className="grid min-w-0 gap-4 lg:grid-cols-2">{active.map(entry => {
         const status = integrationDashboardStatus(entry, now);
         const current = status.current && !refreshError;
@@ -139,6 +139,6 @@ export function CurrentIntegrations({ initial }: { initial: IntegrationDashboard
         </article>;
       })}</div>}
     {previous.length ? <div><h3 className="text-sm font-semibold text-slate-300">Previously connected</h3><ul className="mt-2">{previous.map(entry => previousRow(entry))}</ul></div> : null}
-    {hidden.length ? <details className="border-t border-white/10 pt-3"><summary className="cursor-pointer py-2 text-sm text-slate-300 focus-visible:outline focus-visible:outline-2">Hidden integrations ({hidden.length})</summary><ul>{hidden.map(entry => previousRow(entry, true))}</ul></details> : null}
+    {hidden.length ? <details className="border-t border-white/10 pt-3"><summary className="cursor-pointer py-2 text-sm text-slate-300 focus-visible:outline focus-visible:outline-2">Hidden plug-ins ({hidden.length})</summary><ul>{hidden.map(entry => previousRow(entry, true))}</ul></details> : null}
   </section>;
 }

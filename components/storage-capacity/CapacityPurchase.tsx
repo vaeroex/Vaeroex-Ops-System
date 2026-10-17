@@ -166,7 +166,7 @@ export function CapacityPurchase({ workspaceId, workspaceName, currentPacks, bil
           {paymentSession ? <CapacityPayment key={quote.quoteId} session={paymentSession} workspaceId={workspaceId} expiresAt={quote.expiresAt} /> : null}
         </div>}
       </>}
-      <p className="text-xs leading-5 text-muted">Self-service purchase limit: {billing.maxPacks} committed packs, with up to {formatStorageBytes(capacityAllowance(billing.maxPacks).bytes, { gb: true })} and {capacityAllowance(billing.maxPacks).files.toLocaleString("en-US")} file slots total when paid. Larger enterprise needs require a separately qualified plan, including processing and integration capacity. Contact support before expanding beyond this limit.</p>
+      <p className="text-xs leading-5 text-muted">Self-service purchase limit: {billing.maxPacks} committed packs, with up to {formatStorageBytes(capacityAllowance(billing.maxPacks).bytes, { gb: true })} and {capacityAllowance(billing.maxPacks).files.toLocaleString("en-US")} file slots total when paid. Larger enterprise needs require a separately qualified plan, including processing and plug-in capacity. Contact support before expanding beyond this limit.</p>
     </div> : null}
     {billing.subscriptions.length > 0 ? <div className="mt-5 border-t border-line pt-4">
       <h3 className="text-sm font-semibold text-ink">Capacity subscriptions</h3>

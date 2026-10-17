@@ -16,8 +16,8 @@ export default async function SquareSandboxManagementPage() {
 
   return (
     <div className="workspace-page mx-auto max-w-5xl space-y-5">
-      <PageHeader eyebrow="Integrations" title="Square Sandbox" description="Authorized observations for this workspace."
-        actions={<Link href="/app/integrations" title="Back to integrations" aria-label="Back to integrations"
+      <PageHeader eyebrow="Plug-ins" title="Square Sandbox" description="Authorized observations for this workspace."
+        actions={<Link href="/app/integrations" title="Back to plug-ins" aria-label="Back to plug-ins"
           className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-line bg-white text-ink hover:bg-slate-50">
           <ArrowLeft aria-hidden="true" className="h-4 w-4" />
         </Link>} />

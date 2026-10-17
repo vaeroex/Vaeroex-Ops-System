@@ -39,7 +39,7 @@ export async function loadIntegrationDashboard(input: DashboardInput) {
     // An unavailable saved projection must not take findings or briefings down,
     // or fabricate an empty connected-state/zero financial result.
     return { loadFailed: true, googleSheetsConnectionIds: [] as string[], dashboard: IntegrationDashboardSchema.parse({ workspaceId: input.access.workspaceId, observedAt,
-      timeZone: "UTC", timeZoneConfirmed: false, preferencesAvailable: false, entries: [], unavailable: ["Integration"] }),
+      timeZone: "UTC", timeZoneConfirmed: false, preferencesAvailable: false, entries: [], unavailable: ["Plug-in"] }),
       currentQboAccounting: buildQboAccountingIntelligence({ workspaceId: input.access.workspaceId, summaries: [], asOf: observedAt }) };
   }
 }
@@ -99,7 +99,7 @@ async function readIntegrationDashboard(input: DashboardInput) {
     entries.push({ key: connection.key, provider: "Square", name: [...new Set([connection.sellerLabel ?? connection.businessEntityLabel, connection.locationLabel].filter(Boolean))].join(" / "), href,
       connectionState: connection.connectionState, lastSuccessfulRefreshAt: connection.lastSuccessfulRefreshAt,
       currentUntil: null, freshness: connection.evidence.freshness, unchangedCheck: false,
-      cadence: "Payments refresh on request in Integrations.", results, hidden: hidden.has(connection.key) });
+      cadence: "Payments refresh on request in Plug-ins.", results, hidden: hidden.has(connection.key) });
   }
 
   const sheetRows = !sheets?.error && (sheets?.data?.length ?? 0) <= 100 ? (sheets?.data ?? []).flatMap(connection => {
@@ -150,7 +150,7 @@ async function readIntegrationDashboard(input: DashboardInput) {
       lastSuccessfulRefreshAt: connection.lastSuccessfulRefreshAt,
       currentUntil: connection.automatic_refresh_enabled ? plusMinutes(connection.lastSuccessfulRefreshAt, 15) : null,
       freshness: connection.evidence.freshness === "stale" ? "stale" : connection.automatic_refresh_enabled && connection.lastSuccessfulRefreshAt ? "current" : "unknown",
-      unchangedCheck: false, cadence: connection.automatic_refresh_enabled ? "Automatic checks every 15 minutes." : "Automatic refresh is off. Refresh in Integrations.",
+      unchangedCheck: false, cadence: connection.automatic_refresh_enabled ? "Automatic checks every 15 minutes." : "Automatic refresh is off. Refresh in Plug-ins.",
       results, hidden: hidden.has(connection.key) });
   }
 

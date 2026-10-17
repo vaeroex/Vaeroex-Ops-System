@@ -30,7 +30,7 @@ export default async function GoogleSheetsErasurePage({ params }: { params: Prom
         <p className="text-sm font-medium text-muted">Google Sheets</p>
         <h1 className="mt-1 text-2xl font-semibold text-ink">Approve data erasure</h1>
       </div>
-      <Link href="/app/integrations" prefetch={false} title="Back to integrations" aria-label="Back to integrations"
+      <Link href="/app/integrations" prefetch={false} title="Back to plug-ins" aria-label="Back to plug-ins"
         className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-line text-ink hover:bg-slate-50">
         <ArrowLeft aria-hidden="true" className="h-4 w-4" />
       </Link>

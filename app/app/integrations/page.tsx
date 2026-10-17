@@ -55,7 +55,7 @@ export default async function IntegrationsPage() {
 
   return (
     <div className="workspace-page mx-auto max-w-5xl space-y-5">
-      <PageHeader eyebrow="Workspace" title="Integrations" description="Connections and data status for this workspace." />
+      <PageHeader eyebrow="Workspace" title="Plug-ins" description="Connections and data status for this workspace." />
       {squareEnabled || qboEnabled || squareEvidence || googleSheetsEnabled || loyverseAvailable || zohoAvailable || owner ? (
         <div className="grid items-stretch gap-4 md:grid-cols-2">
           {squareEnabled ? <ProviderCard name="Square" description="Payments and location connections."
@@ -106,7 +106,7 @@ export default async function IntegrationsPage() {
             requires="A Square Sandbox test connection."
             statuses={["Sync health unknown"]} href="/app/integrations/square" action="View Square Sandbox" /> : null}
         </div>
-      ) : <p role="status" className="border-y border-line py-4 text-sm text-muted">No integrations are available for your workspace role right now.</p>}
+      ) : <p role="status" className="border-y border-line py-4 text-sm text-muted">No plug-ins are available for your workspace role right now.</p>}
     </div>
   );
 }

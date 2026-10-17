@@ -37,7 +37,7 @@ type CollectionConfig = {
 };
 
 const RETIRED_CUSTOMER_RECORD_MUTATION_MESSAGE =
-  "Customer record management in Vaeroex has been retired. Existing customer activity rows are historical evidence only; use Sources or external system integrations for new customer information.";
+  "Customer record management in Vaeroex has been retired. Existing customer activity rows are historical evidence only; use Sources or external system plug-ins for new customer information.";
 
 type MutableCollection = Exclude<ManagedCollection, "crm_leads">;
 
