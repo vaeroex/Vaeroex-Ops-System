@@ -117,18 +117,21 @@ const order = z.object({
 }).passthrough();
 const searchResponse = z.object({
   orders: z.array(order).max(100).default([]),
-  metadata: z.object({ cursors: z.object({ next: z.string().max(16000).nullish() }).optional(), hasNext: z.boolean().optional() }).optional()
+  metadata: z.object({ cursors: z.object({ next: z.string().max(16000).nullish(),
+    hasNext: z.boolean().optional() }).optional(), hasNext: z.boolean().optional() }).optional()
 }).passthrough();
 
 export type OrderFact = { order_id: string; created_at: string; total_amount: number; currency_code: string; payment_status: string };
 
 export async function recentOrders(token: string, start: string, end: string): Promise<OrderFact[]> {
   const facts: OrderFact[] = [];
+  const startTime = Date.parse(start), endTime = Date.parse(end);
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || startTime >= endTime) throw new Error("wix_window_invalid");
   let cursor: string | undefined;
   const seen = new Set<string>();
   for (let page = 0; page < 50; page++) {
-    const search = cursor ? { cursorPaging: { limit: 100, cursor } } :
-      { filter: { _createdDate: { $gte: start, $lt: end }, status: "APPROVED" }, cursorPaging: { limit: 100 } };
+    const search = { filter: { _createdDate: { $gte: start, $lt: end }, status: "APPROVED" },
+      cursorPaging: { limit: 100, ...(cursor ? { cursor } : {}) } };
     const response = await fetch(`${API}/ecom/v1/orders/search`, { method: "POST", headers: {
       authorization: token, "content-type": "application/json", accept: "application/json"
     }, body: JSON.stringify({ search }), cache: "no-store", signal: AbortSignal.timeout(15_000) });
@@ -138,19 +141,20 @@ export async function recentOrders(token: string, start: string, end: string): P
     const parsed = searchResponse.parse(JSON.parse(body));
     for (const item of parsed.orders) {
       const orderId = item.id ?? item._id, createdAt = item.createdDate ?? item._createdDate;
-      if (!orderId || !createdAt || !Number.isFinite(Date.parse(createdAt))) throw new Error("wix_order_invalid");
+      const createdTime = Date.parse(createdAt ?? "");
+      if (!orderId || !Number.isFinite(createdTime)) throw new Error("wix_order_invalid");
       if (item.status !== "APPROVED") continue;
-      if (createdAt < start || createdAt >= end || seen.has(orderId)) continue;
+      if (createdTime < startTime || createdTime >= endTime || seen.has(orderId)) continue;
       seen.add(orderId);
       const total = Number(item.priceSummary.total.amount);
       if (!Number.isFinite(total) || total < 0 || total > 1_000_000_000) throw new Error("wix_amount_invalid");
-      facts.push({ order_id: orderId, created_at: createdAt, total_amount: total,
+      facts.push({ order_id: orderId, created_at: new Date(createdTime).toISOString(), total_amount: total,
         currency_code: item.currency, payment_status: item.paymentStatus });
     }
     if (facts.length > 5000) throw new Error("wix_too_many_orders");
     const next = parsed.metadata?.cursors?.next ?? undefined;
     if (!next) {
-      if (parsed.metadata?.hasNext) throw new Error("wix_pagination_invalid");
+      if (parsed.metadata?.hasNext || parsed.metadata?.cursors?.hasNext) throw new Error("wix_pagination_invalid");
       return facts;
     }
     if (next === cursor) throw new Error("wix_pagination_invalid");
