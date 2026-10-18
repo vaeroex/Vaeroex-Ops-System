@@ -24,8 +24,9 @@ function uuidOrNull(value: string) {
 }
 
 function redirectBack(formData: FormData, key: "message" | "error", message: string): never {
-  const returnPath = text(formData, "return_path").slice(0, 120) || "/support";
-  const safePath = ["/support", "/app/support", "/contact", "/demo"].includes(returnPath) ? returnPath : "/support";
+  const submittedPath = text(formData, "return_path").slice(0, 120) || "/support";
+  const returnPath = submittedPath === "/demo" ? "/contact" : submittedPath;
+  const safePath = ["/support", "/app/support", "/contact"].includes(returnPath) ? returnPath : "/support";
   redirect(`${safePath}?${key}=${encodeURIComponent(message)}` as Route);
 }
 
@@ -167,7 +168,7 @@ export async function createSupportRequestAction(formData: FormData) {
 
   const successMessage =
     issueType === "Demo request" || issueType === "Product Demo"
-      ? "Demo request received. Vaeroex will review it."
+      ? "Contact request received. Vaeroex will review it."
       : [
           "Contact request",
           "General Question",

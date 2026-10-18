@@ -10,7 +10,6 @@ const publicPages = [
   "/trust",
   "/help",
   "/contact",
-  "/demo",
   "/about",
   "/about/why-vaeroex",
   "/careers"

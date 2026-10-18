@@ -13,7 +13,7 @@ export const metadata: Metadata = publicPageMetadata({
   path: "/contact"
 });
 
-const inquiryCategories = ["Product Demo", "Platform Questions", "Strategic Partnership", "Support Request", "Billing or Subscription", "General Inquiry"];
+const inquiryCategories = ["Platform Questions", "Strategic Partnership", "Support Request", "Billing or Subscription", "General Inquiry"];
 
 const contactChannels = [
   ["Product and general questions", VAEROEX_CONTACT_EMAILS.general, VAEROEX_MAILTO_LINKS.general],
@@ -35,7 +35,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
       <PublicPageHero
         eyebrow="Vaeroex Executive Intelligence"
         title="Tell us what you want to understand."
-        description="Use the form for Vaeroex intelligence questions, an Executive Intelligence walkthrough, support, billing, or a strategic conversation. Your request goes to the appropriate Vaeroex contact."
+        description="Use the form for Executive Intelligence questions, support, billing, or a business conversation. Your request goes to the appropriate Vaeroex contact."
       />
 
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">

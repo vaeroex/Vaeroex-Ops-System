@@ -32,7 +32,7 @@ export default async function AdminSupportRequestsPage({ searchParams }: AdminSu
 
   return (
     <div className="space-y-4">
-      <header><p className="text-xs font-semibold uppercase tracking-wide text-muted">Platform admin · All workspaces</p><h1 className="mt-1 text-2xl font-semibold">Support requests</h1><p className="mt-1 text-sm text-muted">Triage submitted support requests. Deleted requests retain their contents and can be restored.</p></header>
+      <header><p className="text-xs font-semibold uppercase tracking-wide text-muted">Platform admin · All workspaces</p><h1 className="mt-1 text-2xl font-semibold">Support requests</h1><p className="mt-1 text-sm text-muted">Review contact inquiries and public or in-app support requests. Deleted requests retain their contents and can be restored.</p></header>
       {error ? <ErrorNotice message="Support requests are unavailable. Refresh and try again." /> : <>
         {workspaceResult.error ? <ErrorNotice message="Some workspace names are unavailable. Request filters and counts are still complete." /> : null}
         <SupportRequestsInbox key={JSON.stringify(filters)} requests={requests} filters={filters} total={total} />
