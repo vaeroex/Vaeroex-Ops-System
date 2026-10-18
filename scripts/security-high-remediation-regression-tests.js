@@ -92,7 +92,8 @@ for (const handler of [supportAction, activationRoute, publicFormRoute]) {
 assert.match(supportAction, /supportRequestSchema\.parse/);
 assert.match(supportAction, /const admin = createSupabaseAdminClient\(\)/);
 assert.doesNotMatch(supportAction, /const client = admin \|\| supabase/);
-assert.match(supportAction, /\["\/support", "\/app\/support", "\/contact", "\/demo"\]\.includes\(returnPath\)/);
+assert.match(supportAction, /submittedPath === "\/demo" \? "\/contact" : submittedPath/, "retired demo submissions must return to contact");
+assert.match(supportAction, /\["\/support", "\/app\/support", "\/contact"\]\.includes\(returnPath\)/);
 assert.match(activationRoute, /manualActivationRequestSchema\.parse/);
 assert.match(activationRoute, /status: "pending"/);
 assert.match(publicFormRoute, /\.eq\("public_slug", slug\)/);
