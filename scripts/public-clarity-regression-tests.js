@@ -568,7 +568,7 @@ async function main() {
   assert.match(
     form,
     /action=\{createSupportRequestAction\}/,
-    "Public contact/demo forms must retain their working server action",
+    "Public contact forms must retain their working server action",
   );
   for (const field of [
     "return_path",

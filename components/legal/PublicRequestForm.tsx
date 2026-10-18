@@ -3,7 +3,7 @@ import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 
 type PublicRequestFormProps = {
-  returnPath: "/contact" | "/demo";
+  returnPath: "/contact";
   issueType: string;
   issueOptions?: string[];
   message?: string;
