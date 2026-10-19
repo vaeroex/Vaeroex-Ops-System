@@ -45,9 +45,21 @@ export function financialReport(browser: QboBrowser, url: string, stale: boolean
     return { row: index + 1, depth: row.depth, kind: row.rowType, path, label, amount: decimal(raw) === null ? null : raw };
   });
   const totals: FinancialReport["totals"] = {};
+  // QBO emits report-level totals such as GrossProfit/NetIncome as a Section
+  // with only Summary (no Header or Rows). Preserve the provider rows and their
+  // citation numbers, but treat that single empty wrapper as report scope.
+  // Do not promote a named account, nested section, or multi-child subtotal.
+  const isReportSummaryWrapper = (row: FinancialReport["rows"][number]) => {
+    if (row.depth !== 1 || row.kind !== "summary") return false;
+    const parent = preview.rows[row.row - 2], following = preview.rows[row.row];
+    return parent?.rowType === "section" && parent.depth === 0
+      && parent.cells.every(cell => cell.value === null || cell.value.trim() === "")
+      && (!following || following.depth === 0);
+  };
   if (!preview.truncated && supported) for (const [key, name] of Object.entries(names)) {
     const matching = rows.filter(row => name.test(row.label) && row.amount !== null
-      && (row.path.length === 1 || row.path.length === 2 && sections[key]?.test(row.path[0])) && row.kind === "summary");
+      && (row.path.length === 1 || row.path.length === 2 && sections[key]?.test(row.path[0])
+        || isReportSummaryWrapper(row)) && row.kind === "summary");
     if (matching.length === 1) totals[key] = { amount: matching[0].amount!, row: matching[0].row };
     else limitations.push(`${key}: ${matching.length ? "ambiguous reported totals" : "no supported reported total"}; not treated as zero.`);
   }

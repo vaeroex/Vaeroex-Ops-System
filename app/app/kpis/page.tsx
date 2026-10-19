@@ -1,3 +1,4 @@
+import { ReportedFinancialMetrics } from "@/components/kpis/ReportedFinancialMetrics";
 import { ComparisonCharts } from "@/components/charts/ComparisonCharts";
 import { kpiComparisons } from "@/lib/charts/kpi";
 import type { Route } from "next";
@@ -1803,6 +1804,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         }
       />
       <SuccessNotice message={params?.message} />
+      <ReportedFinancialMetrics />
       <TargetUndoNotice
         metricName={undoMetricName}
         previousTarget={params?.undo_target}

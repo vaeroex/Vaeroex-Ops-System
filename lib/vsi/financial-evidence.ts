@@ -11,8 +11,10 @@ import type { VsiEvidenceResult } from "./types";
 
 /** Read-only owner JWT path. The existing RPC independently enforces live session,
  * tenant/entity scope, retained source version and validation. No service role or refresh. */
-export async function retrieveFinancialEvidence(access: WorkspaceAccess, asOf: string): Promise<VsiEvidenceResult> {
-  const result: VsiEvidenceResult = { sources: [], limitations: [] };
+export type ReportedFinancialEvidence = VsiEvidenceResult & { reports: FinancialReport[] };
+
+export async function retrieveFinancialEvidence(access: WorkspaceAccess, asOf: string): Promise<ReportedFinancialEvidence> {
+  const result: ReportedFinancialEvidence = { sources: [], limitations: [], reports: [] };
   if (!qboProductionCustomerConnectionsEnabled() || access.membership.role !== "owner") return result;
   try {
     if (access.membership.status !== "active" || access.membership.workspace_id !== access.workspaceId || access.membership.user_id !== access.user.id) throw Error("denied");
@@ -73,9 +75,9 @@ export async function retrieveFinancialEvidence(access: WorkspaceAccess, asOf: s
       if (result.sources.reduce((sum, source) => sum + source.text.length, 0) > 16000) {
         result.sources.splice(groupStart);
         result.limitations.push("An additional financial report group exceeded the bounded context; it was omitted as a whole, including its calculations.");
-      }
+      } else result.reports.push(...reports);
     }
-  } catch { return { sources: [], limitations: ["QuickBooks financial source eligibility could not be verified; costs and profit are unavailable, not zero."] }; }
+  } catch { return { sources: [], reports: [], limitations: ["QuickBooks financial source eligibility could not be verified; costs and profit are unavailable, not zero."] }; }
   if (!result.sources.length) result.limitations.push("No eligible validated QuickBooks P&L observations were found. Disconnected, unapproved, replaced or incomplete source states are not promoted to financial evidence.");
   return result;
 }

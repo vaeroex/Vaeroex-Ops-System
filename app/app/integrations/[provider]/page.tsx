@@ -159,12 +159,12 @@ export default async function ReportingPage({ params, searchParams }: { params: 
           <summary className="cursor-pointer font-semibold">Earlier saved summary</summary>
           <LegacySummary provider={provider} report={report}/>
         </details> : null}
-        <p className="text-xs text-slate-600">Imported history stays saved when you log out or import another period. Disconnecting with removal deletes it. These provider summaries are shown here; they are not combined with other plug-ins, added to financial KPIs, or sent to VSI chat.</p>
+        <p className="text-xs text-slate-600">Imported history stays saved when you log out or import another period. Disconnecting with removal deletes it. {provider === "clockify" ? "Saved summaries may provide VSI context, with their scope and freshness limits. They are not combined into financial KPIs or Business Health." : "These provider summaries are shown here; they are not combined with other plug-ins, added to financial KPIs, or sent to VSI chat."}</p>
       </div>
     </SectionCard> : null}
     {!historical && report && row ? <SectionCard title="Last complete report" description={report.start === report.end ? `Snapshot at ${report.end}` : `${report.start.slice(0,10)} through ${report.end.slice(0,10)}.`}>
       <Metrics provider={provider} metrics={report.metrics}/>
-      <p className="mt-4 text-xs text-slate-600">Last successful sync: {row.last_sync_at}. These provider summaries are shown here; they are not combined with other plug-ins, added to financial KPIs, or sent to VSI chat.</p>
+      <p className="mt-4 text-xs text-slate-600">Last successful sync: {row.last_sync_at}. {provider === "zoho-inventory" ? "Saved summaries may provide VSI context, with their scope and freshness limits. They are not combined into financial KPIs or Business Health." : "These provider summaries are shown here; they are not combined with other plug-ins, added to financial KPIs, or sent to VSI chat."}</p>
     </SectionCard> : null}
   </div>;
 }

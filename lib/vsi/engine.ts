@@ -36,6 +36,36 @@ const answerSchema = z.object({ content: z.string().trim().min(1).max(24_000), c
 const answerJsonSchema = { type: "object", additionalProperties: false, properties: {
   content: { type: "string" }, citationIds: { type: "array", items: { type: "string" } }
 }, required: ["content", "citationIds"] };
+
+/** Constrain the provider's citation list to the authorized context for this turn.
+ * Inline citations and links still pass the independent validator below. */
+export function vsiAnswerSchemaForSources(sources: readonly VsiCitation[]) {
+  const ids = [...new Set(sources.map(source => source.id))];
+  return { ...answerJsonSchema, properties: { ...answerJsonSchema.properties,
+    citationIds: { type: "array", maxItems: Math.min(30, ids.length),
+      items: ids.length ? { type: "string", enum: ids } : { type: "string" } }
+  } };
+}
+
+/** Fresh source aliases are short and turn-local; historical IDs stay intact.
+ * Source IDs, snapshot hashes and calculation input dependencies never change. */
+export function aliasCurrentVsiSources<T extends VsiCitation>(sources: readonly T[], reserved: readonly VsiCitation[]): T[] {
+  const used = new Set(reserved.map(source => source.id));
+  let ordinal = 0;
+  return sources.map(source => {
+    let id: string;
+    do { id = `B${++ordinal}`; } while (used.has(id));
+    used.add(id);
+    return { ...source, id };
+  });
+}
+/** Chart layout metadata duplicates the financial source/calculation text. Keep it
+ * on validated citation cards, outside the provider's bounded reasoning input. */
+export function serializeVsiPayload<T extends { businessSources: readonly VsiCitation[] }>(payload: T) {
+  return JSON.stringify({ ...payload, businessSources: payload.businessSources.map(source => {
+    const copy = { ...source }; delete copy.comparisons; return copy;
+  }) });
+}
 type ProviderPayload = { model?: string; status?: string; output_text?: string; output?: Array<{ type?: string; status?: string;
   action?: { type?: string; url?: string | null; sources?: Array<{ type?: string; url?: string }> };
   content?: Array<{ type?: string; text?: string; refusal?: string; annotations?: Array<{ type?: string; url?: string; title?: string }> }> }>;
@@ -350,15 +380,27 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     sourceRequirements: { datedPricingOnly: plan.objectives.includes("dated_pricing_only") },
     livePublicLookup: webSources.length ? publicSelection.lookup : null,
     researchStatus: { tier: plan.mode === "research" ? plan.tier : null, rounds: researchRounds, partial: researchPartial, toolAllowanceExceeded: usage.toolAllowanceExceeded === true, limitations: [...new Set(researchLimitations)].slice(-8) } };
+  const omittedBusinessSources: typeof payload.businessSources = [];
+  const omissionNotice = () => {
+    if (!omittedBusinessSources.length) return;
+    const prefix = "Final answer context omitted ";
+    payload.evidenceLimitations = payload.evidenceLimitations.filter(item => !item.startsWith(prefix));
+    payload.evidenceLimitations.push(prefix + omittedBusinessSources.length + " retrieved records (" + [...new Set(omittedBusinessSources.map(source => source.sourceType))].join(", ") + "). Do not imply those records were assessed; coverage is partial.");
+  };
   // Bound whole records, not serialized fragments. Preserve the newest conversation and its source snapshot.
-  while (JSON.stringify(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars && payload.businessSources.length > 2) payload.businessSources.pop();
-  payload.businessSources = payload.businessSources.filter(source => source.sourceType !== "financial_calculation"
-    || source.inputSourceIds?.every(id => payload.businessSources.some(input => input.sourceType === "financial_report" && input.sourceId === id)));
-  while (JSON.stringify(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars && payload.recentConversation.length > 2) payload.recentConversation.shift();
-  while (JSON.stringify(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars && payload.historicalSources.length > 4) payload.historicalSources.pop();
-  if (JSON.stringify(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars) payload.recentConversation = payload.recentConversation.map(message => ({ ...message, content: message.content.slice(0, 3000) }));
+  while (serializeVsiPayload(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars && payload.businessSources.length > 2) { omittedBusinessSources.push(payload.businessSources.pop()!); omissionNotice(); }
+  payload.businessSources = payload.businessSources.filter(source => {
+    const keep = source.sourceType !== "financial_calculation" || source.inputSourceIds?.every(id =>
+      payload.businessSources.some(input => input.sourceType === "financial_report" && input.sourceId === id));
+    if (!keep) omittedBusinessSources.push(source);
+    return keep;
+  });
+  omissionNotice();
+  while (serializeVsiPayload(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars && payload.recentConversation.length > 2) payload.recentConversation.shift();
+  while (serializeVsiPayload(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars && payload.historicalSources.length > 4) payload.historicalSources.pop();
+  if (serializeVsiPayload(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars) payload.recentConversation = payload.recentConversation.map(message => ({ ...message, content: message.content.slice(0, 3000) }));
   if (payload.livePublicLookup) {
-    const withoutLookup = JSON.stringify({ ...payload, livePublicLookup: null }).length + VSI_SYSTEM_PROMPT.length;
+    const withoutLookup = serializeVsiPayload({ ...payload, livePublicLookup: null }).length + VSI_SYSTEM_PROMPT.length;
     publicSelection = boundedVsiPublicEvidence(webClaims, webSources, Math.max(0, Math.min(16_000, config.maxInputChars - withoutLookup - 1000)));
     payload.livePublicLookup = publicSelection.lookup;
     if (!publicSelection.citations.length) throw new VsiEngineError("The verified research is too large to summarize safely with this question. Please ask about a narrower part.", usage, false, "context_block");
@@ -367,19 +409,21 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
       payload.researchStatus.limitations.push(`${publicSelection.omittedClaims} additional verified findings from ${publicSelection.omittedSourceTitles.join(", ")} were left outside this bounded answer context. State that coverage is partial and offer a focused follow-up; do not claim those details were all assessed in the answer.`);
     }
   }
-  if (JSON.stringify(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars) {
+  if (serializeVsiPayload(payload).length + VSI_SYSTEM_PROMPT.length > config.maxInputChars) {
     throw new VsiEngineError("This question and its sources are too large for one answer. Please narrow the question.", usage, false, "context_block");
   }
   usage.researchStatus = plan.mode === "research" ? payload.researchStatus.partial ? "partial" : "completed" : "not_required";
   usage.evidenceLimitations = payload.evidenceLimitations.length > 0 || payload.researchStatus.limitations.length > 0;
-  const reply = await call({ input: [{ role: "system", content: VSI_SYSTEM_PROMPT }, { role: "user", content: JSON.stringify(payload) }],
+  payload.businessSources = aliasCurrentVsiSources(payload.businessSources, [...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]);
+  const answerSources = [...payload.businessSources, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations];
+  const reply = await call({ input: [{ role: "system", content: VSI_SYSTEM_PROMPT }, { role: "user", content: serializeVsiPayload(payload) }],
     reasoning: { effort: plan.tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, plan.tier === "deep" ? 6000 : 4000),
-    text: { format: { type: "json_schema", name: "vsi_answer_v1", strict: true, schema: answerJsonSchema } } });
+    text: { format: { type: "json_schema", name: "vsi_answer_v1", strict: true, schema: vsiAnswerSchemaForSources(answerSources) } } });
   let structuredAnswer;
   try { structuredAnswer = answerSchema.parse(JSON.parse(outputText(reply))); }
   catch { throw new VsiEngineError("Vaeroex could not verify this answer and its sources. Please retry. Your question has not been counted.", usage, false, "output_validation"); }
   try {
-    const answer = validateVsiAnswer(structuredAnswer, [...payload.businessSources, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]);
+    const answer = validateVsiAnswer(structuredAnswer, answerSources);
     if (webSources.length && !answer.citations.some(source => source.sourceType === "web")) throw new Error("The live answer omitted its source.");
     return finish({ ...answer, ...(publicResearchTopics ? { publicResearchTopics } : {}) });
   } catch {
