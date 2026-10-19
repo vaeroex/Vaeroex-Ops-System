@@ -71,7 +71,7 @@ const workspaceId = '11111111-1111-4111-8111-111111111111', userId = '22222222-2
 const settings = { id: 'setting', workspace_id: workspaceId, name: 'Revenue', category: 'Sales', weight: 5, sort_order: 0, color: '#0055aa', desired_direction: 'increase', metric_kind: 'currency', classification_confirmed: true, classification_status: 'confirmed', target: 100, archived_at: null, deleted_at: null };
 const base = { kpis: [80, 90, 85].map((x, i) => ({ id: 'kpi' + i, workspace_id: workspaceId, name: 'Revenue', actual_value: x, target: 100, metric_date: '2026-10-0' + (i + 1), created_at: date, updated_at: date, unit: 'USD', category: 'Sales', archived_at: null, deleted_at: null, source_file_id: null, raw_data_json: {} })), kpi_settings: [settings], issues: [{ id: 'issue', workspace_id: workspaceId, title: 'Synthetic late delivery', description: 'Observed delay', status: 'Open', severity: 'High', created_at: date, updated_at: date, archived_at: null, deleted_at: null }], file_uploads: [{ id: 'file', workspace_id: workspaceId, display_name: 'Synthetic source', original_name: 'Source.csv', file_extension: 'csv', created_at: date, updated_at: date, archived_at: null, deleted_at: null, metadata_json: {} }] };
 function client() { return { from(table) { const ops = []; const query = new Proxy({}, { get(_, key) { if (key === 'then')
-            return (resolve, reject) => { state.trace.push(['query', table, ...ops]); return Promise.resolve({ data: state.rows[table] || [], error: state.error === table ? new Error('synthetic ' + table + ' unavailable') : null }).then(resolve, reject); }; return (...args) => { ops.push([key, ...args]); return query; }; } }); return query; } }; }
+            return (resolve, reject) => { state.trace.push(['query', table, ...ops]); let rows = state.rows[table] || []; if (table === 'ai_agent_runs') for (const [op, column, value] of ops) { if (op === 'neq') rows = rows.filter(row => row[column] !== value); if (op === 'order') rows = [...rows].sort((a,b) => String(b[column]).localeCompare(String(a[column]))); if (op === 'limit') rows = rows.slice(0,column); } return Promise.resolve({ data: rows, error: state.error === table ? new Error('synthetic ' + table + ' unavailable') : null }).then(resolve, reject); }; return (...args) => { ops.push([key, ...args]); return query; }; } }); return query; } }; }
 async function run(fn, test) { state = { rows: structuredClone(test.empty ? {} : base), error: test.error, trace: [], writes: [], authorityTrace: [] }; if (test.inactive)
     state.rows.file_uploads[0].archived_at = date; let value, error; try {
     value = await fn({ supabase: client(), workspaceId, workspace: { id: workspaceId, name: 'Synthetic owner workspace' }, userId: test.userId === null ? null : userId, comparisonTrends: [{ name: 'Revenue', changePercent: -4 }], includeAnalysis: test.includeAnalysis !== false });
@@ -90,7 +90,7 @@ catch (e) {
         assert.equal(result.authorityTrace[0], 'begin');
         assert(result.authorityTrace.some(item => Array.isArray(item) && item[0] === 'bind'));
         if (!test.empty) assert(result.authorityTrace.some(item => Array.isArray(item) && item[1].some(source => source.table === 'kpis' && source.id === 'kpi0')), 'source rows remain bound before being aggregated');
-        const contract = JSON.parse(JSON.stringify({ trace: result.trace.map(item => item[0] === "query" && item[1] === "ai_agent_runs" ? item.map(part => Array.isArray(part) && part[0] === "select" ? [part[0], part[1].replace(/^id,/, "")] : part) : item), model: result.value.executiveHomepageModel, evidence: result.value.evidence, history: result.value.businessHealthHistory, analysisPackage: result.value.businessHealthAnalysisPackage, token: result.value.businessHealthAnalysisToken, state: result.value.businessHealthAnalysisState, error: result.error, writes: result.writes }, (key, value) => ["readTicket", "readTicketId", "consumedSources"].includes(key) ? undefined : value instanceof Error ? { name: value.name, message: value.message } : value));
+        const contract = JSON.parse(JSON.stringify({ trace: result.trace.map(item => item[0] === "query" && item[1] === "ai_agent_runs" ? item.filter(part => !(Array.isArray(part) && part[0] === "neq" && part[1] === "agent_type" && part[2] === "private_analysis_reservation_v1")).map(part => Array.isArray(part) && part[0] === "select" ? [part[0], part[1].replace(/^id,/, "")] : part) : item), model: result.value.executiveHomepageModel, evidence: result.value.evidence, history: result.value.businessHealthHistory, analysisPackage: result.value.businessHealthAnalysisPackage, token: result.value.businessHealthAnalysisToken, state: result.value.businessHealthAnalysisState, error: result.error, writes: result.writes }, (key, value) => ["readTicket", "readTicketId", "consumedSources"].includes(key) ? undefined : value instanceof Error ? { name: value.name, message: value.message } : value));
         const expected = fixture.cases.find(x => x.name === test.name).componentHashes;
         for (const [key, value] of Object.entries(contract)) {
             if (recordContract) expected[key] = sha(JSON.stringify(value));
@@ -108,6 +108,10 @@ catch (e) {
                 assert.deepEqual(contract.trace.filter(x => x[0] === 'query'), fixture.reviewablePopulatedContract.directQueries);
             }
         }
+        // Retain old data/output hashes while independently enforcing the one new query predicate.
+        const actualRunQuery = result.trace.find(x => x[0] === 'query' && x[1] === 'ai_agent_runs');
+        const reservationFilter = actualRunQuery.findIndex(x => Array.isArray(x) && x[0] === 'neq' && x[1] === 'agent_type' && x[2] === 'private_analysis_reservation_v1');
+        assert(reservationFilter > 0 && reservationFilter < actualRunQuery.findIndex(x => Array.isArray(x) && x[0] === 'limit'), 'quota-only rows are excluded before the bounded analysis page');
         const queries = result.trace.filter(x => x[0] === 'query');
         assert.equal(queries.length, 15, test.name + ' has fifteen direct queries and one complete KPI loader');
         assert(queries.every(x => x.some(op => Array.isArray(op) && op[0] === 'eq' && op[1] === 'workspace_id' && op[2] === workspaceId)), test.name + ' scopes every query to the authenticated workspace');
@@ -117,6 +121,11 @@ catch (e) {
     // consistency assertion on these failures is recorded in one-off parity evidence,
     // not blessed as the desired UI contract by this regression.
     const { loadWorkspaceHealthEvidence } = req(path.join(root, 'lib/intelligence/workspace-health.ts'));
+    state = { rows: structuredClone(base), trace: [], writes: [], authorityTrace: [] };
+    state.rows.ai_agent_runs = [...Array.from({length:11}, (_,i) => ({id:'quota'+i,agent_type:'private_analysis_reservation_v1',status:'completed',input_json:{},output_json:{},created_at:'2026-10-05T00:00:00Z',updated_at:'2026-10-05T00:00:00Z'})), {id:'real-analysis',agent_type:'ask_vaeroex',status:'completed',input_json:{},output_json:{summary:'Retained original analysis'},created_at:date,updated_at:date}];
+    const quotaFiltered = await loadWorkspaceHealthEvidence({supabase:client(),workspaceId});
+    assert.equal(quotaFiltered.overviewRunCompatibility.derivedFindingCount,1,'many quota slots cannot displace an older real analysis');
+    assert.equal(quotaFiltered.overviewRunCompatibility.latestEvidenceUpdate,date,'quota timestamps are not business-evidence freshness');
     const errors = ['kpis', 'kpi_settings', 'issues', 'sops', 'file_uploads', 'file_imports', 'assets', 'crm_leads', 'crm_lead_history', 'ai_agent_runs', 'operational_metrics', 'people', 'business_decisions', 'business_memory_chunks', 'sourceParents', 'memoryEligibility'];
     for (const error of errors) {
         state = { rows: structuredClone(base), error, trace: [], writes: [], authorityTrace: [] };

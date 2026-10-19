@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS synthetic fixtures and isolated native adapter tests. */
 /* Provider-shaped synthetic fixture enrichment; no provider access or oracle inputs. */
 const { createHash } = require('node:crypto');
 // Authored chart of accounts: exact reference mapping, not a production name classifier.

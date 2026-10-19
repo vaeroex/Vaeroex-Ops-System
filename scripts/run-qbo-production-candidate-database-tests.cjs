@@ -70,6 +70,7 @@ const candidates = [
 const journalMigrations = [
   '20261019223220_qbo_journal_accounting_v2.sql',
   '20261019223253_owner_financial_briefings_v1.sql',
+  '20261019225318_owner_financial_brief_usage_reservations.sql',
 ];
 const pendingSuite = { file: 'scripts/qbo-pending-connection-database-tests.cjs', pending: true, expectedScenarios: 14 };
 const eligibilitySuite = { file: 'scripts/qbo-pending-cancellation-eligibility-database-tests.cjs', eligibility: true, expectedScenarios: 19 };
@@ -562,6 +563,11 @@ async function main() {
         assert.deepEqual(journalGrants, { owner_read: true, service_read: false, private_read: false,
           private_service_read: false, client_finish: false, service_finish: true });
         result.journalPrivateBoundaryChecks = { tables: journalTables, grants: journalGrants };
+        await client.query('begin');
+        try {
+          result.privateUsageBoundaryChecks = await require('./owner-financial-usage-database-tests.cjs').qualifyStorage({ client });
+          assert.equal(result.privateUsageBoundaryChecks.length, 10, 'all private usage storage boundaries qualified');
+        } finally { await client.query('rollback'); }
         result.finalLedger = [...ledger].sort();
         console.log(`${shape.name}: ${ledger.length} migrations applied including the shared audit, capacity and VSI tails; exact ledger and QBO-only Square catalog guard verified.`);
         // pgTAP's test metadata ACLs are not part of the pristine migration catalog.
@@ -669,7 +675,7 @@ async function main() {
 }
 
 if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
-module.exports = { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
+module.exports = { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite, journalMigrations,
   productionSquare, productionSheets, auditMigrations, capacityMigrations, storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, sheetsErasureMigrations, billingObservationMigration, vsiDeletionMigration, assertProductionBaselineLedger,
   dashboardMigrations, dashboardSuites, dashboardPlan, checkDashboardAssertionNames, composeSquareIdentitySuite, executeDashboardSuite,
   preferenceAssertionNames, reportingTimezoneAssertionNames, squareIdentityAssertionNames, squareCatalog };

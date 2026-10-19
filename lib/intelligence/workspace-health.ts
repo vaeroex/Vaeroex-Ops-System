@@ -88,6 +88,7 @@ export async function loadWorkspaceHealthEvidence({ supabase, workspaceId, readT
       .from("ai_agent_runs")
       .select("id,agent_type,input_json,output_json,status,error_message,created_at,updated_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
+      .neq("agent_type", "private_analysis_reservation_v1")
       .order("created_at", { ascending: false })
       .limit(10),
     supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }).limit(500),

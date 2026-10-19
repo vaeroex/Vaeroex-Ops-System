@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS synthetic fixtures and isolated native adapter tests. */
 const assert=require('node:assert/strict');
 require('./qbo-customer-test-support.cjs').installLoader();
 const {minimizeQboSourceRecord}=require('../lib/integrations/providers/qbo/minimizers.ts');

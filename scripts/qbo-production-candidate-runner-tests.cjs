@@ -5,7 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
-const { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite,
+const { checkTap, expandFixture, suiteRequests, candidateDblinkSetting, candidates, pendingSuite, eligibilitySuite, journalMigrations,
   productionSquare, productionSheets, auditMigrations, capacityMigrations, storageMigrations, pricingMigration, legalAcceptanceMigration, adminTelemetryMigration, sheetsErasureMigrations, billingObservationMigration, vsiDeletionMigration, assertProductionBaselineLedger,
   dashboardMigrations, dashboardSuites, dashboardPlan, checkDashboardAssertionNames, composeSquareIdentitySuite, executeDashboardSuite,
   preferenceAssertionNames, reportingTimezoneAssertionNames, squareIdentityAssertionNames } = require('./run-qbo-production-candidate-database-tests.cjs');
@@ -19,6 +19,14 @@ assert.ok(fs.existsSync(path.join(__dirname, '..', pendingSuite.file)), 'registe
 assert.deepEqual(eligibilitySuite, { file: 'scripts/qbo-pending-cancellation-eligibility-database-tests.cjs', eligibility: true, expectedScenarios: 19 }); assertions++;
 assert.ok(fs.existsSync(path.join(__dirname, '..', eligibilitySuite.file)), 'registered eligibility suite exists'); assertions++;
 const candidateRunner = fs.readFileSync(path.join(__dirname, 'run-qbo-production-candidate-database-tests.cjs'), 'utf8');
+assert.deepEqual(journalMigrations, [
+  '20261019223220_qbo_journal_accounting_v2.sql',
+  '20261019223253_owner_financial_briefings_v1.sql',
+  '20261019225318_owner_financial_brief_usage_reservations.sql',
+]); assertions++;
+assert.match(candidateRunner, /require\('\.\/owner-financial-usage-database-tests\.cjs'\)\.qualifyStorage\(\{ client \}\)/, 'both layouts run actual native quota storage checks'); assertions++;
+assert.match(candidateRunner, /privateUsageBoundaryChecks.length, 10/, 'partial quota storage coverage fails CI'); assertions++;
+
 assert.match(candidateRunner, /accounting: true \}, pendingSuite, eligibilitySuite\]/, 'pending and eligibility tests run with the required candidate suites'); assertions++;
 assert.match(candidateRunner, /outcome\.assertions = await require\('\.\/qbo-pending-connection-database-tests\.cjs'\)\.qualify\(\{ client: runner, connection: config \}\)/,
   'pending tests use the owned per-suite database clone'); assertions++;
