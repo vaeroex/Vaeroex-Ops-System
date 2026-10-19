@@ -236,7 +236,7 @@ async function migrationQualification(target, administrator) {
   equal(wixOrdersTail.length, 1, "separately qualified Wix orders read-only migration present");
   const loyverseReconnectTail = files.filter(name => name === "20261017184954_loyverse_merchant_reconnect_guard.sql");
   equal(loyverseReconnectTail.length, 1, "separately qualified Loyverse merchant reconnect guard present");
-  const reportingMigrations = ["20261019001207_ready_account_reporting_connectors.sql", "20261019033506_reporting_supported_jwt_role.sql"];
+  const reportingMigrations = ["20261019001207_ready_account_reporting_connectors.sql", "20261019033506_reporting_supported_jwt_role.sql", "20261019070945_reporting_import_history.sql", "20261019070949_zoho_books_import_history.sql", "20261019070953_loyverse_import_history.sql", "20261019071008_wix_orders_import_history.sql"];
   const reportingTail = files.filter(name => reportingMigrations.includes(name));
   equal(JSON.stringify(reportingTail), JSON.stringify(reportingMigrations), "exact reporting connector and JWT compatibility migrations present");
   const billingObservationTail = files.filter(name => name === "20261012201726_stripe_subscription_observation_fence.sql");
