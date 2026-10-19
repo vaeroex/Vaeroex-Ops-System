@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 const migration = readFileSync(new URL('../supabase/migrations/20261019001207_ready_account_reporting_connectors.sql',import.meta.url),'utf8');
+const roleMigration = readFileSync(new URL('../supabase/migrations/20261019033506_reporting_supported_jwt_role.sql',import.meta.url),'utf8');
 const w='11111111-1111-4111-8111-111111111111', other='22222222-2222-4222-8222-222222222222', actor='33333333-3333-4333-8333-333333333333', c='44444444-4444-4444-8444-444444444444', lease='55555555-5555-4555-8555-555555555555';
 const ciphertext='A'.repeat(64), account={id:'123',name:'Test account'};
 const report=()=>({start:new Date().toISOString(),end:new Date().toISOString(),metrics:[{key:'hours',value:1},{key:'entries',value:1},{key:'billable_hours',value:1},{key:'running',value:0}]});
@@ -10,17 +11,18 @@ async function setup() {
  const db=new PGlite();
  await db.exec(`create role anon;create role authenticated;create role service_role;
  create schema auth;create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+ create function auth.role() returns text language sql stable as $$select coalesce(nullif(current_setting('request.jwt.claim.role',true),''),nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'role')$$;
  create table public.workspaces(id uuid primary key);create table public.profiles(id uuid primary key);
  create table public.workspace_members(workspace_id uuid,user_id uuid,status text,role text);
  grant usage on schema public,auth to authenticated,service_role;
  grant select on public.workspace_members to authenticated,service_role;`);
- await db.exec(migration);
+ await db.exec(migration); await db.exec(roleMigration);
  await db.query('insert into workspaces values($1),($2)',[w,other]);await db.query('insert into profiles values($1)',[actor]);
  await db.query("insert into workspace_members values($1,$2,'active','owner')",[w,actor]);
  return db;
 }
 async function connect(db) {
- await db.exec("set request.jwt.claim.role='service_role'");
+ await db.exec(`set request.jwt.claim.role=''; set request.jwt.claims='{"role":"service_role"}';`);
  await db.query('select begin_reporting_connection($1,$2,$3,$4,$5)',[w,'harvest',actor,c,'b'.repeat(64)]);
  await db.query('select finish_reporting_connection($1,$2,$3,$4)',[w,'harvest',c,ciphertext]);
  await db.query('select select_reporting_account($1,$2,$3,$4,$5)',[w,'harvest',c,JSON.stringify(account),ciphertext]);
@@ -43,7 +45,7 @@ test('credentials and OAuth states have no client access; connections are tenant
 });
 test('only current owners can begin; completion and selection cannot replay or retarget',async()=>{
  const db=await setup();try{
- await db.exec("set request.jwt.claim.role='service_role'");
+ await db.exec(`set request.jwt.claim.role=''; set request.jwt.claims='{"role":"service_role"}';`);
  await assert.rejects(db.query('select begin_reporting_connection($1,$2,$3,$4,$5)',[other,'harvest',actor,c,null]),/owner_required/);
  await connect(db);
  assert.equal((await db.query('select finish_reporting_connection($1,$2,$3,$4) as ok',[w,'harvest',c,'B'.repeat(64)])).rows[0].ok,false);
@@ -82,5 +84,17 @@ test('disconnect fences refresh and sync, removes stored data, and cannot affect
  for(const table of ['reporting_credentials','reporting_oauth_states']) assert.equal((await db.query(`select count(*)::int as n from ${table}`)).rows[0].n,0);
  const row=(await db.query('select status,account,snapshot from reporting_connections where id=$1',[c])).rows[0];
  assert.deepEqual(row,{status:'disconnected',account:null,snapshot:null});
+ }finally{await db.close();}
+});
+
+test('modern JSON claims admit only service role and legacy claims remain compatible',async()=>{
+ const db=await setup();try{
+ for(const role of ['authenticated','anon']){
+  await db.query("select set_config('request.jwt.claims',$1,false)",[JSON.stringify({role})]);
+  await assert.rejects(db.query('select begin_reporting_connection($1,$2,$3,$4,$5)',[w,'harvest',actor,c,null]),/service_role_required/);
+ }
+ await db.exec("set request.jwt.claims=''; set request.jwt.claim.role='service_role'");
+ await db.query('select begin_reporting_connection($1,$2,$3,$4,$5)',[w,'harvest',actor,c,null]);
+ assert.equal((await db.query('select count(*)::int as n from reporting_connections')).rows[0].n,1);
  }finally{await db.close();}
 });

@@ -32,7 +32,8 @@ export async function post(request: Request, context: Params) {
       const connection = randomUUID(), state = randomBytes(32).toString("base64url");
       const { error } = await db.rpc("begin_reporting_connection", { ...rpcArgs(access.workspaceId, provider, connection),
         p_actor: access.user.id, p_hash: catalog[provider].auth === "oauth" ? hashState(state) : null });
-      if (error) return redirect(provider, "connection_exists");
+      if (error?.code === "23505") return redirect(provider, "connection_exists");
+      if (error) throw new Error("database_action_failed");
       cleanup = { workspace: access.workspaceId, connection };
       if (catalog[provider].auth === "oauth") {
         const target = authorizationUrl(provider, state); cleanup = null;

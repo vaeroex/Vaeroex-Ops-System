@@ -55,3 +55,12 @@ test('a failed lease claim makes no provider call and a disabled connector can s
  reset();enabled=false;const result=await post(request('disconnect',{connectionId:connection,confirmation:'disconnect'}),context('disconnect'));
  assert.match(result.headers.get('location'),/disconnected/);assert.equal(dbCalls[0][0][1],'disconnect_reporting_connection');
 });
+
+test('only unique conflicts report an existing connection; other database errors fail closed',async()=>{
+ for(const [code,result] of [['23505','connection_exists'],['42501','sync_failed'],['PGRST202','sync_failed']]){
+  reset();rpcResults.push({data:null,error:{code}});
+  const response=await post(request('connect',{confirmation:'connect'}),context('connect'));
+  assert.equal(new URL(response.headers.get('location')).searchParams.get('result'),result);
+  assert.equal(providerCalls,0);assert.equal(dbCalls.length,1);
+ }
+});

@@ -236,7 +236,7 @@ async function migrationQualification(target, administrator) {
   equal(wixOrdersTail.length, 1, "separately qualified Wix orders read-only migration present");
   const loyverseReconnectTail = files.filter(name => name === "20261017184954_loyverse_merchant_reconnect_guard.sql");
   equal(loyverseReconnectTail.length, 1, "separately qualified Loyverse merchant reconnect guard present");
-  const reportingTail = files.filter(name => name === "20261019001207_ready_account_reporting_connectors.sql");
+  const reportingTail = files.filter(name => name === "20261019001207_ready_account_reporting_connectors.sql", "20261019033506_reporting_supported_jwt_role.sql");
   equal(reportingTail.length, 1, "separately qualified reporting connectors migration present");
   const billingObservationTail = files.filter(name => name === "20261012201726_stripe_subscription_observation_fence.sql");
   equal(billingObservationTail.length, 1, "separately qualified base billing observation fence migration present");
