@@ -52,9 +52,11 @@ async function main() {
       await page.goto(`${origin}/app/settings`);
       await page.getByRole("link", { name: "Manage plug-ins", exact: true }).click();
       await page.getByRole("heading", { name: "Plug-ins", exact: true }).waitFor();
-      assert.equal(await page.getByRole("article").count(), 4);
+      assert.equal(await page.getByRole("article").count(), 10);
       assert.equal(await page.getByRole("article", { name: "Google Sheets", exact: true }).count(), 1);
-      assert.equal(await page.getByText("Configuration required", { exact: true }).count(), 1);
+      for (const name of ["Xero", "Harvest", "Zoho Inventory", "Clockify", "Toggl 2.0", "Katana"])
+        assert.equal(await page.getByRole("article", { name, exact: true }).count(), 1);
+      assert.equal(await page.getByText("Configuration required", { exact: true }).count(), 7);
       assert.equal(await page.getByRole("link", { name: "View Google Sheets setup", exact: true }).getAttribute("href"), "/app/settings/integrations/google-sheets");
       assert.equal(await page.getByText("Pending authorization", { exact: true }).count(), 1);
       assert.equal(await page.locator("main form").count(), 0);
