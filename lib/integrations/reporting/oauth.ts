@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Provider } from "./catalog";
 import { config, type Credential } from "./security";
 import { readJson } from "./transport";
+import handoffPolicy from "../control-plane/square-customer-handoff-policy.json";
 
 const oauth = {
   xero: { authorize: "https://login.xero.com/identity/connect/authorize", token: "https://identity.xero.com/connect/token",
@@ -21,6 +22,21 @@ export function authorizationUrl(provider: Provider, state: string) {
   if (settings.scope) url.searchParams.set("scope", settings.scope);
   if (provider === "zoho-inventory") { url.searchParams.set("access_type", "offline"); url.searchParams.set("prompt", "consent"); }
   return url.toString();
+}
+export function authorizationHandoff(provider: Provider, state: string) {
+  // A native form's cross-origin 303 is blocked by the application's form-action
+  // policy. Reuse Square's fixed, hash-authorized navigation document instead;
+  // no provider origins or arbitrary scripts are added to the global policy.
+  const target = authorizationUrl(provider, state);
+  const escape = (value: string) => value.replace(/&/g, "&amp;").replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>Connect ${provider}</title></head><body><p id="square-handoff" data-target="${escape(target)}" data-clean-path="/app/integrations/${provider}">Opening provider authorization.</p><noscript>Enable JavaScript, then return to this plug-in to cancel the unfinished connection and try again. Do not share this address.</noscript><script>${handoffPolicy.script}</script></body></html>`, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": handoffPolicy.csp,
+      "Cache-Control": "no-store, max-age=0", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff"
+    }
+  });
 }
 export async function exchange(provider: Provider, grant: { code: string } | { refresh: string }, signal: AbortSignal): Promise<Credential> {
   const cfg = config(provider), settings = spec(provider);

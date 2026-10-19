@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
 import { isProvider, catalog, type Provider } from "./catalog";
 import { admin, assertRequest, available, formData, hashState, redirect, requireOwner, seal, unseal, credentialSchema, accountSchema } from "./security";
-import { authorizationUrl, exchange } from "./oauth";
+import { authorizationHandoff, exchange } from "./oauth";
 import { accounts, snapshot } from "./adapters";
 
 type Params = { params: Promise<{ provider: string; action: string }> };
@@ -36,8 +36,8 @@ export async function post(request: Request, context: Params) {
       if (error) throw new Error("database_action_failed");
       cleanup = { workspace: access.workspaceId, connection };
       if (catalog[provider].auth === "oauth") {
-        const target = authorizationUrl(provider, state); cleanup = null;
-        return new Response(null, { status: 303, headers: { Location: target, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
+        const handoff = authorizationHandoff(provider, state); cleanup = null;
+        return handoff;
       }
       const credential = credentialSchema.parse({ accessToken: form.get("apiKey") });
       credential.accounts = await accounts(provider, credential.accessToken, AbortSignal.timeout(20_000), form);
