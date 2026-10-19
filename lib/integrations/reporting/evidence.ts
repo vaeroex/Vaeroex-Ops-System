@@ -30,7 +30,7 @@ export async function retrieveReportingEvidence(access: WorkspaceAccess, asOf: s
     const connections = z.array(connectionSchema).max(2).parse(saved.data || []);
     for (const connection of connections) {
       if (!connection.last_sync_at || !Number.isFinite(Date.parse(asOf)) || Date.parse(connection.last_sync_at) > Date.parse(asOf)) continue;
-      
+
       const observations: { value: unknown; period: string; url: string; date: string | null; importedAt: string }[] = [];
       if (connection.provider === "zoho-inventory") {
         if (!connection.snapshot) continue;

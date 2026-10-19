@@ -42,4 +42,3 @@ export function ReportedFinancialMetricsView({ groups, limitations, journals = [
     {limitations.length ? <p className="mt-2 text-xs text-slate-400">{limitations.join(" ")}</p> : null}
   </section>;
 }
-
