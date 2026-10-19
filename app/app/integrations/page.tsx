@@ -14,7 +14,7 @@ import { admin as loyverseAdmin, enabled as loyverseEnabled } from "@/lib/integr
 import { admin as zohoAdmin, enabled as zohoEnabled } from "@/lib/integrations/zoho-books/server";
 import { admin as wixAdmin, enabled as wixEnabled } from "@/lib/integrations/wix-orders/server";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
-import { ProviderCard } from "./_ProviderCard";
+import { ProviderCard, ProviderCatalog } from "./_ProviderCard";
 import { readQuickBooksStatus } from "./_qbo";
 
 export const dynamic = "force-dynamic";
@@ -58,20 +58,19 @@ export default async function IntegrationsPage() {
 
   return (
     <div className="workspace-page mx-auto max-w-5xl space-y-5">
-      <PageHeader eyebrow="Workspace" title="Plug-ins" description="Connections and data status for this workspace." />
-      {squareEnabled || qboEnabled || squareEvidence || googleSheetsEnabled || loyverseAvailable || zohoAvailable || owner ? (
-        <div className="grid items-stretch gap-4 md:grid-cols-2">
-          {squareEnabled ? <ProviderCard name="Square" description="Payments and location connections."
+      <PageHeader eyebrow="Workspace" title="Plug-ins" description="Find plug-ins by the work you do. View connection status and manage your workspace data." />
+      <ProviderCatalog>
+          {squareEnabled ? <ProviderCard id="square" name="Square" description="Payments and location connections."
             reads="Connected Square locations and payment IDs, dates, status, amounts, and currency."
             requires="A Square seller account; the workspace owner must authorize access."
             statuses={!square ? ["Status unavailable"] : squareStatuses?.length ? [...new Set(squareStatuses)] : ["Not connected"]}
             href={squareSettingsPath} action={square?.available && !square.connections.length ? "Connect Square" : "Manage Square"} /> : null}
-          {qboEnabled ? <ProviderCard name="QuickBooks Online" description="Accounting connections and stored financial data."
+          {qboEnabled ? <ProviderCard id="quickbooks" name="QuickBooks Online" description="Accounting connections and stored financial data."
             reads="Company details, accounts, customers, vendors, items, sales and expense transactions, and financial reports."
             requires="A QuickBooks Online company and an active Vaeroex business entity."
             statuses={!qbo ? ["Status unavailable"] : qboStatuses?.length ? [...new Set(qboStatuses)] : ["Not connected"]}
             href="/app/settings/integrations/quickbooks" action={owner && qbo && !qbo.connections.length ? "Connect QuickBooks" : "Manage QuickBooks"} /> : null}
-          {loyverseAvailable ? <ProviderCard name="Loyverse" description="Read-only POS sales with selectable imports and saved history."
+          {loyverseAvailable ? <ProviderCard id="loyverse" availability="Historical import testing pending" name="Loyverse" description="Read-only POS sales with selectable imports and saved history."
             reads="Merchant details and receipt totals, refunds, and dates; no customer details are stored."
             requires="A U.S. Loyverse merchant account and owner authorization."
             statuses={loyverse?.error ? ["Status unavailable"] : loyverse?.data?.length
@@ -79,7 +78,7 @@ export default async function IntegrationsPage() {
                 connection.status === "reauthorization_required" ? "Reauthorization required" : "Waiting for authorization"))]
               : ["Not connected"]}
             href="/app/integrations/loyverse" action={owner && !loyverse?.data?.length ? "Connect Loyverse" : "Manage Loyverse"} /> : null}
-          {zohoAvailable ? <ProviderCard name="Zoho Books" description="Read-only invoice and expense totals with selectable imports and saved history."
+          {zohoAvailable ? <ProviderCard id="zoho-books" availability="Historical import testing pending" name="Zoho Books" description="Read-only invoice and expense totals with selectable imports and saved history."
             reads="Organization, invoice, and expense totals and dates; no contacts or line items are stored."
             requires="A U.S. Zoho Books organization and owner authorization."
             statuses={zoho?.error ? ["Status unavailable"] : zoho?.data?.length
@@ -88,10 +87,12 @@ export default async function IntegrationsPage() {
                 connection.status === "reauthorization_required" ? "Reauthorization required" : "Waiting for authorization"))]
               : ["Not connected"]}
             href="/app/integrations/zoho-books" action={owner && !zoho?.data?.length ? "Connect Zoho Books" : "Manage Zoho Books"} /> : null}
-          {owner || wixAvailable ? <ProviderCard name="Wix online orders" description="Read-only order counts and totals with selectable imports and saved history."
+          {owner || wixAvailable ? <ProviderCard id="wix-orders" name="Wix online orders" description="Read-only order counts and totals with selectable imports and saved history."
             reads="Order dates, totals, currency, and payment status; no customer details or items are stored."
             requires="A U.S. Wix site with online orders enabled and a Wix plan that supports payments. Wix Restaurants Orders must be installed for restaurant orders."
-            statuses={!wixAvailable ? ["Setup in progress"] : wix?.error ? ["Status unavailable"] : wix?.data?.length
+            availability={wixAvailable ? "Unlisted connector" : "Setup in progress"}
+            availabilityNote="Public App Market review is separate from this connection. Historical imports still need live connection testing."
+            statuses={!wixAvailable ? [] : wix?.error ? ["Status unavailable"] : wix?.data?.length
               ? [...new Set(wix.data.map((connection) => connection.status === "connected" ? "Connected" :
                 connection.status === "pending" ? "Waiting for Wix installation" : "Reconnect required"))]
               : ["Not connected"]}
@@ -99,27 +100,30 @@ export default async function IntegrationsPage() {
           {providers.filter(provider => owner || reportingAvailable(provider)).map(provider => {
             const info = catalog[provider], enabled = reportingAvailable(provider);
             const connection = reporting?.data?.find(row => row.provider === provider);
-            const status = !enabled ? "Configuration required" : reporting?.error ? "Status unavailable" :
+            const status = reporting?.error ? "Status unavailable" :
               connection?.status === "connected" ? "Connected" : connection?.status === "choose_account" ? "Choose an account" :
               connection?.status === "pending" ? "Waiting for authorization" : connection?.status === "reauthorization_required" ? "Reauthorization required" : "Not connected";
-            return <ProviderCard key={provider} name={info.name} description={info.description} reads={`${Object.values(info.metrics).join(", ")}.`}
+            return <ProviderCard id={provider} key={provider} name={info.name} description={info.description} reads={`${Object.values(info.metrics).join(", ")}.`}
               requires={info.auth === "oauth" ? "Owner authorization and an eligible provider account." : "An owner-provided API key with access to the selected account."}
-              statuses={[status]} href={`/app/integrations/${provider}`} action={enabled ? `Manage ${info.name}` : `View ${info.name} setup`} />;
+              availability={!enabled ? "Configuration required" : provider === "katana" ? "Private API key connection" : undefined}
+              availabilityNote={provider === "katana" ? "Public OAuth partnership is not approved." : undefined}
+              statuses={enabled ? [status] : []} href={`/app/integrations/${provider}`} action={enabled ? `Manage ${info.name}` : `View ${info.name} setup`} />;
           })}
-          {googleSheetsEnabled || owner ? <ProviderCard name="Google Sheets" description={GOOGLE_SHEETS_PILOT.catalog}
+          {googleSheetsEnabled || owner ? <ProviderCard id="google-sheets" name="Google Sheets" description={GOOGLE_SHEETS_PILOT.catalog}
             reads="The selected spreadsheet, sheet names, column headings, and approved data columns."
             requires="A Google account with access to the spreadsheet; connection awaits Google approval."
-            statuses={!googleSheetsEnabled ? ["Configuration required"] : googleSheets?.error ? ["Status unavailable"] : googleSheets?.data?.length ? [...new Set(googleSheets.data.map((connection) =>
+            availability={googleSheetsEnabled ? "Limited pilot" : "Configuration required"}
+            availabilityNote="Only approved Google test accounts can connect; Google Sheets is not generally available."
+            statuses={!googleSheetsEnabled ? [] : googleSheets?.error ? ["Status unavailable"] : googleSheets?.data?.length ? [...new Set(googleSheets.data.map((connection) =>
               connection.revocation_pending ? "Disconnect needs another attempt" : connection.authorization_uncertain ? "Authorization needs recovery" : connection.status === "connected" ? connection.active_approval_id ? "Connected" : "Mapping needs approval" : connection.status === "reauthorization_required" ? "Reauthorization required" : connection.status === "pending_authorization" ? "Waiting for Google authorization" : "Disconnected"))] : ["Not connected"]}
             href="/app/settings/integrations/google-sheets" action={googleSheetsEnabled ? "Manage Google Sheets" : "View Google Sheets setup"}>
             <Link href="/app/sources" prefetch={false} className="text-sm font-semibold text-vaeroex-blue underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Upload spreadsheet files instead</Link>
           </ProviderCard> : null}
-          {squareEvidence ? <ProviderCard name="Square Sandbox" description="Verified non-economic observations."
+          {squareEvidence ? <ProviderCard id="square-sandbox" name="Square Sandbox" description="Verified non-economic observations."
             reads="Sandbox observations for testing."
             requires="A Square Sandbox test connection."
-            statuses={["Sync health unknown"]} href="/app/integrations/square" action="View Square Sandbox" /> : null}
-        </div>
-      ) : <p role="status" className="border-y border-line py-4 text-sm text-muted">No plug-ins are available for your workspace role right now.</p>}
+            availability="Sandbox only" statuses={["Sync health unknown"]} href="/app/integrations/square" action="View Square Sandbox" /> : null}
+        </ProviderCatalog>
     </div>
   );
 }

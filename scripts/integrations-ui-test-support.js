@@ -33,7 +33,7 @@ function loadSource(relative, mocks = {}) {
   return loaded.exports;
 }
 
-function harness(options = {}) {
+function harness(options = {}, extraMocks = {}) {
   const state = { role: "owner", qboEnabled: true, squareEnabled: true, sheetsEnabled: false, sheetsConnections: [], workspaceId: "workspace-a",
     connections: [], freshness: [], cancellations: [], cancellationError: false, errorTable: null, square: { available: true, connections: [] }, squareEvidence: null, ...options };
   const calls = [], queries = [];
@@ -58,7 +58,7 @@ function harness(options = {}) {
           assert.deepEqual(queryCalls.find(([method]) => method === "in"), ["in", "connection_id", state.connections.map(row => row.id)]);
         }
         return resolve({ data: state.errorTable === table ? null : table === "integration_connection_summaries" ? state.connections
-          : table === "integration_freshness_summaries" ? state.freshness : table === "google_sheets_connections" ? state.sheetsConnections : [{ id: "entity-a", display_name: "Synthetic entity" }],
+          : table === "integration_freshness_summaries" ? state.freshness : table === "google_sheets_connections" ? state.sheetsConnections : state.rows?.[table] ?? [{ id: "entity-a", display_name: "Synthetic entity" }],
         error: state.errorTable === table ? { message: "private database error" } : null });
       } };
       for (const method of ["select", "eq", "neq", "not", "order", "in"]) query[method] = (...args) => { queryCalls.push([method, ...args]); return query; };
@@ -81,9 +81,10 @@ function harness(options = {}) {
     } },
     "@/components/help/ContextualHelp": { ContextualHelp: () => null },
     "@/components/app/ThemeControls": { ThemeControls: () => null },
-    "@/lib/auth/actions": { changePasswordAction: async () => { throw Error("mutation_forbidden"); } }
+    "@/lib/auth/actions": { changePasswordAction: async () => { throw Error("mutation_forbidden"); } },
+    ...extraMocks
   };
-  return { state, calls, queries, load: relative => loadSource(relative, mocks),
+  return { state, calls, queries, access, load: relative => loadSource(relative, mocks),
     async render(relative, props = {}) { return renderToStaticMarkup(await loadSource(relative, mocks).default(props)); } };
 }
 
