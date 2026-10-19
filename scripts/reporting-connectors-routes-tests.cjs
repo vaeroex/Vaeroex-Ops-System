@@ -11,11 +11,12 @@ Module._load=function(name,parent,main){if(name==='server-only') return {};
 require.extensions['.ts']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,f);
 const security=require('../lib/integrations/reporting/security.ts');security.admin=()=>db;
 let enabled=true;security.available=()=>enabled;
-const oauth=require('../lib/integrations/reporting/oauth.ts');oauth.exchange=async()=>{providerCalls++;return{accessToken:'synthetic-token',refreshToken:'synthetic-refresh'};};oauth.authorizationUrl=()=> 'https://id.getharvest.com/oauth2/authorize';
+const oauth=require('../lib/integrations/reporting/oauth.ts');oauth.exchange=async()=>{providerCalls++;return{accessToken:'synthetic-token',refreshToken:'synthetic-refresh'};};
 const adapters=require('../lib/integrations/reporting/adapters.ts');adapters.accounts=async()=>{providerCalls++;return[{id:'123',name:'Test'}];};adapters.snapshot=async()=>{providerCalls++;return{};};
 const {get,post}=require('../lib/integrations/reporting/routes.ts');
 const connection='44444444-4444-4444-8444-444444444444';
-function reset(){role='owner';actor='actor';accessCalls=[];dbCalls=[];queue=[];rpcResults=[];providerCalls=0;enabled=true;process.env.REPORTING_CONNECTOR_TOKEN_KEY=Buffer.alloc(32,1).toString('base64');}
+function reset(){role='owner';actor='actor';accessCalls=[];dbCalls=[];queue=[];rpcResults=[];providerCalls=0;enabled=true;process.env.REPORTING_CONNECTOR_TOKEN_KEY=Buffer.alloc(32,1).toString('base64');
+ for(const provider of ['XERO','HARVEST','ZOHO_INVENTORY']){process.env[`${provider}_REPORTING_ENABLED`]='true';process.env[`${provider}_CLIENT_ID`]='synthetic-client';process.env[`${provider}_CLIENT_SECRET`]='synthetic-secret';}}
 function request(action,body,origin='https://www.vaeroex.com'){return new Request(`https://www.vaeroex.com/api/integrations/harvest/${action}`,{method:'POST',headers:{host:'www.vaeroex.com',origin,'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams(body)});}
 const context=action=>({params:Promise.resolve({provider:'harvest',action})});
 const callback=extra=>new Request(`https://www.vaeroex.com/api/integrations/harvest/callback?state=${'a'.repeat(43)}&code=synthetic-code${extra??''}`,{headers:{host:'www.vaeroex.com'}});
@@ -26,9 +27,17 @@ test('mutations reject other origins and nonowners before database/provider acce
 });
 test('OAuth start persists random hashed state with workspace and initiating user; explicit consent required',async()=>{
  reset();await post(request('connect',{}),context('connect'));assert.equal(dbCalls.length,0);
- const result=await post(request('connect',{confirmation:'connect'}),context('connect'));assert.equal(result.status,303);
- assert.equal(result.headers.get('cache-control'),'no-store');const args=dbCalls[0][0][2];
+ const result=await post(request('connect',{confirmation:'connect'}),context('connect'));assert.equal(result.status,200);
+ assert.equal(result.headers.get('location'),null,'native form must receive a document, not a provider redirect');
+ assert.equal(result.headers.get('cache-control'),'no-store, max-age=0');const args=dbCalls[0][0][2];
  assert.equal(args.p_workspace,'workspace');assert.equal(args.p_actor,'actor');assert.equal(args.p_provider,'harvest');assert.match(args.p_hash,/^[a-f0-9]{64}$/);
+ const html=await result.text(),policy=require('../lib/integrations/control-plane/square-customer-handoff-policy.json');
+ assert.equal(result.headers.get('content-security-policy'),policy.csp);assert.equal(result.headers.get('referrer-policy'),'no-referrer');
+ assert.deepEqual([...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]),[policy.script]);
+ const url=new URL(/data-target="([^"]+)"/.exec(html)[1].replace(/&amp;/g,'&'));
+ assert.equal(url.origin,'https://id.getharvest.com');assert.equal(url.pathname,'/oauth2/authorize');
+ assert.equal(url.searchParams.get('redirect_uri'),'https://www.vaeroex.com/api/integrations/harvest/callback');
+ assert.equal(security.hashState(url.searchParams.get('state')),args.p_hash);
 });
 test('callback rejects duplicate state and wrong actor without consuming state or exchanging tokens',async()=>{
  reset();await get(callback('&state=duplicate'),context('callback'));assert.equal(dbCalls.length,0);

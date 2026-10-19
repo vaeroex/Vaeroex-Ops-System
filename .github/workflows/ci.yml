@@ -219,6 +219,9 @@ jobs:
           SQUARE_HOST_BROWSER_TEST=1 node --require ./scripts/square-no-ai-runtime-test-guard.js scripts/square-workspace-host-handler-tests.js
           pnpm test:external-integrations-square-handoff-headers --browser
 
+      - name: Verify reporting OAuth handoff headers and isolated browser navigation
+        run: pnpm test:reporting-connectors:oauth-browser
+
       - name: Verify isolated native Square callback credentials, portal and guest controls
         run: |
           pnpm test:external-integrations-square-gcp-credentials

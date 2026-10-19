@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test:reporting-connectors": "node --test scripts/reporting-connectors-tests.cjs scripts/reporting-connectors-routes-tests.cjs scripts/reporting-connectors-db-tests.mjs",
     "test:reporting-connectors:browser": "node scripts/reporting-connectors-browser-tests.cjs",
+    "test:reporting-connectors:oauth-browser": "node scripts/reporting-oauth-handoff-browser-tests.cjs",
     "test:loyverse-connector": "node --test scripts/loyverse-connector-db-tests.mjs",
     "test:zoho-books-connector": "node --test scripts/zoho-books-connector-db-tests.mjs",
     "test:wix-orders-connector": "node --test scripts/wix-orders-connector-db-tests.mjs",

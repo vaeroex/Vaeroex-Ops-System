@@ -52,6 +52,7 @@ Xero scopes: `offline_access accounting.settings.read accounting.invoices.read` 
 - `reporting_credentials`: AES-256-GCM ciphertext, authenticated with provider + workspace + connection + format version. No client access. Discovered account choices are encrypted and only shown to the initiating owner; only the chosen account remains after selection.
 - `reporting_oauth_states`: random state hashes, bound to workspace, provider, initiating user and connection, ten-minute expiry, atomic single consumption. No client access.
 - All mutating routes require current owner access through the existing subscription/workspace guard and check the canonical request Origin/Host. Callback checks the original workspace and actor before consuming state.
+- OAuth connect returns a standalone same-origin document using Square's existing fixed, hash-authorized navigation script. Exact Next header rules protect only the Xero, Harvest and Zoho Inventory connect documents; the global form-action restriction and provider allowlists remain unchanged. This avoids the browser blocking a native form's cross-origin 303 after its pending connection was created. Optimized Next/Chromium qualification reproduces that failure and checks the repaired navigation, no-referrer policy, script-hash enforcement and unaffected neighboring routes without contacting providers.
 - Account selection is one-time. Changing accounts requires an explicit disconnect and new connection; old reports cannot be silently attributed to a different account.
 - Database functions have empty search paths, explicit service-role checks and no public/anon/authenticated execute grants. Credential refresh and disconnect take the same connection lock.
 - Sync lease: 65 seconds; provider request budget: 45 seconds, at most 12 fixed-host GET requests, 4 MiB per response. No automatic retries or paid quota upgrades. Manual sync is limited to once per hour, including failed attempts.
@@ -63,6 +64,7 @@ Xero scopes: `offline_access accounting.settings.read accounting.invoices.read` 
 Automated checks:
 
 - `pnpm test:reporting-connectors`: provider fixtures, transport limits, encryption, OAuth/CSRF/owner/actor boundaries and local database isolation/concurrency/erasure.
+- `pnpm test:reporting-connectors:oauth-browser`: isolated optimized Next wire headers and actual native-form navigation under both global CSP modes, with synthetic provider destinations intercepted.
 - `pnpm typecheck`
 - Focused ESLint on changed files.
 - Existing Loyverse/Zoho Books database tests and integration UI regression tests.

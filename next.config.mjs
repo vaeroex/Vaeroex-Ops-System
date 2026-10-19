@@ -116,6 +116,18 @@ const nextConfig = {
         ]
       },
       {
+        // Reporting OAuth starts use the same fixed navigation script as Square.
+        // Keep the application-wide form-action restriction; only these three
+        // standalone response documents receive the stricter hash-only policy.
+        source: "/api/integrations/:provider(xero|harvest|zoho-inventory)/connect",
+        headers: [
+          { key: "Content-Security-Policy", value: squareHandoffPolicy.csp },
+          { key: "Content-Security-Policy-Report-Only", value: squareHandoffPolicy.csp },
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "no-store, max-age=0" }
+        ]
+      },
+      {
         source: "/sw.js",
         headers: [
           {
