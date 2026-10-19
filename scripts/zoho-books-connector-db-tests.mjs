@@ -126,6 +126,21 @@ test("Zoho Books historical facts correct by identity, preserve outside ranges, 
     const many = Array.from({length:2001},(_,i)=>fact(String(100+i),'2020-03-01',1));
     await apply('2020-03-01','2020-03-01',many);
     assert.equal((await read()).invoice_count,2001,'SQL aggregate does not truncate at REST row limits');
+    const savedBeforeReauthorization = await read();
+    await renew();
+    await db.query("update zoho_books_connections set status='reauthorization_required' where id=$1",[connection]);
+    assert.deepEqual(await read(),savedBeforeReauthorization,'expired provider authorization does not hide saved history');
+    await assert.rejects(apply('2020-03-01','2020-03-01',[]),/lease_invalid/,
+      'reauthorization status blocks new imports even with an otherwise valid lease');
+    assert.deepEqual(await read(),savedBeforeReauthorization,'blocked import preserves saved facts and coverage');
+    await assert.rejects(db.query("select read_zoho_books_history($1,$2)",[other,connection]),/connection_invalid/,
+      'reauthorization does not weaken the workspace and connection binding');
+    await assert.rejects(db.query("select read_zoho_books_history($1,$2)",[workspace,otherConnection]),/connection_invalid/);
+    for (const status of ['pending','choose_organization']) {
+      await db.query("update zoho_books_connections set status=$1 where id=$2",[status,connection]);
+      await assert.rejects(read(),/connection_invalid/,'unfinished connection states do not expose history');
+    }
+    await db.query("update zoho_books_connections set status='connected' where id=$1",[connection]);
     await renew();
     await db.query("update zoho_books_connections set sync_lease_expires_at=clock_timestamp()-interval '1 second' where id=$1",[connection]);
     await assert.rejects(apply('2020-03-01','2020-03-01',[]),/lease_invalid/);
@@ -141,6 +156,7 @@ test("Zoho Books historical facts correct by identity, preserve outside ranges, 
     assert.equal((await db.query("select count(*)::int as n from zoho_books_history_facts where workspace_id=$1",[workspace])).rows[0].n,0);
     assert.equal((await db.query("select count(*)::int as n from zoho_books_history_coverage")).rows[0].n,0);
     assert.equal((await db.query("select count(*)::int as n from zoho_books_daily_summaries")).rows[0].n,0);
+    await assert.rejects(read(),/connection_invalid/,'disconnect prevents saved-history reads');
     await assert.rejects(apply('2020-03-01','2020-03-01',many),/lease_invalid/);
     assert.equal((await db.query("select count(*)::int as n from zoho_books_history_facts where workspace_id=$1",[other])).rows[0].n,1);
   } finally { await db.close(); }

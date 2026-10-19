@@ -107,7 +107,8 @@ begin
   if (p_start_date is null) <> (p_end_date is null) or p_start_date > p_end_date then
     raise exception 'zoho_books_history_invalid';
   end if;
-  if not exists (select 1 from public.zoho_books_connections where workspace_id=p_workspace_id and id=p_connection_id and status='connected') then
+  if not exists (select 1 from public.zoho_books_connections where workspace_id=p_workspace_id and id=p_connection_id
+    and status in ('connected','reauthorization_required')) then
     raise exception 'zoho_books_connection_invalid';
   end if;
   select min(day),max(day),count(*)::integer,
