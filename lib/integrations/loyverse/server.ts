@@ -28,6 +28,7 @@ const receiptResponse = z.object({
     receipt_number: z.string().min(1).max(120),
     store_id: z.string().min(1).max(120),
     receipt_date: z.string().datetime({ offset: true }),
+    created_at: z.string().datetime({ offset: true }),
     updated_at: z.string().datetime({ offset: true }),
     receipt_type: z.enum(["SALE", "REFUND"]),
     total_money: z.number().finite(),
@@ -38,7 +39,7 @@ const receiptResponse = z.object({
 }).passthrough();
 
 export type ReceiptFact = {
-  receipt_number: string; store_id: string; receipt_date: string; updated_at: string;
+  receipt_number: string; store_id: string; receipt_date: string; created_at: string; updated_at: string;
   receipt_type: "SALE" | "REFUND"; total_money: number; total_tax: number;
   total_discount: number; cancelled: boolean;
 };
@@ -136,10 +137,10 @@ export function decryptToken(workspaceId: string, connectionId: string, cipherte
   return savedToken.parse(JSON.parse(Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]).toString("utf8")));
 }
 
-async function apiGet(path: string, accessToken: string) {
+async function apiGet(path: string, accessToken: string, signal?: AbortSignal) {
   const response = await fetch(`${API_URL}${path}`, { headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" },
-    cache: "no-store", signal: AbortSignal.timeout(15_000) });
-  if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "loyverse_authorization_required" : "loyverse_provider_unavailable");
+    cache: "no-store", redirect: "error", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000) });
+  if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "loyverse_authorization_required" : response.status === 429 ? "loyverse_quota_exceeded" : "loyverse_provider_unavailable");
   const text = await response.text();
   if (text.length > 4_000_000) throw new Error("loyverse_response_too_large");
   return JSON.parse(text) as unknown;
@@ -149,26 +150,34 @@ export async function merchant(accessToken: string) {
   return merchantResponse.parse(await apiGet("/merchant/", accessToken));
 }
 
-export async function recentReceipts(accessToken: string, windowStart: string, windowEnd: string): Promise<ReceiptFact[]> {
+export async function recentReceipts(accessToken: string, windowStart: string, windowEnd: string, signal = AbortSignal.timeout(45_000)): Promise<ReceiptFact[]> {
   const facts: ReceiptFact[] = [], seen = new Set<string>();
+  const cursors = new Set<string>();
   let cursor: string | null = null;
   for (let page = 0; page < 20; page++) {
-    const search = new URLSearchParams({ created_at_min: windowStart, created_at_max: windowEnd, limit: "250" });
+    // The API documents "after" for the lower boundary. Include midnight even
+    // if that boundary is exclusive, then enforce our half-open interval below.
+    const search = new URLSearchParams({ created_at_min: new Date(Date.parse(windowStart) - 1).toISOString(), created_at_max: windowEnd, limit: "250" });
     if (cursor) search.set("cursor", cursor);
-    const result = receiptResponse.parse(await apiGet(`/receipts?${search.toString()}`, accessToken));
+    const result = receiptResponse.parse(await apiGet(`/receipts?${search.toString()}`, accessToken, signal));
     for (const item of result.receipts) {
       if (seen.has(item.receipt_number)) throw new Error("loyverse_duplicate_receipt");
       seen.add(item.receipt_number);
       const date = new Date(item.receipt_date).toISOString();
-      if (date < windowStart || date >= windowEnd) continue;
+      const created = new Date(item.created_at).toISOString();
+      // Loyverse filters server creation time, not the backdated receipt date.
+      if (Date.parse(created) < Date.parse(windowStart) - 1 || created > windowEnd)
+        throw new Error("loyverse_invalid_window");
+      if (created < windowStart || created >= windowEnd) continue;
       facts.push({ receipt_number: item.receipt_number, store_id: item.store_id,
-        receipt_date: date, updated_at: new Date(item.updated_at).toISOString(),
+        receipt_date: date, created_at: created, updated_at: new Date(item.updated_at).toISOString(),
         receipt_type: item.receipt_type, total_money: item.total_money,
         total_tax: item.total_tax ?? 0, total_discount: item.total_discount ?? 0,
         cancelled: Boolean(item.cancelled_at) });
     }
     if (!result.cursor) return facts;
-    if (result.cursor === cursor) throw new Error("loyverse_pagination_invalid");
+    if (cursors.has(result.cursor)) throw new Error("loyverse_pagination_invalid");
+    cursors.add(result.cursor);
     cursor = result.cursor;
   }
   throw new Error("loyverse_receipt_limit_exceeded");

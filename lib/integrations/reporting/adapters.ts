@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
-import { type Account, type Provider, type Snapshot, type Metric, catalog } from "./catalog";
+import { type Account, type Provider, type Snapshot, type Metric, type HistoricalProvider, type HistoryFact, type HistoryImport, catalog } from "./catalog";
+import { resolveImportRange } from "../date-range";
 import { accountSchema } from "./security";
 import { reader } from "./transport";
 
@@ -62,10 +63,29 @@ export function validateSnapshot(provider: Provider, snapshot: unknown): Snapsho
   return parsed;
 }
 export async function snapshot(provider: Provider, token: string, account: Account, signal: AbortSignal, now = new Date()): Promise<Snapshot> {
+  return (await readReport(provider, token, account, signal, now)).snapshot;
+}
+export async function importHistory(provider: HistoricalProvider, token: string, account: Account, signal: AbortSignal,
+  requested: ReturnType<typeof resolveImportRange>, now = new Date()): Promise<HistoryImport> {
+  // Revalidate at the adapter boundary; callers cannot construct an unbounded or future window.
+  const validated = resolveImportRange(requested.startDate, requested.endDate, now);
+  const observed = Date.parse(requested.endAt);
+  const endDayStart = Date.parse(`${validated.endDate}T00:00:00.000Z`);
+  if (!Number.isFinite(observed) || observed < endDayStart || observed > endDayStart+86_400_000 || observed > now.getTime()) {
+    throw new Error("invalid_date_range");
+  }
+  // Preserve the cutoff captured before fetching, including an import that crosses midnight.
+  const range = { ...validated, endAt: requested.endAt };
+  return (await readReport(provider, token, account, signal, now, range)).history;
+}
+async function readReport(provider: Provider, token: string, account: Account, signal: AbortSignal, now: Date,
+  range?: ReturnType<typeof resolveImportRange>): Promise<{ snapshot: Snapshot; history: HistoryImport }> {
   accountSchema.parse(account);
-  const end = now.toISOString(), to = end.slice(0, 10);
-  const start = new Date(`${to}T00:00:00.000Z`); start.setUTCDate(start.getUTCDate() - 6);
-  const from = start.toISOString().slice(0, 10);
+  const end = range?.endAt ?? now.toISOString(), to = range?.endDate ?? end.slice(0, 10);
+  const start = range ? new Date(range.startAt) : new Date(`${to}T00:00:00.000Z`);
+  if (!range) start.setUTCDate(start.getUTCDate() - 6);
+  const from = range?.startDate ?? start.toISOString().slice(0, 10);
+  const facts: HistoryFact[] = [];
   let metrics: Metric[];
   if (provider === "harvest") {
     const get = reader("https://api.harvestapp.com/v2", { ...bearer(token), "Harvest-Account-Id": account.id }, signal);
@@ -82,6 +102,10 @@ export async function snapshot(provider: Provider, token: string, account: Accou
     }
     unique(rows, r => r.id);
     if (rows.some(r => r.spent_date < from || r.spent_date > to)) throw new Error("invalid_window");
+    facts.push(...rows.map(r => ({ recordId: r.id, day: r.spent_date, metrics: [
+      { key: "entries", value: r.is_running ? 0 : 1 }, { key: "hours", value: r.is_running ? 0 : r.hours },
+      { key: "billable_hours", value: !r.is_running && r.billable ? r.hours : 0 }, { key: "running", value: r.is_running ? 1 : 0 }
+    ] })));
     const complete = rows.filter(r => !r.is_running);
     metrics = [{ key: "entries", value: complete.length }, { key: "hours", value: complete.reduce((n,r) => n+r.hours,0) },
       { key: "billable_hours", value: complete.filter(r => r.billable).reduce((n,r) => n+r.hours,0) }, { key: "running", value: rows.length-complete.length }];
@@ -98,9 +122,17 @@ export async function snapshot(provider: Provider, token: string, account: Accou
     unique(rows, r => r.id);
     let seconds = 0, billable = 0, count = 0, running = 0;
     for (const r of rows) {
-      if (!r.timeInterval.end) { running++; continue; }
-      const a = Date.parse(r.timeInterval.start), b = Date.parse(r.timeInterval.end);
-      if (b < a || a < start.getTime() || a > now.getTime() || b > now.getTime()) throw new Error("invalid_window");
+      const a = Date.parse(r.timeInterval.start), b = r.timeInterval.end ? Date.parse(r.timeInterval.end) : null;
+      if (a > now.getTime() || (b !== null && (b < a || b > now.getTime()))) throw new Error("invalid_window");
+      // Clockify may return overlapping entries. Membership is determined by start date;
+      // a completed entry that crosses the end boundary retains its entire duration.
+      if (a < start.getTime() || a >= Date.parse(end)) continue;
+      const hours = b === null ? 0 : (b-a)/3_600_000;
+      facts.push({ recordId: r.id, day: new Date(a).toISOString().slice(0, 10), metrics: [
+        { key: "entries", value: b === null ? 0 : 1 }, { key: "hours", value: hours },
+        { key: "billable_hours", value: r.billable ? hours : 0 }, { key: "running", value: b === null ? 1 : 0 }
+      ] });
+      if (b === null) { running++; continue; }
       seconds += (b-a)/1000; if (r.billable) billable += (b-a)/1000; count++;
     }
     metrics = [{ key: "entries", value: count }, { key: "hours", value: seconds/3600 }, { key: "billable_hours", value: billable/3600 }, { key: "running", value: running }];
@@ -155,14 +187,26 @@ export async function snapshot(provider: Provider, token: string, account: Accou
       if (page > 10) throw new Error("snapshot_too_large");
       const result = z.object({ Invoices: z.array(z.object({ InvoiceID: z.string().uuid(), DateString: z.string().regex(/^\d{4}-\d{2}-\d{2}T00:00:00$/), Type: z.enum(["ACCREC","ACCPAY"]),
         Status: z.enum(["DRAFT","SUBMITTED","DELETED","AUTHORISED","PAID","VOIDED"]), CurrencyCode: z.string().regex(/^[A-Z]{3}$/), Total: number.optional(), AmountDue: number.optional() })).max(100) })
-        .parse(await get("/Invoices", { where, page: String(page), pageSize: "100", Statuses: "AUTHORISED,PAID" }));
+        .parse(await get("/Invoices", { where, page: String(page), pageSize: "100",
+          Statuses: range ? "DRAFT,SUBMITTED,DELETED,AUTHORISED,PAID,VOIDED" : "AUTHORISED,PAID" }));
       rows.push(...result.Invoices); if (result.Invoices.length < 100) break;
     }
     unique(rows, r => r.InvoiceID);
     const groups = new Map<string, Record<string, number>>();
-    for (const r of rows.filter(r => ["AUTHORISED","PAID"].includes(r.Status))) {
+    for (const r of rows) {
       if (r.DateString.slice(0,10) < from || r.DateString.slice(0,10) > to) throw new Error("invalid_window");
-      const total = number.parse(r.Total), due = number.parse(r.AmountDue);
+      const included = ["AUTHORISED","PAID"].includes(r.Status);
+      const total = included ? number.parse(r.Total) : 0, due = included ? number.parse(r.AmountDue) : 0;
+      // Keep excluded-status IDs with zero contributions. A moved-and-voided invoice
+      // must replace its old dated contribution even when importing only its new date.
+      facts.push({ recordId: r.InvoiceID, day: r.DateString.slice(0, 10), metrics: [
+        { key: "invoices", value: included && r.Type === "ACCREC" ? 1 : 0, currency: r.CurrencyCode },
+        { key: "billed", value: r.Type === "ACCREC" ? Math.round(total*100)/100 : 0, currency: r.CurrencyCode },
+        { key: "outstanding", value: r.Type === "ACCREC" ? Math.round(due*100)/100 : 0, currency: r.CurrencyCode },
+        { key: "bills", value: included && r.Type === "ACCPAY" ? 1 : 0, currency: r.CurrencyCode },
+        { key: "purchases", value: r.Type === "ACCPAY" ? Math.round(total*100)/100 : 0, currency: r.CurrencyCode }
+      ] });
+      if (!included) continue;
       const group = groups.get(r.CurrencyCode) ?? { invoices: 0, billed: 0, outstanding: 0, bills: 0, purchases: 0 };
       if (r.Type === "ACCREC") { group.invoices++; group.billed += Math.round(total*100); group.outstanding += Math.round(due*100); }
       else { group.bills++; group.purchases += Math.round(total*100); } groups.set(r.CurrencyCode, group);
@@ -175,5 +219,7 @@ export async function snapshot(provider: Provider, token: string, account: Accou
     metrics = [...groups].flatMap(([currency, values]) => Object.entries(values).map(([key,value]) => ({ key, currency, value: ["invoices","bills"].includes(key) ? value : value/100 })));
   }
   const pointInTime = ["toggl","katana","zoho-inventory"].includes(provider);
-  return validateSnapshot(provider, { start: pointInTime ? end : start.toISOString(), end, metrics });
+  return { snapshot: validateSnapshot(provider, { start: pointInTime ? end : start.toISOString(), end, metrics }),
+    history: { startDate: from, endDate: to, records: facts,
+      currencies: [...new Set([...metrics, ...facts.flatMap(f => f.metrics)].flatMap(m => m.currency ? [m.currency] : []))] } };
 }

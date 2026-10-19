@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Production route modules exercised with isolated auth/database/provider boundaries. */
 const {test,after}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const Module=require('node:module');const ts=require('typescript');
 const oldLoad=Module._load,oldTs=require.extensions['.ts'];
-let role='owner',actor='actor',accessCalls=[],dbCalls=[],queue=[],rpcResults=[],providerCalls=0;
+let role='owner',actor='actor',accessCalls=[],dbCalls=[],queue=[],rpcResults=[],providerCalls=0,importArgs=null,importError=null;
 const db={from(table){const calls=[['from',table]];const chain={};for(const method of ['select','update','eq','is','gt','single','maybeSingle']) chain[method]=(...args)=>{calls.push([method,...args]);return chain;};
  chain.then=(resolve,reject)=>{dbCalls.push(calls);return Promise.resolve(queue.shift()??{data:null,error:null}).then(resolve,reject);};return chain;},
  async rpc(name,args){dbCalls.push([['rpc',name,args]]);return rpcResults.shift()??{data:true,error:null};}};
@@ -13,9 +13,10 @@ const security=require('../lib/integrations/reporting/security.ts');security.adm
 let enabled=true;security.available=()=>enabled;
 const oauth=require('../lib/integrations/reporting/oauth.ts');oauth.exchange=async()=>{providerCalls++;return{accessToken:'synthetic-token',refreshToken:'synthetic-refresh'};};
 const adapters=require('../lib/integrations/reporting/adapters.ts');adapters.accounts=async()=>{providerCalls++;return[{id:'123',name:'Test'}];};adapters.snapshot=async()=>{providerCalls++;return{};};
+adapters.importHistory=async(...args)=>{providerCalls++;importArgs=args;if(importError)throw new Error(importError);return{startDate:args[4].startDate,endDate:args[4].endDate,records:[],currencies:[]};};
 const {get,post}=require('../lib/integrations/reporting/routes.ts');
 const connection='44444444-4444-4444-8444-444444444444';
-function reset(){role='owner';actor='actor';accessCalls=[];dbCalls=[];queue=[];rpcResults=[];providerCalls=0;enabled=true;process.env.REPORTING_CONNECTOR_TOKEN_KEY=Buffer.alloc(32,1).toString('base64');
+function reset(){role='owner';actor='actor';accessCalls=[];dbCalls=[];queue=[];rpcResults=[];providerCalls=0;importArgs=null;importError=null;enabled=true;process.env.REPORTING_CONNECTOR_TOKEN_KEY=Buffer.alloc(32,1).toString('base64');
  for(const provider of ['XERO','HARVEST','ZOHO_INVENTORY']){process.env[`${provider}_REPORTING_ENABLED`]='true';process.env[`${provider}_CLIENT_ID`]='synthetic-client';process.env[`${provider}_CLIENT_SECRET`]='synthetic-secret';}}
 function request(action,body,origin='https://www.vaeroex.com'){return new Request(`https://www.vaeroex.com/api/integrations/harvest/${action}`,{method:'POST',headers:{host:'www.vaeroex.com',origin,'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams(body)});}
 const context=action=>({params:Promise.resolve({provider:'harvest',action})});
@@ -72,4 +73,29 @@ test('only unique conflicts report an existing connection; other database errors
   assert.equal(new URL(response.headers.get('location')).searchParams.get('result'),result);
   assert.equal(providerCalls,0);assert.equal(dbCalls.length,1);
  }
+});
+
+test('historical sync validates dates before lease or provider access and commits only the requested complete period',async()=>{
+ for(const dates of [{startDate:'2018-01-01'},{startDate:'2018-02-30',endDate:'2018-03-01'},{startDate:'2018-01-01',endDate:'2020-01-01'}]){
+  reset();const result=await post(request('sync',{connectionId:connection,...dates}),context('sync'));
+  assert.match(result.headers.get('location'),/invalid_date_range/);assert.equal(dbCalls.length,0);assert.equal(providerCalls,0);
+ }
+ reset();queue.push({data:{status:'connected',account:{id:'123',name:'Test'},created_by:actor},error:null},
+  {data:{ciphertext:security.seal('harvest','workspace',connection,{accessToken:'synthetic-token'})},error:null});
+ const result=await post(request('sync',{connectionId:connection,startDate:'2014-01-01',endDate:'2014-12-31'}),context('sync'));
+ assert.match(result.headers.get('location'),/synced/);assert.equal(importArgs[4].startDate,'2014-01-01');
+ const apply=dbCalls.find(c=>c[0][1]==='apply_reporting_history')[0][2];
+ assert.equal(apply.p_start_date,'2014-01-01');assert.equal(apply.p_end_date,'2014-12-31');assert.deepEqual(apply.p_records,[]);assert.equal(apply.p_workspace,'workspace');
+ assert.equal(dbCalls.filter(c=>c[0][1]==='apply_reporting_snapshot').length,0);
+});
+
+test('historical overflow preserves saved data and releases only the matching lease',async()=>{
+ reset();importError='snapshot_too_large';queue.push({data:{status:'connected',account:{id:'123',name:'Test'},created_by:actor},error:null},
+  {data:{ciphertext:security.seal('harvest','workspace',connection,{accessToken:'synthetic-token'})},error:null});
+ const result=await post(request('sync',{connectionId:connection,startDate:'2014-01-01',endDate:'2014-12-31'}),context('sync'));
+ assert.match(result.headers.get('location'),/snapshot_too_large/);
+ assert.equal(dbCalls.filter(c=>c[0][1]==='apply_reporting_history').length,0);
+ const cleanup=dbCalls.at(-1);assert.ok(cleanup.some(c=>c[0]==='eq'&&c[1]==='lease_id'));
+ assert.ok(cleanup.some(c=>c[0]==='eq'&&c[1]==='workspace_id'&&c[2]==='workspace'));
+ assert.equal(cleanup.find(c=>c[0]==='update')[1].last_error_code,'snapshot_too_large');
 });

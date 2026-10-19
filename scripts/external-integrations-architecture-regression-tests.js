@@ -426,6 +426,10 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026100502201
   currentMigrations.filter(name => name !== "20261017023221_zoho_books_read_only_connection.sql"),
   currentMigrations.filter(name => name !== "20261017051502_wix_orders_read_only_connection.sql"),
   currentMigrations.filter(name => !["20261019001207_ready_account_reporting_connectors.sql", "20261019033506_reporting_supported_jwt_role.sql"].includes(name)),
+  currentMigrations.filter(name => name !== "20261019070945_reporting_import_history.sql"),
+  currentMigrations.filter(name => name !== "20261019070949_zoho_books_import_history.sql"),
+  currentMigrations.filter(name => name !== "20261019070953_loyverse_import_history.sql"),
+  currentMigrations.filter(name => name !== "20261019071008_wix_orders_import_history.sql"),
   currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
   currentMigrations.filter(name => name !== "20260902191325_square_production_internal_pilot_runtime.sql"),
   currentMigrations.filter(name => name !== "20260907225626_square_remote_sandbox_binding.sql"),
@@ -443,6 +447,19 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026100502201
   [...currentMigrations, "20261002182049_integration_summary_preferences.sql"],
   [...currentMigrations, "20990101000000_square_activation.sql"]]) {
   assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "missing or unreviewed tail still rejects");
+}
+// Each separately reviewed history migration is exact: renames and duplicate
+// ledger entries must fail, just like an unknown Square activation migration.
+for (const name of [
+  "20261019070945_reporting_import_history.sql",
+  "20261019070949_zoho_books_import_history.sql",
+  "20261019070953_loyverse_import_history.sql",
+  "20261019071008_wix_orders_import_history.sql",
+]) {
+  for (const manifest of [currentMigrations.map(item => item === name ? item.replace("_", "1_") : item),
+    [...currentMigrations, name]]) {
+    assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "history migration names and uniqueness remain strict");
+  }
 }
 matches(
   zeroBasedUpgradeRunner,

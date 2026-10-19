@@ -71,7 +71,7 @@ export default async function IntegrationsPage() {
             requires="A QuickBooks Online company and an active Vaeroex business entity."
             statuses={!qbo ? ["Status unavailable"] : qboStatuses?.length ? [...new Set(qboStatuses)] : ["Not connected"]}
             href="/app/settings/integrations/quickbooks" action={owner && qbo && !qbo.connections.length ? "Connect QuickBooks" : "Manage QuickBooks"} /> : null}
-          {loyverseAvailable ? <ProviderCard name="Loyverse" description="Read only POS sales for the last seven days."
+          {loyverseAvailable ? <ProviderCard name="Loyverse" description="Read-only POS sales with selectable imports and saved history."
             reads="Merchant details and receipt totals, refunds, and dates; no customer details are stored."
             requires="A U.S. Loyverse merchant account and owner authorization."
             statuses={loyverse?.error ? ["Status unavailable"] : loyverse?.data?.length
@@ -79,7 +79,7 @@ export default async function IntegrationsPage() {
                 connection.status === "reauthorization_required" ? "Reauthorization required" : "Waiting for authorization"))]
               : ["Not connected"]}
             href="/app/integrations/loyverse" action={owner && !loyverse?.data?.length ? "Connect Loyverse" : "Manage Loyverse"} /> : null}
-          {zohoAvailable ? <ProviderCard name="Zoho Books" description="Read-only invoice and expense totals for the last seven dates."
+          {zohoAvailable ? <ProviderCard name="Zoho Books" description="Read-only invoice and expense totals with selectable imports and saved history."
             reads="Organization, invoice, and expense totals and dates; no contacts or line items are stored."
             requires="A U.S. Zoho Books organization and owner authorization."
             statuses={zoho?.error ? ["Status unavailable"] : zoho?.data?.length
@@ -88,7 +88,7 @@ export default async function IntegrationsPage() {
                 connection.status === "reauthorization_required" ? "Reauthorization required" : "Waiting for authorization"))]
               : ["Not connected"]}
             href="/app/integrations/zoho-books" action={owner && !zoho?.data?.length ? "Connect Zoho Books" : "Manage Zoho Books"} /> : null}
-          {owner || wixAvailable ? <ProviderCard name="Wix online orders" description="Read-only order counts and totals for the last seven days."
+          {owner || wixAvailable ? <ProviderCard name="Wix online orders" description="Read-only order counts and totals with selectable imports and saved history."
             reads="Order dates, totals, currency, and payment status; no customer details or items are stored."
             requires="A U.S. Wix site with online orders enabled and a Wix plan that supports payments. Wix Restaurants Orders must be installed for restaurant orders."
             statuses={!wixAvailable ? ["Setup in progress"] : wix?.error ? ["Status unavailable"] : wix?.data?.length

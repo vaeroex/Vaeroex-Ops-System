@@ -3,6 +3,7 @@ import "server-only";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { resolveImportRange } from "@/lib/integrations/date-range";
 
 const CALLBACK_PATH = "/api/integrations/zoho-books/callback";
 const SCOPE = "ZohoBooks.settings.READ,ZohoBooks.invoices.READ,ZohoBooks.expenses.READ";
@@ -49,8 +50,8 @@ const expenseResponse = z.object({
 }).passthrough();
 
 export type Organization = { id: string; name: string; currency: string };
-export type DailySummary = { day: string; invoice_count: number; invoice_total: number;
-  outstanding_total: number; expense_count: number; expense_total: number; excluded_foreign_count: number };
+export type AccountingFact = { kind: "invoice" | "expense"; source_id: string; day: string;
+  counted: boolean; currency: string; total: number; outstanding: number };
 
 export function config() {
   if (process.env.ZOHO_BOOKS_ENABLED !== "true") throw new Error("zoho_books_disabled");
@@ -143,10 +144,10 @@ export function decryptToken(workspaceId: string, connectionId: string, cipherte
   return savedToken.parse(JSON.parse(Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]).toString("utf8")));
 }
 
-async function apiGet(path: string, accessToken: string) {
+async function apiGet(path: string, accessToken: string, signal?: AbortSignal) {
   const response = await fetch(`${API_DOMAIN}/books/v3${path}`, { headers: {
     authorization: `Zoho-oauthtoken ${accessToken}`, accept: "application/json"
-  }, cache: "no-store", signal: AbortSignal.timeout(15_000) });
+  }, cache: "no-store", redirect: "error", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000) });
   if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "zoho_books_authorization_required" : "zoho_books_provider_unavailable");
   const text = await response.text();
   if (text.length > 4_000_000) throw new Error("zoho_books_response_too_large");
@@ -162,12 +163,12 @@ export async function organizations(accessToken: string): Promise<Organization[]
 }
 
 async function listPages<T>(path: "invoices" | "expenses", accessToken: string, organizationId: string,
-  startDate: string, endDate: string, parse: (value: unknown) => { items: T[]; more?: boolean }): Promise<T[]> {
+  startDate: string, endDate: string, signal: AbortSignal, parse: (value: unknown) => { items: T[]; more?: boolean }): Promise<T[]> {
   const all: T[] = [];
   for (let page = 1; page <= 10; page++) {
     const query = new URLSearchParams({ organization_id: organizationId, date_start: startDate,
       date_end: endDate, page: String(page), per_page: "200" });
-    const result = parse(await apiGet(`/${path}?${query}`, accessToken));
+    const result = parse(await apiGet(`/${path}?${query}`, accessToken, signal));
     all.push(...result.items);
     if (result.more === false || (result.more === undefined && result.items.length < 200)) return all;
   }
@@ -183,51 +184,43 @@ function cents(value: number) {
   return Math.round(value * 100);
 }
 
-export async function recentSummaries(accessToken: string, organizationId: string, startDate: string, endDate: string): Promise<DailySummary[]> {
-  if (!/^\d{5,30}$/.test(organizationId) || !datePattern.test(startDate) || !datePattern.test(endDate) || startDate > endDate)
-    throw new Error("zoho_books_window_invalid");
+/** Complete selected-period import. Only stable IDs, dates and numeric accounting facts leave this adapter. */
+export async function accountingFacts(accessToken: string, organizationId: string, startDate: string, endDate: string): Promise<AccountingFact[]> {
+  if (!/^\d{5,30}$/.test(organizationId)) throw new Error("zoho_books_window_invalid");
+  resolveImportRange(startDate, endDate);
+  const signal = AbortSignal.timeout(45_000);
   const [invoices, expenses] = await Promise.all([
-    listPages("invoices", accessToken, organizationId, startDate, endDate, (value) => {
+    listPages("invoices", accessToken, organizationId, startDate, endDate, signal, (value) => {
       const result = invoiceResponse.parse(value);
       return { items: result.invoices, more: morePages(result.page_context) };
     }),
-    listPages("expenses", accessToken, organizationId, startDate, endDate, (value) => {
+    listPages("expenses", accessToken, organizationId, startDate, endDate, signal, (value) => {
       const result = expenseResponse.parse(value);
       return { items: result.expenses, more: morePages(result.page_context) };
     })
   ]);
-  const days = new Map<string, { invoiceCount: number; invoiceCents: number; balanceCents: number;
-    expenseCount: number; expenseCents: number; foreignCount: number }>();
-  for (let day = startDate; day <= endDate; day = new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10)) {
-    days.set(day, { invoiceCount: 0, invoiceCents: 0, balanceCents: 0, expenseCount: 0, expenseCents: 0, foreignCount: 0 });
-    if (days.size > 7) throw new Error("zoho_books_window_too_large");
+  const facts: AccountingFact[] = [], seen = new Set<string>();
+  function identity(kind: AccountingFact["kind"], id: string, day: string) {
+    if (!/^\d{1,30}$/.test(id) || seen.has(`${kind}:${id}`)) throw new Error("zoho_books_duplicate_or_invalid_id");
+    if (day < startDate || day > endDate || new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) !== day)
+      throw new Error("zoho_books_day_invalid");
+    seen.add(`${kind}:${id}`);
   }
-  const invoiceIds = new Set<string>(), expenseIds = new Set<string>();
   for (const item of invoices) {
-    if (invoiceIds.has(item.invoice_id)) throw new Error("zoho_books_duplicate_invoice");
-    invoiceIds.add(item.invoice_id);
-    const day = days.get(item.date);
-    if (!day || item.status === "draft" || item.status === "void") continue;
-    if (!["sent", "paid", "overdue", "unpaid", "partially_paid", "viewed"].includes(item.status))
+    identity("invoice", item.invoice_id, item.date);
+    if (!["draft", "void", "sent", "paid", "overdue", "unpaid", "partially_paid", "viewed"].includes(item.status))
       throw new Error("zoho_books_invoice_status_unknown");
-    if (item.currency_code !== "USD") { day.foreignCount++; continue; }
-    day.invoiceCount++;
-    day.invoiceCents += cents(item.total);
-    day.balanceCents += cents(item.balance);
+    const counted = item.status !== "draft" && item.status !== "void";
+    facts.push({ kind: "invoice", source_id: item.invoice_id, day: item.date, counted, currency: item.currency_code,
+      total: counted && item.currency_code === "USD" ? cents(item.total) / 100 : 0,
+      outstanding: counted && item.currency_code === "USD" ? cents(item.balance) / 100 : 0 });
   }
   for (const item of expenses) {
-    if (expenseIds.has(item.expense_id)) throw new Error("zoho_books_duplicate_expense");
-    expenseIds.add(item.expense_id);
-    const day = days.get(item.date);
-    if (!day) continue;
-    if (item.currency_code !== "USD") { day.foreignCount++; continue; }
-    day.expenseCount++;
-    day.expenseCents += cents(item.total);
+    identity("expense", item.expense_id, item.date);
+    facts.push({ kind: "expense", source_id: item.expense_id, day: item.date, counted: true, currency: item.currency_code,
+      total: item.currency_code === "USD" ? cents(item.total) / 100 : 0, outstanding: 0 });
   }
-  return [...days].map(([day, item]) => ({ day, invoice_count: item.invoiceCount,
-    invoice_total: item.invoiceCents / 100, outstanding_total: item.balanceCents / 100,
-    expense_count: item.expenseCount, expense_total: item.expenseCents / 100,
-    excluded_foreign_count: item.foreignCount }));
+  return facts;
 }
 
 export function redirect(status: "connected" | "choose" | "disconnected" | "error" | "synced") {

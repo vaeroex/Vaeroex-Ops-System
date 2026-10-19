@@ -1,6 +1,6 @@
 # Ready-account reporting plug-ins
 
-Implementation status: review candidate, disabled by default. No production migration, provider credentials, customer OAuth grants, or live-provider qualification has been performed by this change. A developer account or registered OAuth application is not a connected Executive Intelligence workspace.
+The baseline six-provider release was deployed through [PR #520](https://github.com/vaeroex/Vaeroex-Ops-System/pull/520), and all six designated test connections completed read-only reports on October 19, 2026. Historical import controls described here require the additional migrations in [historical imports](historical-imports.md); their release is tracked separately. A developer account or registered OAuth application alone is not a connected Executive Intelligence workspace.
 
 ## Implemented behavior
 
@@ -8,10 +8,10 @@ Workspace owners can authorize a provider or enter an API key, explicitly select
 
 | Plug-in | Authentication | Report | Important boundary |
 |---|---|---|---|
-| Xero | Authorization code + offline refresh | Seven calendar dates of approved/paid sales invoices and purchase bills, grouped by currency; outstanding balance on those invoices | No journals, bank transactions, payroll, payments or financial writes. Invoice totals are not cash revenue or profit. |
+| Xero | Authorization code + offline refresh | Selected invoice dates, retained across imports: approved/paid sales invoices and purchase bills by currency; balances observed when imported | No journals, bank transactions, payroll, payments or financial writes. Invoice totals are not cash revenue or profit. |
 | Harvest | Registered multi-account OAuth app, Harvest product only | Completed entry count, tracked hours, billable hours; running entries excluded | Access follows authorizing user's role; Harvest's grant is broader than read-only. No rates, employee names or notes persisted. |
 | Zoho Inventory | U.S. OAuth | Current active inventory item count and low-stock item count | Separate scopes/data from Zoho Books. No adjustments or order writes. Counts are not inventory valuation. |
-| Clockify | Owner-supplied API key | Key owner's completed entries/hours in a selected workspace, seven UTC calendar dates | Personal time coverage, not workforce payroll. Key may permit broader actions than this reader. |
+| Clockify | Owner-supplied API key | Key owner's entries/hours in a selected workspace, filtered by entry-start date in UTC and retained across imports | Personal time coverage, not workforce payroll. Key may permit broader actions than this reader. |
 | Toggl 2.0 | Owner-supplied `toggl_sk_` bearer key plus organization/workspace IDs | Visible active project count and lifetime tracked hours for those projects | Focus API, not legacy Track. Not a weekly timesheet. One active key per Toggl user; this code never generates/replaces one. |
 | Katana | Owner-supplied private API key | Current variant/location stock records and records whose on-hand less committed stock is nonpositive | No public OAuth partnership claim. Mixed units are not added together. Factory metadata has no account ID; the immutable key binds the account for the life of the connection. |
 
@@ -48,7 +48,7 @@ Xero scopes: `offline_access accounting.settings.read accounting.invoices.read` 
 
 ## Storage and failure behavior
 
-- `reporting_connections`: workspace/provider/account identity, numeric summary, status and sync metadata. RLS permits active members of that workspace to read. Clients cannot write.
+- `reporting_connections`: workspace/provider/account identity, legacy numeric summary, status and sync metadata. `reporting_history_facts` stores minimized provider IDs/date/numeric contributions for Xero, Harvest and Clockify; `reporting_history_days` records imported date coverage and persistent cutoffs. RLS permits active members of that workspace to read. Clients cannot write.
 - `reporting_credentials`: AES-256-GCM ciphertext, authenticated with provider + workspace + connection + format version. No client access. Discovered account choices are encrypted and only shown to the initiating owner; only the chosen account remains after selection.
 - `reporting_oauth_states`: random state hashes, bound to workspace, provider, initiating user and connection, ten-minute expiry, atomic single consumption. No client access.
 - All mutating routes require current owner access through the existing subscription/workspace guard and check the canonical request Origin/Host. Callback checks the original workspace and actor before consuming state.
@@ -56,8 +56,8 @@ Xero scopes: `offline_access accounting.settings.read accounting.invoices.read` 
 - Account selection is one-time. Changing accounts requires an explicit disconnect and new connection; old reports cannot be silently attributed to a different account.
 - Database functions have empty search paths, explicit service-role checks and no public/anon/authenticated execute grants. Credential refresh and disconnect take the same connection lock.
 - Sync lease: 65 seconds; provider request budget: 45 seconds, at most 12 fixed-host GET requests, 4 MiB per response. No automatic retries or paid quota upgrades. Manual sync is limited to once per hour, including failed attempts.
-- All pages must complete within bounds before a snapshot is committed. Duplicate IDs, malformed values, quota errors, oversized results, expired leases or disconnects preserve the previous complete report.
-- Disconnect erases the local credential, account selection, state and report. The provider's own permission/key must separately be revoked in its settings; the UI says this explicitly. Disabling an enable flag does not block local disconnect.
+- All pages must complete within bounds before an import is committed. A selected date window is replaced atomically, matching IDs are upserted across that connection, and other windows remain. Duplicate IDs, malformed values, quota errors, oversized results, expired leases or disconnects prevent a partial import. On an ambiguous database response, check saved history and import time before retrying.
+- Disconnect erases the local credential, account selection, state, legacy report, historical facts and coverage. Signing out does not erase them. The provider's own permission/key must separately be revoked in its settings; the UI says this explicitly. Disabling an enable flag does not block local disconnect.
 
 ## Qualification and release
 
@@ -72,7 +72,7 @@ Automated checks:
 
 Before live activation, finish secure secret provisioning, apply the migration, deploy the reviewed code and complete provider consent/key entry from the intended workspace owner account. Qualify each provider using a synthetic/demo account where supported: connect, select, sync an empty and a known nonempty report, compare totals against the provider, verify the identity and reporting period, disconnect, and confirm stored data disappears. Provider fixture tests do not establish live API approval or a successful customer connection.
 
-Current handoff from the application task: Xero app registered but client secret not generated; Harvest OAuth app registered and Free account active; Zoho Inventory identity active but developer console reauthentication/client configuration pending; Clockify, Toggl 2.0 and Katana accounts active with no API keys generated. FreeAgent login and the Jibble/Planday/Paychex partner decisions are outside this ready-account release.
+The designated Xero demo, Harvest, Zoho Inventory test, Clockify, Toggl 2.0 and Katana accounts were connected in the baseline release. Existing credentials and grants are reused by historical imports; no new scopes or paid provider plans are requested. FreeAgent login and the Jibble/Planday/Paychex partner decisions are outside this release.
 
 Rollback: disable the affected provider's `_REPORTING_ENABLED` flag. Keep the encryption key until owners disconnect, so credentials remain decryptable. The local disconnect route does not require provider OAuth settings. Retain the additive database schema for erasure and audit of connection status; do not delete other providers' data or secrets.
 
