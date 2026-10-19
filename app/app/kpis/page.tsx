@@ -1,4 +1,5 @@
-import { ReportedFinancialMetrics } from "@/components/kpis/ReportedFinancialMetrics";
+import { loadReportedFinancialMetrics } from "@/lib/integrations/qbo-customer/load-reported-financial-metrics";
+import { ReportedFinancialMetricsView } from "@/components/kpis/ReportedFinancialMetrics";
 import { ComparisonCharts } from "@/components/charts/ComparisonCharts";
 import { kpiComparisons } from "@/lib/charts/kpi";
 import type { Route } from "next";
@@ -1556,12 +1557,14 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     kpiResult,
     folderResult,
     fileResult,
-    kpiSettingsResult
+    kpiSettingsResult,
+    reportedFinancial
   ] = await Promise.all([
     loadActiveWorkspaceKpis({ supabase, workspaceId }),
     getRecordFolders(supabase, workspaceId, "kpis"),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(100),
-    supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false })
+    supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
+    loadReportedFinancialMetrics()
   ]);
 
   const rawKpis = (kpiResult.data || []) as KpiRow[];
@@ -1804,7 +1807,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         }
       />
       <SuccessNotice message={params?.message} />
-      <ReportedFinancialMetrics />
+      <ReportedFinancialMetricsView {...reportedFinancial} />
       <TargetUndoNotice
         metricName={undoMetricName}
         previousTarget={params?.undo_target}

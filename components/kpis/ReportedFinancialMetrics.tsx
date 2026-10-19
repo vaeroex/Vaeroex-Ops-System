@@ -1,8 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
-import { retrieveFinancialEvidence } from "@/lib/vsi/financial-evidence";
-import { reportedFinancialMetrics } from "@/lib/integrations/qbo-customer/reported-financial-metrics";
+import type { reportedFinancialMetrics } from "@/lib/integrations/qbo-customer/reported-financial-metrics";
 
 const labels: Record<string, string> = {
   revenue: "Revenue", costOfGoodsSold: "Cost of goods sold", grossProfit: "Gross profit",
@@ -34,9 +32,3 @@ export function ReportedFinancialMetricsView({ groups, limitations }: {
   </section>;
 }
 
-export async function ReportedFinancialMetrics() {
-  const access = await requireWorkspaceAccess();
-  if (access.membership.role !== "owner") return null;
-  const evidence = await retrieveFinancialEvidence(access, new Date().toISOString());
-  return <ReportedFinancialMetricsView groups={reportedFinancialMetrics(evidence.reports)} limitations={evidence.limitations} />;
-}

@@ -55,3 +55,6 @@ export const fixedAsOf = AS_OF;
 const dashboard = freeze<IntegrationDashboard>({ workspaceId: WORKSPACE_ID, observedAt: AS_OF, timeZone: "UTC", timeZoneConfirmed: true, preferencesAvailable: true, entries: [], unavailable: [] });
 
 export function intelligenceFixture() { return { ...calculatedIntelligence(), workspaceId: WORKSPACE_ID, dashboard, displayErrors: [], explanationTokens: {}, canManageLifecycle: false, blockedState: null, briefingStates: briefings, isIntelligenceBriefingEnabled: () => false }; }
+
+// This offline fixture has no admitted owner financial reports. Never fetch a live source.
+export async function loadReportedFinancialMetrics() { return { groups: [], limitations: [] }; }
