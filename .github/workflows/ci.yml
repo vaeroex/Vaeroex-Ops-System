@@ -166,6 +166,9 @@ jobs:
       - name: Reporting connector authorization, provider and database regressions
         run: pnpm test:plugin-import-history
 
+      - name: Plug-in catalog regression tests
+        run: pnpm test:plugin-catalog
+
       - name: External integrations architecture regressions
         run: pnpm test:external-integrations-architecture
 
@@ -224,6 +227,9 @@ jobs:
 
       - name: Verify historical import controls and saved report coverage
         run: pnpm test:plugin-import-history:browser
+
+      - name: Plug-in catalog browser tests
+        run: pnpm test:plugin-catalog:browser
 
       - name: Verify isolated native Square callback credentials, portal and guest controls
         run: |
