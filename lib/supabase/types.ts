@@ -1,5 +1,12 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
+export type ReportingConnectionRow = {
+  id: string; workspace_id: string; provider: "xero" | "harvest" | "zoho-inventory" | "clockify" | "toggl" | "katana";
+  created_by: string; status: "pending" | "choose_account" | "connected" | "reauthorization_required" | "disconnected";
+  account: Json | null; snapshot: Json | null; last_sync_at: string | null; last_error_code: string | null;
+  next_sync_at: string; lease_id: string | null; lease_expires_at: string | null; created_at: string;
+};
+
 export type WorkspaceRole = "owner" | "admin" | "manager" | "staff" | "viewer";
 
 export type GoogleSheetsConnectionRow = {
@@ -2633,6 +2640,12 @@ export type Database = {
           accepted_at?: string;
           created_at?: string;
         };
+        Update: never;
+        Relationships: [];
+      };
+      reporting_connections: {
+        Row: ReportingConnectionRow;
+        Insert: never;
         Update: never;
         Relationships: [];
       };

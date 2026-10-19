@@ -1,3 +1,5 @@
+import { providers, catalog } from "@/lib/integrations/reporting/catalog";
+import { available as reportingAvailable } from "@/lib/integrations/reporting/security";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -37,14 +39,15 @@ export default async function IntegrationsPage() {
   const loyverseAvailable = loyverseEnabled();
   const zohoAvailable = zohoEnabled();
   const wixAvailable = wixEnabled();
-  const [square, qbo, squareEvidence, googleSheets, loyverse, zoho, wix] = await Promise.all([
+  const [square, qbo, squareEvidence, googleSheets, loyverse, zoho, wix, reporting] = await Promise.all([
     squareEnabled ? squareDirectView() : null,
     qboEnabled ? readQuickBooksStatus(access) : null,
     readSquareWorkspaceEvidence(access.supabase, access.workspaceId, await headers()),
     googleSheetsEnabled ? access.supabase.from("google_sheets_connections").select("status, active_approval_id, revocation_pending, authorization_uncertain").eq("workspace_id", access.workspaceId) : null,
     loyverseAvailable ? loyverseAdmin().from("loyverse_connections").select("status").eq("workspace_id", access.workspaceId).neq("status", "disconnected") : null,
     zohoAvailable ? zohoAdmin().from("zoho_books_connections").select("status").eq("workspace_id", access.workspaceId).neq("status", "disconnected") : null,
-    wixAvailable ? wixAdmin().from("wix_order_connections").select("status").eq("workspace_id", access.workspaceId).neq("status", "disconnected") : null
+    wixAvailable ? wixAdmin().from("wix_order_connections").select("status").eq("workspace_id", access.workspaceId).neq("status", "disconnected") : null,
+    providers.some(reportingAvailable) ? access.supabase.from("reporting_connections").select("provider,status").eq("workspace_id", access.workspaceId).neq("status", "disconnected") : null
   ]);
   const squareStatuses = square?.connections.map((connection) =>
     connection.recoveryRequired ? "Connection recovery required"
@@ -93,6 +96,16 @@ export default async function IntegrationsPage() {
                 connection.status === "pending" ? "Waiting for Wix installation" : "Reconnect required"))]
               : ["Not connected"]}
             href="/app/integrations/wix-orders" action={wixAvailable ? "Manage Wix" : "View Wix requirements"} /> : null}
+          {providers.filter(provider => owner || reportingAvailable(provider)).map(provider => {
+            const info = catalog[provider], enabled = reportingAvailable(provider);
+            const connection = reporting?.data?.find(row => row.provider === provider);
+            const status = !enabled ? "Configuration required" : reporting?.error ? "Status unavailable" :
+              connection?.status === "connected" ? "Connected" : connection?.status === "choose_account" ? "Choose an account" :
+              connection?.status === "pending" ? "Waiting for authorization" : connection?.status === "reauthorization_required" ? "Reauthorization required" : "Not connected";
+            return <ProviderCard key={provider} name={info.name} description={info.description} reads={`${Object.values(info.metrics).join(", ")}.`}
+              requires={info.auth === "oauth" ? "Owner authorization and an eligible provider account." : "An owner-provided API key with access to the selected account."}
+              statuses={[status]} href={`/app/integrations/${provider}`} action={enabled ? `Manage ${info.name}` : `View ${info.name} setup`} />;
+          })}
           {googleSheetsEnabled || owner ? <ProviderCard name="Google Sheets" description={GOOGLE_SHEETS_PILOT.catalog}
             reads="The selected spreadsheet, sheet names, column headings, and approved data columns."
             requires="A Google account with access to the spreadsheet; connection awaits Google approval."

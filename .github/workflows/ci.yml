@@ -163,6 +163,9 @@ jobs:
           pnpm test:external-integrations-square-account-discovery
           pnpm test:external-integrations-square-connection-routes
 
+      - name: Reporting connector authorization, provider and database regressions
+        run: pnpm test:reporting-connectors
+
       - name: External integrations architecture regressions
         run: pnpm test:external-integrations-architecture
 
