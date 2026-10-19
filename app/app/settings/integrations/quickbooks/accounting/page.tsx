@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Route } from "next";
 import { ArrowLeft, Check, ShieldOff } from "lucide-react";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -84,6 +85,7 @@ export default async function QuickBooksAccountingPage({ searchParams }: {
     </section> : null}
 
     {authority ? <>
+      <Link href={`/app/settings/integrations/quickbooks/journals?connectionId=${authority.connectionId}` as Route} className="block text-sm underline">Review journal revenue and cost subtotals</Link>
       <section aria-labelledby="accounting-status" className="space-y-4 border-b border-line pb-6">
         <h2 id="accounting-status" className="break-words text-base font-semibold text-ink">{authority.businessEntityName}</h2>
         <dl className="grid gap-4 text-sm sm:grid-cols-2">

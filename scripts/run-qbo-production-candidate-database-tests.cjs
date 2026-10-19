@@ -65,6 +65,12 @@ const candidates = [
   '20261002012700_qbo_customer_pending_attempt_control.sql',
   '20261002025212_qbo_customer_pending_cancellation_eligibility.sql',
 ];
+// Opt-in journal and owner-private briefing candidates are applied only after
+// the exact historical baseline and existing tails have been verified.
+const journalMigrations = [
+  '20261019223220_qbo_journal_accounting_v2.sql',
+  '20261019223253_owner_financial_briefings_v1.sql',
+];
 const pendingSuite = { file: 'scripts/qbo-pending-connection-database-tests.cjs', pending: true, expectedScenarios: 14 };
 const eligibilitySuite = { file: 'scripts/qbo-pending-cancellation-eligibility-database-tests.cjs', eligibility: true, expectedScenarios: 19 };
 const suiteNames = [
@@ -416,6 +422,7 @@ async function main() {
   assert.equal(prefix.length, 104, 'exact reviewed Production prefix');
   const square = productionSquare.map(name => snapshot(`supabase/production-migrations/${name}`));
   const qbo = candidates.map(name => snapshot(`supabase/production-migrations/${name}`));
+  const journal = journalMigrations.map(name => snapshot(`supabase/production-migrations/${name}`));
   const sheets = productionSheets.map(name => snapshot(`supabase/production-migrations/${name}`));
   const dashboard = Object.values(dashboardMigrations).map(name => snapshot(`supabase/production-migrations/${name}`));
   const audit = auditMigrations.map(name => snapshot(`supabase/production-migrations/${name}`));
@@ -453,6 +460,7 @@ async function main() {
       'scripts/run-square-durable-page-qualification.js', 'supabase/tests/fixtures/square-durable-platform.sql']
       .map(file => { const value = snapshot(file); return { file, sha256: value.sha256 }; }),
     sheetsErasureTailHashes: sheetsErasure.map(({ file, sha256 }) => ({ file, sha256 })),
+    journalCandidateHashes: journal.map(({ file, sha256 }) => ({ file, sha256 })),
     candidateHashes: qbo.map(({ file, sha256 }) => ({ file, sha256 })),
     productionSheetsHashes: sheets.map(({ file, sha256 }) => ({ file, sha256 })),
     sharedAuditTailHashes: audit.map(({ file, sha256 }) => ({ file, sha256 })),
@@ -532,6 +540,28 @@ async function main() {
         for (const item of sheetsErasure) await apply(item);
         await apply(billingObservation);
         await apply(vsiDeletion);
+        for (const item of journal) await apply(item);
+        stage = 'journal_private_boundary_catalog';
+        const journalTables = (await client.query(`select c.relname,c.relrowsecurity,
+          has_table_privilege('authenticated',c.oid,'SELECT') as authenticated_read,
+          has_table_privilege('service_role',c.oid,'SELECT') as service_read
+          from pg_class c join pg_namespace n on n.oid=c.relnamespace
+          where n.nspname='private' and c.relname in
+          ('qbo_journal_authorities_v2','qbo_journal_admissions_v2','owner_financial_briefings_v1') order by c.relname`)).rows;
+        assert.equal(journalTables.length, 3, 'all journal/private briefing tables exist');
+        for (const table of journalTables) assert.deepEqual(
+          [table.relrowsecurity, table.authenticated_read, table.service_read], [true, false, false],
+          `${table.relname} retains RLS and has no direct client or service read grant`);
+        const journalGrants = (await client.query(`select
+          has_function_privilege('authenticated','public.read_qbo_customer_journal_period_v2(uuid,date,date)','EXECUTE') as owner_read,
+          has_function_privilege('service_role','public.read_qbo_customer_journal_period_v2(uuid,date,date)','EXECUTE') as service_read,
+          has_function_privilege('authenticated','private.read_qbo_journal_period_for_actor_v2(uuid,uuid,uuid,date,date)','EXECUTE') as private_read,
+          has_function_privilege('service_role','private.read_qbo_journal_period_for_actor_v2(uuid,uuid,uuid,date,date)','EXECUTE') as private_service_read,
+          has_function_privilege('authenticated','public.finish_owner_financial_brief_v1(uuid,uuid,jsonb)','EXECUTE') as client_finish,
+          has_function_privilege('service_role','public.finish_owner_financial_brief_v1(uuid,uuid,jsonb)','EXECUTE') as service_finish`)).rows[0];
+        assert.deepEqual(journalGrants, { owner_read: true, service_read: false, private_read: false,
+          private_service_read: false, client_finish: false, service_finish: true });
+        result.journalPrivateBoundaryChecks = { tables: journalTables, grants: journalGrants };
         result.finalLedger = [...ledger].sort();
         console.log(`${shape.name}: ${ledger.length} migrations applied including the shared audit, capacity and VSI tails; exact ledger and QBO-only Square catalog guard verified.`);
         // pgTAP's test metadata ACLs are not part of the pristine migration catalog.
