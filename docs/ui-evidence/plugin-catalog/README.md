@@ -24,6 +24,10 @@ public App Market approval.
 - `pnpm typecheck`, focused ESLint, and `git diff --check`: passed.
 - `pnpm build`: passed, including production compilation, type validation, and route generation (existing repository lint warnings remain).
 
+Review follow-up: long unbroken queries previously overflowed the result summary
+inside the workspace's clipped layout. The summary now wraps those words, and
+the browser suite checks the element's own scroll width at every tested viewport.
+
 These are **synthetic local browser fixtures**, using the production catalog
 controls, server-rendered cards, and workspace CSS. They do not use customer data,
 provider credentials, or live OAuth/sync/disconnect calls. They do not establish

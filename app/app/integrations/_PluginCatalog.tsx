@@ -39,7 +39,7 @@ export function PluginCatalog({ entries }: { entries: (CatalogEntry & { content:
       </fieldset>
     </div>
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-      <p role="status" aria-live="polite" aria-atomic="true" className="text-sm text-slate-600">Showing {visible.length} of {entries.length} plug-ins{category !== "all" ? ` in ${categories[category]}` : ""}{query.trim() ? ` matching “${query.trim()}”` : ""}.</p>
+      <p role="status" aria-live="polite" aria-atomic="true" className="min-w-0 max-w-full break-words text-sm text-slate-600">Showing {visible.length} of {entries.length} plug-ins{category !== "all" ? ` in ${categories[category]}` : ""}{query.trim() ? ` matching “${query.trim()}”` : ""}.</p>
       {query || category !== "all" ? <button type="button" onClick={reset} className="min-h-11 text-sm font-semibold text-vaeroex-blue underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Clear filters</button> : null}
     </div>
     <div id="plugin-results" className="grid items-stretch gap-4 md:grid-cols-2">

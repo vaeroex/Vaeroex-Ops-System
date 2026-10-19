@@ -66,6 +66,11 @@ async function main() {
       assert.equal(await input.inputValue(), '');
       assert.equal(await input.evaluate(element => element === document.activeElement), true);
       assert.equal(await page.getByRole('article').count(), 12);
+      await input.fill('x'.repeat(150));
+      const summary = page.getByRole('status');
+      assert.equal(await summary.evaluate(element => element.scrollWidth <= element.clientWidth), true, `${width}px long query must wrap, not be clipped by the workspace shell`);
+      assert.equal(await page.getByRole('article').count(), 0);
+      await page.getByRole('button', { name: 'Clear filters' }).click();
       await input.fill('e-commerce');
       assert.equal(await page.getByRole('article').count(), 1);
       assert.equal(await page.getByRole('link', { name: 'Manage Wix' }).getAttribute('href'), '/app/integrations/wix-orders');
