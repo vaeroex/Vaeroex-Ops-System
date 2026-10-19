@@ -11,7 +11,8 @@ Module._load = function(name, parent, main) {
 };
 const oldTs = require.extensions['.ts'];
 require.extensions['.ts'] = (module, file) => module._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,esModuleInterop:true}}).outputText,file);
-const {accounts,snapshot,validateSnapshot} = require('../lib/integrations/reporting/adapters.ts');
+const {accounts,snapshot,importHistory,validateSnapshot} = require('../lib/integrations/reporting/adapters.ts');
+const {resolveImportRange} = require('../lib/integrations/date-range.ts');
 const {seal,unseal,assertRequest,formData} = require('../lib/integrations/reporting/security.ts');
 const {authorizationUrl,exchange} = require('../lib/integrations/reporting/oauth.ts');
 const {reader,readJson} = require('../lib/integrations/reporting/transport.ts');
@@ -127,4 +128,53 @@ test('mutation boundary rejects CSRF, forwarded host spoofing and duplicate/over
  assert.throws(()=>assertRequest(make({'x-forwarded-host':'evil.example'})));
  await assert.rejects(formData(make({},'confirmation=connect&confirmation=disconnect')),/invalid_form/);
  await assert.rejects(formData(make({},'x'.repeat(12001))),/invalid_form/);
+});
+
+test('historical Harvest imports use requested years and preserve only stable IDs, dates and metrics',async()=>{
+ const calls=mock([{time_entries:[{id:47,spent_date:'2018-04-05',hours:2.25,billable:true,is_running:false,user:{name:'Excluded employee'},notes:'Excluded note'}],page:1,next_page:null,total_entries:1}]);
+ const report=await importHistory('harvest',token,{id:'123',name:'Test'},signal(),resolveImportRange('2018-01-01','2018-12-31',now),now);
+ assert.equal(new URL(calls[0].url).searchParams.get('from'),'2018-01-01');assert.equal(new URL(calls[0].url).searchParams.get('to'),'2018-12-31');
+ assert.deepEqual(report.records,[{recordId:'47',day:'2018-04-05',metrics:[{key:'entries',value:1},{key:'hours',value:2.25},{key:'billable_hours',value:2.25},{key:'running',value:0}]}]);
+ assert.doesNotMatch(JSON.stringify(report),/Excluded|notes|user/);
+ mock([]);await assert.rejects(importHistory('harvest',token,{id:'123',name:'Test'},signal(),{startDate:'2018-01-01',endDate:'2019-12-31'},now),/invalid_date_range/);
+});
+
+test('historical Clockify bounds by UTC start date and keeps complete overnight durations',async()=>{
+ const calls=mock([[{id:'before',billable:true,timeInterval:{start:'2019-03-31T23:00:00Z',end:'2019-04-01T01:00:00Z'}},
+ {id:'in',billable:true,timeInterval:{start:'2019-04-01T23:00:00Z',end:'2019-04-02T02:00:00Z'}},
+ {id:'after',billable:false,timeInterval:{start:'2019-04-02T00:00:00Z',end:'2019-04-02T01:00:00Z'}}]]);
+ const report=await importHistory('clockify',token,{id:'123',user:'userA',name:'Test'},signal(),resolveImportRange('2019-04-01','2019-04-01',now),now);
+ assert.equal(new URL(calls[0].url).searchParams.get('end'),'2019-04-02T00:00:00.000Z');
+ assert.equal(report.records.length,1);assert.equal(report.records[0].recordId,'in');assert.equal(report.records[0].metrics.find(m=>m.key==='hours').value,3);
+});
+
+test('historical Xero facts retain distinct currencies and empty imports fetch actual base currency',async()=>{
+ const row=(i,currency,Type='ACCREC')=>({InvoiceID:`00000000-0000-4000-8000-${String(i).padStart(12,'0')}`,DateString:'2016-02-29T00:00:00',Type,Status:'AUTHORISED',CurrencyCode:currency,Total:12.34,AmountDue:1.25});
+ const calls=mock([{Invoices:[row(1,'USD'),row(2,'EUR','ACCPAY')]}]);
+ const range=resolveImportRange('2016-01-01','2016-12-31',now);
+ let report=await importHistory('xero',token,{id:'123',name:'Test'},signal(),range,now);
+ assert.match(new URL(calls[0].url).searchParams.get('where'),/DateTime\(2016,1,1\).*DateTime\(2017,1,1\)/);
+ assert.equal(report.records.length,2);assert.equal(report.records[0].day,'2016-02-29');assert.deepEqual(report.currencies,['USD','EUR']);
+ mock([{Invoices:[]},{Organisations:[{BaseCurrency:'CAD'}]}]);
+ report=await importHistory('xero',token,{id:'123',name:'Test'},signal(),range,now);assert.deepEqual(report.records,[]);assert.deepEqual(report.currencies,['CAD']);
+});
+
+test('historical imports never succeed after truncated pages, duplicate IDs or quota failures',async()=>{
+ const range=resolveImportRange('2015-01-01','2015-12-31',now);
+ const row={id:1,spent_date:'2015-02-03',hours:2,billable:false,is_running:false};
+ mock([{time_entries:[row],page:1,next_page:null,total_entries:2}]);await assert.rejects(importHistory('harvest',token,{id:'123',name:'Test'},signal(),range,now),/incomplete/);
+ mock([{time_entries:[row,row],page:1,next_page:null,total_entries:2}]);await assert.rejects(importHistory('harvest',token,{id:'123',name:'Test'},signal(),range,now),/duplicate/);
+ mock([new Response('excluded provider body',{status:429})]);await assert.rejects(importHistory('harvest',token,{id:'123',name:'Test'},signal(),range,now),/quota_exceeded/);
+ mock(Array.from({length:10},(_,i)=>({time_entries:[{...row,id:i+1}],page:i+1,next_page:i+2,total_entries:11})));
+ await assert.rejects(importHistory('harvest',token,{id:'123',name:'Test'},signal(),range,now),/snapshot_too_large/);
+});
+
+test('historical Xero imports keep zero-value excluded-status IDs to correct moved invoices',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ const calls=mock([{Invoices:[{InvoiceID:id,DateString:'2018-05-01T00:00:00',Type:'ACCREC',Status:'VOIDED',CurrencyCode:'EUR'}]},
+ {Organisations:[{BaseCurrency:'USD'}]}]);
+ const report=await importHistory('xero',token,{id:'123',name:'Test'},signal(),resolveImportRange('2018-05-01','2018-05-01',now),now);
+ assert.match(new URL(calls[0].url).searchParams.get('Statuses'),/VOIDED/);
+ assert.equal(report.records[0].recordId,id);assert.ok(report.records[0].metrics.every(m=>m.value===0));
+ assert.ok(report.currencies.includes('EUR'));
 });

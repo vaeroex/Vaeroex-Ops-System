@@ -1,6 +1,6 @@
 # Zoho Books connection
 
-Executive Intelligence offers a read-only Zoho Books connection for U.S. organizations. The workspace owner authorizes a Zoho Books account and, if more than one eligible organization is available, chooses which organization to use. A manual sync reads the last seven UTC calendar dates. It stores daily USD invoice and expense counts and totals, with no customer, vendor, document, or line-item details. Draft and void invoices are excluded. Invoices are amounts billed, not recognized revenue or cash received. Non-USD transactions are counted as omitted rather than combined with USD.
+Executive Intelligence offers a read-only Zoho Books connection for U.S. organizations. The workspace owner authorizes a Zoho Books account and, if more than one eligible organization is available, chooses which organization to use. A manual import accepts up to 366 UTC calendar dates per batch, including older years. It retains minimized invoice/expense IDs, dates, currencies and numeric contributions, with no customer, vendor, document text, or line-item details. Draft and void invoices contribute zero. Invoices are amounts billed, not recognized revenue or cash received. Non-USD transactions are counted as omitted rather than combined with USD.
 
 ## Provider setup
 
@@ -14,7 +14,9 @@ In Vercel Production only, set the server-side variables `ZOHO_BOOKS_ENABLED=tru
 
 ## Data and operations
 
-The owner connects at `/app/integrations/zoho-books`, approves access at Zoho, chooses an organization when needed, and clicks **Sync last seven dates**. Each sync replaces the seven-day summary atomically. A failed sync retains the last complete snapshot. Disconnect removes stored credentials, OAuth state, and summaries locally. The owner can also revoke the app in Zoho Connected Apps.
+The owner connects at `/app/integrations/zoho-books`, approves access at Zoho, chooses an organization when needed, then selects **Import selected dates**. Every page must complete before that period replaces its saved facts. Other periods remain; matching provider IDs are updated without duplicates. Saved-history filters are independent of imports, and database aggregation avoids API row-limit truncation. Outstanding amounts are the balances observed when invoices were imported, not historical balances as of their invoice dates. Re-import to refresh changed records.
+
+Apply additive migration `20261019070949_zoho_books_import_history.sql` before deploying the history controls. Completed empty dates, partial dates and missing dates are distinguished. A partial date remains partial until refreshed. Existing aggregate-only summaries remain available separately and can be re-imported to join the new history without fabricated IDs or double counting. Signing out retains saved history; explicit disconnect removes credentials, OAuth state, facts, coverage and legacy summaries. The owner can also revoke the app in Zoho Connected Apps. See [historical import behavior](integrations/historical-imports.md) for batch limits and release ordering.
 
 The provider does not currently have a connected real customer. Test the OAuth callback and first sync with the designated test organization before declaring end-to-end production verification.
 

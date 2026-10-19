@@ -164,7 +164,7 @@ jobs:
           pnpm test:external-integrations-square-connection-routes
 
       - name: Reporting connector authorization, provider and database regressions
-        run: pnpm test:reporting-connectors
+        run: pnpm test:plugin-import-history
 
       - name: External integrations architecture regressions
         run: pnpm test:external-integrations-architecture
@@ -221,6 +221,9 @@ jobs:
 
       - name: Verify reporting OAuth handoff headers and isolated browser navigation
         run: pnpm test:reporting-connectors:oauth-browser
+
+      - name: Verify historical import controls and saved report coverage
+        run: pnpm test:plugin-import-history:browser
 
       - name: Verify isolated native Square callback credentials, portal and guest controls
         run: |

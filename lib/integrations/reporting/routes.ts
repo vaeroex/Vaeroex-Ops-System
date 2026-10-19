@@ -2,10 +2,11 @@ import "server-only";
 import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
-import { isProvider, catalog, type Provider } from "./catalog";
+import { isProvider, isHistoricalProvider, catalog, type Provider } from "./catalog";
 import { admin, assertRequest, available, formData, hashState, redirect, requireOwner, seal, unseal, credentialSchema, accountSchema } from "./security";
 import { authorizationHandoff, exchange } from "./oauth";
-import { accounts, snapshot } from "./adapters";
+import { accounts, importHistory, snapshot } from "./adapters";
+import { resolveImportRange } from "../date-range";
 
 type Params = { params: Promise<{ provider: string; action: string }> };
 const uuid = z.string().uuid();
@@ -26,7 +27,11 @@ export async function post(request: Request, context: Params) {
     const access = await requireWorkspaceAccess(); requireOwner(access);
     // Disconnect remains possible after a provider has been disabled or credentials rotated.
     if (action !== "disconnect" && !available(provider)) return redirect(provider, "configuration_required");
-    const form = await formData(request), db = admin();
+    const form = await formData(request);
+    // Invalid dates consume neither a lease/cooldown nor provider requests.
+    const range = action === "sync" && isHistoricalProvider(provider)
+      ? resolveImportRange(form.get("startDate"), form.get("endDate")) : null;
+    const db = admin();
     if (action === "connect") {
       if (form.get("confirmation") !== "connect") throw new Error("confirmation_required");
       const connection = randomUUID(), state = randomBytes(32).toString("base64url");
@@ -79,13 +84,23 @@ export async function post(request: Request, context: Params) {
       credential = await exchange(provider, { refresh: credential.refreshToken }, signal);
       requireResult(await db.rpc("save_reporting_refresh", { ...args, p_lease: lease!.id, p_ciphertext: seal(provider, access.workspaceId, connection, credential) }));
     }
-    const report = await snapshot(provider, credential.accessToken, accountSchema.parse(row.account), signal);
-    requireResult(await db.rpc("apply_reporting_snapshot", { ...args, p_lease: lease!.id, p_snapshot: report }));
+    if (isHistoricalProvider(provider) && range) {
+      const report = await importHistory(provider, credential.accessToken, accountSchema.parse(row.account), signal, range);
+      requireResult(await db.rpc("apply_reporting_history", { ...args, p_lease: lease!.id,
+        p_start_date: report.startDate, p_end_date: report.endDate, p_records: report.records,
+        p_currencies: report.currencies, p_observed_through: range.endAt }));
+    } else {
+      const report = await snapshot(provider, credential.accessToken, accountSchema.parse(row.account), signal);
+      requireResult(await db.rpc("apply_reporting_snapshot", { ...args, p_lease: lease!.id, p_snapshot: report }));
+    }
     lease = null; return redirect(provider, "synced");
   } catch (error) {
-    const code = error instanceof Error && ["authorization_required","quota_exceeded","snapshot_too_large"].includes(error.message) ? error.message : "sync_failed";
+    const message = error instanceof Error ? error.message : "sync_failed";
+    const code = ["snapshot_too_large","read_budget_exceeded","response_too_large"].includes(message) ? "snapshot_too_large" :
+      ["authorization_required","quota_exceeded","invalid_date_range"].includes(message) ? message : "sync_failed";
     if (cleanup) await admin().rpc("disconnect_reporting_connection", rpcArgs(cleanup.workspace, provider, cleanup.connection));
-    if (lease) await admin().from("reporting_connections").update({ lease_id: null, lease_expires_at: null, last_error_code: code,
+    if (lease) await admin().from("reporting_connections").update({ lease_id: null, lease_expires_at: null,
+      last_error_code: code === "invalid_date_range" ? "sync_failed" : code,
       ...(code === "authorization_required" ? { status: "reauthorization_required" } : {}) })
       .eq("workspace_id", lease.workspace).eq("provider", provider).eq("id", lease.connection).eq("lease_id", lease.id).eq("status", "connected");
     return redirect(provider, code);

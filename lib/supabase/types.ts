@@ -67,6 +67,10 @@ type GoogleSheetsFactLinkRow = {
 export type Database = {
   public: {
     Functions: {
+      read_reporting_history: {
+        Args: { p_workspace: string; p_provider: string; p_connection: string; p_start_date?: string | null; p_end_date?: string | null };
+        Returns: Json;
+      };
       begin_google_sheets_read_v1: { Args: { p_workspace_id: string; p_actor_id?: string | null }; Returns: Json };
       bind_google_sheets_read_v1: { Args: { p_ticket_id: string; p_sources: Json }; Returns: Json };
       get_google_sheets_read_context_v1: { Args: { p_ticket_id: string }; Returns: Json };
