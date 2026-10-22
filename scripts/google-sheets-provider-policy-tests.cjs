@@ -55,11 +55,15 @@ const settings = { timeoutMs: 2000, maxRetries: 0, retryBaseDelayMs: 1, circuitF
   await assert.rejects(assertGoogleSheetsProviderPolicy(ticketId, "nvidia"), /limited/);
   const googleHeaders = { Authorization: `Bearer ${sheetsKey}`, "OpenAI-Organization": "org-synthetic", "OpenAI-Project": "proj_synthetic" };
   assert.deepEqual(await googleSheetsOpenAIHeaders(ticketId), googleHeaders);
-  databaseError = { message: "expired" };
-  await assert.rejects(googleSheetsOpenAIHeaders(ticketId), /changed or expired/);
+  databaseError = { code: "40001", message: "synthetic private detail must not escape" };
+  await assert.rejects(googleSheetsOpenAIHeaders(ticketId), error => error.reason === "source_changed" && /changed or expired/.test(error.message));
+  databaseError = { code: "42501", message: "synthetic private detail must not escape" };
+  await assert.rejects(googleSheetsOpenAIHeaders(ticketId), error => error.reason === "source_access_denied" && !/private detail/.test(error.message));
+  databaseError = { code: "XX000", message: "synthetic private detail must not escape" };
+  await assert.rejects(googleSheetsOpenAIHeaders(ticketId), error => error.reason === "source_authority_unavailable" && !/private detail/.test(error.message));
   databaseError = null;
   context = { ...context, hasUnattributedDerivedSources: true };
-  await assert.rejects(googleSheetsOpenAIHeaders(ticketId), /source review/);
+  await assert.rejects(googleSheetsOpenAIHeaders(ticketId), error => error.reason === "source_attribution" && /source review/.test(error.message));
   context = { ...context, hasUnattributedDerivedSources: false };
   const transports = [];
   let failTransport = false;
@@ -84,7 +88,7 @@ const settings = { timeoutMs: 2000, maxRetries: 0, retryBaseDelayMs: 1, circuitF
   await provider.createEmbeddings(["Synthetic"], "synthetic-embedding", settings, ticketId); assertDedicated();
   process.env.OPENAI_API_KEY = globalKey;
   const before = transports.length;
-  databaseError = { message: "deletion fence" };
+  databaseError = { code: "40001", message: "deletion fence" };
   await assert.rejects(provider.generate(request), /changed or expired/);
   await assert.rejects(provider.createEmbeddings(["Synthetic"], "synthetic-embedding", settings, ticketId), /changed or expired/);
   assert.equal(transports.length, before);
@@ -170,11 +174,11 @@ const settings = { timeoutMs: 2000, maxRetries: 0, retryBaseDelayMs: 1, circuitF
   }
   delete process.env.GOOGLE_SHEETS_OPENAI_API_KEY;
   const blockedOffset = transports.length;
-  await assert.rejects(runVsiAnswer(vsiInput), /Workspace data changed/);
+  await assert.rejects(runVsiAnswer(vsiInput), error => error.usage.sourcePolicyFailure === "provider_configuration" && /provider connection is verified/.test(error.message));
   assert.equal(transports.length, blockedOffset, "VSI cannot fall back to the configured global key");
   process.env.GOOGLE_SHEETS_OPENAI_API_KEY = sheetsKey;
   removeKeyAfterPlanner = true;
-  await assert.rejects(runVsiAnswer(vsiInput), /Workspace data changed/);
+  await assert.rejects(runVsiAnswer(vsiInput), error => error.usage.sourcePolicyFailure === "provider_configuration" && error.usage.providerCalls === 1);
   assert.equal(transports.length, blockedOffset + 1, "every VSI round rechecks dedicated configuration");
   removeKeyAfterPlanner = false;
   process.env.GOOGLE_SHEETS_OPENAI_API_KEY = sheetsKey;
@@ -192,5 +196,19 @@ const settings = { timeoutMs: 2000, maxRetries: 0, retryBaseDelayMs: 1, circuitF
   assert.equal(transports[changingOffset + 1].headers.Authorization, `Bearer ${sheetsKey}`,
     "VSI switches only after consumed Google sources are bound, including uncited context");
   assert.equal(process.env.OPENAI_API_KEY, globalKey, "policy never changes the existing global credential");
+  // All denials stop before transport, preserve the paid-call count, and have
+  // separate operational categories without storing raw DB messages.
+  const deniedOffset = transports.length;
+  context = { ...context, hasUnattributedDerivedSources: true };
+  await assert.rejects(runVsiAnswer(vsiInput), error => error.usage.sourcePolicyFailure === "source_attribution" && /source review/.test(error.message));
+  context = { ...context, hasUnattributedDerivedSources: false };
+  databaseError = { code: "42501", message: "synthetic private detail must not escape" };
+  await assert.rejects(runVsiAnswer(vsiInput), error => error.usage.sourcePolicyFailure === "source_access_denied" && !/private detail/.test(JSON.stringify(error.usage) + error.message));
+  databaseError = null;
+  const originalContext = context; context = { ...context, ticketId: "00000000-0000-4000-8000-000000000000" };
+  await assert.rejects(runVsiAnswer(vsiInput), error => error.usage.sourcePolicyFailure === "source_authority_unavailable");
+  context = originalContext;
+  await assert.rejects(runVsiAnswer({ ...vsiInput, supabase: { rpc: async () => ({ data: null, error: { code: "40001" } }) } }), error => error.usage.sourcePolicyFailure === "read_ticket_unavailable");
+  assert.equal(transports.length, deniedOffset, "no denial retries, fallback, or paid transport");
   process.stdout.write("Google-derived provider policy passed: dedicated Responses/embeddings/VSI credentials, missing-key and stale-ticket denial, no global/NVIDIA fallback, per-call source classification, and unchanged ordinary routing. No remote requests.\n");
 })().catch(error => { console.error(error); process.exitCode = 1; });

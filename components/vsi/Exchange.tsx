@@ -4,6 +4,7 @@ import { parseComparisons } from "@/lib/charts/comparison";
 import { SaveVsiAnalysis } from "@/components/vsi/SaveVsiAnalysis";
 import { AnswerContent } from "@/components/vsi/AnswerContent";
 import { displayDate, safeSourceUrl, type VsiExchange } from "@/components/vsi/contracts";
+import { vsiCitationNavigationUrl } from "@/lib/vsi/citation-links";
 
 const sourceDateLabels = { publication: "Published", updated: "Updated", observation: "Observed", event: "Event" } as const;
 
@@ -33,7 +34,7 @@ export function Exchange({ exchange, canEditNotes, saving, disabled, workspaceNa
         <summary className="min-h-11 cursor-pointer px-3 py-2.5 text-xs font-semibold text-slate-700">Sources ({exchange.citations.length})</summary>
         <ol className="grid gap-2 px-3 pb-3 sm:grid-cols-2">
           {exchange.citations.map((source) => {
-            const href = safeSourceUrl(source.url);
+            const href = safeSourceUrl(vsiCitationNavigationUrl(source));
             return <li key={source.id} className="min-w-0 rounded-md border border-slate-200 bg-white p-2 text-xs leading-5">
               <span className="font-semibold text-slate-500">[{source.id}] </span>
               {href ? <a href={href} {...(href.startsWith("https:") ? { target: "_blank", rel: "noopener noreferrer" } : {})} className="break-words font-semibold text-vaeroex-blue underline decoration-slate-300 underline-offset-2 focus-visible:outline-2 focus-visible:outline-vaeroex-blue">{source.title}</a> : <span className="font-semibold text-slate-700">{source.title}</span>}

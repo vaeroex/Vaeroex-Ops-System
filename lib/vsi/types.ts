@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 
 import type { Comparison } from "@/lib/charts/comparison";
+import type { AIProviderPolicyFailure } from "@/lib/ai/providers/types";
 
 export type VsiCitation = { comparisons?: Comparison[]; inputSourceIds?: string[]; id: string; title: string; url: string; sourceType: string; sourceId: string | null;
   evidenceDate: string | null; evidenceDateKind?: "publication" | "updated" | "observation" | "event"; evidenceDateText?: string; retrievedAt: string; excerpt?: string; snapshotHash?: string };
@@ -11,6 +12,7 @@ export type VsiUsage = { model: "gpt-6-luna"; inputTokens: number; cachedInputTo
   reasoningTokens: number; webSearchCalls: number; retries: number; estimatedCostUsd: number; providerRequestId?: string | null; latencyMs: number; costEstimated?: boolean; toolAllowanceExceeded?: boolean; providerCalls?: number; webOpenCalls?: number; webFindCalls?: number; researchTier?: "simple" | "standard" | "deep";
   // Operational enums/counters only. Never persist prompts, source URLs or error messages here.
   telemetryVersion?: 1; outcomeFailure?: VsiFailureCategory; researchStatus?: "not_required" | "completed" | "partial" | "failed";
+  sourcePolicyFailure?: AIProviderPolicyFailure | "read_ticket_unavailable";
   citationStatus?: "not_required" | "validated" | "failed"; evidenceLimitations?: boolean; noteProposal?: boolean;
   providerFailures?: number; outputValidationFailures?: number; citationValidationFailures?: number };
 export type VsiNoteDraft = { title: string; content: string };

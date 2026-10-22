@@ -1,5 +1,6 @@
 import { googleSheetsOpenAIHeaders } from "@/lib/ai/providers/google-data-policy";
 import { bindGoogleSheetsRead } from "@/lib/integrations/google-sheets/read-authority";
+import { AIProviderPolicyError } from "@/lib/ai/providers/types";
 import "server-only";
 import { z } from "zod";
 import { hasProhibitedVsiIdentifiers, VSI_PROHIBITED_INPUT_MESSAGE } from "./sensitive-input";
@@ -212,9 +213,16 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     let googleDataHeaders: Record<string, string>;
     try {
       await bindGoogleSheetsRead(input.supabase, input.readTicket.ticketId, []);
-      googleDataHeaders = await googleSheetsOpenAIHeaders(input.readTicket.ticketId);
+    } catch {
+      usage.sourcePolicyFailure = "read_ticket_unavailable";
+      throw new VsiEngineError("Workspace source access could not be revalidated. Reload this chat before trying again.", usage, false, "evidence_unavailable");
     }
-    catch { throw new VsiEngineError("Workspace data changed. Reload this chat before trying again.", usage, false, "evidence_unavailable"); }
+    try {
+      googleDataHeaders = await googleSheetsOpenAIHeaders(input.readTicket.ticketId);
+    } catch (error) {
+      usage.sourcePolicyFailure = error instanceof AIProviderPolicyError ? error.reason : "source_authority_unavailable";
+      throw new VsiEngineError(error instanceof AIProviderPolicyError ? error.message : "Source-data authority could not be verified. Please try again later.", usage, false, "evidence_unavailable");
+    }
     if (!key && !googleDataHeaders.Authorization) throw new VsiEngineError("Vaeroex Super Intelligence is temporarily unavailable because its provider connection is not configured. Please try again later.", usage);
     if (usage.estimatedCostUsd >= config.requestReserveUsd) throw new VsiEngineError("This question reached its spending safeguard. Please narrow it and retry.", usage, false, "budget_block");
     const remaining = config.timeoutMs - (Date.now() - startedAt) - reserveAnswerMs;

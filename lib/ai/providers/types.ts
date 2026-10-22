@@ -90,8 +90,11 @@ export class AIProviderError extends Error {
   }
 }
 
+export type AIProviderPolicyFailure = "source_authority_unavailable" | "source_access_denied" | "source_changed"
+  | "source_attribution" | "provider_configuration" | "provider_not_allowed" | "policy";
+
 export class AIProviderPolicyError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly reason: AIProviderPolicyFailure = "policy") {
     super(message);
     this.name = "AIProviderPolicyError";
   }
