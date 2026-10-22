@@ -15,6 +15,8 @@ import { kpiSemantics } from "@/lib/kpis/settings";
 import { loadIntegrationDashboard } from "@/lib/integrations/dashboard/server";
 import { parseSavedAnalysisEnvelope } from "@/lib/reports/saved-analysis";
 import { currentSavedAnalysisReleaseChannel } from "@/lib/reports/release-channel";
+import { loadVsiAttributedReports } from "./saved-report-evidence";
+import { vsiCitationNavigationUrl } from "./citation-links";
 import type { WorkspaceAccess } from "@/lib/security/types";
 import type { VsiRunInput, VsiEvidence, VsiEvidenceResult } from "./types";
 
@@ -76,6 +78,15 @@ function relevance(question: string, text: string) {
   return terms.reduce((score, term) => score + Number(text.toLowerCase().includes(term)), 0);
 }
 
+function matchesEvidenceHref(source: VsiEvidence, href: string) {
+  if (source.url === href) return true;
+  // Preserve saved KPI lineage across the citation navigation fix. Only the
+  // exact old generated link for the same metric is an alias; arbitrary list
+  // filters, other routes and dates do not become evidence equivalences.
+  if (source.sourceType !== "kpi") return false;
+  return vsiCitationNavigationUrl({ sourceType: source.sourceType, url: href }) === source.url;
+}
+
 /** Authenticated client, explicit workspace predicates, existing RLS and source lifecycle on every read.
  * No admin client, external refresh, transcript indexing, embedding call or new memory store. */
 export async function retrieveVsiEvidence(access: WorkspaceAccess, question: string, asOf = new Date().toISOString(), inheritedTicket?: GoogleSheetsReadTicket): Promise<VsiEvidenceResult> {
@@ -86,14 +97,12 @@ export async function retrieveVsiEvidence(access: WorkspaceAccess, question: str
     new SupabasePgvectorCandidateRetriever({ supabase }).retrieve({ version: EVIDENCE_QUERY_VERSION, workspaceId, text: question,
       requestedDomains: ["business_memory"], strategy: "keyword_only", candidateLimit: 24, resultLimit: 16, minimumSourceDiversity: 2, freshnessAfter: null }),
     loadApprovedBusinessNoteContextV1({ supabase, workspaceId, releaseChannel: businessNoteReleaseChannel(), asOf, maximumRows: 50 }),
-    supabase.from("reports").select("id,title,source_data_json,created_at").eq("workspace_id", workspaceId)
-      .is("deleted_at", null).is("archived_at", null).contains("source_data_json", { record_kind: "saved_analysis", release_channel: currentSavedAnalysisReleaseChannel() })
-      .order("created_at", { ascending: false }).limit(30)
+    loadVsiAttributedReports(access)
   ]);
   const limitations: string[] = [];
   if (health.errors.length) limitations.push("Some workspace records could not be checked. Do not interpret unavailable records as zero activity or a healthy result.");
   if (notes.error) limitations.push("Approved Business Notes could not be checked for this answer.");
-  if (reports.error) limitations.push("Saved analyses could not be checked for this answer.");
+  limitations.push(...reports.limitations);
   const candidates: VsiEvidence[] = [];
   const add = (sourceType: string, sourceId: string | null, title: string, text: string, evidenceDate: string | null, url: string, treatment: VsiEvidence["treatment"]) => {
     candidates.push({ id: "", title: clean(title, 180), text: clean(text, 2400), excerpt: publicVsiExcerpt(sourceType, text), sourceType, sourceId,
@@ -151,7 +160,7 @@ export async function retrieveVsiEvidence(access: WorkspaceAccess, question: str
     note.observedAt || note.approvedAt, `/app/sources?note=${encodeURIComponent(note.sourceNoteId)}#business-notes`, "reported_context");
   for (const row of health.kpis) add("kpi", row.id, row.name,
     JSON.stringify({ name: row.name, value: row.actual_value, target: row.target, category: row.category, date: row.metric_date,
-      notes: row.notes, sourceFileId: row.source_file_id, semantics: kpiSemantics(row.name, health.kpiSettings) }), row.metric_date, `/app/kpis?q=${encodeURIComponent(row.name)}`, "record");
+      notes: row.notes, sourceFileId: row.source_file_id, semantics: kpiSemantics(row.name, health.kpiSettings) }), row.metric_date, `/app/kpis?metric=${encodeURIComponent(row.name)}&section=detail#kpi-detail`, "record");
   for (const row of health.operationalMetrics) add("operational_metric", row.id, row.metric_name,
     JSON.stringify({ name: row.metric_name, value: row.value, date: row.metric_date, notes: row.notes }), row.metric_date, "/app/sources", "record");
   const integrations = await loadIntegrationDashboard({ access, eligibleKpis: health.kpis });
@@ -180,8 +189,11 @@ export async function retrieveVsiEvidence(access: WorkspaceAccess, question: str
     const envelope = parseSavedAnalysisEnvelope(report.source_data_json);
     if (!envelope || envelope.workspace_id !== workspaceId || envelope.release_channel !== currentSavedAnalysisReleaseChannel()) continue;
     const lineage = envelope.evidence_lineage.length ? envelope.evidence_lineage : envelope.citations;
-    const lineagePermitted = lineage.length > 0 && lineage.every(reference => reference.href && candidates.some(source =>
-      source.url === reference.href && (!reference.recordedAt || source.evidenceDate?.slice(0, 10) === reference.recordedAt.slice(0, 10))));
+    const lineagePermitted = lineage.length > 0 && lineage.every(reference => {
+      const href = reference.href;
+      return href && candidates.some(source => matchesEvidenceHref(source, href)
+        && (!reference.recordedAt || source.evidenceDate?.slice(0, 10) === reference.recordedAt.slice(0, 10)));
+    });
     if (!lineagePermitted) {
       limitations.push("A saved analysis was excluded because its original sources could not all be verified as currently permitted. Check its original records before relying on that analysis.");
       continue;

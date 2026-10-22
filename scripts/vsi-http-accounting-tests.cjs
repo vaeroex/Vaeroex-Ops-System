@@ -72,6 +72,7 @@ async function check(name, failure, expectedCost, estimated) {
     assert.equal(settlement.usage.providerCalls, failure.usage.providerCalls);
     assert.equal(settlement.usage.inputTokens, failure.usage.inputTokens);
     assert.equal(settlement.usage.webSearchCalls, failure.usage.webSearchCalls);
+    assert.equal(settlement.usage.sourcePolicyFailure, failure.usage.sourcePolicyFailure);
   }
 }
 (async () => {
@@ -79,6 +80,7 @@ async function check(name, failure, expectedCost, estimated) {
   await check('uncertainty flag also preserves known spending above the reserve', new VsiEngineError(usage(0.32, true)), 0.32, true);
   await check('uncertainty below reserve retains the conservative floor', new VsiEngineError(usage(0.012), true), 0.25, true);
   await check('fully accounted failure charges only its observed usage', new VsiEngineError(usage(0.012)), 0.012, false);
+  await check('later source guard preserves one completed provider call and classified failure', new VsiEngineError({ ...usage(0.0002327), providerCalls: 1, sourcePolicyFailure: 'source_attribution', outcomeFailure: 'evidence_unavailable' }), 0.0002327, false);
   await check('known zero-cost rejection remains free', new VsiEngineError({ ...usage(0), inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, reasoningTokens: 0, providerCalls: 0, webSearchCalls: 0 }), 0, false);
   await check('untyped failure reserves uncertain cost', new Error('Synthetic unexpected failure'), 0.25, true);
   const logs = [], originalError = console.error;
@@ -125,5 +127,5 @@ async function check(name, failure, expectedCost, estimated) {
     assert.deepEqual(captured.pop(), ['[vsi-rate-limit]', { operation: 'consume_request_rate_limit_v1', code: 'empty_result' }]);
     assert.equal(captured.length, 0);
   } finally { console.error = oldError; }
-  console.log(JSON.stringify({ passed: true, suite: 'VSI HTTP failed-answer accounting preserves known cost and reservation floor', scenarios: 6, paidProviderCalls: 0, databaseCalls: 0 }));
+  console.log(JSON.stringify({ passed: true, suite: 'VSI HTTP failed-answer accounting preserves known cost and reservation floor', scenarios: 7, paidProviderCalls: 0, databaseCalls: 0 }));
 })().catch(error => { console.error(error); process.exitCode = 1; });
