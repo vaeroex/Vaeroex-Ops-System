@@ -34,10 +34,10 @@ export type ExchangeRow = {
 type Table<Row> = { Row: Row; Insert: Partial<Row>; Update: Partial<Row>; Relationships: [] };
 type VsiDatabase = Database & { public: Database["public"] & {
   Tables: Database["public"]["Tables"] & { vsi_conversations: Table<ConversationRow>; vsi_exchanges: Table<ExchangeRow> };
-  Functions: Database["public"]["Functions"] & { vsi_mutate_v1: { Args: { p_workspace_id: string; p_actor_user_id: string; p_action: string; p_input: Json }; Returns: Json } };
+  Functions: Database["public"]["Functions"] & { vsi_mutate_v2: { Args: { p_workspace_id: string; p_actor_user_id: string; p_action: string; p_input: Json; p_session_id: string }; Returns: Json } };
 } };
 export type VsiAccess = {
-  supabase: SupabaseClient<Database>; workspaceId: string; userId: string; canEditBusinessNotes: boolean;
+  supabase: SupabaseClient<Database>; workspaceId: string; userId: string; sessionId: string; canEditBusinessNotes: boolean;
 };
 
 /** Bind every browser request to the workspace that rendered the page. */
@@ -50,13 +50,18 @@ export async function requireVsiAccess(request: Request, expectedWorkspaceId: un
   if (!supabase) throw new VsiHttpError(503, "storage_unavailable", "Chat storage is temporarily unavailable. Please try again.");
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new VsiHttpError(401, "authentication_required", "Sign in to continue this chat.");
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  const sessionId = vsiUuid.safeParse(claimsData?.claims.session_id);
+  if (claimsError || claimsData?.claims.sub !== user.id || !sessionId.success) {
+    throw new VsiHttpError(401, "authentication_required", "Sign in to continue this chat.");
+  }
   const context = await getWorkspaceContext(undefined, { supabase, user });
   if (!context.activeWorkspace || context.activeWorkspace.id !== expectedWorkspaceId || context.membership?.status !== "active") {
     throw new VsiHttpError(403, "workspace_changed", "Your active workspace changed or access ended. Reload before continuing.");
   }
   const subscription = await getSubscriptionStatus({ supabase, userId: user.id, email: user.email, workspaceId: context.activeWorkspace.id });
   if (!subscription.allowed) throw new VsiHttpError(402, "subscription_required", "This workspace needs an active subscription to use Vaeroex.");
-  return { supabase, workspaceId: context.activeWorkspace.id, userId: user.id,
+  return { supabase, workspaceId: context.activeWorkspace.id, userId: user.id, sessionId: sessionId.data,
     canEditBusinessNotes: ["owner", "admin", "manager", "staff"].includes(context.membership.role) };
 }
 
@@ -68,7 +73,7 @@ export function exchangeView(row: ExchangeRow) {
     publicResearchTopics: Array.isArray(row.public_research_topics) ? row.public_research_topics.filter((term): term is string => typeof term === "string" && term.length <= 160).slice(0, 12) : [],
     createdAt: row.created_at, rememberProposal: row.remember_proposal as { title: string; content: string } | null, savedNoteId: row.saved_note_id };
 }
-export async function loadVsiExchange(access: VsiAccess, id: string) {
+export async function loadVsiExchange(access: Omit<VsiAccess, "sessionId">, id: string) {
   if (!vsiUuid.safeParse(id).success) return null;
   const client = access.supabase as SupabaseClient<VsiDatabase>;
   const { data, error } = await client.from("vsi_exchanges").select("*").eq("workspace_id", access.workspaceId).eq("actor_user_id", access.userId).eq("id", id).maybeSingle();
@@ -120,7 +125,9 @@ const ERROR_MESSAGES: Record<string, [number, string]> = {
 export async function mutateVsi<T>(access: VsiAccess, action: string, input: Record<string, unknown> = {}): Promise<T> {
   const admin = createSupabaseAdminClient() as SupabaseClient<VsiDatabase> | null;
   if (!admin) throw new VsiHttpError(503, "storage_unavailable", "Chat storage is temporarily unavailable. Please try again.");
-  const { data, error } = await admin.rpc("vsi_mutate_v1", { p_workspace_id: access.workspaceId, p_actor_user_id: access.userId, p_action: action, p_input: input as Json });
+  // The session-fenced entry point rechecks live authority for every mutation.
+  // Never fall back to v1: its service-role permission was deliberately revoked.
+  const { data, error } = await admin.rpc("vsi_mutate_v2", { p_workspace_id: access.workspaceId, p_actor_user_id: access.userId, p_action: action, p_input: input as Json, p_session_id: access.sessionId });
   if (error) {
     if (error.code === "42501") throw new VsiHttpError(403, "access_denied", "Your access to this workspace or action has changed. Nothing was saved.");
     console.error("[vsi-storage]", { action, code: error.code });
