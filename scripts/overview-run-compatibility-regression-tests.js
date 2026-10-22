@@ -62,7 +62,8 @@ const runs = [
   completedRun({ id: "run-newer", updated_at: "2026-07-21T12:00:00.000Z" }),
   completedRun({ id: "run-failed", status: "failed", error_message: "Provider timeout." }),
   completedRun({ id: "run-archived", archived_at: "2026-07-22T12:00:00.000Z" }),
-  completedRun({ id: "run-checklist", agent_type: "checklist_builder" })
+  completedRun({ id: "run-checklist", agent_type: "checklist_builder" }),
+  completedRun({ id: "quota-only", agent_type: "private_analysis_reservation_v1", output_json: {}, updated_at: "2026-07-30T12:00:00.000Z" })
 ];
 
 const legacyEligibleRuns = excludeChecklistDerivedRecords(
@@ -73,6 +74,7 @@ const compatibility = buildOverviewRunCompatibility(runs);
 assert.deepEqual(eligibleOverviewCompatibilityRuns(runs), legacyEligibleRuns);
 assert.deepEqual(Object.keys(compatibility).sort(), ["derivedFindingCount", "latestEvidenceUpdate", "snapshotSourceCount"]);
 assert.equal(compatibility.derivedFindingCount, legacyEligibleRuns.length);
+assert.equal(compatibility.derivedFindingCount, 2, "quota reservations must not inflate analysis counts or freshness");
 assert.equal(compatibility.snapshotSourceCount, legacyEligibleRuns.length);
 assert.equal(compatibility.latestEvidenceUpdate, "2026-07-21T12:00:00.000Z");
 assert.doesNotMatch(JSON.stringify(compatibility), /Historical result|ask_vaeroex|run-current/);

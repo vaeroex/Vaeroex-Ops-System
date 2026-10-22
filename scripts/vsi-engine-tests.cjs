@@ -27,6 +27,12 @@ mock('lib/vsi/retrieval.ts',{
 const productSource={id:'P1',title:'Vaeroex product',url:'/app/help',sourceType:'product_context',sourceId:null,evidenceDate:null,retrievedAt:'2026-10-08T12:00:00Z',text:'Vaeroex provides text chat and public research.',treatment:'record'};
 mock('lib/vsi/product-context.ts',{loadVsiProductContext:async()=>{if(!productAvailable)throw new Error('synthetic product lookup failure');return {authoritative:{assistant:{name:'Vaeroex'},workspace:{name:'PRIVATE WORKSPACE LABEL'},publishedPlan:{price:'$149'}},sources:[productSource],limitations:[]};}});
 const {runVsiAnswer,explicitVsiNoteDraft,boundedVsiHistory,validateVsiAnswer,readVsiWebSources,vsiLiveLookupDiagnostic,VsiEngineError,VSI_SYSTEM_PROMPT} = require('../lib/vsi/engine.ts');
+const {vsiAnswerSchemaForSources,aliasCurrentVsiSources,serializeVsiPayload}=require('../lib/vsi/engine.ts');
+const originals=[{...source,id:'B1234567890',snapshotHash:'immutable',inputSourceIds:['report-a','report-b']},{...source,id:'B77'}];
+const chartSource={...originals[0],text:'Grounded calculations',comparisons:[{title:'Chart layout'}]};const compactInput=JSON.parse(serializeVsiPayload({businessSources:[chartSource]}));assert.equal(compactInput.businessSources[0].comparisons,undefined);assert.equal(chartSource.comparisons.length,1);assert.equal(compactInput.businessSources[0].text,'Grounded calculations');assert.deepEqual(compactInput.businessSources[0].inputSourceIds,['report-a','report-b']);
+const aliases=aliasCurrentVsiSources(originals,[{...source,id:'B1'},{...source,id:'B3'}]);
+assert.deepEqual(aliases.map(s=>s.id),['B2','B4']);assert.equal(originals[0].id,'B1234567890');assert.equal(aliases[0].snapshotHash,'immutable');assert.deepEqual(aliases[0].inputSourceIds,['report-a','report-b']);
+assert.deepEqual(vsiAnswerSchemaForSources(aliases).properties.citationIds.items.enum,['B2','B4']);assert.equal(vsiAnswerSchemaForSources([]).properties.citationIds.maxItems,0);
 const research = require('../lib/vsi/research.ts');
 const {vsiEstimatedCost,getVsiConfig,vsiResearchLimits} = require('../lib/vsi/config.ts');
 const {resetAIProviderCircuitForTests,recordAIProviderFailure,getAIProviderRetrySettings} = require('../lib/ai/provider-resilience.ts');

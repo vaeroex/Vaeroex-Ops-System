@@ -1,6 +1,7 @@
 import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 import { retrieveFinancialEvidence } from "./financial-evidence";
+import { retrieveReportingEvidence } from "@/lib/integrations/reporting/evidence";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 import { loadWorkspaceHealthEvidence } from "@/lib/intelligence/workspace-health";
@@ -162,6 +163,9 @@ export async function retrieveVsiEvidence(access: WorkspaceAccess, question: str
   const financial = await retrieveFinancialEvidence(access, asOf);
   candidates.push(...financial.sources);
   limitations.push(...financial.limitations);
+  const reporting = await retrieveReportingEvidence(access, asOf, financial.reports);
+  candidates.push(...reporting.sources);
+  limitations.push(...reporting.limitations);
   // Same producer as Overview/Intelligence, without writing snapshots or invoking their models.
   if (!health.businessHealthSourceErrors.length && !excludedFileIds.size) {
     const operationalInsights = buildOperationalEvidenceInsights({ sourceParents: health.sourceParentResult.eligibility.records,
@@ -195,8 +199,14 @@ export async function retrieveVsiEvidence(access: WorkspaceAccess, question: str
     || String(b.evidenceDate).localeCompare(String(a.evidenceDate)));
   const selected: VsiEvidence[] = [];
   for (const source of ranked.filter(source => source.sourceType === "financial_report" || source.sourceType === "financial_calculation")) selected.push(source);
-  for (const kind of ["kpi", "business_note", "file", "finding", "saved_analysis", "integration", "business_health"]) {
-    const match = ranked.find(source => source.sourceType === kind); if (match) selected.push(match);
+  for (const kind of ["kpi", "business_note", "file", "finding", "saved_analysis", "reporting_observation", "integration", "business_health"]) {
+    if (kind === "reporting_observation") {
+      // Keep each bounded provider observation and its comparison periods together,
+      // before additional note matches consume the final synthesis budget.
+      selected.push(...ranked.filter(source => source.sourceType === kind));
+    } else {
+      const match = ranked.find(source => source.sourceType === kind); if (match) selected.push(match);
+    }
   }
   for (const source of ranked) if (!selected.includes(source) && selected.length < 24) selected.push(source);
   let chars = 0;

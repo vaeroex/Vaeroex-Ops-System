@@ -1,3 +1,5 @@
+import { loadReportedFinancialMetrics } from "@/lib/integrations/qbo-customer/load-reported-financial-metrics";
+import { ReportedFinancialMetricsView } from "@/components/kpis/ReportedFinancialMetrics";
 import { ComparisonCharts } from "@/components/charts/ComparisonCharts";
 import { kpiComparisons } from "@/lib/charts/kpi";
 import type { Route } from "next";
@@ -1563,6 +1565,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false })
   ]);
 
+  const reportedFinancial = await loadReportedFinancialMetrics();
+
   const rawKpis = (kpiResult.data || []) as KpiRow[];
   const sourceParentResult = await loadSourceParentEligibilityResult({ supabase, workspaceId, rows: rawKpis });
   const sourceParentEligibility = sourceParentResult.eligibility;
@@ -1803,6 +1807,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         }
       />
       <SuccessNotice message={params?.message} />
+      <ReportedFinancialMetricsView {...reportedFinancial} />
       <TargetUndoNotice
         metricName={undoMetricName}
         previousTarget={params?.undo_target}

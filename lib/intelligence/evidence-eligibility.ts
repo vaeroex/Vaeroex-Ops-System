@@ -24,6 +24,7 @@ export type EvidenceEligibility = {
 };
 
 type EvidenceRecord = {
+  agent_type?: string | null;
   status?: string | null;
   archived_at?: string | null;
   deleted_at?: string | null;
@@ -111,6 +112,11 @@ export function classifyEvidenceEligibility(
   }
   if (value.archived_at) {
     return { eligible: false, classification: "business_evidence", lifecycle: "inactive", reason: "archived" };
+  }
+
+  // A content-free billing reservation is never a business fact or analysis.
+  if (value.agent_type === "private_analysis_reservation_v1") {
+    return { eligible: false, classification: "platform_telemetry", lifecycle: "inactive", reason: "platform_telemetry" };
   }
 
   const metadata = metadataRecords(value);

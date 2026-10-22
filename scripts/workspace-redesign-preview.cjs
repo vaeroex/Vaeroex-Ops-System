@@ -26,6 +26,7 @@ const actionExportContracts = Object.freeze({
   "app/app/settings/reporting-timezone-action.ts": Object.freeze(["saveReportingTimezoneAction"]),
 });
 const readModules = Object.freeze([
+  "@/lib/integrations/qbo-customer/load-reported-financial-metrics",
   "@/lib/workspaces/page-context", "@/lib/kpis/load-workspace-kpis", "@/lib/ai/evidence-index",
   "@/lib/files/storage-links", "@/lib/ai/providers/workflow-provider-policy",
   "@/lib/integrations/control-plane/qbo-customer-availability",

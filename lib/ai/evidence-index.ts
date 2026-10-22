@@ -583,7 +583,7 @@ export function filterEligibleMemoryRows<T extends MemoryChunkRow | MatchMemoryC
 }: {
   rows: T[];
   files: Array<Pick<FileUploadRow, "id" | "deleted_at" | "archived_at" | "metadata_json">>;
-  runs: Array<Pick<AiAgentRunRow, "id" | "status" | "deleted_at" | "archived_at" | "input_json" | "output_json">>;
+  runs: Array<Pick<AiAgentRunRow, "id" | "status" | "deleted_at" | "archived_at" | "input_json" | "output_json"> & Partial<Pick<AiAgentRunRow, "agent_type">>>;
   notes?: Array<Pick<BusinessNoteRow, "id" | "workspace_id" | "release_channel" | "status" | "evidence_lifecycle_status" | "deleted_at" | "archived_at">>;
   worksheetHeads?: Map<string, string | null>;
   workspaceId?: string;
@@ -671,7 +671,7 @@ export async function filterEligibleMemoryRowsByLifecycle<T extends MemoryChunkR
       ? supabase.from("file_uploads").select("id,deleted_at,archived_at,metadata_json").eq("workspace_id", workspaceId).in("id", fileIds)
       : Promise.resolve({ data: [], error: null }),
     runIds.length
-      ? supabase.from("ai_agent_runs").select("id,status,deleted_at,archived_at,input_json,output_json").eq("workspace_id", workspaceId).in("id", runIds)
+      ? supabase.from("ai_agent_runs").select("id,agent_type,status,deleted_at,archived_at,input_json,output_json").eq("workspace_id", workspaceId).in("id", runIds)
       : Promise.resolve({ data: [], error: null }),
     noteIds.length
       ? supabase.from("business_notes").select("id,workspace_id,release_channel,status,evidence_lifecycle_status,deleted_at,archived_at").eq("workspace_id", workspaceId).in("id", noteIds)
@@ -1156,7 +1156,7 @@ export async function indexFileAnalysisEvidence({
 
   const { data: sourceRun, error: sourceRunError } = await supabase
     .from("ai_agent_runs")
-    .select("id,status,deleted_at,archived_at,input_json,output_json")
+    .select("id,agent_type,status,deleted_at,archived_at,input_json,output_json")
     .eq("id", runId)
     .eq("workspace_id", workspaceId)
     .maybeSingle();

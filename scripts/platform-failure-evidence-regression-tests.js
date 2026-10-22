@@ -76,6 +76,11 @@ function run(overrides = {}) {
   };
 }
 
+const reservation = run({ agent_type: "private_analysis_reservation_v1", input_json: {}, output_json: {} });
+assert.equal(classifyEvidenceEligibility(reservation, { sourceKind: "platform_run" }).eligible, false, "a completed quota slot is not an analysis");
+assert.equal(classifyEvidenceEligibility(reservation).classification, "platform_telemetry");
+assert.equal(filterEligibleMemoryRows({ rows: [chunk()], files: [file()], runs: [reservation] }).length, 0, "forged source linkage to a quota slot cannot establish original evidence");
+
 const softFailure = assessFileAnalysisEvidence({
   outputJson: {
     executive_summary: "Image extraction failed. The company may lack visibility.",

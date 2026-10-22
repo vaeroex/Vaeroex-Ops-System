@@ -2,6 +2,7 @@
   "git": {
     "deploymentEnabled": {
       "main": false,
+      "codex/reported-intelligence-evaluation-fixes": false,
       "codex/intelligence-health-consolidation": false,
       "codex/square-remote-sandbox-binding": false,
       "codex/square-sandbox-qualification": false,
