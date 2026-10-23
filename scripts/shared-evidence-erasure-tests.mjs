@@ -3,7 +3,10 @@ import test from 'node:test';import assert from 'node:assert/strict';import {cre
 import * as f from './shared-evidence-sql-fixture.mjs';
 import {prepareWriterCases} from './shared-evidence-writer-cases.mjs';
 import {installFenceFixture} from './shared-evidence-fence-fixture.mjs';
-const {installErasureFixture,issueSyntheticCapability,waitForPrivacyInversion}=createRequire(import.meta.url)('./shared-evidence-erasure-qualification.cjs');
+const {databaseSuffix,installErasureFixture,issueSyntheticCapability,waitForPrivacyInversion}=createRequire(import.meta.url)('./shared-evidence-erasure-qualification.cjs');
+test('privacy runner database suffix respects existing owned-container bounds',()=>{
+ assert.match(databaseSuffix,/^[a-z][a-z0-9_]{0,19}$/);
+});
 test('repository erasure guard/canonical hash enforce exact old row and transaction capability; rollback leaves source intact',async()=>{
  const {db}=await prepareWriterCases();
  try{

@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "scripts/shared-evidence-writer-qualification.cjs",
-      "sha256": "f79e52816c509249620fd7d92e3c611e01b1dc2e8cbd3d26ae85c7c2f0d98efc"
+      "sha256": "4dcd512eb46870202eda08ff586436962b1bfe51148f3c743a22e948fee9ddd0"
     },
     {
       "path": "scripts/shared-evidence-writer-cases.mjs",
@@ -104,11 +104,11 @@
     },
     {
       "path": "scripts/shared-evidence-erasure-qualification.cjs",
-      "sha256": "000eb80bd50ab6557a4e6c12a1c5cdb72b6f8a1c4d5cf9d49c90448df15b0adb"
+      "sha256": "a77af0791cad55686a1c4f2495272a3bbe3c09353bbe1a309c093ca53d259a51"
     },
     {
       "path": "scripts/shared-evidence-erasure-tests.mjs",
-      "sha256": "692c72a04d2666c730101d2cd7662ba3b337d85b2e9f487e4667d37b9940983c"
+      "sha256": "bba309b7ff2478b6f791db603c5b0f8d705695525e7bb88fff350dc7528d1057"
     },
     {
       "path": "supabase/production-migrations/20261012191836_google_sheets_restricted_erasure_retention.sql",

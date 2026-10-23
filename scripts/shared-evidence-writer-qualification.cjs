@@ -77,5 +77,8 @@ async function main(args=process.argv.slice(2)) {
  const run=args[0]==='--privacy-erasure'?require('./shared-evidence-erasure-qualification.cjs').qualifyErasure:args[0]==='--fence'?require('./shared-evidence-fence-qualification.cjs').qualifyFence:qualify;
  return require('./qbo-candidate-local-container.cjs').runContainerQualification(run);
 }
-if(require.main===module)main().then(result=>console.log(JSON.stringify(result))).catch(error=>{console.error(JSON.stringify({status:'blocked_or_failed',reason:'synthetic_writer_probe_failed',code:/^[A-Z0-9_]{1,30}$/.test(error.code||'')?error.code:undefined}));process.exitCode=1;});
+if(require.main===module)main().then(result=>console.log(JSON.stringify(result))).catch(error=>{console.error(JSON.stringify({status:'blocked_or_failed',reason:'synthetic_writer_probe_failed',code:/^[A-Z0-9_]{1,30}$/.test(error.code||'')?error.code:undefined,
+ stage:/^[a-z_]{1,80}$/.test(error.qualificationStage||'')?error.qualificationStage:undefined,
+ assertionLine:Number.isInteger(error.assertionLine)?error.assertionLine:undefined,
+ assertionActualCode:/^[A-Z0-9]{5}$/.test(error.assertionActualCode||'')?error.assertionActualCode:undefined}));process.exitCode=1;});
 module.exports={check,qualify,observeWriter};

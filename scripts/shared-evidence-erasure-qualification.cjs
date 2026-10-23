@@ -4,6 +4,7 @@
 const assert=require('node:assert/strict');
 const {setTimeout:delay}=require('node:timers/promises');
 const {makeAttempt}=require('./shared-evidence-fence-qualification.cjs');
+const databaseSuffix='shared_erasure';
 const adapter=c=>({query:(q,a)=>c.query(q,a),exec:q=>c.query(q),close:async()=>{}});
 function extract(sql,name){
  const escaped=name.replaceAll('.','\\.');
@@ -51,8 +52,8 @@ async function qualifyErasure(target){
  const f=await import('./shared-evidence-sql-fixture.mjs');
  const {prepareWriterCases}=await import('./shared-evidence-writer-cases.mjs');
  const {installFenceFixture}=await import('./shared-evidence-fence-fixture.mjs');
- const database=await target.createDatabase('shared_privacy_erasure','empty');
- const control=database.client,db=adapter(control),clients=[];let pending=null;
+ const database=await target.createDatabase(databaseSuffix,'empty');
+ const control=database.client,db=adapter(control),clients=[];let pending=null;let stage='fixture';
  try{
   const {cases}=await prepareWriterCases({createDatabase:async()=>db});await installFenceFixture(db);await installErasureFixture(db,f);
   const probe=cases.find(c=>c.provider==='google_sheets');assert.ok(probe);
@@ -63,6 +64,7 @@ async function qualifyErasure(target){
   const original=(await control.query('select to_jsonb(k) row from kpis k where id=$1',[f.uuid(304)])).rows[0].row;
   const results=[];let sequence=4000;
   for(const kind of ['vsi_request','briefing_run'])for(const blocked of [false,true]){
+   stage=kind+(blocked?'_blocked':'_open')+'_prepare';
    const attempt=await makeAttempt(db,f,probe,kind,sequence);sequence+=10;
    const targetTable=kind==='vsi_request'?'vsi_requests':'ai_agent_runs';
    const targetBefore=(await control.query(`select to_jsonb(t) row from ${targetTable} t where id=$1`,[attempt.id])).rows[0].row;
@@ -71,15 +73,19 @@ async function qualifyErasure(target){
    await writer.query('select private.google_sheets_privacy_lock_v1($1)',[f.w]);
    await f.login(adapter(reader),f.owner,f.session,'service_role');await reader.query('begin');
    pending=attempt.call(reader).then(()=>({ok:true}),error=>({ok:false,code:error.code}));
+   stage=kind+(blocked?'_blocked':'_open')+'_observe';
    await waitForPrivacyInversion(control,pids[1],pids[2],f.w);
+   stage=kind+(blocked?'_blocked':'_open')+'_unlisted';
    await writer.query("select set_config('vaeroex.google_sheets_erasure_request',$1,true)",[f.uuid(990)]);
    await writer.query('savepoint unlisted');
    await assert.rejects(writer.query('delete from kpis where id=$1',[f.uuid(304)]),e=>e.code==='42501');
    await writer.query('rollback to savepoint unlisted');
+   stage=kind+(blocked?'_blocked':'_open')+'_contended';
    await issueSyntheticCapability(writer,f);
    await assert.rejects(writer.query('delete from kpis where id=$1',[f.uuid(304)]),e=>e.code==='40001');
    await writer.query('rollback'); // Releases privacy, capability and attempted row mutation.
    const outcome=await pending;pending=null;
+   stage=kind+(blocked?'_blocked':'_open')+'_completion';
    if(blocked){assert.deepEqual(outcome,{ok:false,code:'55000'});await reader.query('rollback');}
    else{assert.deepEqual(outcome,{ok:true});await reader.query('commit');}
    assert.deepEqual((await control.query('select to_jsonb(k) row from kpis k where id=$1',[f.uuid(304)])).rows[0].row,original);
@@ -93,10 +99,13 @@ async function qualifyErasure(target){
     if(kind==='vsi_request')assert.equal((await control.query('select count(*)::int n from vsi_exchanges where id=$1',[attempt.id])).rows[0].n,0);
    }
    if(!blocked){
+    stage=kind+'_reopen';
     await f.login(adapter(reader));await reader.query('select reopen_shared_evidence_artifact_v1($1,$2,$3,$4)',[f.w,attempt.artifactKind,attempt.id,artifacts[0].artifact_revision]);
     await writer.query('begin');await issueSyntheticCapability(writer,f);await writer.query('delete from kpis where id=$1',[f.uuid(304)]);await writer.query('commit');
+    stage=kind+'_revoke';
     await assert.rejects(reader.query('select reopen_shared_evidence_artifact_v1($1,$2,$3,$4)',[f.w,attempt.artifactKind,attempt.id,artifacts[0].artifact_revision]),e=>['42501','40001'].includes(e.code));
     await control.query('insert into kpis select * from jsonb_populate_record(null::kpis,$1)',[JSON.stringify(original)]);
+    stage=kind+'_stale_capability';
     // Committed test capabilities remain non-authoritative in a new transaction.
     await writer.query('begin');await writer.query("select set_config('vaeroex.google_sheets_erasure_request',$1,true)",[f.uuid(990)]);
     await assert.rejects(writer.query('delete from kpis where id=$1',[f.uuid(304)]),e=>e.code==='42501');await writer.query('rollback');
@@ -106,6 +115,11 @@ async function qualifyErasure(target){
    results.push({consumer:kind,committedPrivacyBarrier:blocked,exactLockInversionObserved:true,unlistedDenied:true,contendedErasureRolledBack:true,completion:blocked?'privacy_rejected':'saved_once_and_reopen_revoked'});
   }
   return {scope:'synthetic_native_privacy_erasure',sessions:3,scenarios:results,providerCalls:0,releaseQualified:false,fullComposition:'unavailable',erasureOrchestration:'synthetic_controller',hashBridge:'sha256_only_fixture',privateProductionBodiesAdded:0};
+ }catch(error){
+  error.qualificationStage=stage;
+  error.assertionLine=Number(/shared-evidence-erasure-qualification\.cjs:(\d+):/.exec(error.stack||'')?.[1])||undefined;
+  error.assertionActualCode=/^[A-Z0-9]{5}$/.test(error.actual?.code||'')?error.actual.code:undefined;
+  throw error;
  }finally{
   // Release writer's privacy lock before awaiting a blocked reader.
   if(clients[1])await clients[1].query('rollback').catch(()=>{});
@@ -113,4 +127,4 @@ async function qualifyErasure(target){
   for(const c of clients){await c.query('rollback').catch(()=>{});await c.end().catch(()=>{});}
  }
 }
-module.exports={extract,installErasureFixture,issueSyntheticCapability,waitForPrivacyInversion,qualifyErasure};
+module.exports={databaseSuffix,extract,installErasureFixture,issueSyntheticCapability,waitForPrivacyInversion,qualifyErasure};
