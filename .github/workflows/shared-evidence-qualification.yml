@@ -62,7 +62,7 @@ jobs:
         run: env -u SUPABASE_INTERNAL_IMAGE_REGISTRY SUPABASE_DB_MIGRATIONS_ENABLED=false supabase db start
 
       - name: Run owned synthetic foundation interleavings
-        run: node scripts/shared-evidence-postgres-qualification.cjs --foundation
+        run: env -u SUPABASE_INTERNAL_IMAGE_REGISTRY node scripts/shared-evidence-postgres-qualification.cjs --foundation
 
       - name: Stop disposable runner Supabase
         if: always() && (steps.local_image.outcome == 'success' || steps.local_image.outcome == 'failure' || steps.local_image.outcome == 'cancelled')

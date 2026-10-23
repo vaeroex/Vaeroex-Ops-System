@@ -9,7 +9,7 @@ const read=p=>fs.readFileSync(path.join(root,p),'utf8');
 async function run() {
  const manifest=preflight(['--check'],{});assert.equal(manifest.fullCompositionReady,false);
  for(const args of [[],['--foundation','--url=postgres://localhost/x'],['postgres://localhost/x'],['--hosted'],['--check','--full-composition']])assert.throws(()=>preflight(args,{}));
- for(const name of ['DATABASE_URL','PGHOST','PGPASSWORD','SUPABASE_ACCESS_TOKEN','SUPABASE_TEST_DATABASE_URL','NEXT_PUBLIC_SUPABASE_URL'])assert.throws(()=>preflight(['--foundation'],{[name]:'synthetic'}),/configuration_forbidden/);
+ for(const name of ['DATABASE_URL','PGHOST','PGPASSWORD','SUPABASE_ACCESS_TOKEN','SUPABASE_TEST_DATABASE_URL','NEXT_PUBLIC_SUPABASE_URL','SUPABASE_INTERNAL_IMAGE_REGISTRY'])assert.throws(()=>preflight(['--foundation'],{[name]:'synthetic'}),/configuration_forbidden/);
  assert.throws(()=>preflight(['--full-composition'],{}),e=>e.message==='full_composition_unavailable'&&e.blockers.includes('private.guard_workspace_mutation_entitlement_v1'));
  assert.throws(()=>preflight(['--check'],{},p=>read(p)+(p.endsWith('foundation.sql')?'\n-- changed':'')),/frozen_contract_hash_mismatch/);
  const noEscape=JSON.parse(read('docs/security-drafts/ci/manifest.json'));noEscape.files[0].path='../escape';
@@ -26,6 +26,7 @@ async function run() {
  assert.doesNotMatch(workflow,/pull_request|workflow_dispatch|secrets\.|environment:|supabase link|migration up|--full-composition|vercel deploy/);
  assert.match(workflow,/contents: read/);assert.match(workflow,/persist-credentials: false/);assert.match(workflow,/timeout-minutes: 30/);
  assert.match(workflow,/SUPABASE_DB_MIGRATIONS_ENABLED=false supabase db start/);
+ assert.match(workflow,/env -u SUPABASE_INTERNAL_IMAGE_REGISTRY node scripts\/shared-evidence-postgres-qualification.cjs --foundation/);
  assert.match(workflow,/supabase stop --no-backup/);
  for(const action of workflow.matchAll(/uses: (\S+)/g))assert.match(action[1],/@[a-f0-9]{40}$/);
  assert.equal(JSON.parse(read('vercel.json')).git.deploymentEnabled['codex/shared-evidence-security-draft'],false);
