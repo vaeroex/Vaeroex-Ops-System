@@ -69,7 +69,7 @@
     },
     {
       "path": "scripts/qbo-candidate-local-container.cjs",
-      "sha256": "7c93d0720119d3b8e3c824a021d8f8a5165549612c217d4ae8000b04019294d1"
+      "sha256": "4977c2d3e44c313897cdf1b716ccc84cb6b4adbdccbda36f611c08ca8cd643a3"
     },
     {
       "path": "scripts/run-square-durable-page-qualification.js",

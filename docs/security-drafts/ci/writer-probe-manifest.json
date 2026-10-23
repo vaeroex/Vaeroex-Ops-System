@@ -1,0 +1,70 @@
+{
+  "scope": "synthetic_source_write_diagnostics",
+  "releaseQualified": false,
+  "files": [
+    {
+      "path": "scripts/shared-evidence-writer-qualification.cjs",
+      "sha256": "85b9d51119539cb595c8ff67deb4885e798c0c1450bcc1f8527271b5601fc33a"
+    },
+    {
+      "path": "scripts/shared-evidence-writer-cases.mjs",
+      "sha256": "bce6f5bcb70bf47d5e551efb6c69a835c4d4e8a3190cbb50064712cf0e4e39e4"
+    },
+    {
+      "path": "scripts/shared-evidence-sql-fixture.mjs",
+      "sha256": "05546bcc20b9fd56c6fe3bc186be391ee5f6e95fbf524895e2d63d9353f55edb"
+    },
+    {
+      "path": "scripts/shared-evidence-writer-probe-tests.mjs",
+      "sha256": "2082b20338e382468db6f876c24aad3513d43faaa5d0f852b2617b8fc6a86e55"
+    },
+    {
+      "path": "docs/security-drafts/01-legacy-evidence.sql",
+      "sha256": "802724c88e8605678a1fc15f6151cb7d6af422f6109fdd957a118310c31fcd28"
+    },
+    {
+      "path": "docs/security-drafts/02-owner-artifact-boundary.sql",
+      "sha256": "892bd3f3f97d3baef3e8ec08d7836a34d36afa4ad78b0bc77bca8ea3ebd41af4"
+    },
+    {
+      "path": "docs/security-drafts/03-generation-manifest-schema.sql",
+      "sha256": "c783c3a89e4f06e6fff3f2ef85cd182d51d258ac5e067879625c922e6e515f61"
+    },
+    {
+      "path": "docs/security-drafts/04-pause-new-readers.sql",
+      "sha256": "02b32ffdf9b65acbe22687eb484a88218e0189c7a66e51e0329821a497d6ea00"
+    },
+    {
+      "path": "docs/security-drafts/05-manifest-admission.sql",
+      "sha256": "f5411008dbbd0c1d32469c5b217bf68fa080ba83e607f61101173bbbf876b977"
+    },
+    {
+      "path": "docs/security-drafts/06-typed-source-admission.sql",
+      "sha256": "cc9ad3bb5598b15cb757e8e9261cde5905f8ece050f6e0eef740de78a734b44e"
+    },
+    {
+      "path": "docs/security-drafts/07-reopen-shared-artifact.sql",
+      "sha256": "0b1b92a50b3ed980d6e968cdd2f08e9a7c53412506005cbdf84b5460640be998"
+    },
+    {
+      "path": "docs/security-drafts/08-sheets-projection.sql",
+      "sha256": "9b31f0b4f3e5e9dfc5269a7b82e8ffb58a4a608edbe56b74df292d330436050c"
+    },
+    {
+      "path": "docs/security-drafts/09-katana-installation-boundary.sql",
+      "sha256": "675310eec622b087ab1baac3a657c33e78e36afbbd4d1d58a9da73d2de6705b4"
+    },
+    {
+      "path": "docs/security-drafts/10-memory-semantic-receipts.sql",
+      "sha256": "98d1c14cae9cb54d6ec092789526c28220eb7f9a02e0d9efcfcaa25587f529a8"
+    },
+    {
+      "path": "docs/security-drafts/11-generation-discovery.sql",
+      "sha256": "2b49a9a2e77988d22a96ed2a0a6dd3ccf0b49b65cb2cc8797c86c1cc19ba566f"
+    },
+    {
+      "path": "supabase/migrations/20261008190000_vsi_private_chat.sql",
+      "sha256": "b4dbb12ad856d4e50b52a82d9442808d20c9e59a1a3b690a83555c5c1a9722fb"
+    }
+  ]
+}

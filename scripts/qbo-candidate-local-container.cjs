@@ -123,8 +123,9 @@ exec postgres -D /tmp/qbo-candidate-data -c listen_addresses='*' -c unix_socket_
     assert.equal(observed.db, 'postgres');
     assert.equal(observed.port, 5432);
     inspect();
-    return await callback({ targetKind: 'owned-supabase-image', async createDatabase(suffix) {
+    return await callback({ targetKind: 'owned-supabase-image', async createDatabase(suffix, platformFixture = 'square-durable') {
       assert.match(suffix, /^[a-z][a-z0-9_]{0,19}$/);
+      assert.ok(['square-durable', 'empty'].includes(platformFixture), 'fixed local fixture only');
       inspect();
       const database = `qbo_candidate_${nonce}_${suffix}`;
       await administrator.query(`create database ${quote(database)} template template0 encoding 'UTF8'`);
@@ -135,7 +136,7 @@ exec postgres -D /tmp/qbo-candidate-data -c listen_addresses='*' -c unix_socket_
       await client.connect();
       assert.equal((await client.query('select current_database() as db')).rows[0].db, database);
       await client.query('set search_path=public,extensions');
-      await client.query(fs.readFileSync(path.join(root, 'supabase/tests/fixtures/square-durable-platform.sql'), 'utf8'));
+      if (platformFixture === 'square-durable') await client.query(fs.readFileSync(path.join(root, 'supabase/tests/fixtures/square-durable-platform.sql'), 'utf8'));
       return { name: database, client, connection: config,
         dblinkConnection: `host=/tmp port=5432 dbname=${database} user=postgres` };
     } });
