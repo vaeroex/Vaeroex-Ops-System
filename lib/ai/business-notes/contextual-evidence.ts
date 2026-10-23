@@ -32,7 +32,7 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-function reviewedExtraction(note: BusinessNoteRow): BusinessNoteExtraction | null {
+export function reviewedExtraction(note: BusinessNoteRow): BusinessNoteExtraction | null {
   const original = validateBusinessNoteExtraction(note.extraction_json, note.original_note_text);
   if (!original.ok) return null;
   const reviewed = record(note.reviewed_extraction_json);
@@ -54,7 +54,7 @@ function reviewedExtraction(note: BusinessNoteRow): BusinessNoteExtraction | nul
   };
 }
 
-function reviewedUserContext(note: BusinessNoteRow): BusinessNoteUserAddedContext[] | null {
+export function reviewedUserContext(note: BusinessNoteRow): BusinessNoteUserAddedContext[] | null {
   const value = record(note.user_corrections_json).userAddedContext;
   const parsed = userAddedContextSchema.safeParse(value || []);
   return parsed.success ? parsed.data : null;

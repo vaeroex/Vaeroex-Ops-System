@@ -2,6 +2,7 @@ import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, t
 import "server-only";
 
 import { createHash } from "crypto";
+import { evidenceEngineHash } from "@/lib/ai/evidence-engine/hash";
 import { updateVsiPrivateSummary } from "./summary";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -122,12 +123,16 @@ const ERROR_MESSAGES: Record<string, [number, string]> = {
   note_rejected: [409, "This note already exists and was rejected during review. No new note was saved. Edit and submit it again through Business Notes."],
   note_already_exists: [409, "This note already exists in Business Notes. No new note was saved. Open Business Notes to see its current status."],
 };
-export async function mutateVsi<T>(access: VsiAccess, action: string, input: Record<string, unknown> = {}): Promise<T> {
+export async function mutateVsi<T>(access: VsiAccess, action: string, input: Record<string, unknown> = {}, sharedManifestId?: string): Promise<T> {
   const admin = createSupabaseAdminClient() as SupabaseClient<VsiDatabase> | null;
   if (!admin) throw new VsiHttpError(503, "storage_unavailable", "Chat storage is temporarily unavailable. Please try again.");
   // The session-fenced entry point rechecks live authority for every mutation.
   // Never fall back to v1: its service-role permission was deliberately revoked.
-  const { data, error } = await admin.rpc("vsi_mutate_v2", { p_workspace_id: access.workspaceId, p_actor_user_id: access.userId, p_action: action, p_input: input as Json, p_session_id: access.sessionId });
+  if (sharedManifestId && (!vsiUuid.safeParse(sharedManifestId).success || action !== "settle")) throw new VsiHttpError(503,"shared_manifest_invalid","This answer could not be saved safely.");
+  const args={ p_workspace_id: access.workspaceId, p_actor_user_id: access.userId, p_action: action, p_input: input as Json, p_session_id: access.sessionId };
+  const { data, error } = sharedManifestId
+    ? await (admin as unknown as {rpc(name:string,args:Record<string,unknown>):PromiseLike<{data:unknown;error:{code:string}|null}>}).rpc("vsi_mutate_v3", {...args,p_manifest_id:sharedManifestId})
+    : await admin.rpc("vsi_mutate_v2", args);
   if (error) {
     if (error.code === "42501") throw new VsiHttpError(403, "access_denied", "Your access to this workspace or action has changed. Nothing was saved.");
     console.error("[vsi-storage]", { action, code: error.code });
@@ -139,6 +144,31 @@ export async function mutateVsi<T>(access: VsiAccess, action: string, input: Rec
     throw new VsiHttpError(status, result.error, message);
   }
   return data as unknown as T;
+}
+
+/** Reconcile an uncertain success before failure accounting. Never regenerate,
+ * overwrite an observed completed exchange, or retry the successful submission. */
+export async function settleGeneratedVsi(access:VsiAccess,input:Record<string,unknown>,sharedManifestId?:string) {
+  try { return await mutateVsi(access,"settle",input,sharedManifestId); }
+  catch(error) {
+    const id=vsiUuid.safeParse(input.id);if(!id.success)throw error;
+    const reader=access.supabase as SupabaseClient<VsiDatabase>;
+    const saved=await reader.from("vsi_exchanges").select("*").eq("workspace_id",access.workspaceId).eq("actor_user_id",access.userId).eq("id",id.data).maybeSingle();
+    if(saved.error)throw error;
+    if(saved.data) {
+      if(saved.data.conversation_id===input.conversationId&&saved.data.user_message===input.question&&saved.data.answer===input.answer
+        &&evidenceEngineHash(saved.data.citations)===evidenceEngineHash(input.citations))return {state:"settled"};
+      throw error;
+    }
+    const admin=createSupabaseAdminClient();if(!admin)throw error;
+    // Status-only query. Exact actor/workspace/attempt binding; no source content.
+    const status=await (admin as unknown as SupabaseClient).from("vsi_requests").select("status,attempt,conversation_id")
+      .eq("workspace_id",access.workspaceId).eq("actor_user_id",access.userId).eq("id",id.data).maybeSingle();
+    if(status.error||status.data?.status!=="pending"||status.data.attempt!==input.attempt||status.data.conversation_id!==input.conversationId)throw error;
+    await mutateVsi(access,"settle",{id:id.data,conversationId:input.conversationId,attempt:input.attempt,
+      usage:{...(input.usage as Record<string,unknown>),failed:true}});
+    throw error;
+  }
 }
 
 export function questionHash(question: string) { return createHash("sha256").update(question).digest("hex"); }

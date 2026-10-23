@@ -1,0 +1,54 @@
+{
+  "status": "Proposal only. No migration, grants, reader bypass, backfill or runtime activation implemented.",
+  "baseline": "ec8fb7defe90face91fd36dc9f2533b67ef46234",
+  "scope": "One reviewed contract change set covering currently implemented connectors, with independent application commits. No seats, arbitrary connection cap or demo changes.",
+  "existingInfrastructureToReuse": [
+    "EvidenceCandidate, source registry, evidence manifests, deterministic signals, existing source-aware citation validation",
+    "private.external_source_records and private.external_source_record_versions already carry immutable versions, normalized schema, temporal/accounting qualifiers and validation state",
+    "private.provider_entity_mappings already records verified mapping versions; its connection foreign keys and provider admission must be reviewed before reusing it for legacy connector stores",
+    "Existing Sheets read tickets, QBO protected authenticated browse, Square actor/session-protected saved-payment browse, approved file authority and approved-note loaders"
+  ],
+  "proposedBoundaries": [
+    {
+      "name": "owner_only_existing_briefs",
+      "artifacts": ["ai_agent_runs.agent_type = intelligence_briefing_v1", "reports weekly_briefing/monthly_briefing and trusted copies inheriting brief lineage"],
+      "rule": "Active owner of the exact workspace, plus all existing privacy/source/session guards. Creator status supplies no exception; another active owner of that workspace may reuse an eligible brief.",
+      "operations": ["create", "load", "duplicate reuse", "complete", "copy/save", "historical access"],
+      "historicalImpact": "No deletion, regeneration or invented lineage. Nonowners lose access. Ambiguous saved-copy lineage requires a metadata-only impact check and must fail closed.",
+      "preserve": "Trusted completion/failure transaction claims and triggers; existing actor-bound Sheets ticket and session checks; unrelated artifact policies. No new roles or seats."
+    },
+    {
+      "name": "versioned_plugin_source_references",
+      "inputReference": ["workspaceId", "provider", "connectionId", "recordType", "providerRecordId or snapshotScope", "sourceVersion or contentHash", "period", "sourceTimezone"],
+      "serverResolution": "Resolve exact authoritative originals and current connection/source lifecycle. Validate owner/session/workspace, provider policy, entity mapping and retained version. Never trust a caller-supplied eligible or scopeVerified flag.",
+      "storage": "Prefer references to existing immutable canonical source versions. For legacy snapshots/history, first establish version identity and current content verification; do not invent a UUID for composite keys or silently copy records into canonical storage.",
+      "binding": "A narrowly reviewed plugin-reference binder/validator complements the existing Sheets ticket. It must record every consumed original and revalidate before save/reopen. The existing UUID-table allowlist cannot represent the added stores and must not be broadly opened.",
+      "failure": "Unknown mapping, changed version, erased/disconnected source, unavailable authority or incomplete dependency group excludes that evidence or blocks saving; no refreshed-ticket fallback after generation."
+    },
+    {
+      "name": "legacy_connector_entity_correspondence",
+      "providers": ["loyverse", "zoho-books", "wix-orders", "xero", "harvest", "clockify", "toggl", "zoho-inventory", "katana"],
+      "identity": ["workspace_id", "provider", "connection_id", "external account/scope fingerprint", "business_entity_id", "mapping_version", "verification_state", "verified_by", "verified_at"],
+      "rule": "Owner-confirmed exact account/entity/scope correspondence. Cross-workspace references rejected by constraints and protected reads. Connection replacement invalidates correspondence until verified. No automatic mapping from labels, creator, matching totals or workspace identity.",
+      "designGate": "Inspect existing mapping foreign keys and provider registry admission before deciding on a bridge or reuse; no duplicate canonical subsystem is authorized. Existing customer mappings are not changed automatically."
+    },
+    {
+      "name": "complete_owner_bound_readers",
+      "existing": "Use authenticated reporting history/Wix invoker readers and current protected QBO/Square paths where their output and source authority are sufficient. Their signatures and grants are recorded in shared-evidence-contract-audit.json.",
+      "loyverseZoho": "Do not grant authenticated execution to existing service-only aggregates. Propose narrow authenticated owner/session-bound aggregate readers with explicit workspace/connection/date arguments, completeness, exact original-version references and no provider calls. Alternatively use existing RLS reads only if all-page completeness is proven within budget.",
+      "lifecycle": "The new readers must treat reauthorization/disconnected/stale/partial states explicitly and respect current revocation. No tokens, credential decryption, sync, import or provider refresh is part of reasoning."
+    }
+  ],
+  "runtimeWiringAfterContractReview": {
+    "vsi": "Protected adapters produce admitted shared evidence, then existing bounded businessSources and citation snapshots. Replace status-summary evidence only where exact originals are available; retain existing unsupported-source limitations.",
+    "briefing": "Same admitted evidence produces deterministic relationship signals with all original citations; project one canonical signal per claim without loosening relationship validation. Recheck file extraction authority and preserve approved notes as noncausal attributed context.",
+    "budget": "Keep existing 24-source/24000-character VSI envelope initially. Select whole dependency groups, deduplicate original identities, and report omissions. Recompute final serialized payload costs. No 5-provider or 10-connection product cap.",
+    "savedOutputs": "Use reviewed session-aware lifecycle patch; owner audience is enforced at the database and application boundaries. Reopen through original protected citation views, reporting changed/unavailable sources explicitly."
+  },
+  "localQualification": {
+    "implemented": "12 pure stored-output parsers/projections, two closed deterministic relationship recipes, complete dependency-group selection, VSI and briefing draft projectors, synthetic tests.",
+    "notImplemented": "New live readers/admission, immutable citation routes for additional providers, audience policy migration, source binding migration, canonical mapping writes, saved-output database integration, live model qualification.",
+    "representative": "Five plugins plus processed file and approved note; sixth-source and all-twelve cases; offset dates, currency partitions, different versions of a payment, incomplete coverage, mismatched entity/period/unit and full citation dependencies.",
+    "testBoundary": "JSON round-trip is a serialization check, not database persistence/reopening or real citation navigation. All projections are explicitly unadmitted and no application runtime imports them."
+  }
+}

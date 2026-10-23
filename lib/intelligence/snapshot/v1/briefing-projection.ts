@@ -477,7 +477,7 @@ export function projectIntelligenceBriefingV1({
     manifestId: manifest.manifestId,
     signalFacts: allSignals.map((signal) => ({ ref: signal.ref, stableKey: signal.stableKey, fact: signal.fact, citationIds: signal.citationIds })),
     eligibility,
-    context: context.references.map((record) => ({ sourceNoteId: record.sourceNoteId, sourceVersion: record.sourceVersion })),
+    context: context.references.map((record) => record.sourceKind === "reviewed_file" ? { sourceFileId: record.sourceFileId, sourceChunkId: record.sourceChunkId, sourceHash: record.sourceHash } : { sourceNoteId: record.sourceNoteId, sourceVersion: record.sourceVersion }),
     promptVersion: INTELLIGENCE_BRIEFING_PROMPT_VERSION,
     schemaVersion: INTELLIGENCE_BRIEFING_SCHEMA_VERSION,
     plainLanguageVersion: INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION

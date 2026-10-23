@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "scope": "synthetic_legacy_foundation_only",
+  "fullCompositionReady": false,
+  "missingAuditedTriggerDefinitions": [
+    "private.enforce_workspace_persisted_limit_v1",
+    "private.guard_workspace_mutation_entitlement_v1",
+    "private.protect_business_entity_identity_v1",
+    "private.reject_explicit_regulated_business_text_v1"
+  ],
+  "remainingContractGaps": [
+    "Complete deployed table, constraint, RLS, grant and trigger inventory for all source and artifact relations (the audit is selective).",
+    "Recursive dependencies of the audited routines, including exact installed source-writer definitions and lock order.",
+    "Approved dependency-ordered complete installation overlay; repository migration history alone is not live parity.",
+    "Final-validation/output-commit source-writer interlocks and deterministic two-session release scenarios for every admitted source."
+  ],
+  "files": [
+    {
+      "path": "docs/security-drafts/audit/deployed-contracts.json",
+      "sha256": "001d937b3f5031c2ba55edc0547321e94eec3ad4c1d63f17fe4d2294abcba0f6"
+    },
+    {
+      "path": "docs/security-drafts/audit/typed-source-contracts.json",
+      "sha256": "c5eaef1116500cd0ba82417517746c231c9c45e5666c3b235738ceac5eb2702a"
+    },
+    {
+      "path": "supabase/migrations/20261019001207_ready_account_reporting_connectors.sql",
+      "sha256": "19b9ec711bc48f2c4e8da03d45bb3643d231480fc93bdd34b0c52789f45b2724"
+    },
+    {
+      "path": "supabase/migrations/20261019070945_reporting_import_history.sql",
+      "sha256": "f16404ea373c576671880789e1ee380c181f8a1706150ee894209bc9cff33c5f"
+    },
+    {
+      "path": "supabase/migrations/20261017013603_loyverse_read_only_connection.sql",
+      "sha256": "a3755d4cda49495b197e8eb189568ffc7cb931034f5a8d1b360397fa5525ddfb"
+    },
+    {
+      "path": "supabase/migrations/20261019070953_loyverse_import_history.sql",
+      "sha256": "e53a5c864e6a5b39e94490ab97ed85088bc7c8e6aa755c087953c300c1e88d4b"
+    },
+    {
+      "path": "supabase/migrations/20261017023221_zoho_books_read_only_connection.sql",
+      "sha256": "bae4ee841f129f787ab7a54015ebb50ed6773e801877555581e343cf47262e25"
+    },
+    {
+      "path": "supabase/migrations/20261019070949_zoho_books_import_history.sql",
+      "sha256": "8dda6837bf6421386d0734cb3b11647b6a8e20e522157d9661dc7f3d6206658e"
+    },
+    {
+      "path": "supabase/migrations/20261017051502_wix_orders_read_only_connection.sql",
+      "sha256": "fd00638b38e6042d4f4ca863ce225e863378673b1352f2b5ddcc1b0f7e7c7d6b"
+    },
+    {
+      "path": "supabase/migrations/20261019071008_wix_orders_import_history.sql",
+      "sha256": "b7f4b537a7f78cfa740eccf2c188e47c5ca74ec8e1cdd7f70264cf4ea79a6367"
+    },
+    {
+      "path": "docs/security-drafts/ci/audited-definitions.json",
+      "sha256": "e46954b40426754818a5d0d1a0d12a847009a8ba906e999ff29137e55b39cbc7"
+    },
+    {
+      "path": "docs/security-drafts/ci/foundation.sql",
+      "sha256": "4fa22980a5a9f2ead2e567b24c59b9b1813a02d72d608874ed187a344101fe81"
+    },
+    {
+      "path": "docs/security-drafts/01-legacy-evidence.sql",
+      "sha256": "802724c88e8605678a1fc15f6151cb7d6af422f6109fdd957a118310c31fcd28"
+    },
+    {
+      "path": "scripts/qbo-candidate-local-container.cjs",
+      "sha256": "7c93d0720119d3b8e3c824a021d8f8a5165549612c217d4ae8000b04019294d1"
+    },
+    {
+      "path": "scripts/run-square-durable-page-qualification.js",
+      "sha256": "2c7876c4796d9092d9c45bf476a53e9d656ba81668a8a498090cf3a23c997e22"
+    },
+    {
+      "path": "supabase/tests/fixtures/square-durable-platform.sql",
+      "sha256": "1613c8630c563eed640efc4d8b80278b67b4195fb9cdbad4bc97bd34dcb8c4de"
+    }
+  ]
+}

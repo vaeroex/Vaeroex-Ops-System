@@ -66,6 +66,8 @@ const coverageSchema = z.object({
   missingOrWeakDomains: z.array(z.string().trim().min(1))
 }).strict();
 const signalSchema = z.object({
+  sharedRelationship: z.literal("financial_stage_boundary_v1").optional(),
+  sourceScope: z.record(z.unknown()).optional(),
   ref: z.string().trim().min(1),
   stableKey: hash,
   kind: z.enum(["business_health", "kpi", "finding", "reported_context"]),
@@ -78,7 +80,7 @@ const signalSchema = z.object({
   evidenceReferenceIds: z.array(z.string().trim().min(1)),
   limitation: z.string().trim().min(1).nullable(),
   periodRelation: z.enum(["new_or_changed", "continuing", "current_state", "reported_context"]),
-  periodContext: z.enum(["briefing_period", "historical_context"]).default("briefing_period"),
+  periodContext: z.enum(["briefing_period", "historical_context", "undated_context"]).default("briefing_period"),
   comparisonUnit: z.string().max(40).optional(),
   temporalLineage: z.object({
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -144,7 +146,8 @@ const artifactSchema = z.object({
     recordedAt: iso.nullable(),
     href: z.string().startsWith("/app/")
   }).strict()),
-  contextReferences: z.array(z.object({
+  contextReferences: z.array(z.union([z.object({
+    sourceKind: z.literal("business_note").optional(),
     ref: z.string().trim().min(1),
     sourceNoteId: z.string().uuid(),
     sourceVersion: z.number().int().positive(),
@@ -154,7 +157,13 @@ const artifactSchema = z.object({
     observedAt: dateLike.nullable(),
     applicabilityStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
     applicabilityEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable()
-  }).strict()),
+  }).strict(), z.object({
+    sourceKind: z.literal("reviewed_file"),
+    ref: z.string().trim().min(1), sourceFileId: z.string().uuid(), sourceChunkId: z.string().uuid(), sourceHash: hash,
+    title: z.string().trim().min(1), summary: z.string().trim().min(1), observedAt: dateLike.nullable(),
+    applicabilityStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+    applicabilityEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable()
+  }).strict()])),
   providerAttribution: z.object({
     provider: z.literal("openai"),
     model: z.string().trim().min(1),

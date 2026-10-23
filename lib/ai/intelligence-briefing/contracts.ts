@@ -100,6 +100,8 @@ export type IntelligenceBriefingTemporalLineage = Readonly<{
 }>;
 
 export type IntelligenceBriefingSignal = Readonly<{
+  sharedRelationship?: "financial_stage_boundary_v1";
+  sourceScope?: Readonly<Record<string,unknown>>;
   ref: string;
   stableKey: string;
   kind: IntelligenceBriefingSignalKind;
@@ -112,7 +114,7 @@ export type IntelligenceBriefingSignal = Readonly<{
   evidenceReferenceIds: readonly string[];
   limitation: string | null;
   periodRelation: "new_or_changed" | "continuing" | "current_state" | "reported_context";
-  periodContext: "briefing_period" | "historical_context";
+  periodContext: "briefing_period" | "historical_context" | "undated_context";
   temporalLineage?: IntelligenceBriefingTemporalLineage;
   comparisonUnit?: string;
   semanticState?: Readonly<{
@@ -142,17 +144,16 @@ export type IntelligenceBriefingEvidenceCoverage = Readonly<{
 
 export type IntelligenceBriefingContextReference = Readonly<{
   ref: string;
-  sourceNoteId: string;
-  sourceVersion: number;
   title: string;
   summary: string;
-  approvedAt: string;
   observedAt: string | null;
   applicabilityStart: string | null;
   applicabilityEnd: string | null;
-}>;
+} & ({sourceKind?: "business_note"; sourceNoteId: string; sourceVersion: number; approvedAt: string}
+  | {sourceKind: "reviewed_file"; sourceFileId: string; sourceChunkId: string; sourceHash: string})>;
 
 export type IntelligenceBriefingPackage = Readonly<{
+  sharedEvidenceFingerprint?: string;
   contractId: typeof INTELLIGENCE_BRIEFING_CONTRACT_ID;
   contractVersion: typeof INTELLIGENCE_BRIEFING_CONTRACT_VERSION;
   schemaVersion: typeof INTELLIGENCE_BRIEFING_SCHEMA_VERSION;

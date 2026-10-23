@@ -40,8 +40,11 @@ const {
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
+const sessionId = "44444444-4444-4444-8444-444444444444";
 const generationKey = "a".repeat(64);
 const inputJson = {
+  google_sheets_read_ticket_id: "55555555-5555-4555-8555-555555555555",
+  workflow: INTELLIGENCE_BRIEFING_CONTRACT_ID,
   briefing_type: "monthly",
   generation_key: generationKey,
   prompt_version: INTELLIGENCE_BRIEFING_PROMPT_VERSION,
@@ -52,7 +55,8 @@ const inputJson = {
 function createAdmin(existingRows) {
   return {
     rpc(name, args) {
-      assert.equal(name, "create_trusted_analysis_run_v1");
+      assert.equal(name, "create_trusted_analysis_run_v2");
+      assert.equal(args.p_session_id, sessionId);
       assert.equal(args.p_actor_id, userId);
       return this.from("ai_agent_runs").insert({ workspace_id: args.p_workspace_id, agent_type: args.p_agent_type,
         input_json: args.p_input_json, output_json: {}, status: "processing", created_by: args.p_actor_id }).select("id");
@@ -127,6 +131,7 @@ async function claim(existingRows) {
     reader: createAdmin(existingRows),
     workspaceId,
     userId,
+    sessionId,
     briefingType: "monthly",
     generationKey,
     inputJson

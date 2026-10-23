@@ -1,0 +1,367 @@
+{
+  "scope": "Approved read-only function/trigger metadata; no customer rows or secrets. Retry after explicit approval succeeded.",
+  "functions": [
+    {
+      "nspname": "private",
+      "proname": "google_sheets_checked_ticket_v1",
+      "definition": "CREATE OR REPLACE FUNCTION private.google_sheets_checked_ticket_v1(p_ticket_id uuid, p_workspace_id uuid)\n RETURNS private.google_sheets_read_tickets\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare t private.google_sheets_read_tickets;\nbegin\n perform private.google_sheets_privacy_open_v1(p_workspace_id);\n select * into t from private.google_sheets_read_tickets where id=p_ticket_id and workspace_id=p_workspace_id;\n if t.id is null or t.expires_at<=clock_timestamp() or t.epoch<>(select epoch from private.google_sheets_privacy_epochs where workspace_id=p_workspace_id) then\n  raise exception 'google_sheets_read_ticket_stale' using errcode='40001'; end if;\n perform private.google_sheets_ticket_actor_v1(p_workspace_id,t.actor_id);\n return t;\nend $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "guard_trusted_derived_run_transition_v1",
+      "definition": "CREATE OR REPLACE FUNCTION private.guard_trusted_derived_run_transition_v1()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nbegin\n  if old.agent_type in (\n    'business_health_explanation_v1','finding_explanation_v1','intelligence_briefing_v1'\n  ) and old.status='processing' and new.status in ('completed','failed') then\n    perform 1 from private.trusted_derived_run_commits as claim\n      where claim.run_id=old.id and claim.workspace_id=old.workspace_id\n        and claim.transition=new.status\n        and claim.transaction_id=txid_current()\n        and new.created_by is not distinct from old.created_by\n        and new.agent_type=old.agent_type and new.workspace_id=old.workspace_id\n        and new.input_json=old.input_json\n      for share;\n    if not found then\n      raise exception 'trusted_derived_run_commit_required' using errcode='42501';\n    end if;\n  end if;\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "require_live_actor_session_v1",
+      "definition": "CREATE OR REPLACE FUNCTION private.require_live_actor_session_v1(p_workspace_id uuid, p_actor_id uuid, p_session_id uuid, p_roles text[])\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nbegin\n  if (select auth.role()) is distinct from 'service_role'\n    or p_workspace_id is null or p_actor_id is null or p_session_id is null\n    or p_roles is null or cardinality(p_roles)=0 then\n    raise exception 'actor_session_denied' using errcode='42501';\n  end if;\n  perform 1 from auth.sessions as session_row\n  join auth.users as account on account.id=session_row.user_id\n  join public.workspace_members as member\n    on member.user_id=account.id and member.workspace_id=p_workspace_id\n  where session_row.id=p_session_id and session_row.user_id=p_actor_id\n    and account.deleted_at is null\n    and (account.banned_until is null or account.banned_until<=clock_timestamp())\n    and (session_row.not_after is null or session_row.not_after>clock_timestamp())\n    and member.status='active' and member.role=any(p_roles)\n  for share of session_row, account, member;\n  if not found then raise exception 'actor_session_denied' using errcode='42501'; end if;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "complete_trusted_derived_run_v1",
+      "definition": "CREATE OR REPLACE FUNCTION public.complete_trusted_derived_run_v1(p_workspace_id uuid, p_run_id uuid, p_actor_id uuid, p_session_id uuid, p_read_ticket_id uuid, p_agent_type text, p_output_json jsonb)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare r public.ai_agent_runs; t private.google_sheets_read_tickets;\nbegin\n  if p_agent_type not in (\n    'business_health_explanation_v1','finding_explanation_v1','intelligence_briefing_v1'\n  ) or jsonb_typeof(p_output_json) is distinct from 'object'\n    or octet_length(p_output_json::text)>2097152\n    or p_output_json->>'contractId' is distinct from p_agent_type then\n    raise exception 'trusted_derived_output_invalid' using errcode='22023';\n  end if;\n  perform private.require_live_actor_session_v1(\n    p_workspace_id,p_actor_id,p_session_id,\n    array['owner','admin','manager','staff','viewer']\n  );\n  t:=private.google_sheets_checked_ticket_v1(p_read_ticket_id,p_workspace_id);\n  if t.actor_id is distinct from p_actor_id or not t.bound then\n    raise exception 'trusted_derived_read_ticket_denied' using errcode='42501';\n  end if;\n  select * into r from public.ai_agent_runs\n    where id=p_run_id and workspace_id=p_workspace_id\n      and agent_type=p_agent_type and created_by=p_actor_id\n      and status='processing' and trusted_source\n      and archived_at is null and deleted_at is null\n    for update;\n  if not found\n    or r.input_json->>'workflow' is distinct from p_agent_type\n    or r.input_json->>'google_sheets_read_ticket_id' is distinct from p_read_ticket_id::text\n    or (r.google_sheets_read_ticket_id is not null\n      and r.google_sheets_read_ticket_id<>p_read_ticket_id) then\n    raise exception 'trusted_derived_run_changed' using errcode='42501';\n  end if;\n  if p_agent_type in ('business_health_explanation_v1','finding_explanation_v1') then\n    if r.input_json->>'fingerprint' is null\n      or r.input_json->>'fingerprint' !~ '^[0-9a-f]{64}$'\n      or p_output_json->>'fingerprint' is distinct from r.input_json->>'fingerprint'\n      or p_output_json->>'contractVersion' is distinct from r.input_json->>'contract_version'\n      or p_output_json->>'validatorVersion' is distinct from r.input_json->>'validator_version' then\n      raise exception 'trusted_derived_output_identity_changed' using errcode='42501';\n    end if;\n  else\n    if r.input_json->>'generation_key' is null\n      or p_output_json->>'workspaceId' is distinct from p_workspace_id::text\n      or p_output_json->>'briefingType' is distinct from r.input_json->>'briefing_type'\n      or p_output_json->>'generationKey' is distinct from r.input_json->>'generation_key'\n      or p_output_json->>'evidenceFingerprint'\n        is distinct from r.input_json->>'evidence_fingerprint'\n      or p_output_json->>'effectiveEvidenceFingerprint'\n        is distinct from r.input_json->>'effective_evidence_fingerprint'\n      or p_output_json->>'materialStateFingerprint'\n        is distinct from r.input_json->>'material_state_fingerprint'\n      or p_output_json->>'schemaVersion' is distinct from r.input_json->>'schema_version'\n      or p_output_json->>'validatorVersion' is distinct from r.input_json->>'validator_version'\n      or p_output_json->>'promptVersion' is distinct from r.input_json->>'prompt_version'\n      or p_output_json->>'generationPolicyVersion'\n        is distinct from r.input_json->>'generation_policy_version' then\n      raise exception 'trusted_derived_output_identity_changed' using errcode='42501';\n    end if;\n  end if;\n  insert into private.trusted_derived_run_commits(\n    run_id,workspace_id,actor_id,read_ticket_id,transition,transaction_id\n  ) values (p_run_id,p_workspace_id,p_actor_id,p_read_ticket_id,'completed',txid_current());\n  update public.ai_agent_runs set output_json=p_output_json,status='completed',\n    error_message=null,google_sheets_read_ticket_id=p_read_ticket_id,\n    updated_at=clock_timestamp()\n    where id=p_run_id and workspace_id=p_workspace_id;\n  delete from private.trusted_derived_run_commits where run_id=p_run_id;\n  return p_run_id;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "fail_trusted_derived_run_v1",
+      "definition": "CREATE OR REPLACE FUNCTION public.fail_trusted_derived_run_v1(p_workspace_id uuid, p_run_id uuid, p_actor_id uuid, p_session_id uuid, p_read_ticket_id uuid, p_agent_type text)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare r public.ai_agent_runs; t private.google_sheets_read_tickets;\nbegin\n  if p_agent_type not in (\n    'business_health_explanation_v1','finding_explanation_v1','intelligence_briefing_v1'\n  ) then\n    raise exception 'trusted_derived_type_invalid' using errcode='22023';\n  end if;\n  perform private.require_live_actor_session_v1(\n    p_workspace_id,p_actor_id,p_session_id,\n    array['owner','admin','manager','staff','viewer']\n  );\n  t:=private.google_sheets_checked_ticket_v1(p_read_ticket_id,p_workspace_id);\n  if t.actor_id is distinct from p_actor_id or not t.bound then\n    raise exception 'trusted_derived_read_ticket_denied' using errcode='42501';\n  end if;\n  select * into r from public.ai_agent_runs\n    where id=p_run_id and workspace_id=p_workspace_id\n      and agent_type=p_agent_type and created_by=p_actor_id\n      and status='processing' and trusted_source\n      and archived_at is null and deleted_at is null\n    for update;\n  if not found\n    or r.input_json->>'workflow' is distinct from p_agent_type\n    or r.input_json->>'google_sheets_read_ticket_id' is distinct from p_read_ticket_id::text then\n    raise exception 'trusted_derived_run_changed' using errcode='42501';\n  end if;\n  insert into private.trusted_derived_run_commits(\n    run_id,workspace_id,actor_id,read_ticket_id,transition,transaction_id\n  ) values (p_run_id,p_workspace_id,p_actor_id,p_read_ticket_id,'failed',txid_current());\n  update public.ai_agent_runs set status='failed',\n    error_message=case p_agent_type\n      when 'business_health_explanation_v1' then 'Business Health analysis generation failed.'\n      when 'finding_explanation_v1' then 'Finding explanation generation failed.'\n      else 'Intelligence Briefing generation failed.' end,\n    updated_at=clock_timestamp()\n    where id=p_run_id and workspace_id=p_workspace_id;\n  delete from private.trusted_derived_run_commits where run_id=p_run_id;\n  return p_run_id;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "get_google_sheets_read_context_v1",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_google_sheets_read_context_v1(p_ticket_id uuid)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare t private.google_sheets_read_tickets; result jsonb; s jsonb; row_data jsonb; unattributed boolean:=false;\nbegin\n select * into t from private.google_sheets_read_tickets where id=p_ticket_id;\n if t.id is null then raise exception 'google_sheets_read_ticket_stale' using errcode='40001'; end if;\n t:=private.google_sheets_checked_ticket_v1(t.id,t.workspace_id);\n if not t.bound then raise exception 'google_sheets_read_ticket_unbound' using errcode='40001'; end if;\n result:=public.bind_google_sheets_read_v1(t.id,'[]');\n for s in select value from jsonb_array_elements(t.sources) where (exists(select 1 from private.google_sheets_source_root_links where workspace_id=t.workspace_id) or exists(select 1 from private.google_sheets_connection_root_links where workspace_id=t.workspace_id))\n and value->>'table'=any(array[\n  'ai_agent_runs','reports','business_health_snapshots','vsi_exchanges','vsi_conversations','intelligence_card_lifecycle','intelligence_card_lifecycle_events','business_notes','business_memory_chunks','file_processing_jobs','file_uploads','kpi_settings']) loop\n  execute format('select to_jsonb(x) from public.%I x where id=$1 and workspace_id=$2',s->>'table') into row_data using (s->>'id')::uuid,t.workspace_id;\n  if row_data is null then raise exception 'google_sheets_read_source_changed' using errcode='40001'; end if;\n  if s->>'table'='file_uploads' and private.google_sheets_unmaterialized_file_v1(\n   row_data,t.workspace_id,(s->>'id')::uuid) then continue; end if;\n  if s->>'table'='kpi_settings' and coalesce(row_data->>'classification_source','unknown')<>'luna' then continue; end if;\n  if nullif(row_data->>'google_sheets_read_ticket_id','') is null and not exists(select 1 from private.google_sheets_derivation_roots\n   where workspace_id=t.workspace_id and (table_name=s->>'table' or s->>'table'='file_uploads' and table_name='file_upload_analysis') and record_id=(s->>'id')::uuid) then unattributed:=true; end if;\n end loop;\n return result||jsonb_build_object('workspaceId',t.workspace_id,'containsGoogleSheets',jsonb_array_length(result->'connectionIds')>0,\n  'hasUnattributedDerivedSources',unattributed);\nend $function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "vsi_mutate_v2",
+      "definition": "CREATE OR REPLACE FUNCTION public.vsi_mutate_v2(p_workspace_id uuid, p_actor_user_id uuid, p_action text, p_input jsonb, p_session_id uuid)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nbegin\n  perform private.require_live_actor_session_v1(\n    p_workspace_id,p_actor_user_id,p_session_id,\n    array['owner','admin','manager','staff','viewer']\n  );\n  return public.vsi_mutate_v1(\n    p_workspace_id,p_actor_user_id,p_action,p_input\n  );\nend;\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "google_sheets_privacy_open_v1",
+      "arguments": "p_workspace_id uuid",
+      "definition": "CREATE OR REPLACE FUNCTION private.google_sheets_privacy_open_v1(p_workspace_id uuid)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nbegin\n perform private.google_sheets_privacy_lock_v1(p_workspace_id);\n if exists(select 1 from private.google_sheets_privacy_epochs where workspace_id=p_workspace_id and blocked) then\n  raise exception 'google_sheets_privacy_paused' using errcode='55000';\n end if;\nend $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "google_sheets_ticket_actor_v1",
+      "arguments": "p_workspace_id uuid, p_actor_id uuid",
+      "definition": "CREATE OR REPLACE FUNCTION private.google_sheets_ticket_actor_v1(p_workspace_id uuid, p_actor_id uuid)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nbegin\n if p_actor_id is null or (auth.role()<>'service_role' and (auth.role()<>'authenticated' or auth.uid() is distinct from p_actor_id)) then\n  raise exception 'google_sheets_read_denied' using errcode='42501'; end if;\n if not exists(select 1 from public.workspace_members m join auth.users u on u.id=m.user_id\n  where m.workspace_id=p_workspace_id and m.user_id=p_actor_id and m.status='active' and u.deleted_at is null\n   and (u.banned_until is null or u.banned_until<=clock_timestamp())) then\n  raise exception 'google_sheets_read_denied' using errcode='42501'; end if;\nend $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "qbo_customer_require_owner_v1",
+      "arguments": "p_actor uuid, p_session uuid, p_workspace uuid, p_entity uuid, p_require_entitlement boolean",
+      "definition": "CREATE OR REPLACE FUNCTION private.qbo_customer_require_owner_v1(p_actor uuid, p_session uuid, p_workspace uuid, p_entity uuid, p_require_entitlement boolean DEFAULT true)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  v_expires timestamptz;\n  v_subscription public.customer_subscriptions;\nbegin\n  if p_actor is null or p_session is null or p_workspace is null or p_entity is null then\n    raise exception 'qbo_customer_owner_denied' using errcode = '42501';\n  end if;\n  perform 1 from public.workspaces where id = p_workspace for share;\n  if not found then raise exception 'qbo_customer_owner_denied' using errcode = '42501'; end if;\n  select s.not_after into v_expires from auth.sessions s\n    join auth.users u on u.id = s.user_id\n    where s.id = p_session and s.user_id = p_actor and u.deleted_at is null\n      and (u.banned_until is null or u.banned_until <= clock_timestamp())\n    for share of s, u;\n  if not found or (v_expires is not null and v_expires <= clock_timestamp()) then\n    raise exception 'qbo_customer_session_denied' using errcode = '42501';\n  end if;\n  perform 1 from public.workspace_members m where m.workspace_id = p_workspace\n    and m.user_id = p_actor and m.role = 'owner' and m.status = 'active' for share;\n  if not found then raise exception 'qbo_customer_owner_denied' using errcode = '42501'; end if;\n  perform 1 from public.business_entities e where e.workspace_id = p_workspace\n    and e.id = p_entity and e.status = 'active' for share;\n  if not found then raise exception 'qbo_customer_entity_denied' using errcode = '42501'; end if;\n  if not p_require_entitlement then return; end if;\n  select s.* into v_subscription from public.customer_subscriptions s\n    where s.workspace_id = p_workspace and s.billing_provider = 'stripe'\n    order by s.created_at desc, s.id desc limit 1 for share;\n  if found then\n    if v_subscription.manually_activated or v_subscription.status not in ('active','trialing')\n      or v_subscription.current_period_end is null or v_subscription.current_period_end <= clock_timestamp()\n      or v_subscription.stripe_customer_id is null or v_subscription.stripe_subscription_id is null then\n      raise exception 'qbo_customer_entitlement_denied' using errcode = '42501';\n    end if;\n  elsif not exists (select 1 from public.workspaces w\n      join public.customer_subscriptions s on s.workspace_id = w.id\n      where w.id = p_workspace and w.manually_unlocked and s.billing_provider = 'manual'\n        and s.manually_activated and s.status in ('active','trialing')) then\n    raise exception 'qbo_customer_entitlement_denied' using errcode = '42501';\n  end if;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "square_production_customer_require_owner_v1",
+      "arguments": "p_actor_id uuid, p_session_id uuid, p_workspace_id uuid, p_business_entity_id uuid",
+      "definition": "CREATE OR REPLACE FUNCTION private.square_production_customer_require_owner_v1(p_actor_id uuid, p_session_id uuid, p_workspace_id uuid, p_business_entity_id uuid DEFAULT NULL::uuid)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare expires_at timestamptz; member_role text; member_status text; entity_status text; now_at timestamptz;\nbegin\n  if p_actor_id is null or p_session_id is null or p_workspace_id is null then\n    raise exception 'square_production_customer_owner_denied' using errcode='42501';\n  end if;\n  perform 1 from public.workspaces where id=p_workspace_id for share;\n  if not found then raise exception 'square_production_customer_owner_denied' using errcode='42501'; end if;\n  select s.not_after into expires_at from auth.sessions s\n    join auth.users u on u.id=s.user_id\n    where s.id=p_session_id and s.user_id=p_actor_id and u.deleted_at is null\n      and (u.banned_until is null or u.banned_until<=clock_timestamp())\n    for share of s,u;\n  if not found then raise exception 'square_production_customer_owner_denied' using errcode='42501'; end if;\n  select m.role,m.status into member_role,member_status from public.workspace_members m\n    where m.user_id=p_actor_id and m.workspace_id=p_workspace_id for share;\n  if not found then raise exception 'square_production_customer_owner_denied' using errcode='42501'; end if;\n  if p_business_entity_id is not null then\n    select e.status into entity_status from public.business_entities e\n      where e.id=p_business_entity_id and e.workspace_id=p_workspace_id for share;\n    if not found then raise exception 'square_production_customer_owner_denied' using errcode='42501'; end if;\n  end if;\n  now_at:=clock_timestamp();\n  -- Supabase leaves not_after NULL when absolute session time-boxing is off.\n  -- The exact live session/user binding above remains mandatory; finite\n  -- expirations are enforced, and request JWT validity is checked by the host.\n  if (expires_at is not null and expires_at<=now_at) or member_role<>'owner'\n    or member_status<>'active' or (p_business_entity_id is not null and entity_status<>'active') then\n    raise exception 'square_production_customer_owner_denied' using errcode='42501';\n  end if;\nend\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "vsi_mutate_v1",
+      "arguments": "p_workspace_id uuid, p_actor_user_id uuid, p_action text, p_input jsonb",
+      "definition": "CREATE OR REPLACE FUNCTION public.vsi_mutate_v1(p_workspace_id uuid, p_actor_user_id uuid, p_action text, p_input jsonb DEFAULT '{}'::jsonb)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nbegin\n if auth.role() is distinct from 'service_role' then raise exception 'vsi_server_only' using errcode='42501'; end if;\n perform private.google_sheets_privacy_open_v1(p_workspace_id);\n if nullif(p_input->>'conversationId','') is not null and not public.google_sheets_record_readable_v1(p_workspace_id,'vsi_conversations',(p_input->>'conversationId')::uuid) then raise exception 'google_sheets_source_expired' using errcode='55000'; end if;\n perform set_config('vaeroex.google_sheets_read_ticket_id',coalesce(p_input->>'readTicketId',''),true);\n return private.vsi_mutate_before_sheets_privacy_v1(p_workspace_id,p_actor_user_id,p_action,p_input-'readTicketId');\nend $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "google_sheets_derivative_write_v1",
+      "definition": "CREATE OR REPLACE FUNCTION private.google_sheets_derivative_write_v1()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare t private.google_sheets_read_tickets; tid uuid; w uuid; n jsonb:=to_jsonb(new); old_data jsonb; sink_table text:=tg_table_name;\nbegin\n w:=(n->>'workspace_id')::uuid;\n if tg_table_name='file_uploads' then\n  sink_table:='file_upload_analysis';\n  if tg_op='UPDATE' and private.google_sheets_exact_delete_allowed_v1(w,sink_table,old.id,to_jsonb(old))\n   and new.analysis_prompt is null and new.analysis_summary is null\n   and new.metadata_json=private.google_sheets_file_metadata_without_analysis_v1(old.metadata_json)\n   and (n-'analysis_prompt'-'analysis_summary'-'metadata_json'-'google_sheets_read_ticket_id'-'updated_at')=\n    (to_jsonb(old)-'analysis_prompt'-'analysis_summary'-'metadata_json'-'google_sheets_read_ticket_id'-'updated_at') then return new; end if;\n end if;\n -- Fresh uploads and ordinary settings are user-supplied records. Their model\n -- generated fields use this same fence without blocking storage bookkeeping.\n if tg_table_name='file_uploads' and nullif(n->>'google_sheets_read_ticket_id','') is null\n  and nullif(current_setting('vaeroex.google_sheets_read_ticket_id',true),'') is null\n  and (tg_op='INSERT' and coalesce(n->>'analysis_summary','')='' or tg_op='UPDATE'\n   and n->>'analysis_summary' is not distinct from to_jsonb(old)->>'analysis_summary'\n   and not exists(select 1 from private.google_sheets_derivation_roots where workspace_id=w and table_name=sink_table and record_id=(n->>'id')::uuid)) then return new; end if;\n if tg_table_name='file_processing_jobs' and coalesce(n->>'job_type','') not in ('analyze','index')\n  and nullif(n->>'google_sheets_read_ticket_id','') is null\n  and nullif(current_setting('vaeroex.google_sheets_read_ticket_id',true),'') is null then return new; end if;\n if tg_table_name='file_uploads' and tg_op='UPDATE' and\n  (n-'processing_status'-'processing_error'-'processed_at'-'index_status'-'index_error'-'indexed_at'-'indexed_chunk_count'-'import_status'-'imported_rows'-'updated_at')=\n  (to_jsonb(old)-'processing_status'-'processing_error'-'processed_at'-'index_status'-'index_error'-'indexed_at'-'indexed_chunk_count'-'import_status'-'imported_rows'-'updated_at') then return new; end if;\n if tg_table_name='kpi_settings' and coalesce(n->>'classification_source','unknown')<>'luna'\n  and nullif(n->>'google_sheets_read_ticket_id','') is null\n  and nullif(current_setting('vaeroex.google_sheets_read_ticket_id',true),'') is null then return new; end if;\n if tg_op='UPDATE' then\n  old_data:=to_jsonb(old);\n  -- Lifecycle-only changes do not produce new Google-derived content.\n  if (n-'archived_at'-'deleted_at'-'updated_at'-'status'-'error_message')=\n     (old_data-'archived_at'-'deleted_at'-'updated_at'-'status'-'error_message') then return new; end if;\n end if;\n if not exists(select 1 from private.google_sheets_source_root_links where workspace_id=w) and not exists(select 1 from private.google_sheets_connection_root_links where workspace_id=w) then return new; end if;\n tid:=coalesce(nullif(current_setting('vaeroex.google_sheets_read_ticket_id',true),'')::uuid,\n  nullif(n#>>'{card_snapshot_json,google_sheets_read_ticket_id}','')::uuid,\n  nullif(n#>>'{source_metadata,google_sheets_read_ticket_id}','')::uuid,\n  nullif(n->>'google_sheets_read_ticket_id','')::uuid,\n  nullif(n#>>'{input_json,google_sheets_read_ticket_id}','')::uuid);\n t:=private.google_sheets_checked_ticket_v1(tid,w);\n if not t.bound then raise exception 'google_sheets_read_ticket_unbound' using errcode='40001'; end if;\n if (public.get_google_sheets_read_context_v1(tid)->>'hasUnattributedDerivedSources')::boolean then\n  raise exception 'google_sheets_unattributed_source' using errcode='55000'; end if;\n -- A new empty ticket cannot relabel an existing legacy derived record as\n -- proven unrelated. Lifecycle-only updates above preserve its old ticket.\n if tg_op='UPDATE' and nullif(old_data->>'google_sheets_read_ticket_id','') is null\n  and not exists(select 1 from private.google_sheets_derivation_roots where workspace_id=w and table_name=sink_table and record_id=(n->>'id')::uuid)\n  and not (tg_table_name='file_uploads' and private.google_sheets_unmaterialized_file_v1(\n   old_data,w,(n->>'id')::uuid))\n  and not(tg_table_name='kpi_settings' and coalesce(old_data->>'classification_source','unknown')<>'luna') then\n  raise exception 'google_sheets_unattributed_source' using errcode='55000'; end if;\n if exists(select 1 from jsonb_array_elements(t.sources) s join private.google_sheets_derivation_roots d\n  on d.workspace_id=w and (d.table_name=s->>'table' or s->>'table'='file_uploads' and d.table_name='file_upload_analysis') and d.record_id=(s->>'id')::uuid\n  join private.google_sheets_retention_roots r on r.id=d.root_id where r.erased_at is not null or r.expires_at<=clock_timestamp()) then\n  raise exception 'google_sheets_source_expired' using errcode='55000'; end if;\n new.google_sheets_read_ticket_id:=tid;\n -- Union, never replacement: editing/copying an artifact cannot wash its lineage.\n insert into private.google_sheets_derivation_roots(workspace_id,table_name,record_id,root_id)\n select distinct w,sink_table,(n->>'id')::uuid,d.root_id from jsonb_array_elements(t.sources) s\n join private.google_sheets_derivation_roots d on d.workspace_id=w and (d.table_name=s->>'table' or s->>'table'='file_uploads' and d.table_name='file_upload_analysis') and d.record_id=(s->>'id')::uuid\n on conflict do nothing;\n return new;\nend $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "google_sheets_erasure_cascade_guard_v1",
+      "definition": "CREATE OR REPLACE FUNCTION private.google_sheets_erasure_cascade_guard_v1()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nbegin\n if nullif(current_setting('vaeroex.google_sheets_erasure_request',true),'') is not null\n  and not private.google_sheets_exact_delete_allowed_v1(old.workspace_id,tg_table_name,old.id,to_jsonb(old))\n  and not(tg_op='UPDATE' and tg_table_name='file_uploads' and private.google_sheets_exact_delete_allowed_v1(old.workspace_id,'file_upload_analysis',old.id,to_jsonb(old)))\n  and not(tg_op='UPDATE' and tg_table_name='vsi_requests' and private.google_sheets_exact_delete_allowed_v1(old.workspace_id,'vsi_request_content',old.id,to_jsonb(old))\n   and to_jsonb(new)->>'question_hash'='' and to_jsonb(new)->>'conversation_id' is null\n   and (to_jsonb(new)-'question_hash'-'conversation_id')=(to_jsonb(old)-'question_hash'-'conversation_id')) then\n  raise exception 'sheets_erasure_unlisted_cascade' using errcode='42501'; end if;\n if tg_op='UPDATE' then return new; end if;\n return old;\nend $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "google_sheets_privacy_lock_v1",
+      "definition": "CREATE OR REPLACE FUNCTION private.google_sheets_privacy_lock_v1(p_workspace_id uuid)\n RETURNS void\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n select pg_advisory_xact_lock(hashtextextended('google_sheets:'||p_workspace_id::text,0));\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "vsi_mutate_before_sheets_privacy_v1",
+      "definition": "CREATE OR REPLACE FUNCTION private.vsi_mutate_before_sheets_privacy_v1(p_workspace_id uuid, p_actor_user_id uuid, p_action text, p_input jsonb DEFAULT '{}'::jsonb)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare c public.vsi_conversations; r public.vsi_requests; e public.vsi_exchanges; n public.business_notes;\n v_now timestamptz:=clock_timestamp(); v_note uuid; v_role text; v_count integer; v_spent numeric; v_reserved numeric; v_reserve numeric; v_budget numeric;\nbegin\n if coalesce((select auth.role()),'')<>'service_role' then raise exception 'vsi_server_only' using errcode='42501'; end if;\n perform pg_advisory_xact_lock(hashtextextended('vsi-actor:'||p_actor_user_id::text,0));\n perform pg_advisory_xact_lock(hashtextextended('vsi-workspace:'||p_workspace_id::text,0));\n select role::text into v_role from public.workspace_members where workspace_id=p_workspace_id and user_id=p_actor_user_id and status='active' for share;\n if not found then raise exception 'vsi_access_denied' using errcode='42501'; end if;\n if not private.workspace_billing_entitled_v1(p_workspace_id) and not exists(select 1 from private.platform_admin_subscription_exemptions where user_id=p_actor_user_id) then\n   raise exception 'vsi_subscription_required' using errcode='42501';\n end if;\n if p_action='create' then\n   insert into public.vsi_conversations(workspace_id,actor_user_id,actor_role,title) values(p_workspace_id,p_actor_user_id,v_role,left(coalesce(nullif(btrim(p_input->>'title'),''),'New chat'),120)) returning * into c;\n   return to_jsonb(c);\n end if;\n if p_action='usage' then\n   return jsonb_build_object('used',(select count(*) from public.vsi_requests where actor_user_id=p_actor_user_id and accepted_at>v_now-interval '24 hours' and status='completed'),\n    'resetsAt',(select min(accepted_at)+interval '24 hours' from public.vsi_requests where actor_user_id=p_actor_user_id and accepted_at>v_now-interval '24 hours' and status='completed'),\n    'spentUsd',(select coalesce(sum(cost_usd),0) from public.vsi_cost_events where workspace_id=p_workspace_id and occurred_at>=date_trunc('month',v_now at time zone 'UTC') at time zone 'UTC'),\n    'reservedUsd',(select coalesce(sum(reservation_usd),0) from public.vsi_requests where workspace_id=p_workspace_id and status='pending'),\n    'periodStart',date_trunc('month',v_now at time zone 'UTC') at time zone 'UTC');\n end if;\n select * into c from public.vsi_conversations where id=(p_input->>'conversationId')::uuid and workspace_id=p_workspace_id and actor_user_id=p_actor_user_id and actor_role=v_role for update;\n if not found then raise exception 'vsi_conversation_not_found' using errcode='42501'; end if;\n if p_action='rename' then\n  update public.vsi_conversations set title=left(btrim(p_input->>'title'),120),updated_at=v_now where id=c.id returning * into c; return to_jsonb(c);\n elsif p_action='delete' then\n  if exists(select 1 from public.vsi_requests where conversation_id=c.id and status='pending' and lease_until>v_now) then return jsonb_build_object('error','in_progress'); end if;\n  delete from public.vsi_conversations where id=c.id; return jsonb_build_object('deleted',true);\n elsif p_action='continue' then\n  if c.exchange_count<250 then return jsonb_build_object('error','thread_not_full'); end if;\n  select * into c from public.vsi_conversations where parent_conversation_id=c.id and workspace_id=p_workspace_id and actor_user_id=p_actor_user_id;\n  if found then return to_jsonb(c); end if;\n  select * into c from public.vsi_conversations where id=(p_input->>'conversationId')::uuid;\n  insert into public.vsi_conversations(workspace_id,actor_user_id,actor_role,title,parent_conversation_id,context_summary)\n    values(p_workspace_id,p_actor_user_id,v_role,left(c.title||' (continued)',120),c.id,c.context_summary) returning * into c;\n  return to_jsonb(c);\n elsif p_action='reserve' then\n  select * into r from public.vsi_requests where workspace_id=p_workspace_id and actor_user_id=p_actor_user_id and request_id=(p_input->>'requestId')::uuid;\n  if found and (r.question_hash<>p_input->>'questionHash' or r.conversation_id is distinct from c.id) then return jsonb_build_object('error','idempotency_conflict'); end if;\n  if found and r.status='completed' then return jsonb_build_object('state','completed','request',to_jsonb(r)); end if;\n  if found and r.status='pending' and r.lease_until>v_now then return jsonb_build_object('error','in_progress'); end if;\n  -- A crashed call has unknown cost: charge its reservation conservatively,\n  -- free its question slot, and permit an idempotent retry.\n  insert into public.vsi_cost_events(request_id,workspace_id,actor_user_id,attempt,occurred_at,cost_usd,usage_json)\n   select id,workspace_id,actor_user_id,attempt,started_at,reservation_usd,jsonb_build_object('status','expired','costEstimated',true,'estimatedCostUsd',reservation_usd)\n   from public.vsi_requests where status='pending' and lease_until<=v_now and (actor_user_id=p_actor_user_id or workspace_id=p_workspace_id)\n   on conflict(request_id,attempt) do nothing;\n  update public.vsi_requests set status='failed',cost_usd=cost_usd+reservation_usd,reservation_usd=0,\n   usage_json=usage_json||jsonb_build_array(jsonb_build_object('status','expired','costEstimated',true,'estimatedCostUsd',reservation_usd))\n   where status='pending' and lease_until<=v_now and (actor_user_id=p_actor_user_id or workspace_id=p_workspace_id);\n  if exists(select 1 from public.vsi_requests where actor_user_id=p_actor_user_id and status='pending') then return jsonb_build_object('error','in_progress'); end if;\n  if (select count(*) from public.vsi_requests where workspace_id=p_workspace_id and status='pending')>=4 then return jsonb_build_object('error','workspace_busy'); end if;\n  if c.exchange_count>=250 then return jsonb_build_object('error','thread_full'); end if;\n  select count(*) into v_count from public.vsi_requests where actor_user_id=p_actor_user_id and status='completed' and accepted_at>v_now-interval '24 hours';\n  if v_count>=100 then return jsonb_build_object('error','daily_limit'); end if;\n  if (select count(*) from public.vsi_requests where actor_user_id=p_actor_user_id and started_at>v_now-interval '1 minute')>=10 then return jsonb_build_object('error','burst_limit'); end if;\n  v_reserve:=(p_input->>'reserveUsd')::numeric; v_budget:=(p_input->>'monthlyBudgetUsd')::numeric;\n  if v_reserve is null or v_reserve<=0 or v_reserve>5 or v_budget is null or v_budget<=0 then raise exception 'vsi_invalid_budget'; end if;\n  select coalesce(sum(cost_usd),0) into v_spent from public.vsi_cost_events where workspace_id=p_workspace_id and occurred_at>=date_trunc('month',v_now at time zone 'UTC') at time zone 'UTC';\n  select coalesce(sum(reservation_usd),0) into v_reserved from public.vsi_requests where workspace_id=p_workspace_id and status='pending';\n  if v_spent+v_reserved+v_reserve>v_budget then return jsonb_build_object('error','workspace_budget'); end if;\n  insert into public.vsi_requests(workspace_id,actor_user_id,conversation_id,request_id,question_hash,status,reservation_usd,lease_until)\n   values(p_workspace_id,p_actor_user_id,c.id,(p_input->>'requestId')::uuid,p_input->>'questionHash','pending',v_reserve,v_now+interval '240 seconds')\n   on conflict(workspace_id,actor_user_id,request_id) do update set status='pending',attempt=public.vsi_requests.attempt+1,\n    reservation_usd=v_reserve,lease_until=v_now+interval '240 seconds',started_at=v_now returning * into r;\n  return jsonb_build_object('state','reserved','request',to_jsonb(r));\n elsif p_action='settle' then\n  select * into r from public.vsi_requests where id=(p_input->>'id')::uuid and workspace_id=p_workspace_id and actor_user_id=p_actor_user_id and conversation_id=c.id for update;\n  if not found then raise exception 'vsi_request_not_found'; end if;\n  if r.status='completed' then return jsonb_build_object('state','completed'); end if;\n  if r.status<>'pending' or r.attempt<>(p_input->>'attempt')::integer then return jsonb_build_object('error','stale_attempt'); end if;\n  v_spent:=coalesce((p_input->'usage'->>'estimatedCostUsd')::numeric,0);\n  if v_spent<0 or v_spent>10 then raise exception 'vsi_invalid_cost'; end if;\n  insert into public.vsi_cost_events(request_id,workspace_id,actor_user_id,attempt,occurred_at,cost_usd,usage_json)\n   values(r.id,p_workspace_id,p_actor_user_id,r.attempt,r.started_at,v_spent,coalesce(p_input->'usage','{}'));\n  update public.vsi_requests set status=case when coalesce(p_input->>'answer','')<>'' then 'completed' else 'failed' end,\n    accepted_at=case when coalesce(p_input->>'answer','')<>'' then v_now else null end,\n    cost_usd=cost_usd+v_spent,reservation_usd=0,lease_until=null,usage_json=usage_json||jsonb_build_array(coalesce(p_input->'usage','{}')) where id=r.id;\n  if coalesce(p_input->>'answer','')<>'' then\n   insert into public.vsi_exchanges(id,workspace_id,actor_user_id,conversation_id,user_message,answer,citations,remember_proposal,public_research_topics)\n    values(r.id,p_workspace_id,p_actor_user_id,c.id,p_input->>'question',p_input->>'answer',coalesce(p_input->'citations','[]'),p_input->'rememberProposal',coalesce(p_input->'publicResearchTopics','[]'));\n   update public.vsi_conversations set exchange_count=exchange_count+1,updated_at=v_now,\n    title=case when exchange_count=0 and title='New chat' then left(p_input->>'question',80) else title end,\n    context_summary=left(coalesce(p_input->>'summary',context_summary),8000) where id=c.id;\n  end if;\n  return jsonb_build_object('state','settled');\n elsif p_action='remember' then\n  if v_role not in ('owner','admin','manager','staff') then raise exception 'vsi_note_permission' using errcode='42501'; end if;\n  select * into e from public.vsi_exchanges where id=(p_input->>'exchangeId')::uuid and conversation_id=c.id for update;\n  if not found or e.remember_proposal is null or e.remember_proposal='null'::jsonb then raise exception 'vsi_note_proposal_missing'; end if;\n  if e.remember_proposal->>'content' is distinct from p_input->>'content' then raise exception 'vsi_note_proposal_changed'; end if;\n  if e.saved_note_id is not null then\n   select * into n from public.business_notes where id=e.saved_note_id and workspace_id=p_workspace_id for update;\n  else\n   select * into n from public.business_notes where workspace_id=p_workspace_id and release_channel=p_input->>'releaseChannel'\n    and source_text_hash=p_input->>'sourceHash' and source_version=1 and deleted_at is null for update;\n  end if;\n  -- Existing notes keep their review/lifecycle state. Re-confirming a private\n  -- proposal must never silently reopen a rejected, archived or approved note.\n  if n.id is not null then\n   if n.deleted_at is not null or n.status='archived' or n.evidence_lifecycle_status='archived' then\n    return jsonb_build_object('error','note_archived');\n   elsif n.status='rejected' then return jsonb_build_object('error','note_rejected');\n   elsif n.status<>'review_required' then return jsonb_build_object('error','note_already_exists');\n   end if;\n   v_note:=n.id;\n  end if;\n  if v_note is null then\n   insert into public.business_notes(workspace_id,author_user_id,original_note_text,source_text_hash,release_channel,status,evidence_lifecycle_status,\n    extraction_json,source_spans_json,extracted_at,policy_version,validator_version)\n    values(p_workspace_id,p_actor_user_id,p_input->>'content',p_input->>'sourceHash',p_input->>'releaseChannel','review_required','inactive',\n    p_input->'extraction',p_input->'spans',v_now,'vsi_explicit_note_verbatim_v1','business_note_extraction_validator_v2') returning id into v_note;\n  end if;\n  update public.vsi_exchanges set saved_note_id=v_note where id=e.id;\n  return jsonb_build_object('noteId',v_note);\n end if;\n raise exception 'vsi_unknown_action';\nend;\n$function$\n"
+    }
+  ],
+  "triggers": [
+    {
+      "nspname": "public",
+      "relname": "ai_agent_runs",
+      "tgname": "aa_google_sheets_erasure_cascade_guard",
+      "definition": "CREATE TRIGGER aa_google_sheets_erasure_cascade_guard BEFORE DELETE OR UPDATE ON public.ai_agent_runs FOR EACH ROW EXECUTE FUNCTION private.google_sheets_erasure_cascade_guard_v1()",
+      "proname": "google_sheets_erasure_cascade_guard_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "ai_agent_runs",
+      "tgname": "audit_workspace_entitlement",
+      "definition": "CREATE TRIGGER audit_workspace_entitlement BEFORE INSERT OR DELETE OR UPDATE ON public.ai_agent_runs FOR EACH ROW EXECUTE FUNCTION private.guard_workspace_mutation_entitlement_v1('workspace_id')",
+      "proname": "guard_workspace_mutation_entitlement_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "ai_agent_runs",
+      "tgname": "guard_trusted_derived_run_transition_v1",
+      "definition": "CREATE TRIGGER guard_trusted_derived_run_transition_v1 BEFORE UPDATE ON public.ai_agent_runs FOR EACH ROW EXECUTE FUNCTION private.guard_trusted_derived_run_transition_v1()",
+      "proname": "guard_trusted_derived_run_transition_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "ai_agent_runs",
+      "tgname": "reject_explicit_regulated_business_text_v1",
+      "definition": "CREATE TRIGGER reject_explicit_regulated_business_text_v1 BEFORE INSERT OR UPDATE ON public.ai_agent_runs FOR EACH ROW EXECUTE FUNCTION private.reject_explicit_regulated_business_text_v1('input_json', 'output_json', 'error_message')",
+      "proname": "reject_explicit_regulated_business_text_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "ai_agent_runs",
+      "tgname": "set_ai_agent_runs_updated_at",
+      "definition": "CREATE TRIGGER set_ai_agent_runs_updated_at BEFORE UPDATE ON public.ai_agent_runs FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "proname": "set_updated_at"
+    },
+    {
+      "nspname": "public",
+      "relname": "ai_agent_runs",
+      "tgname": "workspace_persisted_usage_limit",
+      "definition": "CREATE TRIGGER workspace_persisted_usage_limit BEFORE INSERT OR UPDATE ON public.ai_agent_runs FOR EACH ROW EXECUTE FUNCTION private.enforce_workspace_persisted_limit_v1()",
+      "proname": "enforce_workspace_persisted_limit_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "ai_agent_runs",
+      "tgname": "zz_google_sheets_derivative_fence",
+      "definition": "CREATE TRIGGER zz_google_sheets_derivative_fence BEFORE INSERT OR UPDATE ON public.ai_agent_runs FOR EACH ROW EXECUTE FUNCTION private.google_sheets_derivative_write_v1()",
+      "proname": "google_sheets_derivative_write_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "business_entities",
+      "tgname": "audit_workspace_entitlement",
+      "definition": "CREATE TRIGGER audit_workspace_entitlement BEFORE INSERT OR DELETE OR UPDATE ON public.business_entities FOR EACH ROW EXECUTE FUNCTION private.guard_workspace_mutation_entitlement_v1('workspace_id')",
+      "proname": "guard_workspace_mutation_entitlement_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "business_entities",
+      "tgname": "protect_business_entity_identity_v1",
+      "definition": "CREATE TRIGGER protect_business_entity_identity_v1 BEFORE UPDATE ON public.business_entities FOR EACH ROW EXECUTE FUNCTION private.protect_business_entity_identity_v1()",
+      "proname": "protect_business_entity_identity_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "reports",
+      "tgname": "aa_google_sheets_erasure_cascade_guard",
+      "definition": "CREATE TRIGGER aa_google_sheets_erasure_cascade_guard BEFORE DELETE OR UPDATE ON public.reports FOR EACH ROW EXECUTE FUNCTION private.google_sheets_erasure_cascade_guard_v1()",
+      "proname": "google_sheets_erasure_cascade_guard_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "reports",
+      "tgname": "audit_workspace_entitlement",
+      "definition": "CREATE TRIGGER audit_workspace_entitlement BEFORE INSERT OR DELETE OR UPDATE ON public.reports FOR EACH ROW EXECUTE FUNCTION private.guard_workspace_mutation_entitlement_v1('workspace_id')",
+      "proname": "guard_workspace_mutation_entitlement_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "reports",
+      "tgname": "reject_explicit_regulated_business_text_v1",
+      "definition": "CREATE TRIGGER reject_explicit_regulated_business_text_v1 BEFORE INSERT OR UPDATE ON public.reports FOR EACH ROW EXECUTE FUNCTION private.reject_explicit_regulated_business_text_v1('report_type', 'title', 'body_markdown', 'source_data_json')",
+      "proname": "reject_explicit_regulated_business_text_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "reports",
+      "tgname": "set_reports_updated_at",
+      "definition": "CREATE TRIGGER set_reports_updated_at BEFORE UPDATE ON public.reports FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "proname": "set_updated_at"
+    },
+    {
+      "nspname": "public",
+      "relname": "reports",
+      "tgname": "zz_google_sheets_derivative_fence",
+      "definition": "CREATE TRIGGER zz_google_sheets_derivative_fence BEFORE INSERT OR UPDATE ON public.reports FOR EACH ROW EXECUTE FUNCTION private.google_sheets_derivative_write_v1()",
+      "proname": "google_sheets_derivative_write_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "vsi_conversations",
+      "tgname": "aa_google_sheets_erasure_cascade_guard",
+      "definition": "CREATE TRIGGER aa_google_sheets_erasure_cascade_guard BEFORE DELETE OR UPDATE ON public.vsi_conversations FOR EACH ROW EXECUTE FUNCTION private.google_sheets_erasure_cascade_guard_v1()",
+      "proname": "google_sheets_erasure_cascade_guard_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "vsi_conversations",
+      "tgname": "zz_google_sheets_derivative_fence",
+      "definition": "CREATE TRIGGER zz_google_sheets_derivative_fence BEFORE INSERT OR UPDATE ON public.vsi_conversations FOR EACH ROW EXECUTE FUNCTION private.google_sheets_derivative_write_v1()",
+      "proname": "google_sheets_derivative_write_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "vsi_exchanges",
+      "tgname": "aa_google_sheets_erasure_cascade_guard",
+      "definition": "CREATE TRIGGER aa_google_sheets_erasure_cascade_guard BEFORE DELETE OR UPDATE ON public.vsi_exchanges FOR EACH ROW EXECUTE FUNCTION private.google_sheets_erasure_cascade_guard_v1()",
+      "proname": "google_sheets_erasure_cascade_guard_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "vsi_exchanges",
+      "tgname": "zz_google_sheets_derivative_fence",
+      "definition": "CREATE TRIGGER zz_google_sheets_derivative_fence BEFORE INSERT OR UPDATE ON public.vsi_exchanges FOR EACH ROW EXECUTE FUNCTION private.google_sheets_derivative_write_v1()",
+      "proname": "google_sheets_derivative_write_v1"
+    },
+    {
+      "nspname": "public",
+      "relname": "vsi_requests",
+      "tgname": "aa_google_sheets_erasure_cascade_guard",
+      "definition": "CREATE TRIGGER aa_google_sheets_erasure_cascade_guard BEFORE DELETE OR UPDATE ON public.vsi_requests FOR EACH ROW EXECUTE FUNCTION private.google_sheets_erasure_cascade_guard_v1()",
+      "proname": "google_sheets_erasure_cascade_guard_v1"
+    }
+  ],
+  "grants": [
+    {
+      "nspname": "private",
+      "proname": "google_sheets_checked_ticket_v1",
+      "arguments": "p_ticket_id uuid, p_workspace_id uuid",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "body_md5": "6376ff08d398b926f66b03e79684b1ce",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": false
+    },
+    {
+      "nspname": "private",
+      "proname": "google_sheets_derivative_write_v1",
+      "arguments": "",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "body_md5": "edeac78fd146fb69b5d0c98665cbe296",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": false
+    },
+    {
+      "nspname": "private",
+      "proname": "guard_trusted_derived_run_transition_v1",
+      "arguments": "",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "body_md5": "63a2fb3a00330000dc3943db8a002989",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": false
+    },
+    {
+      "nspname": "private",
+      "proname": "require_live_actor_session_v1",
+      "arguments": "p_workspace_id uuid, p_actor_id uuid, p_session_id uuid, p_roles text[]",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "body_md5": "0c7b5cf1b7cd6ad2e71d1efb2e20483c",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": false
+    },
+    {
+      "nspname": "private",
+      "proname": "square_production_customer_require_owner_v1",
+      "arguments": "p_actor_id uuid, p_session_id uuid, p_workspace_id uuid, p_business_entity_id uuid",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "body_md5": "9ef9e36b2c7bcfbd796029e361b3c558",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": false
+    },
+    {
+      "nspname": "public",
+      "proname": "complete_trusted_derived_run_v1",
+      "arguments": "p_workspace_id uuid, p_run_id uuid, p_actor_id uuid, p_session_id uuid, p_read_ticket_id uuid, p_agent_type text, p_output_json jsonb",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "body_md5": "3eb7db1c3bb8cbfa82e13fee1cc2e3b6",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": true
+    },
+    {
+      "nspname": "public",
+      "proname": "fail_trusted_derived_run_v1",
+      "arguments": "p_workspace_id uuid, p_run_id uuid, p_actor_id uuid, p_session_id uuid, p_read_ticket_id uuid, p_agent_type text",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "body_md5": "a0aff859ad5c2486934920e8a5b48a76",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": true
+    },
+    {
+      "nspname": "public",
+      "proname": "get_google_sheets_read_context_v1",
+      "arguments": "p_ticket_id uuid",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "body_md5": "85481d69cf4248a46156e47ce2c5da19",
+      "anon_execute": false,
+      "authenticated_execute": true,
+      "service_execute": true
+    },
+    {
+      "nspname": "public",
+      "proname": "vsi_mutate_v1",
+      "arguments": "p_workspace_id uuid, p_actor_user_id uuid, p_action text, p_input jsonb",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "body_md5": "3735e479667b1d34b89fea40950acb3f",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": false
+    },
+    {
+      "nspname": "public",
+      "proname": "vsi_mutate_v2",
+      "arguments": "p_workspace_id uuid, p_actor_user_id uuid, p_action text, p_input jsonb, p_session_id uuid",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "body_md5": "319023bbb84f66d8ba88e830ad6c0036",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": true
+    }
+  ]
+}

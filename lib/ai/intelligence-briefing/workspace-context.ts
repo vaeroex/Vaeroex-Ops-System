@@ -1,3 +1,6 @@
+import { sharedEvidenceRuntimeEnabled } from "@/lib/ai/shared-evidence/runtime-gate";
+import { prepareSharedGeneration } from "@/lib/ai/shared-evidence/generation";
+import { extendSharedBriefingPackage } from "@/lib/ai/shared-evidence/briefing";
 import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 
@@ -211,7 +214,7 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
     } : {}),
     kpis: kpiProducer
   });
-  const briefingPackage = projectIntelligenceBriefingV1({
+  let briefingPackage = projectIntelligenceBriefingV1({
     snapshot: snapshot.snapshot,
     briefingType,
     period,
@@ -233,7 +236,9 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
     ...businessNotes.records.map(record => ({ table: "business_notes", id: record.sourceNoteId })),
     ...(previousBriefing ? [{ table: "ai_agent_runs", id: previousBriefing.runId }] : [])
   ]);
-  return { briefingPackage, snapshot: snapshot.snapshot, receipt: snapshot.receipt, readTicket };
+  const sharedPrepared=sharedEvidenceRuntimeEnabled()?await prepareSharedGeneration(supabase,workspaceId,period.start,period.end):undefined;
+  if(sharedPrepared) briefingPackage=extendSharedBriefingPackage(briefingPackage,sharedPrepared);
+  return { briefingPackage, snapshot: snapshot.snapshot, receipt: snapshot.receipt, readTicket, sharedPrepared };
 }
 
 export async function loadWorkspaceIntelligenceBriefingStates({

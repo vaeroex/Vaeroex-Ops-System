@@ -1,5 +1,6 @@
 import "server-only";
 
+import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   INTELLIGENCE_BRIEFING_CONTRACT_ID,
@@ -29,6 +30,7 @@ export async function claimIntelligenceBriefingGeneration({
   reader,
   workspaceId,
   userId,
+  sessionId,
   briefingType,
   generationKey,
   inputJson
@@ -37,19 +39,25 @@ export async function claimIntelligenceBriefingGeneration({
   reader: SupabaseClient<Database>;
   workspaceId: string;
   userId: string;
+  sessionId: string;
   briefingType: IntelligenceBriefingType;
   generationKey: string;
   inputJson: Json;
 }): Promise<IntelligenceBriefingGenerationClaim> {
-  const { data: inserted, error: insertError } = await admin
-    .rpc("create_trusted_analysis_run_v1", {
+  if (![workspaceId, userId, sessionId].every(value => z.string().uuid().safeParse(value).success)) return { status: "failed_closed" };
+  const client = admin as unknown as { rpc(name: "create_trusted_analysis_run_v2", args: Record<string, Json>): {
+    maybeSingle(): PromiseLike<{ data: { id: string } | null; error: { code?: string } | null }>;
+  } };
+  const { data: inserted, error: insertError } = await client
+    .rpc("create_trusted_analysis_run_v2", {
       p_workspace_id: workspaceId,
       p_actor_id: userId,
+      p_session_id: sessionId,
       p_agent_type: INTELLIGENCE_BRIEFING_CONTRACT_ID,
       p_input_json: inputJson
     })
     .maybeSingle();
-  if (!insertError && inserted?.id) return { status: "claimed", runId: inserted.id };
+  if (!insertError && z.string().uuid().safeParse(inserted?.id).success && inserted?.id) return { status: "claimed", runId: inserted.id };
   if (insertError?.code !== "23505") return { status: "failed_closed" };
 
   const { data, error } = await reader

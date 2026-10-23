@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "codex/shared-evidence-security-draft": false,
       "main": false,
       "codex/intelligence-health-consolidation": false,
       "codex/square-remote-sandbox-binding": false,

@@ -1,0 +1,607 @@
+{
+  "baseline": "ec8fb7defe90face91fd36dc9f2533b67ef46234",
+  "environment": "production",
+  "method": "Read-only pg_catalog metadata. No customer rows, credentials, RPC execution or function bodies fetched.",
+  "readerSignatures": [
+    {
+      "schema": "public",
+      "proname": "begin_google_sheets_read_v1",
+      "args": "p_workspace_id uuid, p_actor_id uuid",
+      "result": "jsonb",
+      "security_definer": true,
+      "owner": "postgres",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "authenticated_execute": true,
+      "anon_execute": false,
+      "service_execute": true
+    },
+    {
+      "schema": "public",
+      "proname": "bind_google_sheets_read_v1",
+      "args": "p_ticket_id uuid, p_sources jsonb",
+      "result": "jsonb",
+      "security_definer": true,
+      "owner": "postgres",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "authenticated_execute": true,
+      "anon_execute": false,
+      "service_execute": true
+    },
+    {
+      "schema": "public",
+      "proname": "complete_trusted_derived_run_v1",
+      "args": "p_workspace_id uuid, p_run_id uuid, p_actor_id uuid, p_session_id uuid, p_read_ticket_id uuid, p_agent_type text, p_output_json jsonb",
+      "result": "uuid",
+      "security_definer": true,
+      "owner": "postgres",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "authenticated_execute": false,
+      "anon_execute": false,
+      "service_execute": true
+    },
+    {
+      "schema": "public",
+      "proname": "create_trusted_analysis_run_v2",
+      "args": "p_workspace_id uuid, p_actor_id uuid, p_agent_type text, p_input_json jsonb, p_session_id uuid",
+      "result": "TABLE(id uuid)",
+      "security_definer": true,
+      "owner": "postgres",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "authenticated_execute": false,
+      "anon_execute": false,
+      "service_execute": true
+    },
+    {
+      "schema": "public",
+      "proname": "fail_trusted_derived_run_v1",
+      "args": "p_workspace_id uuid, p_run_id uuid, p_actor_id uuid, p_session_id uuid, p_read_ticket_id uuid, p_agent_type text",
+      "result": "uuid",
+      "security_definer": true,
+      "owner": "postgres",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "authenticated_execute": false,
+      "anon_execute": false,
+      "service_execute": true
+    },
+    {
+      "schema": "public",
+      "proname": "loyverse_saved_report",
+      "args": "p_workspace_id uuid, p_connection_id uuid, p_start_date date, p_end_date date",
+      "result": "jsonb",
+      "security_definer": true,
+      "owner": "postgres",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "authenticated_execute": false,
+      "anon_execute": false,
+      "service_execute": true
+    },
+    {
+      "schema": "public",
+      "proname": "qbo_customer_source_browse_v1",
+      "args": "p_workspace_id uuid, p_connection_id uuid, p_after_id uuid, p_source_id uuid, p_kind text",
+      "result": "jsonb",
+      "security_definer": true,
+      "owner": "postgres",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "authenticated_execute": true,
+      "anon_execute": false,
+      "service_execute": false
+    },
+    {
+      "schema": "public",
+      "proname": "read_reporting_history",
+      "args": "p_workspace uuid, p_provider text, p_connection uuid, p_start_date date, p_end_date date",
+      "result": "jsonb",
+      "security_definer": false,
+      "owner": "postgres",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "authenticated_execute": true,
+      "anon_execute": false,
+      "service_execute": true
+    },
+    {
+      "schema": "public",
+      "proname": "read_zoho_books_history",
+      "args": "p_workspace_id uuid, p_connection_id uuid, p_start_date date, p_end_date date",
+      "result": "jsonb",
+      "security_definer": true,
+      "owner": "postgres",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "authenticated_execute": false,
+      "anon_execute": false,
+      "service_execute": true
+    },
+    {
+      "schema": "public",
+      "proname": "resolve_document_extraction_file_authority_v1",
+      "args": "p_workspace_id uuid, p_file_id uuid",
+      "result": "jsonb",
+      "security_definer": true,
+      "owner": "postgres",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "authenticated_execute": true,
+      "anon_execute": false,
+      "service_execute": true
+    },
+    {
+      "schema": "public",
+      "proname": "square_customer_payments_v1",
+      "args": "p_actor_id uuid, p_session_id uuid, p_workspace_id uuid, p_connection_id uuid, p_page integer, p_start_date text, p_end_date text, p_status text",
+      "result": "jsonb",
+      "security_definer": true,
+      "owner": "postgres",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "authenticated_execute": false,
+      "anon_execute": false,
+      "service_execute": true
+    },
+    {
+      "schema": "public",
+      "proname": "wix_order_history_report",
+      "args": "p_workspace_id uuid, p_connection_id uuid, p_from date, p_to date",
+      "result": "jsonb",
+      "security_definer": false,
+      "owner": "postgres",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "authenticated_execute": true,
+      "anon_execute": false,
+      "service_execute": true
+    }
+  ],
+  "tables": [
+    {
+      "schema": "public",
+      "relname": "ai_agent_runs",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": true,
+      "identity_columns": "{id,workspace_id}"
+    },
+    {
+      "schema": "public",
+      "relname": "business_memory_chunks",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": true,
+      "identity_columns": "{id,workspace_id,source_id}"
+    },
+    {
+      "schema": "public",
+      "relname": "business_notes",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{id,workspace_id}"
+    },
+    {
+      "schema": "public",
+      "relname": "google_sheets_connections",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{id,workspace_id,business_entity_id}"
+    },
+    {
+      "schema": "public",
+      "relname": "google_sheets_fact_links",
+      "rls": true,
+      "authenticated_select": false,
+      "anon_select": false,
+      "identity_columns": "{workspace_id,connection_id,source_version_id,id}"
+    },
+    {
+      "schema": "public",
+      "relname": "google_sheets_source_rows",
+      "rls": true,
+      "authenticated_select": false,
+      "anon_select": false,
+      "identity_columns": "{id,workspace_id,business_entity_id,connection_id}"
+    },
+    {
+      "schema": "public",
+      "relname": "google_sheets_source_versions",
+      "rls": true,
+      "authenticated_select": false,
+      "anon_select": false,
+      "identity_columns": "{id,workspace_id,connection_id}"
+    },
+    {
+      "schema": "private",
+      "relname": "integration_connections",
+      "rls": true,
+      "authenticated_select": false,
+      "anon_select": false,
+      "identity_columns": "{id,workspace_id,business_entity_id}"
+    },
+    {
+      "schema": "public",
+      "relname": "kpis",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": true,
+      "identity_columns": "{id,workspace_id}"
+    },
+    {
+      "schema": "public",
+      "relname": "loyverse_connections",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{id,workspace_id}"
+    },
+    {
+      "schema": "public",
+      "relname": "loyverse_import_days",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{workspace_id,connection_id,day}"
+    },
+    {
+      "schema": "public",
+      "relname": "loyverse_receipt_facts",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{workspace_id,connection_id}"
+    },
+    {
+      "schema": "public",
+      "relname": "reporting_connections",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{id,workspace_id,provider,account,snapshot}"
+    },
+    {
+      "schema": "public",
+      "relname": "reporting_history_days",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{workspace_id,provider,connection_id,day}"
+    },
+    {
+      "schema": "public",
+      "relname": "reporting_history_facts",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{workspace_id,provider,connection_id,record_id,day}"
+    },
+    {
+      "schema": "public",
+      "relname": "reports",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": true,
+      "identity_columns": "{id,workspace_id}"
+    },
+    {
+      "schema": "public",
+      "relname": "wix_order_connections",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{id,workspace_id}"
+    },
+    {
+      "schema": "public",
+      "relname": "wix_order_facts",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{workspace_id,connection_id}"
+    },
+    {
+      "schema": "public",
+      "relname": "wix_order_import_days",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{workspace_id,connection_id,day}"
+    },
+    {
+      "schema": "public",
+      "relname": "zoho_books_connections",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{id,workspace_id}"
+    },
+    {
+      "schema": "public",
+      "relname": "zoho_books_history_coverage",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{workspace_id,connection_id,day}"
+    },
+    {
+      "schema": "public",
+      "relname": "zoho_books_history_facts",
+      "rls": true,
+      "authenticated_select": true,
+      "anon_select": false,
+      "identity_columns": "{workspace_id,connection_id,source_id,day,currency}"
+    }
+  ],
+  "sourceBinding": [
+    {
+      "proname": "bind_google_sheets_read_v1",
+      "referenced_symbols": [
+        "google_sheets_allowed_source_v1",
+        "google_sheets_checked_ticket_v1",
+        "google_sheets_connection_root_links",
+        "google_sheets_derivation_roots",
+        "google_sheets_read_tickets",
+        "google_sheets_retention_roots",
+        "google_sheets_source_root_links"
+      ],
+      "allowed_source_literals": null
+    },
+    {
+      "proname": "google_sheets_allowed_source_v1",
+      "referenced_symbols": [],
+      "allowed_source_literals": [
+        "kpis",
+        "kpi_settings",
+        "ai_agent_runs",
+        "reports",
+        "business_health_snapshots",
+        "business_memory_chunks",
+        "business_notes",
+        "vsi_exchanges",
+        "vsi_conversations",
+        "intelligence_card_lifecycle",
+        "intelligence_card_lifecycle_events",
+        "file_uploads",
+        "file_imports",
+        "operational_metrics",
+        "business_decisions",
+        "issues",
+        "sops",
+        "assets",
+        "crm_leads",
+        "crm_lead_history",
+        "forms",
+        "form_submissions",
+        "people",
+        "google_sheets_connections"
+      ]
+    },
+    {
+      "proname": "loyverse_saved_report",
+      "referenced_symbols": [
+        "loyverse_connections",
+        "loyverse_import_days",
+        "loyverse_receipt_facts"
+      ],
+      "allowed_source_literals": null
+    },
+    {
+      "proname": "qbo_customer_source_browse_v1",
+      "referenced_symbols": [
+        "business_entities",
+        "external_source_record_versions",
+        "external_source_records",
+        "integration_connections",
+        "provider_entity_mappings",
+        "qbo_customer_preview_v1",
+        "qbo_production_source_validation_work",
+        "workspace_members",
+        "workspaces"
+      ],
+      "allowed_source_literals": null
+    },
+    {
+      "proname": "read_zoho_books_history",
+      "referenced_symbols": [
+        "zoho_books_connections",
+        "zoho_books_daily_summaries",
+        "zoho_books_history_coverage",
+        "zoho_books_history_facts"
+      ],
+      "allowed_source_literals": null
+    },
+    {
+      "proname": "square_customer_payments_v1",
+      "referenced_symbols": [
+        "business_entities",
+        "connections",
+        "payments",
+        "square_production_customer_require_owner_v1"
+      ],
+      "allowed_source_literals": null
+    },
+    {
+      "proname": "wix_order_history_report",
+      "referenced_symbols": [
+        "wix_order_facts",
+        "wix_order_import_days"
+      ],
+      "allowed_source_literals": null
+    }
+  ],
+  "policies": [
+    {
+      "relname": "loyverse_connections",
+      "polname": "loyverse_connections_read",
+      "polcmd": "r",
+      "polpermissive": true,
+      "using_expression": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = loyverse_connections.workspace_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))))"
+    },
+    {
+      "relname": "loyverse_import_days",
+      "polname": "loyverse_import_days_read",
+      "polcmd": "r",
+      "polpermissive": true,
+      "using_expression": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = loyverse_import_days.workspace_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))))"
+    },
+    {
+      "relname": "loyverse_receipt_facts",
+      "polname": "loyverse_receipt_facts_read",
+      "polcmd": "r",
+      "polpermissive": true,
+      "using_expression": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = loyverse_receipt_facts.workspace_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))))"
+    },
+    {
+      "relname": "reporting_connections",
+      "polname": "reporting_connections_read",
+      "polcmd": "r",
+      "polpermissive": true,
+      "using_expression": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = reporting_connections.workspace_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))))"
+    },
+    {
+      "relname": "reporting_history_days",
+      "polname": "reporting_history_days_member_read",
+      "polcmd": "r",
+      "polpermissive": true,
+      "using_expression": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = reporting_history_days.workspace_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))))"
+    },
+    {
+      "relname": "reporting_history_facts",
+      "polname": "reporting_history_facts_member_read",
+      "polcmd": "r",
+      "polpermissive": true,
+      "using_expression": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = reporting_history_facts.workspace_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))))"
+    },
+    {
+      "relname": "wix_order_connections",
+      "polname": "wix_order_connections_read",
+      "polcmd": "r",
+      "polpermissive": true,
+      "using_expression": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = wix_order_connections.workspace_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))))"
+    },
+    {
+      "relname": "wix_order_facts",
+      "polname": "wix_order_facts_read",
+      "polcmd": "r",
+      "polpermissive": true,
+      "using_expression": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = wix_order_facts.workspace_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))))"
+    },
+    {
+      "relname": "wix_order_import_days",
+      "polname": "wix_order_import_days_read",
+      "polcmd": "r",
+      "polpermissive": true,
+      "using_expression": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = wix_order_import_days.workspace_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))))"
+    },
+    {
+      "relname": "zoho_books_connections",
+      "polname": "zoho_books_connections_read",
+      "polcmd": "r",
+      "polpermissive": true,
+      "using_expression": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = zoho_books_connections.workspace_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))))"
+    },
+    {
+      "relname": "zoho_books_history_coverage",
+      "polname": "zoho_books_history_coverage_read",
+      "polcmd": "r",
+      "polpermissive": true,
+      "using_expression": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = zoho_books_history_coverage.workspace_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))))"
+    },
+    {
+      "relname": "zoho_books_history_facts",
+      "polname": "zoho_books_history_facts_read",
+      "polcmd": "r",
+      "polpermissive": true,
+      "using_expression": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = zoho_books_history_facts.workspace_id) AND (m.user_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))))"
+    }
+  ],
+  "sessionMarkers": [
+    {
+      "nspname": "public",
+      "proname": "square_customer_payments_v1",
+      "args": "p_actor_id uuid, p_session_id uuid, p_workspace_id uuid, p_connection_id uuid, p_page integer, p_start_date text, p_end_date text, p_status text",
+      "checks_auth_sessions": false,
+      "checks_session_id": true,
+      "uses_auth_uid": false,
+      "calls_owner_guard": true,
+      "service_guard": true
+    },
+    {
+      "nspname": "public",
+      "proname": "qbo_customer_source_browse_v1",
+      "args": "p_workspace_id uuid, p_connection_id uuid, p_after_id uuid, p_source_id uuid, p_kind text",
+      "checks_auth_sessions": true,
+      "checks_session_id": true,
+      "uses_auth_uid": true,
+      "calls_owner_guard": false,
+      "service_guard": false
+    },
+    {
+      "nspname": "private",
+      "proname": "square_production_customer_require_owner_v1",
+      "args": "p_actor_id uuid, p_session_id uuid, p_workspace_id uuid, p_business_entity_id uuid",
+      "checks_auth_sessions": true,
+      "checks_session_id": true,
+      "uses_auth_uid": false,
+      "calls_owner_guard": false,
+      "service_guard": false
+    },
+    {
+      "nspname": "private",
+      "proname": "google_sheets_checked_ticket_v1",
+      "args": "p_ticket_id uuid, p_workspace_id uuid",
+      "checks_auth_sessions": false,
+      "checks_session_id": false,
+      "uses_auth_uid": false,
+      "calls_owner_guard": false,
+      "service_guard": false
+    }
+  ],
+  "caveat": "Structural markers are not a complete semantic security proof. Existing verified call paths remain unchanged.",
+  "missingContracts": [
+    {
+      "id": "owner_audience",
+      "scope": "All stored briefs and saved brief copies",
+      "required": "Restrictive active-owner workspace boundary covering create/load/reuse/complete/copy and historical artifacts; preserve current trusted terminal triggers and actor/session checks. No creator-only subsystem or seats."
+    },
+    {
+      "id": "source_binding",
+      "scope": "Additional connector histories/snapshots and protected QBO/Square source dependencies",
+      "required": "Reviewed versioned source-reference contract accepting provider+connection+composite record identity, resolving authoritative source/version and revocation. Do not merely add composite-ID tables to UUID-only Sheets allowlist. Preserve Sheets actor-bound ticket; new evidence must not be mislabeled as Sheets."
+    },
+    {
+      "id": "entity_correspondence",
+      "scope": "Loyverse, Zoho Books, Wix, Xero, Harvest, Clockify, Toggl, Zoho Inventory, Katana",
+      "required": "Canonical workspace business-entity mapping absent from connection identity metadata. Proposed separate owner-confirmed mapping keyed by workspace/provider/connection plus source scope. No matching by labels or assuming one entity per workspace. Exact persistence design requires review; no automatic backfill."
+    },
+    {
+      "id": "stable_citations",
+      "scope": "Mutable reporting snapshots, aggregate history RPCs, composite record stores",
+      "required": "Retain source identity and version/content hash, dates, coverage and all contributing records; verify on reopen and distinguish changed/unavailable source. Review whether current immutable source infrastructure can hold references without copying raw customer data. Aggregate-only response is not immutable record lineage."
+    },
+    {
+      "id": "read_path",
+      "scope": "Loyverse and Zoho Books aggregation",
+      "required": "Existing aggregate RPCs are service-role-only without actor/session args. Do not add service role reasoning path. Prefer authenticated RLS reads if completeness can be established, or narrowly scoped owner/session invoker reader proposal; preserve original revokes."
+    }
+  ],
+  "status": "Local draft adapters only; runtime wiring blocked pending these reviewed contracts. No schema or security changes applied."
+}

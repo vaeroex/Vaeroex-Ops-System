@@ -1,4 +1,6 @@
 "use server";
+import { sealSharedGeneration, type SharedPrepared } from "@/lib/ai/shared-evidence/generation";
+import { bindSharedBriefingCitationTarget } from "@/lib/ai/shared-evidence/briefing";
 
 import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadTicketFields } from "@/lib/integrations/google-sheets/read-authority";
 
@@ -10,6 +12,7 @@ import {
   type IntelligenceBriefingState,
   type IntelligenceBriefingType
 } from "@/lib/ai/intelligence-briefing/contracts";
+import { verifiedBriefingSession, completeIntelligenceBriefingRun, failIntelligenceBriefingRun } from "@/lib/ai/intelligence-briefing/run-lifecycle";
 import { claimIntelligenceBriefingGeneration } from "@/lib/ai/intelligence-briefing/generation-claim";
 import { generateIntelligenceBriefing, intelligenceBriefingProviderAttemptTelemetry } from "@/lib/ai/intelligence-briefing/service";
 import {
@@ -77,8 +80,11 @@ export async function generateIntelligenceBriefingAction(input: {
   if (!supabase) return unavailable(briefingType, "Intelligence Briefings are temporarily unavailable.");
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return unavailable(briefingType, "Sign in again to generate an Intelligence Briefing.");
+  const sessionId = await verifiedBriefingSession(supabase, user.id);
+  if (!sessionId) return unavailable(briefingType, "Sign in again to generate an Intelligence Briefing.");
   const context = await getWorkspaceContext(undefined, { supabase, user });
-  if (!context.activeWorkspace || !context.membership || context.membership.status !== "active") {
+  if (!context.activeWorkspace || !context.membership || context.membership.status !== "active"
+    || context.membership.user_id !== user.id || context.membership.workspace_id !== context.activeWorkspace.id) {
     return unavailable(briefingType, "Active workspace access is required.");
   }
   const workspaceId = context.activeWorkspace.id;
@@ -86,8 +92,9 @@ export async function generateIntelligenceBriefingAction(input: {
   if (!readTicket) return unavailable(briefingType, "Workspace data is being updated. Reload before requesting analysis.");
   const current = await loadCurrentIntelligenceBriefing({ supabase, workspaceId, briefingType }).catch(() => null);
   let briefingPackage;
+  let sharedPrepared:SharedPrepared|undefined;
   try {
-    ({ briefingPackage } = await buildWorkspaceIntelligenceBriefingPackage({
+    ({ briefingPackage,sharedPrepared } = await buildWorkspaceIntelligenceBriefingPackage({
       readTicket,
       supabase,
       workspaceId,
@@ -140,6 +147,7 @@ export async function generateIntelligenceBriefingAction(input: {
     return { ...state, status: "unavailable", message: "Intelligence request limits could not be verified. Please try again shortly." };
   }
   const inputJson = {
+    ...(sharedPrepared?{shared_evidence_contract:"shared_evidence_v1"}:{}),
     ...googleSheetsReadTicketFields(readTicket.ticketId),
     workflow: INTELLIGENCE_BRIEFING_CONTRACT_ID,
     briefing_type: briefingType,
@@ -162,6 +170,7 @@ export async function generateIntelligenceBriefingAction(input: {
     admin,
     workspaceId,
     userId: user.id,
+    sessionId,
     briefingType,
     generationKey: briefingPackage.generationKey,
     inputJson
@@ -170,47 +179,37 @@ export async function generateIntelligenceBriefingAction(input: {
   if (claim.status === "processing") return { ...state, status: "generating", message: "This briefing is already being prepared. Refresh shortly to view it." };
   if (claim.status === "hidden_completed") return { ...state, status: "unavailable", message: "This exact briefing is retained as hidden historical data and cannot be regenerated." };
   if (claim.status !== "claimed") return { ...state, status: "failed", message: SAFE_FAILURE_MESSAGE };
+  const authority = { workspaceId, userId: user.id, sessionId, readTicketId: readTicket.ticketId };
+  let sharedManifestId:string|undefined;
+  let generated: Awaited<ReturnType<typeof generateIntelligenceBriefing>>;
   try {
     await bindGoogleSheetsRead(supabase, readTicket.ticketId, []);
-    const generated = await generateIntelligenceBriefing({ supabase, workspaceId, briefingPackage, readTicketId: readTicket.ticketId, startedAtMs: startedAt });
-    const { data: updated, error: updateError } = await admin
-      .from("ai_agent_runs")
-      .update({
-        ...googleSheetsReadTicketFields(readTicket.ticketId),
-        output_json: generated.artifact as unknown as Json,
-        status: "completed",
-        error_message: null,
-        updated_at: new Date().toISOString()
-      })
-      .eq("workspace_id", workspaceId)
-      .eq("id", claim.runId)
-      .eq("status", "processing")
-      .select("id")
-      .maybeSingle();
-    if (updateError || !updated) throw new Error("The completed briefing could not be persisted atomically.");
-    await recordVaeroexAiUsage({
-      supabase: admin,
-      workspaceId,
-      userId: user.id,
-      agentType: INTELLIGENCE_BRIEFING_CONTRACT_ID,
-      usage: generated.usage
-    });
-    revalidatePath("/app/intelligence/briefings");
-    revalidatePath(`/app/intelligence/briefings/${briefingType}`);
-    return { ...state, status: "current", artifact: generated.artifact, message: null };
+    if(sharedPrepared) {
+      sharedManifestId=await sealSharedGeneration(supabase,sharedPrepared,{kind:"briefing_run",id:claim.runId,attempt:1,ticketId:readTicket.ticketId});
+      briefingPackage=bindSharedBriefingCitationTarget(briefingPackage,claim.runId);
+    }
+    generated = await generateIntelligenceBriefing({ sharedExecution: sharedPrepared&&sharedManifestId?{prepared:sharedPrepared,manifestId:sharedManifestId,runId:claim.runId}:undefined, supabase, workspaceId, briefingPackage, readTicketId: readTicket.ticketId, startedAtMs: startedAt });
   } catch (error) {
-    await admin.from("ai_agent_runs").update({
-      status: "failed",
-      error_message: "Intelligence Briefing generation failed.",
-      updated_at: new Date().toISOString()
-    }).eq("workspace_id", workspaceId).eq("id", claim.runId).eq("status", "processing");
-    await recordVaeroexAiUsage({
-      supabase: admin,
-      workspaceId,
-      userId: user.id,
-      agentType: INTELLIGENCE_BRIEFING_CONTRACT_ID,
-      usage: failedUsage(error, Date.now() - startedAt, briefingType)
-    });
-    return { ...state, status: "failed", artifact: null, message: SAFE_FAILURE_MESSAGE };
+    const failed = await failIntelligenceBriefingRun(admin, authority, claim.runId);
+    await recordVaeroexAiUsage({ supabase: admin, workspaceId, userId: user.id,
+      agentType: INTELLIGENCE_BRIEFING_CONTRACT_ID, usage: failedUsage(error, Date.now() - startedAt, briefingType)
+    }).catch(() => { console.warn("[intelligence-briefing-usage]", { status: "unconfirmed" }); });
+    return { ...state, status: failed ? "failed" : "unavailable", artifact: null,
+      message: failed ? SAFE_FAILURE_MESSAGE : "Briefing status could not be confirmed. Reload this page to check its status." };
   }
+  const completion = await completeIntelligenceBriefingRun({ admin, reader: supabase, authority, runId: claim.runId, artifact: generated.artifact, sharedManifestId });
+  // Provider spending is known even when artifact persistence fails. Do not turn
+  // a storage error into a zero-usage provider failure or regenerate the answer.
+  const usage = completion.status === "completed" ? generated.usage : {
+    ...generated.usage, status: "failed" as const,
+    metadata: { ...(generated.usage.metadata && typeof generated.usage.metadata === "object" && !Array.isArray(generated.usage.metadata) ? generated.usage.metadata : {}),
+      failure_stage: "artifact_persistence", persistence_status: completion.status }
+  };
+  await recordVaeroexAiUsage({ supabase: admin, workspaceId, userId: user.id, agentType: INTELLIGENCE_BRIEFING_CONTRACT_ID, usage
+  }).catch(() => { console.warn("[intelligence-briefing-usage]", { status: "unconfirmed" }); });
+  if (completion.status !== "completed") return { ...state, status: completion.status, artifact: null,
+    message: completion.status === "failed" ? SAFE_FAILURE_MESSAGE : "Briefing status could not be confirmed. Reload this page to check its status." };
+  revalidatePath("/app/intelligence/briefings");
+  revalidatePath(`/app/intelligence/briefings/${briefingType}`);
+  return { ...state, status: "current", artifact: completion.artifact, message: null };
 }

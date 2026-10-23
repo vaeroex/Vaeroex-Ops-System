@@ -43,7 +43,7 @@ const REASONING_PATTERN = /\b(?:chain of thought|hidden reasoning|internal reaso
 const PREDICTION_CERTAINTY_PATTERN = /\b(?:will definitely|guaranteed|certain to|without doubt|inevitably)\b/i;
 const TASK_PATTERN = /\b(?:assign(?:ed)? to|owner\s*:|due date|deadline|create a task|project plan|work item|to-do)\b/i;
 const HIGH_RISK_ACTION_PATTERN = /\b(?:hire|fire|lay off|acquire|sell the company|borrow|increase budget|reduce headcount)\b/i;
-const CONTEXT_ATTRIBUTION_PATTERN = /\b(?:approved business note|business note reports?|business (?:noted|reports?)|leadership reported|reported context|the note reports?)\b/i;
+const CONTEXT_ATTRIBUTION_PATTERN = /\b(?:reviewed file reports?|approved business note|business note reports?|business (?:noted|reports?)|leadership reported|reported context|the note reports?)\b/i;
 const CONTEXT_BOUNDARY_PATTERN = /\b(?:does not establish causation|may provide context|could be relevant|reported context|not independently measured)\b/i;
 
 type RelationshipCategory = NonNullable<SafeAIValidationDiagnostic["relationshipCategory"]>;
@@ -183,8 +183,14 @@ function validateClaim({
     return failure("A material briefing claim does not resolve to eligible citations.", "invalid_citation_id", "citation_provenance", sectionId);
   }
 
+  if(signal.sharedRelationship && claim.text.trim()!==(sectionId==="leadership_considerations"?"Review the order and invoice source records before combining financial totals.":signal.fact.trim())) return failure("A shared relationship must preserve its complete canonical claim and qualifiers.","unsupported_relationship","relationship_support",sectionId);
   const relationships = relationshipCategories(claim.text);
   if (signal.authority === "reported_context") {
+    const sourceContext=context.contextReferences.find(reference=>reference.ref===signal.ref);
+    const wrongKind=sourceContext?.sourceKind==='reviewed_file'
+      ? !/\breviewed file reports?\b/i.test(claim.text)||/\bbusiness note\b/i.test(claim.text)
+      : /\breviewed file\b/i.test(claim.text);
+    if(wrongKind) return failure("Reported context attribution does not match its reviewed source.","unsupported_relationship","relationship_support",sectionId);
     if (relationships.length) {
       return validationFailure("Reported context cannot be connected to measured performance without canonical deterministic relationship support.", {
         reasonCode: "unsupported_relationship",
@@ -197,7 +203,7 @@ function validateClaim({
       });
     }
     if (!CONTEXT_ATTRIBUTION_PATTERN.test(claim.text) || !CONTEXT_BOUNDARY_PATTERN.test(claim.text)) {
-      return validationFailure("Business Note context must remain attributed and explicitly non-causal.", {
+      return validationFailure("Reported context must remain attributed and explicitly non-causal.", {
         reasonCode: "unsupported_relationship",
         stage: "relationship_support",
         expectedField: sectionId,
@@ -249,6 +255,7 @@ function validateClaim({
       unsupportedNumericCount: unsupportedNumbers.length
     });
   }
+  if(signal.periodContext === "undated_context" && (!/\breporting period is not established\b/i.test(claim.text)||/\bduring this briefing period\b/i.test(claim.text))) return failure("Undated context must preserve its missing reporting period.","contextual_inconsistency","contextual_validation",sectionId);
   if (signal.periodContext === "historical_context" && /\bduring this briefing period\b/i.test(claim.text)) {
     return failure("A historical claim was incorrectly presented as current-period evidence.", "contextual_inconsistency", "contextual_validation", sectionId);
   }
