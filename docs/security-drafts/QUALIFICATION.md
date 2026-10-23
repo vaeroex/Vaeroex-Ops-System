@@ -153,7 +153,7 @@ wiring remains unfinished implementation work, separately from that blocker.
 
 An attempted production SELECT of the definitions of
 `read_google_sheets_operational_conflicts_v1` and
-`guard_google_sheets_kpi_authority_v1` in `mdiianhfrojmxqpwrflh` was rejected by
+`guard_google_sheets_kpi_authority_v1` in the approved production project was rejected by
 automatic approval review. Its reason was that database access was prohibited by
 the initial browser-only instructions. It did not execute and was not retried or
 reached through another route. Draft08's deployed-contract comparison is therefore

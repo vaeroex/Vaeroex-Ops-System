@@ -18,9 +18,8 @@ blockers. All twelve pure connector parsers remain unadmitted. See
 ## Verified production contract audit
 
 After explicit read-only approval, the one permitted retry of the previously
-rejected Supabase metadata operation succeeded. Target:
-`mdiianhfrojmxqpwrflh`. Scope: function definitions, grants, triggers and aggregate
-historical-impact counts. No customer records, secrets, mutation RPCs or credentials
+rejected Supabase metadata operation succeeded for the approved production target.
+Scope: function definitions, grants, triggers and aggregate historical-impact checks. No customer records, secrets, mutation RPCs or credentials
 were retrieved. The local evidence is `audit/deployed-contracts.json`.
 
 Important differences from assumptions in the earlier draft:
@@ -38,9 +37,8 @@ Important differences from assumptions in the earlier draft:
 * The Sheets derivative trigger treats changes to added artifact columns as
   content writes. Historical classification therefore uses a **private metadata
   table**, with no updates to historical artifact rows.
-* Aggregate counts: one brief run, completed; zero marked saved brief reports;
-  zero marked saved VSI reports. Marker counts do not prove the absence of
-  malformed/unmarked historical copies.
+* Historical-impact details remain in private audit records. Marker-based checks
+  do not prove the absence of malformed or unmarked historical copies.
 
 The earlier metadata denial is resolved for this scoped audit. The separate
 Vercel provider-configuration metadata 403 remains respected and unverified.

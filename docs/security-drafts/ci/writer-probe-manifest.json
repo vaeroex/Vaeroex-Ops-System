@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "scripts/shared-evidence-writer-qualification.cjs",
-      "sha256": "3ea1a39a1cc7733902e2ff1b0cab44bb74fb3dda69d759acc260908a685e02d6"
+      "sha256": "f79e52816c509249620fd7d92e3c611e01b1dc2e8cbd3d26ae85c7c2f0d98efc"
     },
     {
       "path": "scripts/shared-evidence-writer-cases.mjs",
@@ -88,7 +88,7 @@
     },
     {
       "path": ".github/workflows/shared-evidence-qualification.yml",
-      "sha256": "c19951854e17d532c1f32d2f13ed07ee4f47aaffdcc616ea7fca444fe982fcdf"
+      "sha256": "2a2b6c693eec5e8442083b81063b87dea77f59bbfa527ce3bca2717f35b24974"
     },
     {
       "path": "scripts/shared-evidence-mapping-tests.cjs",
@@ -101,6 +101,26 @@
     {
       "path": "docs/security-drafts/QUALIFICATION-CLOSURE-PACKAGE.md",
       "sha256": "1740b3b66b7c5ed211a4c7dea23828caa7220871c22768663fa70fec0d23b7ef"
+    },
+    {
+      "path": "scripts/shared-evidence-erasure-qualification.cjs",
+      "sha256": "000eb80bd50ab6557a4e6c12a1c5cdb72b6f8a1c4d5cf9d49c90448df15b0adb"
+    },
+    {
+      "path": "scripts/shared-evidence-erasure-tests.mjs",
+      "sha256": "692c72a04d2666c730101d2cd7662ba3b337d85b2e9f487e4667d37b9940983c"
+    },
+    {
+      "path": "supabase/production-migrations/20261012191836_google_sheets_restricted_erasure_retention.sql",
+      "sha256": "107075b9e5ecfba7235bd98d911ee320dde614ef6eed4f689c414d1f6c2209c8"
+    },
+    {
+      "path": "supabase/production-migrations/20261002225025_google_sheets_support_erasure.sql",
+      "sha256": "4ac30e7a57290eb554c7edfff2672b59ae59458dca632f5d269915f6f8c8b33b"
+    },
+    {
+      "path": "supabase/migrations/20260821172015_external_integrations_phase_3_deterministic_dependencies.sql",
+      "sha256": "864243f09995be7b76d0b62775f5bcf32eb4359fc50a980c5da00667c4ea7731"
     }
   ],
   "nativeMode": "--fence",
