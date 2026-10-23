@@ -1,3 +1,4 @@
+import { EvidenceMappingLink } from "@/components/integrations/EvidenceMappingLink";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -53,6 +54,7 @@ export default async function ZohoBooksPage({ searchParams }: PageProps) {
     {params?.result === "invalid_range" ? <p role="alert" className="rounded-md border border-line p-3 text-sm">Choose both dates, ending today or earlier, with at most 366 calendar days per import. Older periods can be imported in separate ranges.</p> : null}
     {params?.result === "synced" ? <p role="status" className="rounded-md border border-line p-3 text-sm">The selected period was imported. Previously imported dates outside that period are retained.</p> : null}
     {params?.result === "disconnected" ? <p role="status" className="rounded-md border border-line p-3 text-sm">Zoho Books disconnected and stored history removed.</p> : null}
+    {connection ? <EvidenceMappingLink workspaceId={access.workspaceId} provider={"zoho-books"} connectionId={connection.id} owner={owner} status={connection.status}/> : null}
     <SectionCard title="Connection" description="For U.S. Zoho Books organizations. Vaeroex requests read-only access to organization settings, invoices, and expenses.">
       {!available ? <p className="text-sm text-slate-600">Zoho Books setup is not complete yet.</p> :
         connectionError ? <p role="alert" className="text-sm text-red-700">Connection status is unavailable.</p> :
