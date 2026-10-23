@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "status": "inactive_local_release_package",
+  "publishedSource": "f2d1547466edeadd586443e0e62afe6199f700da",
+  "sourceTree": "2aefe09d06924a71b6f1417cd71a5610e1716572",
+  "excluded": [
+    "04-pause-new-readers.sql"
+  ],
+  "atomic": true,
+  "preBackfillWriterLocks": [
+    "public.ai_agent_runs",
+    "public.reporting_connections",
+    "public.reporting_credentials",
+    "public.reports",
+    "public.vsi_exchanges"
+  ],
+  "files": [
+    {
+      "path": "docs/security-drafts/01-legacy-evidence.sql",
+      "sha256": "802724c88e8605678a1fc15f6151cb7d6af422f6109fdd957a118310c31fcd28"
+    },
+    {
+      "path": "docs/security-drafts/02-owner-artifact-boundary.sql",
+      "sha256": "892bd3f3f97d3baef3e8ec08d7836a34d36afa4ad78b0bc77bca8ea3ebd41af4"
+    },
+    {
+      "path": "docs/security-drafts/03-generation-manifest-schema.sql",
+      "sha256": "c783c3a89e4f06e6fff3f2ef85cd182d51d258ac5e067879625c922e6e515f61"
+    },
+    {
+      "path": "docs/security-drafts/05-manifest-admission.sql",
+      "sha256": "f5411008dbbd0c1d32469c5b217bf68fa080ba83e607f61101173bbbf876b977"
+    },
+    {
+      "path": "docs/security-drafts/06-typed-source-admission.sql",
+      "sha256": "cc9ad3bb5598b15cb757e8e9261cde5905f8ece050f6e0eef740de78a734b44e"
+    },
+    {
+      "path": "docs/security-drafts/07-reopen-shared-artifact.sql",
+      "sha256": "0b1b92a50b3ed980d6e968cdd2f08e9a7c53412506005cbdf84b5460640be998"
+    },
+    {
+      "path": "docs/security-drafts/08-sheets-projection.sql",
+      "sha256": "9b31f0b4f3e5e9dfc5269a7b82e8ffb58a4a608edbe56b74df292d330436050c"
+    },
+    {
+      "path": "docs/security-drafts/09-katana-installation-boundary.sql",
+      "sha256": "675310eec622b087ab1baac3a657c33e78e36afbbd4d1d58a9da73d2de6705b4"
+    },
+    {
+      "path": "docs/security-drafts/10-memory-semantic-receipts.sql",
+      "sha256": "98d1c14cae9cb54d6ec092789526c28220eb7f9a02e0d9efcfcaa25587f529a8"
+    },
+    {
+      "path": "docs/security-drafts/11-generation-discovery.sql",
+      "sha256": "2b49a9a2e77988d22a96ed2a0a6dd3ccf0b49b65cb2cc8797c86c1cc19ba566f"
+    },
+    {
+      "path": "docs/security-drafts/12-workspace-writer-fence.sql",
+      "sha256": "4d927b46eb52541e3b373f817ab2025452a44db1d6061b61ea525274033c5144"
+    },
+    {
+      "path": "docs/security-drafts/13-vsi-failure-accounting.sql",
+      "sha256": "5329a30f98aae20fb423ba838d2a569e26acb755be925f02c39699df0b65760c"
+    }
+  ],
+  "forwardSha256": "75ad92aba5ebef782d48c15799d7ab70b313a8a0bd0bd6ecac9648bd8223faf6",
+  "pauseSourceSha256": "02b32ffdf9b65acbe22687eb484a88218e0189c7a66e51e0329821a497d6ea00",
+  "pauseSha256": "a184644ea4d27e3c946d2dfb96c55b53ae7453be0a4864e3a1cab385a880e00f",
+  "runtimeEnabled": false
+}

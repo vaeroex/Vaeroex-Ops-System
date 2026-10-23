@@ -54,12 +54,14 @@ There is no automatic retry, fallback to a private function, or eligibility repa
   unchanged disabled-gate behavior.
 - Existing HTTP failure-cost regression (seven scenarios) and shared settlement
   reconciliation regression pass. TypeScript and independent review pass.
-- Tests use existing captured contracts and synthetic rows. Competing terminal
-  orders are serial PGlite tests, not simultaneous native PostgreSQL races.
-  No new native database, CI, provider call or production access occurred.
+- The later published candidate `f2d1547466edeadd586443e0e62afe6199f700da`
+  passed [native CI](https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/39909522264).
+  Three-session tests observed simultaneously pending failure/failure and both
+  failure/success orders, one cost event, preserved successful output, and
+  expired-source/authority/privacy denials. No provider or production call occurred.
 
-Activation requires a separate reviewed release, installed-contract comparison
-and native concurrent qualification. A blocked privacy epoch, ended session,
+Installed helper comparisons and bounded native races are complete. Activation
+still requires the exact reviewed deployment and gate change. A blocked privacy epoch, ended session,
 changed actor role or absent billing authority still denies bookkeeping by design.
 No historical requests are backfilled by this draft.
 

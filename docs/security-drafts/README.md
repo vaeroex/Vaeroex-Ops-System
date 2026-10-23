@@ -237,7 +237,14 @@ approved note, sixth-source and all-twelve cases. Zero paid/provider/database ca
 It proves deterministic unadmitted projections, not saved production answers,
 actual citation navigation or model-quality cross-reasoning.
 
-## Exact remaining release blockers
+## Historical pre-consolidation checklist
+
+The following list records an earlier checkpoint. Mandatory eligibility, both
+consumer integrations, exact citation reopening, the bounded helper comparisons
+and native concurrency/accounting checks have since passed their stated scopes.
+It is not the current release gate list. Use [QUALIFICATION.md](QUALIFICATION.md)
+and [release/DEPLOYMENT.md](release/DEPLOYMENT.md) for the current package, local
+installation result, blocked application build, provider status and approval path.
 
 1. **Complete typed eligibility and source-use policy.** QBO/Square fixture
    resolution now exists; file/note admission remains deliberately blocked until
@@ -294,8 +301,10 @@ feature route. Destructive/security rollback needs separate review.
 
 08 adds the Sheets typed source branch with independent source-row and KPI privacy
 checks, current mapping/version/accepted facts, ticket dependencies and unknown
-coverage. No public grant is added. Production comparison of its authority/conflict
-predicate was denied; do not apply it on repository assumptions.
+coverage. No public grant is added. The later approved authority/conflict
+comparison and captured-reader checks completed; the separate provider-status
+attestation remains unverified. The old denial is not a reason to repeat that
+completed database comparison or bypass the remaining Vercel boundary.
 
 09 adds `private.katana_evidence_installations`, credential/connection triggers and
 a private legacy reader wrapper. The private table has no application grants.

@@ -1,0 +1,43 @@
+name: Inactive shared evidence release build
+
+on:
+  push:
+    branches:
+      - codex/shared-evidence-release-preparation
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shared-evidence-release-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out reviewed release preparation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          run_install: false
+      - name: Set up official Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked build dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify exact inactive SQL package
+        run: node scripts/shared-evidence-release-package.cjs --check
+      - name: Check build transport isolation
+        run: node scripts/shared-evidence-release-build.cjs --check
+      - name: Build full application without service access
+        run: node scripts/shared-evidence-release-build.cjs
+      - name: Record release boundary
+        if: always()
+        run: echo 'Build-only qualification. No database access, migrations, deployment, feature activation, credentials or provider calls. Captured-layout installation is local and separate. Previously passed concurrency tests are not rerun.' >> "$GITHUB_STEP_SUMMARY"

@@ -4,9 +4,12 @@ The runtime remains disabled by `sharedEvidenceRuntimeEnabled()`. Draft SQL is
 outside the migration directories. No production schema, authority, provider
 configuration or data has been changed by this candidate.
 
-The published candidate at `2376030b697367adffa3b14e9c8983455de5f206` passed
-[disposable CI](https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/39904693706).
-Subsequent local changes require review and are not covered by that CI result.
+The published candidate at `f2d1547466edeadd586443e0e62afe6199f700da` passed
+[disposable CI](https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/39909522264),
+including the six-helper comparison package and native accounting races. The
+later local release packaging is documented in [release/DEPLOYMENT.md](release/DEPLOYMENT.md).
+It has not been published or deployed. The full application build is pending:
+the local attempt was blocked before compilation by Mac SWC library signing.
 
 ## Evidence already established
 
@@ -30,6 +33,10 @@ Subsequent local changes require review and are not covered by that CI result.
   rolled back contended erasure and rejected privacy-blocked completion. The
   erasure controller and some dependencies were synthetic. This does not prove
   the installed erasure orchestration or every ingestion transaction.
+- Native accounting tests passed failure/failure and both failure/success orderings
+  with two simultaneously pending RPCs. Each produces one cost event, preserves a
+  winning successful output or creates no output, and retains expired-source,
+  actor/session/workspace, privacy and client execution denials. No rerun is needed.
 - The approved bounded database metadata inspections completed. The live-session
   predicate and three changed callers were captured privately; matched repository
   contracts can be reconstructed locally. The composed QBO validation body
@@ -126,7 +133,10 @@ model quality. Captured private function bodies are not embedded in source files
   positions to brief failure. Prior native tests invoked failure only for VSI,
   so their successful result never proved brief failure execution. Local helper
   correction and a direct brief-failure regression do not retroactively add
-  native coverage to the completed CI run.
+  native coverage to that old CI run. The current native suite proves brief
+  completion/privacy/rollback; its direct brief-failure helper remains covered
+  offline rather than by a native failed-brief invocation. This is a coverage
+  limit, not a demonstrated new defect.
 - **Installed writer execution:** the later approved comparison matched all six
   Square/QBO/entitlement helper bodies and captured the bounded relation metadata.
   Body equality does not establish execution of every installed writer transaction
@@ -182,6 +192,16 @@ model calls remain outside this authorization. The candidate
 must be reviewed as one bounded release, with migration/rollback and historical
 owner/private-copy impact disclosed. Katana installation backfill needs its
 already documented quiescent-writer rollout; no live writer has been paused.
+
+The local release package now assembles all twelve forward drafts atomically,
+excluding procedure04. Reviewed writer-excluding locks precede both historical
+audience classification and Katana initialization. Captured-target installation
+and late-error rollback passed in single-backend PGlite: all existing target
+policies/triggers and the old v1 revoke remain intact. Supporting FK boundaries,
+unresolved numeric-role policies outside the target, and the unrelated intake
+INSERT trigger are explicitly limited; no whole-database parity is claimed.
+The prepared Linux build-only workflow needs publication/run approval. It uses
+no private capture upload and does not repeat the completed concurrency suite.
 
 ## Completion condition
 
