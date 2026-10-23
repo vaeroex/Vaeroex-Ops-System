@@ -1,7 +1,7 @@
 import type { VsiCitation } from "@/lib/vsi/types";
 
 export type SharedVsiRelationship = {fact:string;inputSourceIds:string[]};
-/** The closed financial boundary is application-owned. Reject recognized joint
+/** The closed comparison boundary is application-owned. Reject recognized joint
  * finance claims outside its exact text and require both supporting originals.
  * This is a bounded guard, not a general semantic/answer-quality proof. */
 export function validateSharedVsiRelationships(answer:{content:string;citationIds:string[]},sources:VsiCitation[],relationships:SharedVsiRelationship[]) {
@@ -20,5 +20,5 @@ export function validateSharedVsiRelationships(answer:{content:string;citationId
   }
  }
  // The model cannot disable checking by dropping citations.
- if(relationships.length && /\b(?:matched transaction|payment shortfall|financial stages?|amounts?[^.\n]{0,60}(?:added|combined|reconciled)|(?:add|combine|reconcile)[^.\n]{0,60}(?:amounts?|totals?)|order[^.\n]{0,80}(?:invoice|billed)|(?:invoice|billed)[^.\n]{0,80}order|caused?|because of|due to|therefore)\b/i.test(remaining)) throw new Error('shared_relationship_claim_changed');
+ if(relationships.length && /\b(?:sales.per.hour[^.\n]{0,30}(?:\bis\b|\bare\b|equals|\d)|payment.per.hour[^.\n]{0,30}(?:\bis\b|\bare\b|equals|\d)|productivity[^.\n]{0,30}(?:equals|\d)|POS[^.\n]{0,50}(?:establish|prove)[^.\n]{0,20}profit|matched transaction|payment shortfall|financial stages?|amounts?[^.\n]{0,60}(?:added|combined|reconciled)|(?:add|combine|reconcile)[^.\n]{0,60}(?:amounts?|totals?)|order[^.\n]{0,80}(?:invoice|billed)|(?:invoice|billed)[^.\n]{0,80}order|caused?|because of|due to|therefore)\b/i.test(remaining)) throw new Error('shared_relationship_claim_changed');
 }

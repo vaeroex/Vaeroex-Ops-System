@@ -44,7 +44,23 @@ for(const alter of [
  r=>r.data.records[0].metrics.find(m=>m.key==='bills').value='1',
  r=>r.data.records[0].metrics=r.data.records[0].metrics.filter(m=>m.key!=='bills')
 ]) {const changed=structuredClone(xero);alter(changed);assert.equal(sharedFinancialBoundaries([changed,wix]).length,0);}
-assert.equal(sharedFinancialBoundaries(projected.filter(r=>r.provider!=='wix-orders')).length,0);
+assert.equal(sharedFinancialBoundaries(projected.filter(r=>r.provider!=='wix-orders')).filter(r=>r.kind==='financial_stage_boundary').length,0);
+assert(sharedFinancialBoundaries(projected).some(r=>r.kind==='payment_accounting_boundary'));
+assert(sharedFinancialBoundaries(projected).some(r=>r.kind==='hours_comparison_boundary'&&r.fact.includes('ratio is unavailable')));
+for(const [a,b] of [[projected[1],projected[2]],[projected[1],projected[3]]]) {const foreign=structuredClone(b);foreign.data.workspace_id=id(99);assert.equal(sharedFinancialBoundaries([a,foreign]).length,0);foreign.data.workspace_id=workspace;foreign.scope.entityId=id(99);assert.equal(sharedFinancialBoundaries([a,foreign]).length,0);}
+// The joint context is an eligibility limitation, never an inferred operating cause.
+const inventory=projected.find(r=>r.provider==='zoho-inventory');
+const file={...structuredClone(inventory),provider:'file',hash:'e'.repeat(64),facts:['The reviewed file reports weekly replenishment. '+ 'Reported context. '.repeat(500)],reported:true};
+const note={...structuredClone(inventory),provider:'business_note',hash:'f'.repeat(64),facts:['The business reports supplier timing. '+ 'Reported context. '.repeat(500)],reported:true};
+const contextRelation=sharedFinancialBoundaries([inventory,file,note]);assert.equal(contextRelation.length,1);
+assert.equal(contextRelation[0].kind,'inventory_context_boundary');assert.equal(contextRelation[0].entityId,null);assert.equal(contextRelation[0].date,null);
+assert(contextRelation[0].fact.length<=700);assert.match(contextRelation[0].fact,/does not support an operational explanation/);
+for(const index of [1,2]) {const changed=[inventory,structuredClone(file),structuredClone(note)];changed[index].data.workspace_id=id(99);assert.equal(sharedFinancialBoundaries(changed).length,0);}
+const ctxSources=contextRelation[0].sourceHashes.map((hash,i)=>({id:`B${i+1}`,sourceId:hash}));
+const ctxRelationships=contextRelation.map(r=>({fact:r.fact,inputSourceIds:[...r.sourceHashes]}));
+for(const omit of ctxSources) assert.throws(()=>validateSharedVsiRelationships({content:contextRelation[0].fact,citationIds:ctxSources.filter(s=>s!==omit).map(s=>s.id)},ctxSources,ctxRelationships),/citation_missing/);
+validateSharedVsiRelationships({content:'The reviewed file reports weekly replenishment. [B2]',citationIds:['B2']},ctxSources,ctxRelationships);
+for(const text of ['Sales per hour are 10 USD.','POS payments establish profit of 100 USD.','Stock changed because of supplier timing.']) assert.throws(()=>validateSharedVsiRelationships({content:text,citationIds:ctxSources.map(s=>s.id)},ctxSources,ctxRelationships),/claim_changed/);
 const base={workspaceId:workspace,briefingType:'weekly',period:{start:date,end:date},eligibility:'no_eligible_evidence',signals:[],sections:[],citations:[],contextReferences:[],limitations:[],requiredSignalRefs:[],manifest:{manifestId:'base',generatedAt:'2026-10-02T00:00:00Z',evidence:[],sourceRegistry:{entries:[],candidateToSourceOrdinal:{}}},evidenceFingerprint:'e',effectiveEvidenceFingerprint:'f',materialStateFingerprint:'m',generationKey:'g',trustBinding:{snapshotFingerprint:'s'},snapshotFingerprint:'s'};
 const reader=selection=>({rpc:async(name,args)=>name==='discover_shared_evidence_v1'?{data:{stage:'catalog_only',candidates:selection.map(r=>({provider:r.data.provider,identity:r.identity})),truncated:false},error:null}:{data:{stage:'unadmitted',resolved:selection.find(r=>r.identity.binding_id===args.p_binding_id)},error:null}});
 (async()=>{

@@ -5,6 +5,20 @@ import * as f from './shared-evidence-sql-fixture.mjs';
 import {prepareWriterCases} from './shared-evidence-writer-cases.mjs';
 import {installFenceFixture} from './shared-evidence-fence-fixture.mjs';
 const {assertFailureAccounting,makeAttempt,installCommitBarrier,waitForCommitBarrier,barrierClass,barrierId}=createRequire(import.meta.url)('./shared-evidence-fence-qualification.cjs');
+test('brief failure helper uses exact ticket/type contract and preserves empty output after owner demotion',async()=>{
+ const {db,cases}=await prepareWriterCases();const client={query:(sql,args)=>args?db.query(sql,args):db.exec(sql)};
+ try{
+  await installFenceFixture(db);
+  const attempt=await makeAttempt(db,f,cases[0],'briefing_run',2900);
+  await db.query("update workspace_members set role='admin' where workspace_id=$1 and user_id=$2",[f.w,f.owner]);
+  await f.login(db,f.owner,f.session,'service_role');await attempt.failure(client);
+  await f.admin(db);const row=(await db.query('select status,output_json from ai_agent_runs where id=$1',[attempt.id])).rows[0];
+  assert.equal(row.status,'failed');assert.equal(row.output_json,null);
+  assert.equal((await db.query('select count(*)::int n from private.shared_evidence_artifact_manifests where artifact_id=$1',[attempt.id])).rows[0].n,0);
+  assert.equal((await db.query('select count(*)::int n from private.trusted_derived_run_commits where run_id=$1',[attempt.id])).rows[0].n,0);
+  await f.login(db,f.owner,f.session,'service_role');await assert.rejects(attempt.failure(client),e=>e.code==='42501');
+ }finally{await db.close();}
+});
 test('native helper setup and per-provider VSI/brief manifests execute sequentially with exact reopen and failure accounting',async()=>{
  const {db,cases}=await prepareWriterCases();const client={query:(sql,args)=>args?db.query(sql,args):db.exec(sql)};
  try{

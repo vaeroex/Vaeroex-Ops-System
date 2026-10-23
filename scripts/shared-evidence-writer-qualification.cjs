@@ -6,7 +6,7 @@ const {setTimeout:delay}=require('node:timers/promises');
 const {preflight,waitForLock}=require('./shared-evidence-postgres-qualification.cjs');
 const root=path.resolve(__dirname,'..');
 function check(args,env=process.env) {
- assert.equal(args.length,1);assert(['--check','--source-write-probes','--fence','--privacy-erasure'].includes(args[0]));
+ assert.equal(args.length,1);assert(['--check','--source-write-probes','--fence','--privacy-erasure','--failure-accounting'].includes(args[0]));
  preflight(['--check'],env);
  const manifest=JSON.parse(fs.readFileSync(path.join(root,'docs/security-drafts/ci/writer-probe-manifest.json'),'utf8'));
  assert.equal(manifest.scope,'synthetic_source_write_diagnostics');assert.equal(manifest.releaseQualified,false);
@@ -74,7 +74,7 @@ async function qualify(target) {
 async function main(args=process.argv.slice(2)) {
  const manifest=check(args);
  if(args[0]==='--check')return {scope:manifest.scope,filesVerified:manifest.files.length,execution:'not_run',releaseQualified:false};
- const run=args[0]==='--privacy-erasure'?require('./shared-evidence-erasure-qualification.cjs').qualifyErasure:args[0]==='--fence'?require('./shared-evidence-fence-qualification.cjs').qualifyFence:qualify;
+ const run=args[0]==='--failure-accounting'?require('./vsi-failure-accounting-qualification.cjs').qualifyFailureAccounting:args[0]==='--privacy-erasure'?require('./shared-evidence-erasure-qualification.cjs').qualifyErasure:args[0]==='--fence'?require('./shared-evidence-fence-qualification.cjs').qualifyFence:qualify;
  return require('./qbo-candidate-local-container.cjs').runContainerQualification(run);
 }
 if(require.main===module)main().then(result=>console.log(JSON.stringify(result))).catch(error=>{console.error(JSON.stringify({status:'blocked_or_failed',reason:'synthetic_writer_probe_failed',code:/^[A-Z0-9_]{1,30}$/.test(error.code||'')?error.code:undefined,

@@ -459,11 +459,11 @@ test('empty manifest preserves general-answer accounting and cannot omit inherit
  }finally{await db.close();}
 });
 
-test('actual five-plugin file/note VSI and brief generation, SQL save and exact citation reopening',async()=>{
+for(const pluginCount of [5,6,12]) test(`actual ${pluginCount}-plugin file/note VSI and brief generation, SQL save and exact citation reopening`,async()=>{
  const {db}=await typedSetup();try {
  await admin(db);await sheetsFixture(db);
  for(const draft of ['07-reopen-shared-artifact.sql','08-sheets-projection.sql','10-memory-semantic-receipts.sql','11-generation-discovery.sql']) await db.exec(read(`docs/security-drafts/${draft}`));
  const {default:run}=await import('./shared-evidence-end-to-end.cjs');
- const result=await run({db,uuid,w,owner,session,entity,login,admin,map,read,newRequest});assert.equal(result.paidCalls,0);console.log(JSON.stringify(result));
+ const result=await run({db,uuid,w,owner,session,entity,login,admin,map,read,newRequest,pluginCount});assert.equal(result.paidCalls,0);console.log(JSON.stringify(result));
  }finally{await db.close();}
 });

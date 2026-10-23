@@ -45,6 +45,10 @@ jobs:
           node scripts/shared-evidence-mapping-tests.cjs
           node scripts/shared-evidence-mapping-ui-tests.cjs
           node --test scripts/shared-evidence-writer-probe-tests.mjs scripts/shared-evidence-fence-tests.mjs scripts/shared-evidence-native-fence-tests.mjs scripts/shared-evidence-erasure-tests.mjs
+          node --test scripts/vsi-failure-accounting-tests.mjs scripts/vsi-failure-accounting-native-tests.mjs
+          node scripts/vsi-failure-accounting-application-tests.cjs
+          node scripts/vsi-http-accounting-tests.cjs
+          node scripts/shared-evidence-settlement-tests.cjs
           node node_modules/typescript/bin/tsc --noEmit --incremental false
 
       - name: Verify frozen scope and offline controls
@@ -74,6 +78,9 @@ jobs:
       - name: Run synthetic privacy and erasure interleavings with native sessions
         run: env -u SUPABASE_INTERNAL_IMAGE_REGISTRY node scripts/shared-evidence-writer-qualification.cjs --privacy-erasure
 
+      - name: Run synthetic VSI failure accounting races with native sessions
+        run: env -u SUPABASE_INTERNAL_IMAGE_REGISTRY node scripts/shared-evidence-writer-qualification.cjs --failure-accounting
+
       - name: Stop disposable runner Supabase
         if: always() && (steps.local_image.outcome == 'success' || steps.local_image.outcome == 'failure' || steps.local_image.outcome == 'cancelled')
         run: supabase stop --no-backup
@@ -81,4 +88,4 @@ jobs:
       - name: Record bounded qualification scope
         if: always()
         run: |
-          echo 'Foundation, 64-table fence and privacy/erasure race tests use synthetic dependencies and controller-issued capabilities. Full deployed trigger composition, erasure orchestration and ingestion-writer qualification remain unavailable. No production readiness claim.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Foundation, 64-table fence, privacy/erasure and VSI failure-accounting race tests use synthetic dependencies and controller-issued barriers/capabilities. Full deployed trigger composition, erasure orchestration and ingestion-writer qualification remain unavailable. Both application gates stay disabled. No production readiness claim.' >> "$GITHUB_STEP_SUMMARY"

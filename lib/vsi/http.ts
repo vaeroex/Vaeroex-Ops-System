@@ -7,7 +7,7 @@ import { readVsiJson } from "@/lib/vsi/request-boundary";
 import { hasProhibitedVsiIdentifiers, VSI_PROHIBITED_INPUT_MESSAGE } from "@/lib/vsi/sensitive-input";
 import { getVsiConfig } from "@/lib/vsi/config";
 import { runVsiAnswer, VsiEngineError } from "@/lib/vsi/engine";
-import { confirmVsiNote, conversationView, listVsiConversations, loadVsiConversation, mutateVsi, settleGeneratedVsi, questionHash, requireVsiAccess, updateVsiSummary, VsiHttpError, vsiUuid, type ConversationRow } from "@/lib/vsi/storage";
+import { confirmVsiNote, conversationView, listVsiConversations, loadVsiConversation, mutateVsi, settleFailedVsi, settleGeneratedVsi, questionHash, requireVsiAccess, updateVsiSummary, VsiHttpError, vsiUuid, type ConversationRow } from "@/lib/vsi/storage";
 
 type RouteAction = "list" | "create" | "detail" | "rename" | "delete" | "messages" | "continue" | "remember" | "usage";
 const base = z.object({ expectedWorkspaceId: vsiUuid });
@@ -115,7 +115,7 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
       const uncertainCost = !engineError || engineError.accountingUncertain || engineError.usage.costEstimated === true;
       const usage = { ...engineError?.usage, estimatedCostUsd: uncertainCost ? Math.max(config.requestReserveUsd, engineError?.usage.estimatedCostUsd || 0) : engineError.usage.estimatedCostUsd,
         failed: true, costEstimated: uncertainCost };
-      await mutateVsi(access, "settle", { conversationId, id: claim.request.id, attempt: claim.request.attempt, usage });
+      await settleFailedVsi(access, { conversationId, id: claim.request.id, attempt: claim.request.attempt, usage });
       if (engineError) throw new VsiHttpError(503, "answer_unavailable", engineError.message);
       throw new VsiHttpError(503, "answer_unavailable", "Vaeroex could not complete this answer. Please retry; this question was not counted.");
     }

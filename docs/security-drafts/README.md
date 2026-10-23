@@ -1,19 +1,23 @@
 # Shared evidence: inactive local security drafts
 
-These are review drafts outside `supabase/migrations`, with no runtime activation. The new citation page is
-imported only behind a constant-false code gate. No production schema, permissions, data, settings or application code
-were changed by this step. Nothing was published. Production source baseline:
-`ec8fb7defe90face91fd36dc9f2533b67ef46234`. Branch:
-`codex/shared-evidence-security-draft`.
+These drafts remain outside `supabase/migrations`; the runtime gate is false.
+The candidate branch has been published for separately approved disposable CI,
+which passed at `2376030b697367adffa3b14e9c8983455de5f206`. It has not been
+merged, deployed, applied to production, or activated.
 
-Do not apply these files individually or treat the passing local tests as release
-approval. The original-reference readers and manifest gate are implemented for
-nine legacy connectors; typed QBO/Square admission is now exercised in synthetic
-fixtures. File/note projections remain unadmitted and their seal dispatcher
-explicitly rejects them. Sheets deployed-contract verification, source-writer concurrency,
-full deployed-trigger composition and actual consumer integration remain release
-blockers. All twelve pure connector parsers remain unadmitted. See
-`QUALIFICATION.md` for the current bounded checkpoint and exact remaining work.
+Actual VSI and briefing generation now discover protected stored evidence, perform
+mandatory admission, preserve dependencies, settle manifests, and reopen exact
+citations. Deterministic provider fixtures exercise five plugins plus a processed
+file and approved note. This is not evidence of live model answer quality.
+All twelve connector projections are present; their coverage and units still
+limit which comparisons are justified. Ratios must not be inferred from unknown
+coverage or incompatible scopes.
+
+The current status and finite release conditions are in [QUALIFICATION.md](QUALIFICATION.md).
+Older dated checkpoint documents are historical evidence only. Native CI qualifies
+the actual workspace fence with synthetic writes and privacy/erasure races;
+installed writer/trigger composition remains a separate requirement. Private
+metadata captures are not public fixture inputs.
 
 ## Verified production contract audit
 
@@ -77,7 +81,7 @@ Only existing stored numeric facts/coverage are projected; no provider fetching.
 | Toggl | Stored connection snapshot; lifetime project hours, not period labor. |
 | Zoho Inventory | Stored connection snapshot; current stock, not inventory movement. |
 | Katana | Stored connection snapshot; current stock, not inventory movement. Installation identity qualification remains required. |
-| Loyverse | Receipt facts/import-day coverage; composite receipt identity and currency. |
+| Loyverse | Receipt facts/import-day coverage and composite identity; verified merchant currency is unavailable, so money comparisons are excluded. |
 | Zoho Books | History facts/coverage; composite document identity and currency. |
 | Wix Orders | Order facts/import-day coverage; composite order identity and currency. |
 

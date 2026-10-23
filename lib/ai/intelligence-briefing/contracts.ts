@@ -100,7 +100,7 @@ export type IntelligenceBriefingTemporalLineage = Readonly<{
 }>;
 
 export type IntelligenceBriefingSignal = Readonly<{
-  sharedRelationship?: "financial_stage_boundary_v1";
+  sharedRelationship?: "financial_stage_boundary_v1" | "payment_accounting_boundary_v1" | "hours_comparison_boundary_v1" | "inventory_context_boundary_v1";
   sourceScope?: Readonly<Record<string,unknown>>;
   ref: string;
   stableKey: string;

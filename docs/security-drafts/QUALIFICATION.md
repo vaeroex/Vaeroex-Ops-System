@@ -1,161 +1,199 @@
-# Local qualification checkpoint — 2026-10-23
+# Shared evidence qualification — current consolidated status
 
-Inactive local work only. No new migration registered, production change,
-publication, provider call, import or secret read. This is not a complete release
-candidate. The implementation intentionally stops short of activating incomplete
-admission contracts.
+The runtime remains disabled by `sharedEvidenceRuntimeEnabled()`. Draft SQL is
+outside the migration directories. No production schema, authority, provider
+configuration or data has been changed by this candidate.
 
-| Source | Current local implementation | Qualification limit |
-| --- | --- | --- |
-| Xero, Harvest, Clockify, Toggl, Zoho Inventory, Katana, Loyverse, Zoho Books, Wix Orders | Nine fixed legacy readers, owner-reviewed mapping, immutable references and manifest dispatch | Sequential synthetic tests; writer interlocks outstanding; Katana now has a nonsecret installation nonce; rollout and concurrent writers still unqualified |
-| QBO | Current valid version + unique valid validation work + live canonical mapping/connection; canonical currency/basis/period correspondence; audited minimized preview | Synthetic fixture; coverage unknown; no financial aggregation inference |
-| Square | Exact current payment/connection/entity, installation generation, full projected-field hash, minor-unit preservation | Synthetic fixture; equal-timestamp mutation rejected; coverage unknown |
-| Google Sheets | Shared exact source/version/mapping projection; accepted fact/KPI correspondence; independent source-row and KPI privacy checks | Repository-contract fixture; live conflict/authority comparison denied; coverage remains unknown |
-| Reviewed file facts | Current native/reviewed authority, parent-run and worksheet-head preview; complete eligibility snapshot; canonical `filterEligibleMemoryRows` validator | Admission remains blocked until this validator is mandatory in generation and safe inherited completion |
-| Approved Business Notes | Current approval/version/chunk provenance; canonical memory eligibility, reviewed-text reconstruction and original/chunk hash validation | Admission blocked: validators are not yet mandatory in generation bridge |
+The published candidate at `2376030b697367adffa3b14e9c8983455de5f206` passed
+[disposable CI](https://github.com/vaeroex/Vaeroex-Ops-System/actions/runs/39904693706).
+Subsequent local changes require review and are not covered by that CI result.
 
-Neither production VSI nor production briefs imports these adapters. The existing
-pure draft consumers accept unadmitted synthetic fixtures only. There is no new
-claim of production multi-plugin readiness.
+## Evidence already established
 
-## Tests
+- All twelve connector projections are wired into protected discovery/admission
+  for actual VSI and briefing paths behind the disabled gate. Reviewed file facts
+  and approved notes undergo mandatory canonical eligibility checks. Raw files
+  are not automatically model evidence.
+- Deterministic application fixtures exercise five plugins plus file and note,
+  protected manifest settlement, exact saved citation reopening and revocation.
+  Actual six- and twelve-plugin cases also save and reopen all admitted
+  originals. The twelve-plugin brief does not cite every original inline: its
+  section budget retains eleven inline citations while the manifest/reopen path
+  retains all fourteen plugin/file/note originals. Every retained joint claim
+  must keep its complete citations. These are mocked-provider tests, not live answer-quality proof.
+- Native PostgreSQL CI passed foundation/session/mapping tests and the actual
+  draft12 fence across all twelve synthetic provider cases in both consumers.
+  Source changes before validation and during final commit, rollback, exact
+  reopening and once-only failure accounting are covered at that fixture boundary.
+- Native privacy/erasure tests passed all four VSI/brief × privacy-barrier cases.
+  They observed the real lock inversion, denied missing/stale capabilities,
+  rolled back contended erasure and rejected privacy-blocked completion. The
+  erasure controller and some dependencies were synthetic. This does not prove
+  the installed erasure orchestration or every ingestion transaction.
+- The approved bounded database metadata inspections completed. The live-session
+  predicate and three changed callers were captured privately; matched repository
+  contracts can be reconstructed locally. The composed QBO validation body
+  preserves the later v1/v2 tombstone allowance. There is no outstanding general
+  permission to expand inspection, nor a need to repeat completed reads.
 
-* PGlite SQL contract suite: 28/28 passed. Includes exact QBO scope mismatch,
-  Square equal-timestamp edits, same-tenant ownership, direct inherited-artifact
-  bypass rejection, file/note admission rejection even with bound roots and via
-  historical manifest inheritance, deterministic VSI/brief completion and exact
-  reopening, actor-private VSI, changed citation source rejection, and prior
-  legacy/terminal/accounting cases.
-* Canonical note semantic suite: 8 checks passed; malformed original/review,
-  changed review/index, wrong chunk index and bad user context are rejected.
-* All-12 pure adapter fixture suite passed: 5 plugins + file + note, sixth source,
-  all twelve, both draft consumers, no model/database calls. It remains unadmitted.
-* Business Notes regression passed. Full TypeScript `--noEmit --incremental false`
-  passed. Business Notes contextual integration now passes. Its fixture asserted
-  `Holding steady` without a previous stored snapshot, contrary to the existing
-  movement guard. Only the fixture trend was changed to null; production behavior
-  and the guard are unchanged.
-* Canonical memory eligibility: 13 checks passed. Citation reopening tests passed
-  (exact revision, protected RPC, cross-workspace mismatch, no fallback, internal
-  snapshot stripping). The new citation page exits through a constant-false gate.
-* Independent reviewer cleared the inactive checkpoint after finding and fixing
-  missing ticket roots, parent-run checks, canonical QBO correspondence, and
-  unqualified file/note admission. Reviewer ran the earlier 25 SQL cases plus the
-  8 note checks; the additional inherited-admission regression was then added.
+## Consolidated local compatibility scope
 
-Tests use audited owner/session/privacy/trusted-completion/VSI bodies, but stub
-the full Sheets binder, some readability/entitlement behavior and document
-authority. They do not prove the complete deployed trigger graph or concurrent
-Postgres behavior. Saved-output/citation verification is at the database-contract
-level; it is not a browser citation click or a generated answer quality test.
+Use captured contracts and repository migrations for these six families only:
 
-## Infrastructure and concurrency blocker
+1. Legacy reporting/history/snapshot, Loyverse, Wix and Zoho Books apply,
+   account/refresh and disconnect transactions, including Katana installation
+   identity. Check rollback and invalidation under the existing fence.
+2. QBO source-version commit, validation/promotion/quarantine and the existing
+   connection/mapping authority triggers. Preserve accounting side effects and
+   the composed tombstone handling.
+3. Square stored-payment and connection-state backend transactions. OAuth and
+   credential acquisition are not reasoning paths and are not new test goals.
+4. Sheets source/version/KPI/retention writes and the relevant erasure transaction.
+   Existing guard ordering is not a demonstrated defect; do not rename triggers
+   or add fences merely because a relation is referenced.
+5. Approved file facts/publication heads/review provenance and note approval,
+   version and chunk boundaries. Upload, OCR and provider operation are outside
+   stored-evidence qualification.
+6. VSI and trusted brief completion/failure, owner-only brief/report audiences,
+   original-actor private VSI copies, entitlement/limits and once-only accounting.
 
-No local `postgres`, `psql`, `pg_ctl`, Docker or Postgres.app was found in PATH or
-the supported common installation locations. No software was installed and no
-remote database was substituted. Status: **unavailable infrastructure**, not a
-denied production test. PGlite is single-process synthetic qualification; sequential
-mutation/revalidation is not multi-session race coverage.
+A captured body is evidence, not execution coverage. Local PGlite composition
+is sequential; it does not replace native multi-session execution. Any fixture
+stub or unresolved reachable contract must be named in the result. Private
+captures stay outside public Git and are supplied explicitly to local tests.
 
-Before runtime activation, source writers and terminal validation need a shared,
-reviewed ordering/version interlock. Relevant existing writer families include
-`apply_reporting_history`, `apply_reporting_snapshot`, `select_reporting_account`,
-`save_reporting_refresh`, their disconnect path; `apply_loyverse_receipts`,
-`apply_zoho_books_history`, `apply_wix_order_snapshot` and their disconnect paths;
-QBO canonical validation/current-version publication; Square payment upsert and
-connection generation transitions; file/review publication, note approval,
-mapping/entity lifecycle and inherited output lifecycle. Reader-only locks are
-insufficient while an independent writer can commit between final revalidation
-and output persistence. No new unqualified lock order was introduced.
+## Fixed semantic acceptance
 
-Required two-session cases: writer commits before validation; writer attempts
-commit after validation before output; disconnect/reconnect and entity/mapping
-revocation in both orders; equal-timestamp Square update; QBO quarantine/current
-version replacement; file review/head replacement; note reapproval; parent output
-deletion; simultaneous same-attempt completion; rollback after failed completion.
-Expected result is serialization or fail-closed retry, no stale saved output,
-no duplicate settlement and no deadlock. This suite has not been executed.
+Both consumers must use the same admitted relationships and their complete
+citations. The representative questions are:
 
-Draft09 adds a private random Katana installation nonce initialized from credential
-identity metadata only and rotated on credential INSERT/UPDATE. DELETE removes it.
-The reader includes it in the incarnation hash. Credentials remain unread.
-Initial pending/choose-account setup is supported; reauthorization and disconnect
-are terminal for the connection ID. A replacement requires a new installation.
-The explicit credential-to-connection row-lock inversion was removed.
+- Explain why POS payments/orders and accounting sales/profit are different
+  financial measures; never add overlapping stages or infer profit from POS.
+- Relate tracked hours and sales only within verified entity/period/unit/coverage
+  authority. Unknown coverage, connected-user time, missing currency exponent or
+  incompatible periods require a specific limitation, not a fabricated ratio.
+- Use inventory observations with reviewed file facts and approved notes as
+  cited operational context. Workspace-level reported text is not evidence of
+  matching entity/period or a causal explanation.
 
-Independent review confirmed the old reauthorization bypass is closed and verified
-workspace cascade with a separate synthetic FK fixture. It identified a rollout
-window: a credential insert between backfill and trigger installation could miss
-initialization and fail closed. Draft09 therefore explicitly requires quiescing
-Katana writers through the migration commit; that rollout and real concurrency
-are not yet qualified. No live writer is paused by this local work.
+A ratio prototype is not runtime support. Any numeric relationship requires
+trustworthy original input contracts. These tests must reject changed sources,
+wrong workspaces/actors, unsupported causation and missing dependency citations.
 
-See `ISOLATED-POSTGRES-PROPOSAL.md` for the smallest supported test setup. Native
-PostgreSQL17 would suffice for focused two-session tests, but does not by itself
-establish the full Supabase extension/trigger composition.
+## Completed local checks in this consolidation
 
-## Full deployed-trigger composition and next bounded work
+- Captured legacy writer composition: nine provider apply/disconnect branches,
+  plus Harvest and Katana account/refresh lifecycle, pass. Injected late conflict
+  rolls back rows, coverage and lease consumption. No new retries were added.
+- Captured memory composition: 24 assertions pass for actual stored-file approval,
+  publication heads and note provenance through VSI/brief save/reopen, withdrawal
+  and workspace/actor denials. The stored v1 review branch is qualified locally;
+  v2/v3 OCR/provider execution is not part of this test.
+- Captured save/privacy/entitlement composition: 37 checks pass with 25 function
+  fingerprint comparisons. Subscription expiry denies writes, renewal permits
+  eligible writes, quotas include failed/archived runs, and rejected inserts roll
+  back usage locks. No subscription exemptions are seeded. The later bounded
+  comparison matched the exemption helper fingerprint and captured the named
+  subscription-plan/usage-lock relation contracts; full platform parity is not
+  implied by these selected comparisons.
+- The full SQL/application suite passes 34/34 tests, including actual five-, six-
+  and twelve-plugin generation/save/reopen. The corrected brief-failure helper
+  and two other offline helper tests pass.
+  Prior captured-contract checks pass 19 assertions. Existing provider-policy
+  regression passes without external requests. TypeScript checking passed.
+- Independent review cleared the inactive implementation after correcting
+  temporal qualifiers, excessive canonical text, overly broad keyword rejection
+  and tests that previously checked supplied signals rather than accepted claims.
 
-The approved audit records actual trigger names/bodies in
-`audit/deployed-contracts.json`, plus typed readers in
-`audit/typed-source-contracts.json`. Current fixtures execute the trusted-run
-transition guard, but do not compose all of these deployed guards:
-`aa_google_sheets_erasure_cascade_guard`, `audit_workspace_entitlement`,
-`reject_explicit_regulated_business_text_v1`, `workspace_persisted_usage_limit`,
-`set_*_updated_at`, `zz_google_sheets_derivative_fence`, entity identity protection.
-Audit success is not execution success. Preserve their real alphabetic firing
-order and transaction claims when expanding qualification.
+All composition tests use PGlite, synthetic rows and explicit local capture input.
+They do not establish native writer concurrency, full EXECUTE/RLS parity or real
+model quality. Captured private function bodies are not embedded in source files.
 
-Next code work: make canonical file/note eligibility mandatory before lifting their
-dispatcher rejection; qualify Sheets typed identity; normalize typed projections
-through the existing parsers with explicit entity/period/unit semantics; retain
-all source roots in both VSI and brief bridge; connect the now-implemented gated saved citation
-route to persisted consumer output. Gate activation on full-trigger and real writer-concurrency qualification.
-Then use deterministic 5-plugin/file/note save/reopen fixtures in both consumers,
-plus sixth/all-twelve cases, with financial overlap deduplication and no hard
-five/ten-source cap. No live generation is needed for that step.
+## Demonstrated gaps found during consolidated composition
 
-Separate unresolved denial: Vercel provider-configuration metadata returned 403
-earlier. It was not retried or bypassed. Provider-policy readiness remains
-unverified. No production approval is requested at this checkpoint.
+- **Failure accounting after expired conversation lineage:** the captured public
+  VSI wrapper checks conversation readability before every action, including
+  output-free failure settlement. Once an earlier Sheets retention root expires,
+  failure returns `55000`; the answer remains unsaved, but the pending request and
+  incurred-cost settlement can remain unresolved. Do not bypass the wrapper or
+  refresh a ticket. The minimum repair is an independently reviewed, accounting-
+  only terminal failure contract bound to the original request/attempt/actor and
+  live session, accepting no output, citations or source content, preserving all
+  read/save denials and settling only once. The local implementation is now
+  prepared in draft13 with a separate disabled gate; see
+  [FAILURE-ACCOUNTING.md](FAILURE-ACCOUNTING.md). It is not applied in production.
+- **Native helper coverage correction:** the old helper passed incorrect argument
+  positions to brief failure. Prior native tests invoked failure only for VSI,
+  so their successful result never proved brief failure execution. Local helper
+  correction and a direct brief-failure regression do not retroactively add
+  native coverage to the completed CI run.
+- **Installed writer execution:** the later approved comparison matched all six
+  Square/QBO/entitlement helper bodies and captured the bounded relation metadata.
+  Body equality does not establish execution of every installed writer transaction
+  under the complete production schema and trigger set.
 
-## Explicit integration status and next implementation boundary
+## Completed bounded installed-contract comparison
 
-Actual VSI and briefing generation wiring is **not complete**. No new claim of
-5-plugin/file/note saved end-to-end behavior follows from these tests. The code
-needed next is concrete:
+The approved read-only comparison obtained the following metadata. All six body
+fingerprints match repository reconstruction, so no function body retrieval was
+needed. Owner, signature, security-definer flag, empty search path and ACLs were
+also checked. Captures remain outside Git; no customer rows were retrieved.
 
-1. Add protected discovery of already owner-confirmed binding IDs and typed
-   identities. The current mapping RPC returns a binding ID only during explicit
-   owner confirmation; there is no authenticated list endpoint. Do not query its
-   private table with service-role authority or infer mapping from account labels.
-2. Convert exact protected projections into the existing normalized adapters.
-   Keep Square minor units and unknown coverage; do not treat raw file text as
-   reviewed numeric facts or treat missing entity correspondence as confirmed.
-3. VSI: pass reserved **database request ID and attempt** from `lib/vsi/http.ts`
-   to the engine. Seal after ticket binding, validate canonical file/note semantics
-   before provider input, retain dependency groups during budget selection, and
-   settle the exact manifest through v3. Preserve actual incurred-cost failure
-   settlement and all inherited conversation sources.
-4. Briefs: build the shared evidence package before computing generationKey and
-   trust fingerprints in `workspace-context.ts` / `briefing-projection.ts`; seal
-   the same identities after the normal run claim. Complete through the trusted
-   lifecycle plus manifest wrapper. Appending raw shared JSON after package
-   fingerprinting would invalidate the trust contract and is not implemented.
-5. Only after semantic validation is mandatory across both consumers should the
-   explicit file/note dispatcher rejection be replaced. Keep reopening and saved
-   copies bound to the exact output revision and all original sources.
+- Square `commit_page`: fingerprints for
+  `private.square_production_customer_require_eligible_v1(uuid)` and
+  `private.square_production_customer_require_keys_v1(jsonb,text[])`; only the
+  `singleton`, `enabled`, `application_id` fields and constraints of its private
+  configuration relation are needed. Never retrieve configuration values.
+- QBO source commit: fingerprints for
+  `private.assert_integration_provider_source_authority_v1()` and
+  `private.commit_provider_external_source_before_validation_v1(jsonb,text)`;
+  relevant `integration_sync_tasks` lease/scope/dispatch fields and constraints.
+- QBO deletion/void validation: fingerprint for
+  `private.qbo_production_source_has_effects_v1(uuid)` plus the relevant keys,
+  current-version/reconciliation-state, event-kind/target-event, member-role/
+  additive-candidate and contract/classification fields of
+  `business_fact_sources`, `canonical_business_facts`,
+  `canonical_business_fact_versions`, `reconciliation_case_members`,
+  `fact_contribution_events`, and `reconciliation_cases`.
+- QBO atomic audit side effect: `integration_audit_events` insert constraints and
+  relevant trigger bindings. Serialization/value-validation helpers remain
+  repository-only; do not claim they were fingerprint-verified.
 
-The infrastructure gap blocks race qualification, not all local coding. Consumer
-wiring remains unfinished implementation work, separately from that blocker.
+The entitlement comparison also includes the installed fingerprint of
+`private.platform_admin_subscription_exempt_v1` and the used fields/constraints
+of `subscription_plans` and `workspace_usage_locks`. No exemptions were seeded
+and no exemption grant/change is proposed.
 
-## New denied read-only metadata operation
+These are writer effects/authority dependencies, not
+new evidence sources or reasons to expand the fence. No OAuth, credential rows,
+customer facts or generic schema export is needed.
 
-An attempted production SELECT of the definitions of
-`read_google_sheets_operational_conflicts_v1` and
-`guard_google_sheets_kpi_authority_v1` in the approved production project was rejected by
-automatic approval review. Its reason was that database access was prohibited by
-the initial browser-only instructions. It did not execute and was not retried or
-reached through another route. Draft08's deployed-contract comparison is therefore
-**denied/unverified**, despite the earlier successful, separately approved audit.
-The prior Vercel403 metadata boundary remains unchanged.
+## Remaining external and release boundaries
+
+The Vercel provider-configuration metadata inspection previously returned 403.
+It has not been retried or bypassed. Current dedicated Sheets provider-status
+attestation remains unverified. This concerns Sheets-bearing/derived requests;
+it is not a blanket prerequisite for verified non-Sheets lineage. Existing
+provider routing and ticket checks must remain enforced.
+
+The reviewed fixes and bounded synthetic CI are authorized for the existing
+candidate publication branch. Database apply, deployment, activation and live
+model calls remain outside this authorization. The candidate
+must be reviewed as one bounded release, with migration/rollback and historical
+owner/private-copy impact disclosed. Katana installation backfill needs its
+already documented quiescent-writer rollout; no live writer has been paused.
+
+## Completion condition
+
+Finish the six relevant compatibility families without unexplained stubs on
+executed security paths; preserve source lifecycle, account/session authority,
+workspace isolation, actor-private copies and single settlement. Complete both
+actual application paths with the representative five-plugin/file/note fixture,
+sixth/all-twelve evidence retention, saved output and exact citations. Report
+unavailable semantic contracts rather than claim numeric capability.
+
+After separate release authorization, a bounded real owner VSI answer and brief
+must demonstrate a useful cited cross-source conclusion, save and reopen. If
+eligible real data is absent, state the exact prerequisite; do not invent records
+or begin an open-ended test campaign. Passing mocked output does not satisfy this
+last live-quality requirement.

@@ -1,3 +1,4 @@
+import { sharedRelationshipReviewText } from "@/lib/ai/shared-evidence/financial-boundaries";
 import { assertSharedPrepared,sharedRpc,type SharedPrepared,type SharedClient } from "@/lib/ai/shared-evidence/generation";
 import { sharedEvidenceRuntimeEnabled } from "@/lib/ai/shared-evidence/runtime-gate";
 import "server-only";
@@ -83,6 +84,7 @@ export function intelligenceBriefingProviderPayload(briefingPackage: Intelligenc
           kind: signal.kind,
           authority: signal.authority,
           fact: signal.fact,
+          ...(signal.sharedRelationship?{allowed_review_text:sharedRelationshipReviewText(signal.sharedRelationship)}:{}),
           allowed_numeric_tokens: intelligenceBriefingAllowedNumericTokenDisplays(signal.fact),
           confidence: signal.confidence,
           period_relation: signal.periodRelation,
@@ -97,6 +99,7 @@ export function intelligenceBriefingProviderPayload(briefingPackage: Intelligenc
       kind: signal.kind,
       authority: signal.authority,
       fact: signal.fact,
+          ...(signal.sharedRelationship?{allowed_review_text:sharedRelationshipReviewText(signal.sharedRelationship)}:{}),
       allowed_numeric_tokens: intelligenceBriefingAllowedNumericTokenDisplays(signal.fact),
       confidence: signal.confidence,
       period_context: signal.periodContext,

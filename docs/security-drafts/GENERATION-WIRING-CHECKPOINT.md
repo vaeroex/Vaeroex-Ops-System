@@ -1,3 +1,5 @@
+> Historical checkpoint. Current status is [QUALIFICATION.md](QUALIFICATION.md). Later approved captures resolved the database metadata gaps listed here, and native synthetic fence/privacy-erasure CI passed. Statements below about missing wiring, pending metadata, or unrun synthetic races describe that earlier checkpoint, not current status. Installed writer composition and live model quality are separate.
+
 # Inactive generation wiring checkpoint — 2026-10-23 (superseded below)
 
 ## Latest qualification result

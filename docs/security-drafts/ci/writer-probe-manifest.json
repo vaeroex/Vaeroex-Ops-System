@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "scripts/shared-evidence-writer-qualification.cjs",
-      "sha256": "4dcd512eb46870202eda08ff586436962b1bfe51148f3c743a22e948fee9ddd0"
+      "sha256": "0750b72750b49e079810995cb2b0a2551bac44aeaa3e7fea968226068d1d95f2"
     },
     {
       "path": "scripts/shared-evidence-writer-cases.mjs",
@@ -72,7 +72,7 @@
     },
     {
       "path": "scripts/shared-evidence-fence-qualification.cjs",
-      "sha256": "eee2d8b01c96deb4e2fa3daf96b04d2c02a30fbe54d7fd57f1ea5b57947c55ff"
+      "sha256": "17fe711d8ba9c98949b87a1f4d028082bcfd759e2c08effcd2f01e45f4cd7795"
     },
     {
       "path": "scripts/shared-evidence-fence-fixture.mjs",
@@ -80,7 +80,7 @@
     },
     {
       "path": "scripts/shared-evidence-native-fence-tests.mjs",
-      "sha256": "c8e98ba1a97f937ffcdf9c7c915025844f9b381a8a8e063a119f32ad2c55351c"
+      "sha256": "4793b074ad2ef21937ce56202901e7754fb1dac3650f0bee94b1012ef8905fb3"
     },
     {
       "path": "scripts/shared-evidence-fence-tests.mjs",
@@ -88,7 +88,7 @@
     },
     {
       "path": ".github/workflows/shared-evidence-qualification.yml",
-      "sha256": "2a2b6c693eec5e8442083b81063b87dea77f59bbfa527ce3bca2717f35b24974"
+      "sha256": "a6ab0d4adb6e7efc9b396506734535ca6127849a081e2a45102cd4b5848fa80e"
     },
     {
       "path": "scripts/shared-evidence-mapping-tests.cjs",
@@ -100,7 +100,7 @@
     },
     {
       "path": "docs/security-drafts/QUALIFICATION-CLOSURE-PACKAGE.md",
-      "sha256": "1740b3b66b7c5ed211a4c7dea23828caa7220871c22768663fa70fec0d23b7ef"
+      "sha256": "a3e129d99a7be204025e1d9e617b2110d638834cf9f05269347b9c135ee64986"
     },
     {
       "path": "scripts/shared-evidence-erasure-qualification.cjs",
@@ -121,6 +121,22 @@
     {
       "path": "supabase/migrations/20260821172015_external_integrations_phase_3_deterministic_dependencies.sql",
       "sha256": "864243f09995be7b76d0b62775f5bcf32eb4359fc50a980c5da00667c4ea7731"
+    },
+    {
+      "path": "docs/security-drafts/13-vsi-failure-accounting.sql",
+      "sha256": "5329a30f98aae20fb423ba838d2a569e26acb755be925f02c39699df0b65760c"
+    },
+    {
+      "path": "scripts/vsi-failure-accounting-tests.mjs",
+      "sha256": "caf2e40fa4555bfc7de43d03e5a291d04d2090d827b4f6b5e70182c041a895ad"
+    },
+    {
+      "path": "scripts/vsi-failure-accounting-qualification.cjs",
+      "sha256": "9cc1fba1111f34ac6f8b41fc96c39f8cc61079a713aff0b228792d26f9cf4d11"
+    },
+    {
+      "path": "scripts/vsi-failure-accounting-native-tests.mjs",
+      "sha256": "d288fab4a1607e276a928986470d3394747056bfc98fd3a941a8e11b1bb88777"
     }
   ],
   "nativeMode": "--fence",

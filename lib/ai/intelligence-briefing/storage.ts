@@ -66,7 +66,7 @@ const coverageSchema = z.object({
   missingOrWeakDomains: z.array(z.string().trim().min(1))
 }).strict();
 const signalSchema = z.object({
-  sharedRelationship: z.literal("financial_stage_boundary_v1").optional(),
+  sharedRelationship: z.enum(["financial_stage_boundary_v1", "payment_accounting_boundary_v1", "hours_comparison_boundary_v1", "inventory_context_boundary_v1"]).optional(),
   sourceScope: z.record(z.unknown()).optional(),
   ref: z.string().trim().min(1),
   stableKey: hash,

@@ -29,7 +29,7 @@ async function makeAttempt(db,f,probe,kind,n){
  const input=f.settlement({id,conversationId:conversation,readTicketId:ticket});
  return {id,kind,manifest:m.manifest_id,artifactKind:kind==='vsi_request'?'vsi_exchange':'briefing_run',
   call:client=>kind==='vsi_request'?f.settle(adapter(client),m.manifest_id,input):client.query('select complete_trusted_derived_run_v2($1,$2,$3,$4,$5,$6,$7,$8)',[f.w,id,f.owner,f.session,ticket,'intelligence_briefing_v1',JSON.stringify({contractId:'intelligence_briefing_v1',workspaceId:f.w,briefingType:'weekly',generationKey:'fixture-key'}),m.manifest_id]),
-  failure:client=>kind==='vsi_request'?f.settle(adapter(client),null,{id,conversationId:conversation,attempt:1,readTicketId:ticket,usage:{estimatedCostUsd:0.03,providerCalls:1,failed:true}},2):client.query('select fail_trusted_derived_run_v1($1,$2,$3,$4,$5,$6)',[f.w,id,f.owner,f.session,'intelligence_briefing_v1','synthetic contention']),
+  failure:client=>kind==='vsi_request'?f.settle(adapter(client),null,{id,conversationId:conversation,attempt:1,readTicketId:ticket,usage:{estimatedCostUsd:0.03,providerCalls:1,failed:true}},2):client.query('select fail_trusted_derived_run_v1($1,$2,$3,$4,$5,$6)',[f.w,id,f.owner,f.session,ticket,'intelligence_briefing_v1']),
  };
 }
 async function assertFailureAccounting(client,attempt){

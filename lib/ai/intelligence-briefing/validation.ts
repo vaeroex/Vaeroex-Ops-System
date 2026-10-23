@@ -1,3 +1,4 @@
+import { sharedRelationshipReviewText } from "@/lib/ai/shared-evidence/financial-boundaries";
 import "server-only";
 
 import {
@@ -183,7 +184,8 @@ function validateClaim({
     return failure("A material briefing claim does not resolve to eligible citations.", "invalid_citation_id", "citation_provenance", sectionId);
   }
 
-  if(signal.sharedRelationship && claim.text.trim()!==(sectionId==="leadership_considerations"?"Review the order and invoice source records before combining financial totals.":signal.fact.trim())) return failure("A shared relationship must preserve its complete canonical claim and qualifiers.","unsupported_relationship","relationship_support",sectionId);
+  const sharedReview=signal.sharedRelationship?sharedRelationshipReviewText(signal.sharedRelationship):undefined;
+  if(signal.sharedRelationship && claim.text.trim()!==(sectionId==="leadership_considerations"?sharedReview:signal.fact.trim())) return failure("A shared relationship must preserve its complete canonical claim and qualifiers.","unsupported_relationship","relationship_support",sectionId);
   const relationships = relationshipCategories(claim.text);
   if (signal.authority === "reported_context") {
     const sourceContext=context.contextReferences.find(reference=>reference.ref===signal.ref);
