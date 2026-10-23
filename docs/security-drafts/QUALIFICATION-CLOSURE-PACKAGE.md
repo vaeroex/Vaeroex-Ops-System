@@ -1,113 +1,127 @@
 # Bounded qualification closure package
 
-Local preparation after successful foundation CI on `4245e655`. Nothing in this
-package is published or connected to a workflow. Runtime remains false. The
-existing foundation pass is unchanged; this is a larger, separately scoped test
-proposal, not a production-ready claim.
+This local candidate connects the actual draft12 workspace fence to an executable
+native CI step. It is prepared for review, not published or run. The earlier
+foundation-only CI success on `4245e655` does not cover these changes. Runtime
+remains false; no production schema, provider, or settings changes are included.
 
-## Executable local package
+## Exact executable workflow
 
-`shared-evidence-sql-fixture.mjs` extracts the existing 32-case suite's fixture
-without changing its SQL semantics. It accepts an explicitly supplied local
-database adapter. It still contains disclosed synthetic ticket/readability,
-entitlement and document-authority helpers; it is not the full deployed graph.
-
-`shared-evidence-writer-cases.mjs` supplies twelve exact stored-write probes:
-Xero/Harvest/Clockify history; Toggl/Zoho Inventory/Katana snapshots; Loyverse
-receipt value; Zoho Books invoice total; Wix order amount; equal-timestamp Square
-payment amount; QBO quarantine; and Sheets accepted KPI change. These are direct
-synthetic fixture writes, not calls to installed provider ingestion functions.
-
-`shared-evidence-writer-qualification.cjs` is restricted to the existing verified
-owned disposable container. It accepts no database URL or arbitrary fixture.
-It opens three sessions and observes whether a writer commits before a reader
-ends or waits on an actual lock, then verifies a fresh read rejects changed
-evidence. It also prepares actual wrapper tests for rolled-back VSI completion,
-simultaneous same-attempt VSI settlement, and simultaneous brief completion.
-Output always reports `releaseQualified:false`. A successful diagnostic run is
-not a safe-final-commit proof; these probes do not pause inside the final output
-write or exercise every installed writer, phantom, parent lifecycle or trigger.
-
-The shared container helper adds only a closed `empty` fixture option; existing
-callers retain the original platform fixture. No host/URL/credentials options
-were added. Two hash manifests freeze helper, fixture, audit and SQL inputs.
-
-Local commands already passed:
+`.github/workflows/shared-evidence-qualification.yml` remains push-only on
+`codex/shared-evidence-security-draft`, with read-only repository permissions,
+no persisted checkout credentials, no production credentials, no PR/dispatch,
+no Vercel deployment, and a 30-minute job limit. Its offline checks cover the
+adapter, consumer, relationship, SQL, owner-mapping UI, and fence helpers plus
+TypeScript. It preserves the original foundation native step and then runs:
 
 ```sh
-node --test scripts/shared-evidence-security-draft-tests.mjs
-node --test scripts/shared-evidence-writer-probe-tests.mjs
-node scripts/shared-evidence-postgres-qualification-tests.cjs
-node scripts/qbo-production-candidate-runner-tests.cjs
-node scripts/google-sheets-provider-policy-tests.cjs
-node scripts/shared-evidence-writer-qualification.cjs --check
+env -u SUPABASE_INTERNAL_IMAGE_REGISTRY node scripts/shared-evidence-writer-qualification.cjs --fence
 ```
 
-Results: 32 existing cases; two expanded tests covering twelve real SQL mutation
-projections and mode/barrier controls; 456 existing container-runner assertions;
-actual provider-policy code with mocked transport. No remote requests or native
-expanded execution. `--source-write-probes` is prepared but unexecuted. Its native
-test assertions must be reviewed and run under a new scoped CI proposal before
-any concurrency result can be claimed.
+The existing owned-container helper creates an isolated empty database from the
+pinned local Supabase image. It accepts neither a remote URL nor credentials.
+Three independent PostgreSQL sessions execute the native scenarios. Container
+and local Supabase cleanup run on success or failure. No AI/provider calls occur.
+The older `--source-write-probes` diagnostic mode remains available but is not the
+workflow's fence qualification step.
 
-## Five remaining work packets, with explicit exit criteria
+## What the new runner actually checks
 
-1. **Close metadata, once.** Obtain the safe metadata listed in
-   [REMAINING-QUALIFICATION-CONTRACTS.md](REMAINING-QUALIFICATION-CONTRACTS.md).
-   Twenty-seven audited bodies are reusable. Repository-only definitions may
-   populate a candidate overlay only after equality/compatibility is established.
-   Missing audited triggers, `google_sheets_unmaterialized_file_v1`, dependency
-   tables/policies/grants, and source-writer bodies cannot be fabricated. The
-   denied Sheets definition lookup must not be retried with unchanged evidence.
-   Exit: a reviewed, hash-frozen dependency graph and installation order with no
-   synthetic helper presented as deployed parity.
-2. **Complete one writer/terminal interlock design.** Account for connection,
-   mapping, session, privacy, actor/workspace, source/version and target locks in
-   their existing order. Row locks alone do not cover new rows, date moves,
-   coverage edits or alternate writers. Add the minimum shared interlock in a
-   reviewed local migration/writer patch; do not guess a lock key and activate
-   it. Exit: six parameterized race groups from the inventory pass on the exact
-   graph, including the final-validation-to-output-commit window, rollback,
-   same-attempt accounting, old-wrapper rejection and file/note/copy lifecycle.
-3. **Finish owner mapping and minimum comparison semantics.** The draft mapping
-   RPCs have no application caller in `app/` or `lib/`; the owner confirmation UI
-   is still missing. Show exact connection/incarnation and selected canonical
-   entity, preview, then confirm, with no label matching or automatic backfill.
-   Shared readers support all twelve source observations, but only closed
-   invoice/order non-additivity is wired as a relationship. Choose the first
-   useful comparison supported by authoritative coverage/period/unit evidence;
-   payment-per-tracked-hour cannot assume complete payments or complete labor,
-   and reported file/note text cannot supply a measured denominator. Exit: a
-   meaningful qualified comparison in actual VSI and briefs with both originals,
-   compatible period/entity/unit rules and explicit insufficient-data behavior.
-4. **Qualify configuration and transport without exposing credentials.** An
-   authorized administrator supplies booleans/statuses only: dedicated Sheets
-   key configured for the production deployment; organization/project settings
-   configured and matching the key's issuing project; intended provider data
-   controls verified; classification/revalidation/fallback behavior matches the
-   reviewed app. Do not send key values, tokens or secret exports. The existing
-   Vercel403 is not bypassed by another tool. Local provider-policy tests pass;
-   that does not establish deployed settings or Zero Data Retention. Exit: safe
-   configuration attestation plus policy-path qualification using actual tickets.
-5. **Bundle release review, then a bounded live acceptance.** Only after the
-   preceding exits, propose one exact migration/application release with rollback
-   and historical owner/private-source impact. A separate approved isolated CI
-   run qualifies full composition and deterministic five-plugin/file/note saved
-   VSI and brief behavior. Production application/schema activation and at most
-   one initial VSI plus one initial brief live-model acceptance are separate
-   actions requiring scoped authorization. No repeated campaign, new OAuth,
-   imports, fabricated sandbox data, new seats or fixed plugin cap.
+* Installs draft12 unchanged, including all 64 explicit relation fences. Checks
+  all 128 trigger definitions: table, function, event mask, enabled state and
+  workspace-key arguments. A writer against each relation must fail with40001
+  while final completion holds the workspace fence.
+* For each of twelve providers, creates separate VSI and brief manifests using
+  that provider's own evidence identity and roots. An actual source DML statement
+  held uncommitted must make final completion fail closed.
+* Pauses the real completion path after final validation and before output at a
+  test-only commit-claim trigger. The observer requires the exact advisory lock
+  key and controller backend PID. It never treats a generic wait as proof.
+  Source DML must fail with40001 in that window; a real other-workspace connection
+  update must succeed. No saved output may exist before the barrier is released.
+* A competing same-attempt completion must fail while the first is uncommitted.
+  The committed result has one saved manifest and, for VSI, one cost event.
+* Reopens each exact saved revision. Committing its source mutation must then
+  invalidate both saved consumers and reject a fresh pending stale completion.
+  Failure settlement called twice must leave failed status, no answer or saved
+  artifact, cost0.03 and exactly one cost event.
+* Rolls back actual VSI and brief completion transactions and requires zero
+  output-manifest links, commit claims and VSI cost events.
 
-## Next action requiring new scope
+The twelve direct synthetic source mutations cover Harvest, Xero, Clockify,
+Toggl, Zoho Inventory, Katana, Loyverse, Zoho Books, Wix, Square, QuickBooks and
+Google Sheets. These are stored-record DML probes, not deployed ingestion RPCs.
+The driver emits `releaseQualified:false`, `fullComposition:'unavailable'`, and
+`ingestionWriters:'not_exercised'` even if all bounded assertions pass.
 
-The ready diagnostic package can be published to the same CI-only branch with a
-workflow step for `--source-write-probes`, retaining no secrets, no Vercel deploy,
-owned container cleanup and a bounded job timeout. This expands beyond the
-already-approved foundation run and has **not** been published or run. It would
-consume runner minutes and download the same pinned image/dependencies; it needs
-no production data, credentials or provider calls. It can expose races but cannot
-close missing deployed metadata or implement the interlock by itself.
+## Explicit fixture limits
 
-For the shortest path, resolve packet1's metadata while reviewing packet2's exact
-writer ordering, then run the expanded probes/full-graph tests as one scoped CI
-batch. Do not request a production rollout while those exits remain open.
+The fixture reuses the audited definitions and existing SQL suite. Some ticket,
+entitlement, readability and document-authority helpers remain synthetic. It
+creates minimal workspace/id tables for exactly these 16 missing relations:
+
+```
+private.file_import_attempts
+private.google_sheets_connection_root_links
+private.google_sheets_derivation_roots
+private.google_sheets_retention_roots
+private.google_sheets_source_root_links
+public.business_health_snapshots
+public.intelligence_card_lifecycle
+public.intelligence_card_lifecycle_events
+public.file_processing_jobs
+public.kpi_settings
+public.document_extraction_cache
+public.document_extraction_file_bindings
+public.document_extraction_jobs
+public.document_extraction_reviews
+public.document_extraction_workspace_settings
+public.file_imports
+```
+
+This frozen allowlist fails if an additional placeholder is needed. Testing the
+actual fence trigger on a placeholder proves that trigger's conflict behavior;
+it does not establish the relation's full production constraints, RLS, other
+triggers or writer behavior. Hash manifests freeze the input SQL, fixtures,
+driver, workflow and tests. PGlite executes the native SQL helpers sequentially
+and injected-contention scenarios locally; it cannot establish native races.
+
+## Application work included in this unpublished candidate
+
+The prior owner-mapping UI is wired to the reviewed mapping RPC behind the false
+runtime gate. It requires explicit owner selection and confirmation of an
+existing canonical entity and exact connection incarnation. No label matching
+or automatic backfill occurs. The fence draft also serializes mapping and final
+validation; neither SQL nor UI has been activated.
+
+Shared readers cover twelve source observations. The implemented relationship
+is qualified invoice/order non-additivity with matching entity, period labels
+and currency. It does not prove matched transactions, complete payment/labor
+coverage, common business-day boundaries or causation. Processed files and
+approved notes remain contextual evidence, not invented numeric denominators.
+
+## Remaining release blockers and bounded next actions
+
+1. **Run the prepared native workflow only after scoped publication approval.**
+   No local native PostgreSQL/Docker runtime is available. The new native runner
+   is unexecuted; offline helper success is not a concurrency pass. The proposed
+   run consumes GitHub minutes and pinned dependency/image downloads only.
+2. **Close the deployed metadata graph.** The exact relation, guard and writer
+   metadata request is in `BLOCKED-EVIDENCE-HANDOFF.md`. Twenty-seven audited
+   bodies are reusable; missing installed definitions cannot be replaced by
+   guesses. The expanded metadata approval remains pending. Do not retry the
+   denied Sheets definition or Vercel route. Full deployed trigger composition,
+   installed ingestion writers and their retry/lock order remain unqualified.
+3. **Verify provider configuration with safe statuses.** An authorized owner
+   must confirm the dedicated Sheets destination/key configuration and intended
+   provider data controls without disclosing secrets. Mocked policy tests do not
+   attest deployed settings or Zero Data Retention.
+4. **After the evidence is complete, review one exact release.** Qualify the
+   full dependency graph, writer contention/retry behavior, source lifecycle and
+   provider policy before proposing schema/application activation. Historical
+   owner/private-source impact and rollback remain part of that review. Native
+   fence success alone is insufficient. Only a separately authorized bounded
+   live VSI and brief check can establish current model output quality.
+
+No new seats, fixed plugin cap, demo work, imports, OAuth, live database access,
+publication, workflow run or deployment is authorized by this local package.

@@ -1,13 +1,12 @@
-// Expanded LOCAL draft. Not connected to any workflow; native execution requires
-// separate authorization. This diagnoses synthetic source-write races, not the
-// installed ingestion writers or full deployed trigger graph.
+// Owned-container qualification entry point. --fence runs the actual draft fence
+// with real sessions and explicitly synthetic dependencies. No live database route.
 const assert=require('node:assert/strict');
 const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');
 const {setTimeout:delay}=require('node:timers/promises');
 const {preflight,waitForLock}=require('./shared-evidence-postgres-qualification.cjs');
 const root=path.resolve(__dirname,'..');
 function check(args,env=process.env) {
- assert.equal(args.length,1);assert(['--check','--source-write-probes'].includes(args[0]));
+ assert.equal(args.length,1);assert(['--check','--source-write-probes','--fence'].includes(args[0]));
  preflight(['--check'],env);
  const manifest=JSON.parse(fs.readFileSync(path.join(root,'docs/security-drafts/ci/writer-probe-manifest.json'),'utf8'));
  assert.equal(manifest.scope,'synthetic_source_write_diagnostics');assert.equal(manifest.releaseQualified,false);
@@ -75,7 +74,7 @@ async function qualify(target) {
 async function main(args=process.argv.slice(2)) {
  const manifest=check(args);
  if(args[0]==='--check')return {scope:manifest.scope,filesVerified:manifest.files.length,execution:'not_run',releaseQualified:false};
- return require('./qbo-candidate-local-container.cjs').runContainerQualification(qualify);
+ return require('./qbo-candidate-local-container.cjs').runContainerQualification(args[0]==='--fence'?require('./shared-evidence-fence-qualification.cjs').qualifyFence:qualify);
 }
 if(require.main===module)main().then(result=>console.log(JSON.stringify(result))).catch(error=>{console.error(JSON.stringify({status:'blocked_or_failed',reason:'synthetic_writer_probe_failed',code:/^[A-Z0-9_]{1,30}$/.test(error.code||'')?error.code:undefined}));process.exitCode=1;});
 module.exports={check,qualify,observeWriter};

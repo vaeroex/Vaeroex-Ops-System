@@ -1,4 +1,4 @@
-name: Shared evidence isolated foundation qualification
+name: Shared evidence isolated foundation and fence qualification
 
 on:
   push:
@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  foundation-only:
+  synthetic-qualification:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -42,12 +42,16 @@ jobs:
           node scripts/shared-evidence-consumer-tests.cjs
           node scripts/shared-evidence-relationship-tests.cjs
           node --test scripts/shared-evidence-security-draft-tests.mjs
+          node scripts/shared-evidence-mapping-tests.cjs
+          node scripts/shared-evidence-mapping-ui-tests.cjs
+          node --test scripts/shared-evidence-writer-probe-tests.mjs scripts/shared-evidence-fence-tests.mjs scripts/shared-evidence-native-fence-tests.mjs
           node node_modules/typescript/bin/tsc --noEmit --incremental false
 
       - name: Verify frozen scope and offline controls
         run: |
           node scripts/shared-evidence-postgres-qualification-tests.cjs
           node scripts/shared-evidence-postgres-qualification.cjs --check
+          node scripts/shared-evidence-writer-qualification.cjs --check
 
       - name: Set up pinned local Supabase CLI
         uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
@@ -64,6 +68,9 @@ jobs:
       - name: Run owned synthetic foundation interleavings
         run: env -u SUPABASE_INTERNAL_IMAGE_REGISTRY node scripts/shared-evidence-postgres-qualification.cjs --foundation
 
+      - name: Run actual workspace fence with native sessions and synthetic dependencies
+        run: env -u SUPABASE_INTERNAL_IMAGE_REGISTRY node scripts/shared-evidence-writer-qualification.cjs --fence
+
       - name: Stop disposable runner Supabase
         if: always() && (steps.local_image.outcome == 'success' || steps.local_image.outcome == 'failure' || steps.local_image.outcome == 'cancelled')
         run: supabase stop --no-backup
@@ -71,4 +78,4 @@ jobs:
       - name: Record bounded qualification scope
         if: always()
         run: |
-          echo 'Foundation-only synthetic checks; full deployed trigger composition and source-writer release qualification remain unavailable. No production readiness claim.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Foundation and actual 64-table fence tests use synthetic dependencies and source DML. Full deployed trigger composition and ingestion-writer qualification remain unavailable. No production readiness claim.' >> "$GITHUB_STEP_SUMMARY"

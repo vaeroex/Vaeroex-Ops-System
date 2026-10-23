@@ -4,11 +4,11 @@
   "files": [
     {
       "path": "scripts/shared-evidence-writer-qualification.cjs",
-      "sha256": "85b9d51119539cb595c8ff67deb4885e798c0c1450bcc1f8527271b5601fc33a"
+      "sha256": "3ea1a39a1cc7733902e2ff1b0cab44bb74fb3dda69d759acc260908a685e02d6"
     },
     {
       "path": "scripts/shared-evidence-writer-cases.mjs",
-      "sha256": "bce6f5bcb70bf47d5e551efb6c69a835c4d4e8a3190cbb50064712cf0e4e39e4"
+      "sha256": "6a04d9a32629cd04b3c1fb3adfdb104a07bf42ce034fc46f4bcac7b5e4a111c7"
     },
     {
       "path": "scripts/shared-evidence-sql-fixture.mjs",
@@ -16,7 +16,7 @@
     },
     {
       "path": "scripts/shared-evidence-writer-probe-tests.mjs",
-      "sha256": "2082b20338e382468db6f876c24aad3513d43faaa5d0f852b2617b8fc6a86e55"
+      "sha256": "2439abd746ab90af80d13510a95adef6c98d8d562553909e19dd2c16b5936ef8"
     },
     {
       "path": "docs/security-drafts/01-legacy-evidence.sql",
@@ -65,6 +65,45 @@
     {
       "path": "supabase/migrations/20261008190000_vsi_private_chat.sql",
       "sha256": "b4dbb12ad856d4e50b52a82d9442808d20c9e59a1a3b690a83555c5c1a9722fb"
+    },
+    {
+      "path": "docs/security-drafts/12-workspace-writer-fence.sql",
+      "sha256": "4d927b46eb52541e3b373f817ab2025452a44db1d6061b61ea525274033c5144"
+    },
+    {
+      "path": "scripts/shared-evidence-fence-qualification.cjs",
+      "sha256": "eee2d8b01c96deb4e2fa3daf96b04d2c02a30fbe54d7fd57f1ea5b57947c55ff"
+    },
+    {
+      "path": "scripts/shared-evidence-fence-fixture.mjs",
+      "sha256": "073b38e6dfa5d76ef476f5816e5f49fa3394e9dce8d7a4d5695c5a6dcc1b964a"
+    },
+    {
+      "path": "scripts/shared-evidence-native-fence-tests.mjs",
+      "sha256": "c8e98ba1a97f937ffcdf9c7c915025844f9b381a8a8e063a119f32ad2c55351c"
+    },
+    {
+      "path": "scripts/shared-evidence-fence-tests.mjs",
+      "sha256": "335f33e995854d63a1ffa0a19ccad4e23b804a818b8395d9d5c835d1c47662af"
+    },
+    {
+      "path": ".github/workflows/shared-evidence-qualification.yml",
+      "sha256": "c19951854e17d532c1f32d2f13ed07ee4f47aaffdcc616ea7fca444fe982fcdf"
+    },
+    {
+      "path": "scripts/shared-evidence-mapping-tests.cjs",
+      "sha256": "bc0ad7c897435cc9194569f955d9d18de561bbaf9287c31e5955a8038625ab66"
+    },
+    {
+      "path": "scripts/shared-evidence-mapping-ui-tests.cjs",
+      "sha256": "b7cbe0b0dd733d4091e39462fdf744bf95c9079f856cefe7562921bc2da6fed2"
+    },
+    {
+      "path": "docs/security-drafts/QUALIFICATION-CLOSURE-PACKAGE.md",
+      "sha256": "1740b3b66b7c5ed211a4c7dea23828caa7220871c22768663fa70fec0d23b7ef"
     }
-  ]
+  ],
+  "nativeMode": "--fence",
+  "fullComposition": "unavailable",
+  "ingestionWriters": "not_exercised"
 }

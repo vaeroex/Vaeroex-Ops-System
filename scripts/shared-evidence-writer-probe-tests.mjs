@@ -11,6 +11,7 @@ test('all twelve synthetic source mutations invalidate exact evidence without na
 });
 test('expanded runner fails closed on configuration/mode and distinguishes lock from commit',async()=>{
  assert.equal(check(['--check'],{}).releaseQualified,false);
+ assert.equal(check(['--fence'],{}).releaseQualified,false);
  for(const args of [[],['--foundation'],['--full-composition'],['--source-write-probes','--url=postgres://remote']])assert.throws(()=>check(args,{}));
  for(const key of ['DATABASE_URL','PGHOST','SUPABASE_ACCESS_TOKEN'])assert.throws(()=>check(['--check'],{[key]:'forbidden'}));
  assert.equal(await observeWriter({query:async()=>({rows:[{wait_event_type:'Lock'}]})},1,()=>false),'blocked_on_reader');

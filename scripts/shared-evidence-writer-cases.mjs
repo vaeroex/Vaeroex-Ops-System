@@ -4,15 +4,18 @@ import {typedSetup,sheetsFixture,read,uuid,w,owner,entity,admin,login,map,captur
 export async function prepareWriterCases(options={}) {
  const {db}=await typedSetup(options);await admin(db);
  const cases=[];
+ const credentialDDL=read('supabase/migrations/20261019001207_ready_account_reporting_connectors.sql').match(/create table public\.reporting_credentials \([\s\S]*?\n\);/i)?.[0];assert(credentialDDL);await db.exec(credentialDDL);
+ for(const name of ['07-reopen-shared-artifact.sql','09-katana-installation-boundary.sql','10-memory-semantic-receipts.sql','11-generation-discovery.sql'])await db.exec(read('docs/security-drafts/'+name));
  const addLegacy=async(provider,connection,sql,args=[])=>{
   await login(db);const reference=await capture(db,await map(db,provider,connection));
-  cases.push({provider,sql,args,read:async client=>reopen(client,reference.reference_id),current:v=>v.status==='current'});await admin(db);
+  cases.push({provider,source:{kind:'legacy_reference',reference_id:reference.reference_id},roots:[],sql,args,read:async client=>reopen(client,reference.reference_id),current:v=>v.status==='current'});await admin(db);
  };
  await addLegacy('harvest',uuid(11),"update reporting_history_facts set metrics='[{\"key\":\"hours\",\"value\":9}]' where provider='harvest'");
  for(const [index,provider] of ['xero','clockify','toggl','zoho-inventory','katana'].entries()) {
   const connection=uuid(50+index),key=provider==='xero'?'invoices':provider==='katana'?'stock_rows':provider==='zoho-inventory'?'items':'hours';
   const metrics=[{key,value:1,...(provider==='xero'?{currency:'USD'}:{})}];
   await db.query("insert into reporting_connections(id,workspace_id,provider,created_by,status,account,snapshot,last_sync_at) values($1,$2,$3,$4,'connected','{\"id\":\"synthetic\"}',$5,'2026-10-02')",[connection,w,provider,owner,JSON.stringify({start:'2026-10-01',end:'2026-10-02',metrics})]);
+  if(provider==='katana')await db.query('insert into private.katana_evidence_installations(connection_id,workspace_id) values($1,$2)',[connection,w]);
   if(['xero','clockify'].includes(provider)) {
    await db.query("insert into reporting_history_facts values($1,$2,$3,'one','2026-10-01',$4)",[w,provider,connection,JSON.stringify(metrics)]);
    await addLegacy(provider,connection,'update reporting_history_facts set metrics=$1 where connection_id=$2',[JSON.stringify([{...metrics[0],value:2}]),connection]);
@@ -29,7 +32,7 @@ export async function prepareWriterCases(options={}) {
  await addLegacy('wix-orders',uuid(62),'update wix_order_facts set total_amount=121');
  const addTyped=async(provider,identity,sql,args=[])=>{
   await login(db);const original=await typedRead(db,identity);
-  cases.push({provider,sql,args,read:client=>typedRead(client,identity),current:value=>value.hash===original.hash});await admin(db);
+  cases.push({provider,source:original.identity,roots:original.data.read_sources??[],sql,args,read:client=>typedRead(client,identity),current:value=>value.hash===original.hash});await admin(db);
  };
  await addTyped('square',{kind:'square_payment',connection_id:uuid(210),payment_id:'payment:1'},'update square_customer_private.payments set amount_minor=12346');
  const projection={contractVersion:'qbo_source_record_minimized_v1',provider:{providerKey:'quickbooks_online',sourceEnvironment:'production'},recordType:'Invoice',id:'invoice1',minimizationVersion:'qbo_minimizer_v1',status:'active',temporal:{postingDate:'2026-10-01'},accounting:{basis:'accrual',sourceCurrency:'USD'},amounts:{total:{amount:'100',currency:'USD'}}};
