@@ -1,26 +1,30 @@
 import type { EvidenceManifest } from "@/lib/ai/evidence-engine/contracts";
 import type { TrustProjectionBindingV1 } from "@/lib/ai/trust/contracts";
 import type { Json } from "@/lib/supabase/types";
+import type { QualitativeInterpretation } from "@/lib/ai/shared-evidence/qualitative-synthesis";
 
 export const INTELLIGENCE_BRIEFING_CONTRACT_ID = "intelligence_briefing_v1" as const;
 export const INTELLIGENCE_BRIEFING_CONTRACT_VERSION = "intelligence_briefing_v1" as const;
 export const INTELLIGENCE_BRIEFING_SCHEMA_VERSION = "intelligence_briefing_schema_v2" as const;
-export const INTELLIGENCE_BRIEFING_VALIDATOR_VERSION = "intelligence_briefing_validator_v6" as const;
-export const INTELLIGENCE_BRIEFING_PROMPT_VERSION = "intelligence_briefing_prompt_v6" as const;
-export const INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION = "intelligence_briefing_generation_policy_v6" as const;
+export const INTELLIGENCE_BRIEFING_VALIDATOR_VERSION = "intelligence_briefing_validator_v7" as const;
+export const INTELLIGENCE_BRIEFING_PROMPT_VERSION = "intelligence_briefing_prompt_v7" as const;
+export const INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION = "intelligence_briefing_generation_policy_v7" as const;
 export const INTELLIGENCE_BRIEFING_SUPPORTED_VALIDATOR_VERSIONS = [
   "intelligence_briefing_validator_v4",
   "intelligence_briefing_validator_v5",
+  "intelligence_briefing_validator_v6",
   INTELLIGENCE_BRIEFING_VALIDATOR_VERSION
 ] as const;
 export const INTELLIGENCE_BRIEFING_SUPPORTED_PROMPT_VERSIONS = [
   "intelligence_briefing_prompt_v4",
   "intelligence_briefing_prompt_v5",
+  "intelligence_briefing_prompt_v6",
   INTELLIGENCE_BRIEFING_PROMPT_VERSION
 ] as const;
 export const INTELLIGENCE_BRIEFING_SUPPORTED_GENERATION_POLICY_VERSIONS = [
   "intelligence_briefing_generation_policy_v4",
   "intelligence_briefing_generation_policy_v5",
+  "intelligence_briefing_generation_policy_v6",
   INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION
 ] as const;
 export type IntelligenceBriefingStoredValidatorVersion = (typeof INTELLIGENCE_BRIEFING_SUPPORTED_VALIDATOR_VERSIONS)[number];
@@ -100,7 +104,7 @@ export type IntelligenceBriefingTemporalLineage = Readonly<{
 }>;
 
 export type IntelligenceBriefingSignal = Readonly<{
-  sharedRelationship?: "financial_stage_boundary_v1" | "payment_accounting_boundary_v1" | "hours_comparison_boundary_v1" | "inventory_context_boundary_v1";
+  sharedRelationship?: "financial_stage_boundary_v1" | "payment_accounting_boundary_v1" | "hours_comparison_boundary_v1" | "inventory_context_boundary_v1" | "sandbox_observation_boundary_v1";
   sourceScope?: Readonly<Record<string,unknown>>;
   ref: string;
   stableKey: string;
@@ -201,6 +205,7 @@ export type IntelligenceBriefingPackage = Readonly<{
 export type IntelligenceBriefingClaim = Readonly<{
   text: string;
   support_refs: readonly string[];
+  interpretation?: QualitativeInterpretation;
 }>;
 
 export type IntelligenceBriefingModelOutput = Readonly<{
@@ -213,6 +218,7 @@ export type IntelligenceBriefingModelOutput = Readonly<{
   }>[];
   leadership_considerations: readonly IntelligenceBriefingClaim[];
   limitation_refs: readonly string[];
+  interpretations?: readonly QualitativeInterpretation[];
 }>;
 
 export type IntelligenceBriefingClaimRejectionCategory = Readonly<{

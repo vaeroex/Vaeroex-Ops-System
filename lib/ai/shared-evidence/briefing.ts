@@ -3,10 +3,24 @@ import { intelligenceBriefingCustomerText } from "@/lib/ai/intelligence-briefing
 import { evidenceEngineHash } from "@/lib/ai/evidence-engine/hash";
 import { INTELLIGENCE_BRIEFING_SECTION_LABELS, type IntelligenceBriefingPackage, type IntelligenceBriefingSignal } from "@/lib/ai/intelligence-briefing/contracts";
 import { assertSharedPrepared, sharedTargetHref, type SharedPrepared } from "./generation";
+/** Retain normal projector control metadata, never its unbound business content.
+ * Sandbox facts (including files/notes) enter only via the protected packet.
+ * The existing snapshot receipt remains a control dependency, not model evidence. */
+export function isolatedSandboxBriefingBase(base:IntelligenceBriefingPackage,p:SharedPrepared):IntelligenceBriefingPackage {
+ assertSharedPrepared(p);if(!p.sandboxInstallationId||base.workspaceId!==p.workspaceId) throw new Error('sandbox_brief_scope_denied');
+ const h=evidenceEngineHash({contract:'sandbox_empty_base_v1',snapshot:base.snapshotFingerprint,packet:p.fingerprint});
+ return {...base,eligibility:'no_eligible_evidence',confidence:'Low',signals:[],sections:[],citations:[],contextReferences:[],limitations:[],requiredSignalRefs:[],previousBriefing:null,
+  businessHealth:{available:false,score:null,status:'Unavailable',trajectory:null,confidence:'Low'},
+  evidenceCoverage:{supportingRecordCount:0,independentSourceCount:0,freshness:'unavailable',latestEvidenceAt:null,overallCoverage:null,coverageLabel:'Limited',includedDomains:[],missingOrWeakDomains:[]},
+  manifest:{...base.manifest,manifestId:h,evidence:[],sourceRegistry:{version:base.manifest.sourceRegistry.version,workspaceId:base.workspaceId,entries:[],candidateToSourceOrdinal:{},independentOriginalSourceCount:0}},
+  evidenceFingerprint:h,effectiveEvidenceFingerprint:h,materialStateFingerprint:h,generationKey:h,
+  trustBinding:{...base.trustBinding,projectionFingerprint:h}};
+}
 /** Extend before the run claim. All evidence/material/generation/trust identities
  * include exact shared identities and facts; citations are application-owned. */
 export function extendSharedBriefingPackage(base:IntelligenceBriefingPackage,p:SharedPrepared):IntelligenceBriefingPackage {
  assertSharedPrepared(p);if(base.workspaceId!==p.workspaceId||base.period.start!==p.start||base.period.end!==p.end) throw new Error('shared_brief_scope_changed');
+ if(p.sandboxInstallationId&&(base.signals.length||base.citations.length||base.contextReferences.length||base.manifest.evidence.length||base.manifest.sourceRegistry.entries.length||base.businessHealth.available||base.previousBriefing)) throw new Error('sandbox_base_evidence_unbound');
  let next=Math.max(0,...base.citations.map(c=>c.citationId));
  const citations=[...base.citations],entries=[...base.manifest.evidence],registry=[...base.manifest.sourceRegistry.entries];
  const contextReferences=[...base.contextReferences];
@@ -30,7 +44,7 @@ export function extendSharedBriefingPackage(base:IntelligenceBriefingPackage,p:S
  for(const relationship of p.relationships) {
   const citationIds=relationship.sourceHashes.map(hash=>citationByHash.get(hash));
   if(citationIds.some(id=>id===undefined)) throw new Error('shared_relationship_dependency_missing');
-  const label={financial_stage_boundary:'Order and invoice boundary',payment_accounting_boundary:'Sales and profit interpretation',hours_comparison_boundary:'Hours comparison eligibility',inventory_context_boundary:'Inventory context eligibility limitation'}[relationship.kind];
+  const label={financial_stage_boundary:'Order and invoice boundary',payment_accounting_boundary:'Sales and profit interpretation',hours_comparison_boundary:'Hours comparison eligibility',inventory_context_boundary:'Inventory context eligibility limitation',sandbox_observation_boundary:'Sandbox observation interpretation'}[relationship.kind];
   signals.push({ref:`SHARED-R-${relationship.id.slice(0,14)}`,stableKey:relationship.id,kind:'finding',authority:'deterministic_result',sectionId:relationship.kind==='inventory_context_boundary'||relationship.kind==='hours_comparison_boundary'?'operations_delivery':'financial_performance',label,sharedRelationship:`${relationship.kind}_v1`,fact:intelligenceBriefingCustomerText(relationship.fact),confidence:'Low',citationIds:citationIds as number[],evidenceReferenceIds:relationship.sourceHashes.map(hash=>`shared:${hash}`),limitation:'Partial stored observations; no matched transaction, complete coverage, or causation is established.',periodRelation:'current_state',periodContext:!relationship.date?'undated_context':relationship.date>=p.start&&relationship.date<=p.end?'briefing_period':'historical_context',sourceScope:{entityId:relationship.entityId,start:relationship.date,end:relationship.date,currency:relationship.currency,timeZone:relationship.date?'UTC':null,additive:false}});
  }
  const sections=[...base.sections];for(const signal of signals){if(!signal.sectionId)continue;const i=sections.findIndex(s=>s.id===signal.sectionId);if(i<0)sections.push({id:signal.sectionId,label:INTELLIGENCE_BRIEFING_SECTION_LABELS[signal.sectionId],signalRefs:[signal.ref]});else if(!sections[i].signalRefs.includes(signal.ref))sections[i]={...sections[i],signalRefs:[...sections[i].signalRefs,signal.ref]};}

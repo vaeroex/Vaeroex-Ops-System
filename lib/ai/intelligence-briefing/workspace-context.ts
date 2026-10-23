@@ -1,6 +1,7 @@
 import { sharedEvidenceRuntimeEnabled } from "@/lib/ai/shared-evidence/runtime-gate";
-import { prepareSharedGeneration } from "@/lib/ai/shared-evidence/generation";
-import { extendSharedBriefingPackage } from "@/lib/ai/shared-evidence/briefing";
+import { prepareSharedGeneration, prepareSandboxSharedGeneration } from "@/lib/ai/shared-evidence/generation";
+import { sandboxSharedEvidenceInstallation } from "@/lib/ai/shared-evidence/sandbox-policy";
+import { extendSharedBriefingPackage, isolatedSandboxBriefingBase } from "@/lib/ai/shared-evidence/briefing";
 import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 
@@ -236,8 +237,9 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
     ...businessNotes.records.map(record => ({ table: "business_notes", id: record.sourceNoteId })),
     ...(previousBriefing ? [{ table: "ai_agent_runs", id: previousBriefing.runId }] : [])
   ]);
-  const sharedPrepared=sharedEvidenceRuntimeEnabled()?await prepareSharedGeneration(supabase,workspaceId,period.start,period.end):undefined;
-  if(sharedPrepared) briefingPackage=extendSharedBriefingPackage(briefingPackage,sharedPrepared);
+  const sandboxInstallationId=sandboxSharedEvidenceInstallation();
+  const sharedPrepared=sandboxInstallationId?await prepareSandboxSharedGeneration(supabase,workspaceId,period.start,period.end,sandboxInstallationId):sharedEvidenceRuntimeEnabled()?await prepareSharedGeneration(supabase,workspaceId,period.start,period.end):undefined;
+  if(sharedPrepared) briefingPackage=extendSharedBriefingPackage(sharedPrepared.sandboxInstallationId?isolatedSandboxBriefingBase(briefingPackage,sharedPrepared):briefingPackage,sharedPrepared);
   return { briefingPackage, snapshot: snapshot.snapshot, receipt: snapshot.receipt, readTicket, sharedPrepared };
 }
 

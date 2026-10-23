@@ -2,6 +2,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { qualitativeInterpretationSchema, renderQualitativeInterpretation } from "@/lib/ai/shared-evidence/qualitative-synthesis";
+import { briefingSynthesisSources } from "./qualitative";
 import {
   INTELLIGENCE_BRIEFING_CLAIM_ACCEPTANCE_VERSION,
   INTELLIGENCE_BRIEFING_CONTRACT_ID,
@@ -42,7 +44,8 @@ const periodSchema = z.object({
 }).strict();
 const claimSchema = z.object({
   text: z.string().trim().min(1),
-  support_refs: z.array(z.string().trim().min(1)).min(1)
+  support_refs: z.array(z.string().trim().min(1)).min(1),
+  interpretation: qualitativeInterpretationSchema.optional()
 }).strict();
 const modelOutputSchema = z.object({
   executive_summary: claimSchema,
@@ -66,7 +69,7 @@ const coverageSchema = z.object({
   missingOrWeakDomains: z.array(z.string().trim().min(1))
 }).strict();
 const signalSchema = z.object({
-  sharedRelationship: z.enum(["financial_stage_boundary_v1", "payment_accounting_boundary_v1", "hours_comparison_boundary_v1", "inventory_context_boundary_v1"]).optional(),
+  sharedRelationship: z.enum(["financial_stage_boundary_v1", "payment_accounting_boundary_v1", "hours_comparison_boundary_v1", "inventory_context_boundary_v1", "sandbox_observation_boundary_v1"]).optional(),
   sourceScope: z.record(z.unknown()).optional(),
   ref: z.string().trim().min(1),
   stableKey: hash,
@@ -216,6 +219,13 @@ function artifactRelationshipsAreValid(artifact: IntelligenceBriefingArtifact) {
     ...artifact.analysis.leadership_considerations
   ];
   if (claims.some((claim) => claim.support_refs.some((ref) => !signalRefs.has(ref)))) return false;
+  const synthesisSources=briefingSynthesisSources(artifact);
+  try {
+    for(const claim of claims) if(claim.interpretation) {
+      if(claim.text!==renderQualitativeInterpretation(claim.interpretation,synthesisSources)
+        ||JSON.stringify(claim.support_refs)!==JSON.stringify(claim.interpretation.premises.map(p=>p.ref))) return false;
+    }
+  } catch { return false; }
   if (artifact.analysis.limitation_refs.some((ref) => !limitationRefs.has(ref))) return false;
   const expectedSections = new Set(artifact.sections.map((section) => section.id));
   const actualSections = new Set(artifact.analysis.sections.map((section) => section.section_id));

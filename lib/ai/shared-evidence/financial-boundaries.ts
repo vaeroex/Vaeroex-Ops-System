@@ -5,7 +5,7 @@ import type { SharedRow } from "./generation";
 
 export type SharedRelationship = Readonly<{
   id: string;
-  kind: "financial_stage_boundary" | "payment_accounting_boundary" | "hours_comparison_boundary" | "inventory_context_boundary";
+  kind: "financial_stage_boundary" | "payment_accounting_boundary" | "hours_comparison_boundary" | "inventory_context_boundary" | "sandbox_observation_boundary";
   fact: string;
   sourceHashes: readonly string[];
   entityId: string | null;
@@ -18,7 +18,9 @@ const currency = z.string().regex(/^[A-Z]{3}$/);
 /** Closed non-additivity recipe. It does not infer that two records describe the
  * same transaction, reconcile balances, aggregate partial imports, or assign
  * financial meaning to arbitrary spreadsheet labels or file text. */
-export function sharedFinancialBoundaries(rows: readonly SharedRow[]): SharedRelationship[] {
+export function sharedFinancialBoundaries(allRows: readonly SharedRow[]): SharedRelationship[] {
+  // Sandbox observations never enter the production payment/accounting recipes.
+  const rows=allRows.filter(row=>row.scope.environment!=='sandbox');
   const inputs: Input[] = [];
   for (const row of rows) {
     if (row.scope.entityBinding !== "protected" || !z.string().uuid().safeParse(row.scope.entityId).success
@@ -39,6 +41,15 @@ export function sharedFinancialBoundaries(rows: readonly SharedRow[]): SharedRel
     }
   }
   const signals: SharedRelationship[] = [];
+  for(const square of allRows.filter(row=>row.provider==='square'&&row.scope.environment==='sandbox')) {
+    for(const qbo of allRows.filter(row=>row.provider==='quickbooks_online'&&row.scope.environment==='sandbox')) {
+      if(!square.scope.entityId||square.scope.entityId!==qbo.scope.entityId||square.data.workspace_id!==qbo.data.workspace_id
+        ||square.scope.installationId!==qbo.scope.installationId) continue;
+      const sourceHashes=[square.hash,qbo.hash];
+      const fact='Reporting period is not established across these sources. Square Sandbox observations and QuickBooks Sandbox accounting records concern the same approved demo business entity. They describe different financial stages and must not be added as extra sales. Square remains non-economic; these records do not establish profit, matched transactions, complete coverage or why amounts differ. Reporting periods and reconciliation must be checked before a numerical comparison. This is Sandbox evidence, not merchant production activity.';
+      signals.push({id:evidenceEngineHash({kind:'sandbox_observation_boundary',sourceHashes,fact}),kind:'sandbox_observation_boundary',fact,sourceHashes,entityId:String(square.scope.entityId),date:null,currency:null});
+    }
+  }
   for (const invoice of inputs.filter(input=>input.stage==='invoice')) for (const order of inputs.filter(input=>input.stage==='order')) {
     if (invoice.row.data.workspace_id !== order.row.data.workspace_id || invoice.row.scope.entityId !== order.row.scope.entityId || invoice.currency !== order.currency || invoice.date !== order.date) continue;
     const sourceHashes=[invoice.row.hash,order.row.hash];
@@ -87,6 +98,7 @@ export function sharedRelationshipReviewText(kind: `${SharedRelationship['kind']
     financial_stage_boundary_v1:"Review the order and invoice source records before combining financial totals.",
     payment_accounting_boundary_v1:"Review payment and accounting evidence, including period and accounting basis. Reporting period is not established across these sources.",
     hours_comparison_boundary_v1:"Check sales and tracked-time coverage, period, workforce scope and currency units before calculating a ratio. Reporting period is not established across these sources.",
-    inventory_context_boundary_v1:"Check item, entity, period and relevance evidence before linking the inventory snapshot to reported context. Reporting period is not established across these sources."
+    inventory_context_boundary_v1:"Check item, entity, period and relevance evidence before linking the inventory snapshot to reported context. Reporting period is not established across these sources.",
+    sandbox_observation_boundary_v1:"Review both Sandbox originals before making a numerical comparison. Reporting period is not established across these sources; do not treat Sandbox observations as merchant production evidence."
   }[kind];
 }

@@ -1,0 +1,9 @@
+{
+  "squareAuthoritySource": "supabase/migrations/20260911222230_square_workspace_evidence.sql",
+  "squareAuthoritySha256": "61bf5fcb7a2f2c05750fad5dbe4d58c0c4ead06675a4bbfc44a63122f9ef6a0d",
+  "sharedSealSource": "docs/security-drafts/05-manifest-admission.sql",
+  "runtimeEnabled": false,
+  "descriptiveModelUseApproved": false,
+  "qboPreviewSource": "docs/security-drafts/audit/typed-source-contracts.json",
+  "qboPreviewDefinitionSha256": "af799298b21f276228826b455145081c5fc2a660bbf517aca1f42a9f50b2bde1"
+}

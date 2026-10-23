@@ -1,4 +1,7 @@
 import { sharedRelationshipReviewText } from "@/lib/ai/shared-evidence/financial-boundaries";
+import { renderQualitativeInterpretation, validateQualitativeInterpretation } from "@/lib/ai/shared-evidence/qualitative-synthesis";
+import { briefingSynthesisSources } from "./qualitative";
+import { qualitativeSynthesisEnabled } from "@/lib/ai/shared-evidence/qualitative-policy";
 import "server-only";
 
 import {
@@ -406,6 +409,29 @@ export function validateIntelligenceBriefingOutput(
       expectedCount: minimumMeasuredClaims,
       observedCount: acceptedMeasuredSectionClaims.length
     });
+  }
+
+  // A separate, labelled hypothesis channel may connect exact premises across
+  // sections. It never changes atomic observations or measured-claim minimums.
+  const synthesisSources=briefingSynthesisSources(context);
+  for(const value of candidate.interpretations) {
+    totalClaimsReturned++;
+    try {
+      if(!qualitativeSynthesisEnabled()) throw new Error("interpretation_disabled");
+      const interpretation=validateQualitativeInterpretation(value,synthesisSources);
+      const refs=interpretation.premises.map(p=>p.ref);
+      const sectionId=refs.map(ref=>signalByRef.get(ref)?.sectionId).find(id=>id&&allowedSectionRefs.has(id));
+      if(!sectionId||!acceptedBySection.has(sectionId)) throw new Error("interpretation_section_unavailable");
+      // Every premise is retained as an ordinary fact as well; a hypothesis may
+      // not resurrect rejected/omitted evidence or an unaccepted source signal.
+      const retained=new Set([...acceptedBySection.values()].flatMap(items=>items.filter(item=>!item.claim.interpretation).flatMap(item=>item.claim.support_refs)));
+      if(refs.some(ref=>!retained.has(ref))) throw new Error("interpretation_premise_not_retained");
+      const text=renderQualitativeInterpretation(interpretation,synthesisSources);
+      if(claimSecurityFailure(text,context,sectionId)) throw new Error("interpretation_security_failed");
+      acceptedBySection.get(sectionId)!.push({claim:{text,support_refs:refs,interpretation},sectionId,measured:false});
+    } catch {
+      rejections.push({reasonCode:"unsupported_relationship",stage:"relationship_support",sectionId:"interpretation"});
+    }
   }
 
   const retainedSignalRefs = new Set(

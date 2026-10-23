@@ -9,6 +9,7 @@ import { QboPreviewSchema } from "@/lib/integrations/qbo-customer/contracts";
 import { decimalSchema, daySchema, pluginProviders } from "./contracts";
 import { sharedFinancialBoundaries, type SharedRelationship } from "./financial-boundaries";
 import { validateSharedMemoryProjection } from "./memory-eligibility";
+import { requireSandboxInstallation, sandboxFacts } from "./sandbox-projection";
 
 export type SharedClient = { rpc(name:string,args:Record<string,unknown>):PromiseLike<{data:unknown;error:unknown}> };
 export async function sharedRpc(reader:SharedClient,name:string,args:Record<string,unknown>) {
@@ -18,18 +19,22 @@ const identity=z.record(z.unknown()),hash=z.string().regex(/^[a-f0-9]{64}$/);
 const resolved=z.object({identity,hash,data:z.record(z.unknown())});
 const root=z.object({table:z.string().regex(/^[a-z][a-z0-9_]*$/),id:z.string().uuid()});
 export type SharedRow={identity:Record<string,unknown>;hash:string;provider:string;facts:string[];scope:Record<string,unknown>;reported:boolean;data:Record<string,unknown>;roots:z.infer<typeof root>[]};
-export type SharedPrepared={workspaceId:string;start:string;end:string;rows:SharedRow[];fingerprint:string;limitations:string[];relationships:SharedRelationship[]};
+export type SharedPrepared={workspaceId:string;start:string;end:string;rows:SharedRow[];fingerprint:string;limitations:string[];relationships:SharedRelationship[];sandboxInstallationId?:string};
 const issued=new WeakMap<SharedPrepared,string>();
 const num=(v:unknown)=>decimalSchema.parse(v);
 const label=(v:unknown)=>z.string().min(1).max(160).parse(v).replace(/[_-]/g," ");
 const object=(v:unknown)=>z.record(z.unknown()).parse(v);
 /** Exact stored observations only. Never sum invoice/order/payment/accounting totals,
  * infer a currency exponent, infer entity correspondence, or parse raw file text. */
-export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
+export function sharedRow(raw:unknown,workspaceId:string,sandboxInstallationId?:string):SharedRow {
  const r=resolved.parse(raw),d=r.data;if(d.workspace_id!==workspaceId) throw new Error("shared_workspace_mismatch");
  const provider=z.enum([...pluginProviders,"file","business_note"]).parse(d.provider);
  let facts:string[]=[];const reported=provider==='file'||provider==='business_note';
- if(reported) facts=[`${provider==='file'?'The reviewed file reports':'The business reports'}: ${validateSharedMemoryProjection(d,workspaceId).text}. This reported context is not independently measured and does not establish causation.`];
+ const sandbox=d.environment==='sandbox'||String(r.identity.kind).includes('sandbox');
+ if(sandbox && (!sandboxInstallationId||d.installation_id!==sandboxInstallationId)) throw new Error('sandbox_production_admission_denied');
+ if(sandbox) facts=sandboxFacts(r.identity,d);
+ else if(sandboxInstallationId&&!reported) throw new Error('sandbox_mixed_environment_denied');
+ else if(reported) facts=[`${provider==='file'?'The reviewed file reports':'The business reports'}: ${validateSharedMemoryProjection(d,workspaceId).text}. This reported context is not independently measured and does not establish causation.`];
  else if(provider==='google_sheets') facts=z.array(z.object({metric:z.string(),value:decimalSchema,unit:z.string()})).max(100).parse(d.metrics)
   .map(m=>`Google Sheets ${label(m.metric)}: ${m.value} ${label(m.unit)}, recorded ${daySchema.parse(d.date)}.`);
  else if(provider==='square') facts=[`Square completed payment: ${num(d.amount_minor)} ${z.string().regex(/^[A-Z]{3}$/).parse(d.currency)} minor units, recorded ${z.string().parse(d.created_at)}. This is a payment record, not posted accounting revenue.`];
@@ -67,36 +72,45 @@ export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
   const parts=new Intl.DateTimeFormat('en-CA',{timeZone:d.time_zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(d.created_at));
   eventDay=daySchema.parse(['year','month','day'].map(type=>parts.find(part=>part.type===type)!.value).join('-'));
  }
- const scope={entityId:d.entity_id??d.business_entity_id??null,connectionId:d.connection_id??null,
+ const scope={...(sandbox?{environment:'sandbox',installationId:sandboxInstallationId}:{}),entityId:d.entity_id??d.business_entity_id??null,connectionId:d.connection_id??null,
   entityBinding:d.entity_id||d.business_entity_id?'protected':'unavailable',scope:d.scope??'stored_record_only',
   start:d.period_start??d.posting_date??d.date??eventDay??null,end:d.period_end??d.posting_date??d.date??eventDay??null,timeZone:d.time_zone??null,
   currency:d.currency??null,coverage:typeof d.coverage==='string'?d.coverage:'unknown',additive:false};
  return {...r,provider,facts,scope,reported,roots:z.array(root).parse(d.read_sources??[])};
 }
-const fingerprint=(rows:SharedRow[])=>evidenceEngineHash({contract:"shared_generation_v2",rows:rows.map(r=>({identity:r.identity,hash:r.hash,facts:r.facts,scope:r.scope})),relationships:sharedFinancialBoundaries(rows)});
+const fingerprint=(rows:SharedRow[],sandboxInstallationId?:string)=>evidenceEngineHash({contract:"shared_generation_v2",...(sandboxInstallationId?{environment:'sandbox',sandboxInstallationId}:{}),rows:rows.map(r=>({identity:r.identity,hash:r.hash,facts:r.facts,scope:r.scope})),relationships:sharedFinancialBoundaries(rows)});
 export async function prepareSharedGeneration(reader:SupabaseClient<Database>,workspaceId:string,start:string,end:string):Promise<SharedPrepared> {
+ return prepareGeneration(reader,workspaceId,start,end);
+}
+/** Called only by a separately reviewed isolated host; defaults deny before RPC. */
+export async function prepareSandboxSharedGeneration(reader:SupabaseClient<Database>,workspaceId:string,start:string,end:string,installationId:string):Promise<SharedPrepared> {
+ return prepareGeneration(reader,workspaceId,start,end,requireSandboxInstallation(installationId));
+}
+async function prepareGeneration(reader:SupabaseClient<Database>,workspaceId:string,start:string,end:string,sandboxInstallationId?:string):Promise<SharedPrepared> {
  daySchema.parse(start);daySchema.parse(end);z.string().uuid().parse(workspaceId);
  const rpc=reader as unknown as SharedClient;
- const catalog=z.object({stage:z.literal('catalog_only'),candidates:z.array(z.object({provider:z.string(),identity})).max(97),truncated:z.boolean()}).parse(await sharedRpc(rpc,'discover_shared_evidence_v1',{p_workspace_id:workspaceId,p_start:start,p_end:end}));
+ const catalog=z.object({stage:z.literal('catalog_only'),candidates:z.array(z.object({provider:z.string(),identity})).max(97),truncated:z.boolean()}).parse(await sharedRpc(rpc,sandboxInstallationId?'discover_sandbox_shared_evidence_v1':'discover_shared_evidence_v1',{p_workspace_id:workspaceId,p_start:start,p_end:end,...(sandboxInstallationId?{p_installation_id:sandboxInstallationId}:{})}));
  const rows:SharedRow[]=[];let omitted=catalog.truncated;let chars=0;
  for(const candidate of catalog.candidates.slice(0,96)) {
   if(rows.length===24) {omitted=true;break;}
   const i=candidate.identity;
-  const raw=await sharedRpc(rpc,i.kind==='legacy_binding'?'preview_shared_legacy_evidence_v1':'read_shared_typed_evidence_v1',i.kind==='legacy_binding'
-   ?{p_workspace_id:workspaceId,p_binding_id:i.binding_id,p_start:i.start,p_end:i.end}:{p_workspace_id:workspaceId,p_identity:i});
+  const raw=await sharedRpc(rpc,sandboxInstallationId?'read_sandbox_shared_evidence_v1':i.kind==='legacy_binding'?'preview_shared_legacy_evidence_v1':'read_shared_typed_evidence_v1',i.kind==='legacy_binding'
+   ?{p_workspace_id:workspaceId,p_binding_id:i.binding_id,p_start:i.start,p_end:i.end}:{p_workspace_id:workspaceId,p_identity:i,...(sandboxInstallationId?{p_installation_id:sandboxInstallationId}:{})});
   const preview=z.object({stage:z.literal('unadmitted'),resolved}).parse(raw);
   // Any unknown, stale or unauthorized input stops the candidate before provider use.
-  const row=sharedRow(preview.resolved,workspaceId);if(row.provider!==candidate.provider) throw new Error('shared_provider_mismatch');
+  const row=sharedRow(preview.resolved,workspaceId,sandboxInstallationId);if(row.provider!==candidate.provider) throw new Error('shared_provider_mismatch');
   const size=JSON.stringify(row.facts).length;
   if(chars+size>12000){omitted=true;continue;}chars+=size;rows.push(row);
  }
- const prepared={workspaceId,start,end,rows,relationships:sharedFinancialBoundaries(rows),fingerprint:fingerprint(rows),limitations:[
+ const prepared={workspaceId,start,end,rows,...(sandboxInstallationId?{sandboxInstallationId}:{}),relationships:sharedFinancialBoundaries(rows),fingerprint:fingerprint(rows,sandboxInstallationId),limitations:[
+  ...(sandboxInstallationId?['Sandbox provider observations only; not live merchant production evidence. Square remains non-economic and historical coverage is unknown.']:[]),
   'Stored observations have source-specific periods and units. Coverage is not proven complete; do not sum overlapping accounting, invoice, order or payment evidence or infer causation.',
   ...(omitted?['Some whole source groups were omitted by the evidence budget. This is not an exhaustive audit.']:[])]};
  issued.set(prepared,evidenceEngineHash(prepared));return prepared;
 }
 export function assertSharedPrepared(p:SharedPrepared) {
- if(issued.get(p)!==evidenceEngineHash(p)||fingerprint(p.rows)!==p.fingerprint) throw new Error('shared_preparation_changed');
+ if(issued.get(p)!==evidenceEngineHash(p)||fingerprint(p.rows,p.sandboxInstallationId)!==p.fingerprint) throw new Error('shared_preparation_changed');
+ if(p.sandboxInstallationId) requireSandboxInstallation(p.sandboxInstallationId);
  // Always repeat canonical semantics; issued packets cannot skip this before AI use.
  for(const row of p.rows) if(row.reported) validateSharedMemoryProjection(row.data,p.workspaceId);
 }
@@ -125,7 +139,8 @@ export async function sealSharedGeneration(reader:SupabaseClient<Database>,p:Sha
  await bindGoogleSheetsRead(reader,target.ticketId,p.rows.flatMap(r=>r.roots));
  const deps=z.object({manifestIds:z.array(z.string().uuid()),readSources:z.array(root)}).parse(await sharedRpc(rpc,'shared_evidence_dependencies_v1',{p_workspace_id:p.workspaceId,p_ticket_id:target.ticketId}));
  await bindGoogleSheetsRead(reader,target.ticketId,deps.readSources);
- const sealed=z.object({stage:z.literal('database_bound'),manifest_id:z.string().uuid(),provider_policy_required:z.literal(true)}).parse(await sharedRpc(rpc,'seal_shared_evidence_manifest_v1',{
+ const sealed=z.object({stage:z.literal('database_bound'),manifest_id:z.string().uuid(),provider_policy_required:z.literal(true)}).parse(await sharedRpc(rpc,p.sandboxInstallationId?'seal_sandbox_shared_evidence_v1':'seal_shared_evidence_manifest_v1',{
+  ...(p.sandboxInstallationId?{p_installation_id:p.sandboxInstallationId}:{}),
   p_workspace_id:p.workspaceId,p_target_kind:target.kind,p_target_id:target.id,p_attempt:target.attempt,p_read_ticket_id:target.ticketId,p_sources:sources,p_inherited_manifest_ids:deps.manifestIds}));
  return sealed.manifest_id;
 }

@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 import { INTELLIGENCE_BRIEFING_SECTION_IDS } from "@/lib/ai/intelligence-briefing/contracts";
+import { qualitativeInterpretationSchema, qualitativeInterpretationJsonSchema } from "@/lib/ai/shared-evidence/qualitative-synthesis";
 
 export const INTELLIGENCE_BRIEFING_MODEL_OUTPUT_LIMITS = {
   claimText: { min: 20, max: 700 },
@@ -25,6 +26,7 @@ export const INTELLIGENCE_BRIEFING_CLAIM_SCHEMA = z.object({
 }).strict();
 
 export const INTELLIGENCE_BRIEFING_MODEL_OUTPUT_SCHEMA = z.object({
+  interpretations: z.array(qualitativeInterpretationSchema).max(3).default([]),
   executive_summary: z.object({
     text: z.string().trim().min(limits.executiveSummaryText.min).max(limits.executiveSummaryText.max),
     support_refs: supportRefsSchema
@@ -71,8 +73,9 @@ const CLAIM_JSON_SCHEMA = {
 export const INTELLIGENCE_BRIEFING_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["executive_summary", "sections", "leadership_considerations", "limitation_refs"],
+  required: ["executive_summary", "sections", "leadership_considerations", "limitation_refs", "interpretations"],
   properties: {
+    interpretations: { type: "array", maxItems: 3, items: qualitativeInterpretationJsonSchema },
     executive_summary: {
       type: "object",
       additionalProperties: false,

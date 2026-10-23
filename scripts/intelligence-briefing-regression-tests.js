@@ -287,9 +287,9 @@ const validResult = validateIntelligenceBriefingOutput(valid, limited);
 assert.equal(validResult.ok, true, "a fully bounded structured briefing passes strict validation");
 const acceptedValid = validResult.value;
 assert.equal(INTELLIGENCE_BRIEFING_SCHEMA_VERSION, "intelligence_briefing_schema_v2");
-assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v6");
-assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v6");
-assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v6");
+assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v7");
+assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v7");
+assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v7");
 assert.equal(
   INTELLIGENCE_BRIEFING_JSON_SCHEMA.properties.sections.items.properties.claims.minItems,
   INTELLIGENCE_BRIEFING_MODEL_OUTPUT_LIMITS.sectionClaims.min,
@@ -648,6 +648,11 @@ const artifact = {
   }
 };
 assert.ok(parseIntelligenceBriefingArtifact(artifact), "a complete immutable artifact round-trips through strict storage validation");
+const historicalV6=clone(artifact);
+for(const [field,value] of Object.entries({promptVersion:'intelligence_briefing_prompt_v6',validatorVersion:'intelligence_briefing_validator_v6',generationPolicyVersion:'intelligence_briefing_generation_policy_v6'})) {
+  historicalV6[field]=value;historicalV6.provenance.claimAcceptance[field]=value;
+}
+assert.ok(parseIntelligenceBriefingArtifact(historicalV6), "historical v6 artifacts remain readable after the interpretation-channel version bump");
 assert.equal(parseIntelligenceBriefingArtifact({ ...artifact, workspaceId: "foreign-workspace" }), null, "stored artifacts reject invalid workspace identity");
 assert.equal(parseIntelligenceBriefingArtifact({ ...artifact, providerAttribution: { ...artifact.providerAttribution, provider: "nvidia" } }), null, "briefing storage cannot switch to NVIDIA");
 

@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "codex/sandbox-synthesis-qualification": false,
       "codex/shared-evidence-security-draft": false,
       "codex/shared-evidence-release-preparation": false,
       "main": false,

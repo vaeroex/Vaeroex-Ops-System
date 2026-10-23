@@ -1,0 +1,67 @@
+name: Inactive sandbox and synthesis candidate
+
+on:
+  push:
+    branches:
+      - codex/sandbox-synthesis-qualification
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sandbox-synthesis-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-build-and-synthetic-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out reviewed inactive candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          run_install: false
+      - name: Set up official Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify inactive package and build transport isolation
+        run: |
+          node scripts/shared-evidence-release-package.cjs --check
+          node scripts/shared-evidence-release-build.cjs --check
+          node scripts/sandbox-synthesis-native-qualification.cjs --check
+      - name: Full application build without service access
+        run: node scripts/shared-evidence-release-build.cjs
+      - name: Targeted sandbox and qualitative synthesis tests with mocked models
+        run: |
+          export NODE_OPTIONS="--require=$PWD/scripts/shared-evidence-release-build-offline.cjs"
+          node --test scripts/sandbox-shared-evidence-tests.mjs
+          node scripts/qualitative-synthesis-tests.cjs
+          node scripts/sandbox-shared-consumer-tests.cjs
+          node scripts/shared-evidence-consumer-tests.cjs
+          node scripts/intelligence-briefing-regression-tests.js
+          node scripts/vsi-engine-tests.cjs
+      - name: Set up pinned local Supabase image source
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: 2.111.0
+      - name: Initialize disposable runner configuration
+        run: supabase init --force
+      - name: Start local image source without application migrations
+        id: local_image
+        run: env -u SUPABASE_INTERNAL_IMAGE_REGISTRY SUPABASE_DB_MIGRATIONS_ENABLED=false supabase db start
+      - name: Native sandbox dependency and final-settlement interleavings
+        run: env -u SUPABASE_INTERNAL_IMAGE_REGISTRY NODE_OPTIONS="--require=$PWD/scripts/shared-evidence-release-build-offline.cjs" node scripts/sandbox-synthesis-native-qualification.cjs --native
+      - name: Stop disposable image source
+        if: always() && (steps.local_image.outcome == 'success' || steps.local_image.outcome == 'failure' || steps.local_image.outcome == 'cancelled')
+        run: supabase stop --no-backup
+      - name: Record exact acceptance boundary
+        if: always()
+        run: echo 'Inactive candidate only. Synthetic rows and mocked models; no service credentials, hosted database access, application migration installation, deployment or activation. Native cases test draft lock behavior, not full installed writer/trigger parity. Real-model synthesis quality and live merchant readiness remain unverified.' >> "$GITHUB_STEP_SUMMARY"

@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { validateSharedMemoryProjection } from "./memory-eligibility";
+import { requireSandboxInstallation } from "./sandbox-projection";
 
 export const sharedCitationTarget = z.object({ workspaceId: z.string().uuid(),
   kind: z.enum(["report", "briefing_run", "vsi_exchange"]), id: z.string().uuid(), revision: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict().refine(t=>t.kind!=="report"||Boolean(t.revision));
@@ -26,6 +27,10 @@ export async function reopenSharedCitation(reader: Reader, target: Target) {
     return false;
   }).map(source => {
     if(source.data.workspace_id !== t.workspaceId) throw new Error("shared_citation_workspace_mismatch");
+    if(source.data.environment==='sandbox'||String(source.identity.kind).includes('sandbox')) {
+      const installation=requireSandboxInstallation(source.data.installation_id);
+      if(source.identity.environment!=='sandbox'||source.identity.installation_id!==installation) throw new Error('sandbox_citation_scope_denied');
+    }
     if(source.data.provider==='file'||source.data.provider==='business_note') {
       const memory=validateSharedMemoryProjection(source.data,t.workspaceId);
       return { hash:source.hash,provider:String(source.data.provider),text:memory.text,sourceHref:memory.url,identity:source.identity };
