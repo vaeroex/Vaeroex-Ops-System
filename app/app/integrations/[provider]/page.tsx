@@ -1,3 +1,4 @@
+import { EvidenceMappingLink } from "@/components/integrations/EvidenceMappingLink";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -101,6 +102,7 @@ export default async function ReportingPage({ params, searchParams }: { params: 
   return <div className="workspace-page mx-auto max-w-5xl space-y-5">
     <PageHeader eyebrow="Plug-ins" title={info.name} description={info.description} actions={<Link href="/app/integrations" className={button}>All plug-ins</Link>} />
     {query.result && messages[query.result] ? <p role="status" className="rounded-md border border-line p-3 text-sm">{query.result === "synced" && historical ? "Import complete. Your saved history is ready to filter below." : messageFor(query.result)}</p> : null}
+    {row ? <EvidenceMappingLink workspaceId={access.workspaceId} provider={provider} connectionId={row.id} owner={owner} status={row.status}/> : null}
     <SectionCard title="Connection" description={info.permission}>
       {error ? <p role="alert">Connection status is unavailable.</p> : row ? <div className="space-y-4">
         <p className="font-semibold">{row.status === "connected" ? "Connected" : row.status === "pending" ? "Waiting for authorization" : row.status === "choose_account" ? "Choose an account" : "Reauthorization required"}{savedAccount.success ? ` · ${savedAccount.data.name}` : ""}</p>

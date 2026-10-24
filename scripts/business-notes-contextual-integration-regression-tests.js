@@ -388,7 +388,8 @@ const homepage = {
     available: true,
     score: intelligence.businessHealth.score,
     status: intelligence.businessHealth.status,
-    trend: intelligence.businessHealth.trend,
+    // No prior snapshot is supplied below; movement must remain unavailable.
+    trend: null,
     trendDelta: null,
     summary: intelligence.executiveSummary,
     driver: intelligence.topRisk.title,

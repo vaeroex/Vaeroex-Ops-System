@@ -1,7 +1,9 @@
+import { vsiFailureAccountingEnabled } from "./failure-accounting-gate";
 import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 
 import { createHash } from "crypto";
+import { evidenceEngineHash } from "@/lib/ai/evidence-engine/hash";
 import { updateVsiPrivateSummary } from "./summary";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -122,12 +124,16 @@ const ERROR_MESSAGES: Record<string, [number, string]> = {
   note_rejected: [409, "This note already exists and was rejected during review. No new note was saved. Edit and submit it again through Business Notes."],
   note_already_exists: [409, "This note already exists in Business Notes. No new note was saved. Open Business Notes to see its current status."],
 };
-export async function mutateVsi<T>(access: VsiAccess, action: string, input: Record<string, unknown> = {}): Promise<T> {
+export async function mutateVsi<T>(access: VsiAccess, action: string, input: Record<string, unknown> = {}, sharedManifestId?: string): Promise<T> {
   const admin = createSupabaseAdminClient() as SupabaseClient<VsiDatabase> | null;
   if (!admin) throw new VsiHttpError(503, "storage_unavailable", "Chat storage is temporarily unavailable. Please try again.");
   // The session-fenced entry point rechecks live authority for every mutation.
   // Never fall back to v1: its service-role permission was deliberately revoked.
-  const { data, error } = await admin.rpc("vsi_mutate_v2", { p_workspace_id: access.workspaceId, p_actor_user_id: access.userId, p_action: action, p_input: input as Json, p_session_id: access.sessionId });
+  if (sharedManifestId && (!vsiUuid.safeParse(sharedManifestId).success || action !== "settle")) throw new VsiHttpError(503,"shared_manifest_invalid","This answer could not be saved safely.");
+  const args={ p_workspace_id: access.workspaceId, p_actor_user_id: access.userId, p_action: action, p_input: input as Json, p_session_id: access.sessionId };
+  const { data, error } = sharedManifestId
+    ? await (admin as unknown as {rpc(name:string,args:Record<string,unknown>):PromiseLike<{data:unknown;error:{code:string}|null}>}).rpc("vsi_mutate_v3", {...args,p_manifest_id:sharedManifestId})
+    : await admin.rpc("vsi_mutate_v2", args);
   if (error) {
     if (error.code === "42501") throw new VsiHttpError(403, "access_denied", "Your access to this workspace or action has changed. Nothing was saved.");
     console.error("[vsi-storage]", { action, code: error.code });
@@ -139,6 +145,80 @@ export async function mutateVsi<T>(access: VsiAccess, action: string, input: Rec
     throw new VsiHttpError(status, result.error, message);
   }
   return data as unknown as T;
+}
+
+/** Terminal bookkeeping only. Never passes generated content or a read ticket.
+ * The SQL operation independently rechecks authority and races under row locks. */
+export async function settleFailedVsi(access: VsiAccess, input: {
+  id: unknown; conversationId: unknown; attempt: unknown; usage: unknown;
+}): Promise<void> {
+  if (!vsiFailureAccountingEnabled()) {
+    await mutateVsi(access, "settle", { id: input.id, conversationId: input.conversationId, attempt: input.attempt,
+      usage: { ...(input.usage as Record<string, unknown>), failed: true } });
+    return;
+  }
+  const parsed = z.object({ id: vsiUuid, conversationId: vsiUuid,
+    attempt: z.number().int().min(1).max(2147483647),
+    usage: z.object({ estimatedCostUsd: z.number().finite().min(0).max(10),
+      providerCalls: z.number().int().min(0).max(1000).nullish(), costEstimated: z.boolean().optional() })
+  }).safeParse(input);
+  if (!parsed.success) throw new VsiHttpError(503, "failure_accounting_unavailable", "This answer could not be completed safely.");
+  const value = parsed.data;
+  const admin = createSupabaseAdminClient();
+  if (!admin) throw new VsiHttpError(503, "failure_accounting_unavailable", "This answer could not be completed safely.");
+  // Reconcile status before mutation; absence or an uncertain read is not proof
+  // of failure. No transcript, source, question or answer is selected here.
+  const status = await (admin as unknown as SupabaseClient).from("vsi_requests")
+    .select("status,attempt,conversation_id").eq("workspace_id", access.workspaceId)
+    .eq("actor_user_id", access.userId).eq("id", value.id).maybeSingle();
+  if (status.error || !status.data || !["pending", "failed"].includes(status.data.status)
+    || status.data.attempt !== value.attempt || status.data.conversation_id !== value.conversationId) {
+    throw new VsiHttpError(503, "failure_accounting_unavailable", "This answer could not be completed safely.");
+  }
+  const { data, error } = await (admin as unknown as { rpc(name: string, args: Record<string, unknown>):
+    PromiseLike<{ data: unknown; error: unknown }> }).rpc("fail_vsi_request_accounting_v1", {
+      p_workspace_id: access.workspaceId, p_actor_user_id: access.userId, p_session_id: access.sessionId,
+      p_conversation_id: value.conversationId, p_request_id: value.id, p_attempt: value.attempt,
+      p_cost_usd: Number(value.usage.estimatedCostUsd.toFixed(8)),
+      p_provider_calls: value.usage.providerCalls ?? null, p_cost_estimated: value.usage.costEstimated ?? false
+    });
+  if (error || !z.object({ state: z.enum(["failed", "already_failed"]) }).strict().safeParse(data).success) {
+    throw new VsiHttpError(503, "failure_accounting_unavailable", "This answer could not be completed safely.");
+  }
+  // Deliberately return no answer/result. Callers must preserve their error.
+}
+
+/** Reconcile an uncertain success before failure accounting. Never regenerate,
+ * overwrite an observed completed exchange, or retry the successful submission. */
+export async function settleGeneratedVsi(access:VsiAccess,input:Record<string,unknown>,sharedManifestId?:string) {
+  try { return await mutateVsi(access,"settle",input,sharedManifestId); }
+  catch(error) {
+    if (vsiFailureAccountingEnabled()) {
+      // A failed save can have an uncertain outcome. Reconcile only terminal
+      // status here; neither hidden output nor expired source content is read.
+      try { await settleFailedVsi(access, { id: input.id, conversationId: input.conversationId,
+        attempt: input.attempt, usage: input.usage }); }
+      catch { console.error("[vsi-storage]", { operation: "failure_accounting", code: "unconfirmed" }); }
+      throw error;
+    }
+    const id=vsiUuid.safeParse(input.id);if(!id.success)throw error;
+    const reader=access.supabase as SupabaseClient<VsiDatabase>;
+    const saved=await reader.from("vsi_exchanges").select("*").eq("workspace_id",access.workspaceId).eq("actor_user_id",access.userId).eq("id",id.data).maybeSingle();
+    if(saved.error)throw error;
+    if(saved.data) {
+      if(saved.data.conversation_id===input.conversationId&&saved.data.user_message===input.question&&saved.data.answer===input.answer
+        &&evidenceEngineHash(saved.data.citations)===evidenceEngineHash(input.citations))return {state:"settled"};
+      throw error;
+    }
+    const admin=createSupabaseAdminClient();if(!admin)throw error;
+    // Status-only query. Exact actor/workspace/attempt binding; no source content.
+    const status=await (admin as unknown as SupabaseClient).from("vsi_requests").select("status,attempt,conversation_id")
+      .eq("workspace_id",access.workspaceId).eq("actor_user_id",access.userId).eq("id",id.data).maybeSingle();
+    if(status.error||status.data?.status!=="pending"||status.data.attempt!==input.attempt||status.data.conversation_id!==input.conversationId)throw error;
+    await settleFailedVsi(access,{id:id.data,conversationId:input.conversationId,attempt:input.attempt,
+      usage:input.usage});
+    throw error;
+  }
 }
 
 export function questionHash(question: string) { return createHash("sha256").update(question).digest("hex"); }
