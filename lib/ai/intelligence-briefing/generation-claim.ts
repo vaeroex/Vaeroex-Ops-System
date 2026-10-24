@@ -1,4 +1,5 @@
 import "server-only";
+import { separateBriefingGenerationRetired } from "./retirement";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -41,6 +42,7 @@ export async function claimIntelligenceBriefingGeneration({
   generationKey: string;
   inputJson: Json;
 }): Promise<IntelligenceBriefingGenerationClaim> {
+  if (separateBriefingGenerationRetired()) return { status: "failed_closed" };
   const { data: inserted, error: insertError } = await admin
     .rpc("create_trusted_analysis_run_v1", {
       p_workspace_id: workspaceId,

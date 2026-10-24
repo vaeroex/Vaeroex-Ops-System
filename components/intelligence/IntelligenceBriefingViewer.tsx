@@ -57,7 +57,7 @@ export function IntelligenceBriefingViewer({ artifact }: { artifact: Intelligenc
   return (
     <div className="workspace-briefing-viewer mx-auto max-w-5xl space-y-6" data-intelligence-briefing-viewer={artifact.briefingType}>
       <Link href="/app/intelligence/briefings" className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-cyan-200 hover:underline">
-        <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Intelligence Briefings
+        <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Saved briefs
       </Link>
       <header className="workspace-page-header border-b border-white/10 pb-5">
         <p className="text-xs font-semibold uppercase tracking-[0.15em] text-cyan-200">Executive Intelligence</p>

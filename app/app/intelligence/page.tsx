@@ -4,10 +4,8 @@ import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources } 
 import Link from "next/link";
 import { unstable_rethrow } from "next/navigation";
 import { HealthSnapshotUnavailable } from "@/components/intelligence/HealthSnapshotUnavailable";
-import { CalendarRange } from "lucide-react";
 import { IntelligenceHealthSnapshot } from "@/components/intelligence/IntelligenceHealthSnapshot";
 import { buildWorkspaceHealthView, loadWorkspaceHealthEvidence } from "@/lib/intelligence/workspace-health";
-import { IntelligenceBriefingCards } from "@/components/intelligence/IntelligenceBriefingCards";
 import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
@@ -17,11 +15,7 @@ import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-chan
 import { buildFindingExplanationPackage } from "@/lib/ai/finding-explanation/context";
 import { buildFindingExplanationFromSnapshotV1 } from "@/lib/ai/finding-explanation/snapshot-context";
 import { trySealFindingExplanationPackage } from "@/lib/ai/finding-explanation/token";
-import {
-  isFindingExplanationEnabled,
-  isIntelligenceBriefingEnabled
-} from "@/lib/ai/providers/workflow-provider-policy";
-import { loadWorkspaceIntelligenceBriefingStates } from "@/lib/ai/intelligence-briefing/workspace-context";
+import { isFindingExplanationEnabled } from "@/lib/ai/providers/workflow-provider-policy";
 import { loadActiveWorkspaceKpis } from "@/lib/kpis/load-workspace-kpis";
 import type { IntelligenceCardLifecycleRecord } from "@/lib/intelligence/card-lifecycle/contracts";
 import { buildIntelligenceBlockedState } from "@/lib/intelligence/blocked-state";
@@ -52,7 +46,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   const access = await requireWorkspaceAccess();
   const { supabase, workspaceId, context } = access;
   const readTicket = await beginGoogleSheetsRead(supabase, workspaceId, access.user.id);
-  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult, briefingStates, healthView] = await Promise.all([
+  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult, healthView] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     loadActiveWorkspaceKpis({ supabase, workspaceId }),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
@@ -67,11 +61,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(2000),
     supabase.from("business_memory_chunks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("indexed_at", { ascending: false }).limit(500),
     supabase.from("intelligence_card_lifecycle").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }),
-    loadWorkspaceIntelligenceBriefingStates({
-      supabase,
-      workspaceId,
-      workspace: context.activeWorkspace || {}
-    }),
     (async () => {
       const evidence = await loadWorkspaceHealthEvidence({ supabase, workspaceId });
       return buildWorkspaceHealthView({ supabase, workspaceId, workspace: context.activeWorkspace, userId: access.user.id, evidence,
@@ -327,21 +316,13 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
         canManageLifecycle={canManageLifecycle}
         blockedState={blockedState}
       />
-      <section aria-labelledby="intelligence-briefings-heading" className="workspace-briefings-section space-y-4 border-t border-white/10 pt-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 id="intelligence-briefings-heading" className="mt-1 text-xl font-semibold text-white">Intelligence Briefings</h2>
-            <p className="mt-1 text-sm text-slate-400">Weekly and monthly summaries of eligible evidence.</p>
-          </div>
-          <Link href="/app/intelligence/briefings" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-cyan-200 hover:underline">
-            <CalendarRange aria-hidden="true" className="h-4 w-4" /> Open Briefings
-          </Link>
+      <section aria-labelledby="intelligence-vsi-brief-heading" className="space-y-2 border-t border-white/10 pt-6">
+        <h2 id="intelligence-vsi-brief-heading" className="text-xl font-semibold text-white">Go deeper with VSI</h2>
+        <p className="text-sm text-slate-400">Request an executive brief, compare periods, or explore a finding in your private VSI conversation.</p>
+        <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-cyan-200">
+          <Link href="/app/si" className="inline-flex min-h-11 items-center hover:underline">Open VSI</Link>
+          <Link href="/app/intelligence/briefings" className="inline-flex min-h-11 items-center hover:underline">Saved briefs</Link>
         </div>
-        <IntelligenceBriefingCards
-          states={briefingStates}
-          generationEnabled={isIntelligenceBriefingEnabled()}
-          compactUnavailable
-        />
       </section>
     </div>
   );

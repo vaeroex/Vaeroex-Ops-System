@@ -5,6 +5,7 @@ import { ChatActions } from "@/components/vsi/ChatActions";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { Exchange } from "@/components/vsi/Exchange";
 import { displayDate, usagePercent, monthlyResetAt, type VsiChat, type VsiExchange, type VsiUsageView } from "@/components/vsi/contracts";
+import { suggestedPromptDraft, VSI_SUGGESTED_PROMPTS } from "@/lib/vsi/suggested-prompts";
 
 type Props = { workspaceId: string; workspaceName: string; userId: string; timeZone?: string; initialConversationId?: string; initialPrompt?: string };
 type ChatResponse = { workspaceId: string; conversation: VsiChat; exchanges?: VsiExchange[]; exchange?: VsiExchange; canEditBusinessNotes?: boolean };
@@ -324,6 +325,22 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
         </div>
         {(chat?.exchangeCount || 0) >= 225 ? <div className="mx-3 mb-3 shrink-0 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950"><p>{readOnly ? "This chat has reached 250 exchanges and is now read-only." : "This is a long conversation. At 250 exchanges, continue in a new chat to keep answers focused."} A new chat carries forward a concise summary and links back to this transcript.</p>{readOnly ? <button type="button" onClick={continueChat} disabled={disabled} className={`${button} mt-3`}>{pending === "continue" ? "Preparing new chat…" : "Continue in a new chat"}</button> : null}</div> : null}
         {!readOnly ? <form data-vsi-composer data-vaeroex-skip-global-activity onSubmit={(event) => { event.preventDefault(); void send(); }} className="shrink-0 scroll-mb-3 border-t border-slate-200 p-3 sm:px-4">
+          <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <label className="flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-600">Suggested prompts
+              <select value="" disabled={disabled} aria-label="Suggested prompts" aria-describedby="vsi-prompt-help" onChange={(event) => {
+                const next = suggestedPromptDraft(message, event.target.value);
+                if (next.added) {
+                  setMessage(next.draft);
+                  setNotice(message.length ? "Suggested prompt appended. Your existing draft is unchanged; edit and send when ready." : "Suggested prompt added. Edit and send when ready.");
+                  composer.current?.focus({ preventScroll: true });
+                } else if (event.target.value) setNotice("There is not enough room to add that prompt. Your draft has been kept unchanged.");
+              }} className="min-h-11 min-w-0 max-w-[min(22rem,65vw)] rounded-lg border border-slate-300 bg-white px-2 text-sm font-normal text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vaeroex-blue disabled:opacity-50">
+                <option value="">Choose a starting point…</option>
+                {VSI_SUGGESTED_PROMPTS.map(prompt => <option key={prompt.id} value={prompt.id}>{prompt.label}</option>)}
+              </select>
+            </label>
+            <span id="vsi-prompt-help" className="text-xs text-slate-500">Edit, then send. Existing draft text is kept.</span>
+          </div>
           <label htmlFor="vsi-message" className="sr-only">Message Vaeroex</label>
           <div className="flex items-end gap-2"><textarea ref={composer} id="vsi-message" rows={2} value={message} onChange={(event) => setMessage(event.target.value)} onFocus={() => composer.current?.closest("form")?.scrollIntoView({ block: "nearest" })} maxLength={8000} disabled={accessLost} placeholder="Ask anything…" aria-describedby="vsi-composer-help" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} className="block max-h-32 min-h-14 min-w-0 flex-1 resize-y rounded-xl border border-slate-300 bg-white px-3 py-2 text-base leading-6 text-slate-900 placeholder:text-slate-500 focus:border-vaeroex-blue focus:outline-2 focus:outline-offset-2 focus:outline-vaeroex-blue disabled:opacity-50" />
           <button type="submit" disabled={disabled || !message.trim()} aria-label={pending === "answer" ? "Preparing answer…" : "Send"} className="min-h-11 shrink-0 rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vaeroex-blue disabled:cursor-not-allowed disabled:opacity-50">{pending === "answer" ? "Waiting…" : "Send"}</button></div>

@@ -1,4 +1,5 @@
 import "server-only";
+import { separateBriefingGenerationRetired } from "./retirement";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { evidenceEngineHash } from "@/lib/ai/evidence-engine/hash";
@@ -184,6 +185,7 @@ export async function generateIntelligenceBriefing({
   briefingPackage: IntelligenceBriefingPackage;
   startedAtMs?: number;
 }) {
+  if (separateBriefingGenerationRetired()) throw new Error("separate_briefing_generation_retired");
   if (briefingPackage.workspaceId !== workspaceId || briefingPackage.eligibility === "no_eligible_evidence") {
     throw new Error("Intelligence briefing generation is not eligible.");
   }

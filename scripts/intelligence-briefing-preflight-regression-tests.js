@@ -286,17 +286,13 @@ async function main() {
   assert.equal(providerInvocationCount, 0, "verification failure and verified zero evidence must never enter provider execution");
   assert.equal(intelligenceBriefingStateAllowsGeneration(productionStates.monthly), true, "limited evidence remains eligible when provider policy is independently enabled");
 
-  const cards = read("components/intelligence/IntelligenceBriefingCards.tsx");
   const action = read("app/app/intelligence/briefings/actions.ts");
-  assert.match(cards, /if \(!generationEnabled\) return "Generation unavailable"/);
-  assert.match(cards, /state\.eligibility === "verification_unavailable"/);
-  assert.match(cards, /return "Evidence verification unavailable"/);
-  assert.ok(cards.indexOf("Generation unavailable") !== cards.indexOf("Evidence verification unavailable"), "provider and evidence states remain independently represented");
+  assert.match(action, /separateBriefingGenerationRetired\(\)/, "new separate generation is retired before preflight");
   assert.ok(
     action.indexOf("intelligenceBriefingStateAllowsGeneration(state)") < action.indexOf("generateIntelligenceBriefing({"),
     "fail-closed evidence state validation must precede provider invocation"
   );
-  assert.doesNotMatch(cards, /VAEROEX_INTELLIGENCE_BRIEFING_POLICY|gpt-5\.6|database|PostgREST|stack trace/i, "customer status text must not expose internals");
+  assert.doesNotMatch(read("app/app/intelligence/briefings/page.tsx"), /VAEROEX_INTELLIGENCE_BRIEFING_POLICY|gpt-5\.6|database|PostgREST|stack trace/i, "customer status text must not expose internals");
 
   console.log("Intelligence Briefing preflight regressions passed.");
 }
