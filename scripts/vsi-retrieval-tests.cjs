@@ -84,6 +84,9 @@ async function main(){
   // and therefore cannot reach either the planner or answer transport.
   require('../lib/ai/providers/google-data-policy.ts').googleSheetsOpenAIHeaders=async()=>({});
   require('../lib/vsi/product-context.ts').loadVsiProductContext=async()=>({authoritative:{},sources:[],limitations:[]});
+  // This regression exercises the legacy retrieval path; shared admission is qualified in its dedicated suite.
+  require('../lib/ai/shared-evidence/runtime-gate.ts').sharedEvidenceRuntimeEnabled=()=>false;
+  require('../lib/ai/shared-evidence/qualitative-policy.ts').qualitativeSynthesisEnabled=()=>false;
   const {runVsiAnswer}=require('../lib/vsi/engine.ts');
   const payloads=[];process.env.OPENAI_API_KEY='synthetic-test-only';
   global.fetch=async(_url,init)=>{
