@@ -21,6 +21,7 @@ import { explicitStoredVsiQuestion } from "./context-selection";
 import type { VsiAnswer, VsiCitation, VsiEvidenceResult, VsiMessage, VsiRunInput, VsiUsage } from "./types";
 import { vsiEvidenceWindow } from "./evidence-window";
 import { packVsiAnswerContext, serializeVsiAnswerContext, serializeVsiProviderRequest, VsiAnswerContextLimit } from "./answer-context";
+import { vsiValidationDiagnostic, type VsiValidationStage } from "./validation-diagnostics";
 
 const VSI_LIVE_FRESHNESS_INSTRUCTION = "For weather and other time-sensitive observations, describe the observation available in this lookup and give its source observation time. Compare that observation time with the supplied current lookup time, respecting the stated timezone. If the observation is more than about one hour old, explicitly say how old it is and that it may no longer reflect conditions now; never describe that reading as current or latest. If the observation time or timezone is missing or cannot be established, say its freshness cannot be verified and do not describe it as current or latest. Resolve today and tonight using the requested public location's local calendar date and the timezone established by its weather source, not the UTC/server date of the lookup. State the local date explicitly when giving today's conditions or tonight's forecast; the UTC lookup date can be a different calendar day. If the location timezone cannot be established, say so and do not guess a local date or label an uncertain forecast period today/tonight. Keep the observation time, forecast period and lookup time separate. A live lookup can return an older source; a fresh lookup timestamp does not make an older observation fresh.";
 
@@ -321,12 +322,14 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     try {
       const packed = packVsiAnswerContext(payload, systemPrompt, config.maxInputChars, { selectRelevant: shared, maxBytes: config.maxProviderInputBytes,
         requestJSON: json => serializeVsiProviderRequest(answerRequest(json,tier),config.maxOutputTokens) });
-      if (shared) console.info("[vsi-context-budget]", { phase, reason: "bounded_model_view", initial: packed.initialMetrics, final: packed.metrics });
+      if (shared) console.info("[vsi-context-budget]", { phase, reason: "bounded_model_view", maxChars: config.maxInputChars, maxBytes: config.maxProviderInputBytes,
+        charUnit: "javascript_utf16_code_units", byteUnit: "utf8", initial: packed.initialMetrics, final: packed.metrics });
       return packed;
     }
     catch (error) {
       if (error instanceof VsiAnswerContextLimit) {
-        console.error("[vsi-context-budget]", { phase, reason: "required_context_unfit", maxChars: config.maxInputChars, maxBytes: config.maxProviderInputBytes, ...error.metrics });
+        console.error("[vsi-context-budget]", { phase, reason: "required_context_unfit", maxChars: config.maxInputChars, maxBytes: config.maxProviderInputBytes,
+          charUnit: "javascript_utf16_code_units", byteUnit: "utf8", ...error.metrics });
         throw new VsiEngineError(shared ? "The required whole source scopes and workspace context do not fit within this answer's limit. No canonical evidence was shortened and no answer was generated. Please narrow the source scope or period."
           : "This question and its sources are too large for one answer. Please narrow the question.", usage, false, "context_block");
       }
@@ -464,16 +467,22 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   usage.researchStatus = plan.mode === "research" ? payload.researchStatus.partial ? "partial" : "completed" : "not_required";
   usage.evidenceLimitations = payload.evidenceLimitations.length > 0 || payload.researchStatus.limitations.length > 0 || packedContext.metrics.omittedSourceGroups > 0;
   const reply = await call(answerRequest(packedContext.json,plan.tier));
-  let structuredAnswer;
-  try { structuredAnswer = answerSchema.parse(JSON.parse(outputText(reply))); }
-  catch { throw new VsiEngineError("Vaeroex could not verify this answer and its sources. Please retry. Your question has not been counted.", usage, false, "output_validation"); }
-  try {
-    validateSharedVsiRelationships(answerSchema.parse(structuredAnswer),selectedBusiness,selectedRelationships);
-    const interpretations=structuredAnswer.interpretations.map(claim=>renderQualitativeInterpretation(claim,selectedPremises,ref=>` [${ref}]`));
-    const answer = validateVsiAnswer({content:[structuredAnswer.content,...interpretations].join("\n\n"),citationIds:[...new Set([...structuredAnswer.citationIds,...structuredAnswer.interpretations.flatMap(claim=>claim.premises.map(p=>p.ref))])]}, [...selectedBusiness, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]);
-    if (webSources.length && !answer.citations.some(source => source.sourceType === "web")) throw new Error("The live answer omitted its source.");
-    return finish({ ...answer, ...(packedContext.metrics.omittedSourceGroups ? {content: `Coverage: This is a partial review of selected stored evidence.\n\n${answer.content}`} : {}), ...(publicResearchTopics ? { publicResearchTopics } : {}) });
-  } catch {
-    throw new VsiEngineError("Vaeroex could not verify this answer and its sources. Please retry. Your question has not been counted.", usage, false, "citation_validation");
-  }
+  const validateAt = <T,>(stage: VsiValidationStage, check: () => T): T => {
+    try { return check(); }
+    catch (error) {
+      const diagnostic = vsiValidationDiagnostic(stage, error);
+      usage.validationFailure = diagnostic;
+      // Failure accounting deliberately stores only terminal cost metadata. Log
+      // this bounded diagnostic before settlement, without retaining the output.
+      console.error("[vsi-validation]", diagnostic);
+      throw new VsiEngineError("Vaeroex could not verify this answer and its sources. Please retry. Your question has not been counted.", usage, false, diagnostic.category);
+    }
+  };
+  const decodedAnswer = validateAt("answer_json", () => JSON.parse(outputText(reply)));
+  const structuredAnswer = validateAt("answer_schema", () => answerSchema.parse(decodedAnswer));
+  validateAt("shared_relationships", () => validateSharedVsiRelationships(structuredAnswer,selectedBusiness,selectedRelationships));
+  const interpretations=structuredAnswer.interpretations.map(claim=>validateAt("qualitative_interpretation", () => renderQualitativeInterpretation(claim,selectedPremises,ref=>` [${ref}]`)));
+  const answer = validateAt("citation_resolution", () => validateVsiAnswer({content:[structuredAnswer.content,...interpretations].join("\n\n"),citationIds:[...new Set([...structuredAnswer.citationIds,...structuredAnswer.interpretations.flatMap(claim=>claim.premises.map(p=>p.ref))])]}, [...selectedBusiness, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]));
+  validateAt("public_source_coverage", () => { if (webSources.length && !answer.citations.some(source => source.sourceType === "web")) throw new Error("The live answer omitted its source."); });
+  return finish({ ...answer, ...(packedContext.metrics.omittedSourceGroups ? {content: `Coverage: This is a partial review of selected stored evidence.\n\n${answer.content}`} : {}), ...(publicResearchTopics ? { publicResearchTopics } : {}) });
 }
