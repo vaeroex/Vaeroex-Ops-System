@@ -76,6 +76,21 @@ global.fetch=async(url,init)=>{
    if(answerVariant==='number')output.interpretations[0].hypothesis='Stored observations may warrant a review of 123.';
    if(answerVariant==='cause')output.interpretations[0].hypothesis='Stored observations may cause these review concerns.';
   }
+  if(['multi_fact','duplicate_premise','same_original','invented_multi_quote'].includes(answerVariant)){
+   const xero=payload.qualitative_sources.find(p=>p.ref===rows.find(row=>row.sourceType==='shared_xero').id);
+   const sheets=payload.qualitative_sources.find(p=>p.ref===rows.find(row=>row.sourceType==='shared_google_sheets').id);
+   assert(xero.facts.length>=2&&sheets.facts.length>=2);
+   const premise=(source,n)=>({ref:source.ref,binding:source.binding,quote:source.facts[n]});
+   output={content:`Stored observations [${xero.ref}] [${sheets.ref}].`,citationIds:[xero.ref,sheets.ref],interpretations:[{
+    premises:[premise(xero,0),premise(xero,1),premise(sheets,0),premise(sheets,1)],
+    hypothesis:'Invoice balance may warrant review alongside dispatches and backlog.',
+    missing_information:'Whether invoice balance, dispatches and backlog concern comparable periods.',
+    next_check:'Review invoice balance alongside dispatches and backlog.'
+   }]};
+   if(answerVariant==='duplicate_premise')output.interpretations[0].premises[1]=premise(xero,0);
+   if(answerVariant==='same_original')output.interpretations[0].premises=[premise(xero,0),premise(xero,1)];
+   if(answerVariant==='invented_multi_quote')output.interpretations[0].premises[1].quote+=' DO_NOT_LOG_SECRET';
+  }
  }
  return new Response(JSON.stringify({model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:20},output_text:answerVariant==='json'&&body.text.format.name==='vsi_answer_v1'?'DO_NOT_LOG_SECRET invalid JSON':JSON.stringify(output)}),{status:200});
 };
@@ -85,12 +100,23 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  const metrics=measured.at(-1);assert(metrics.initial.requestChars>32000);assert(metrics.final.requestChars<=32000);for(const m of [metrics.initial,metrics.final])assert.equal(m.contextChars+m.systemChars+m.inputFramingAndEscapingChars+m.schemaAndOutputFormatChars+m.otherRequestEnvelopeChars,m.requestChars);
  assert.match(result.content,/^Coverage: This is a partial review/);
  assert(budgetEvents.length>=2);for(const diagnostic of budgetEvents){assert.equal(diagnostic.maxChars,32000);assert.equal(diagnostic.maxBytes,192000);assert.equal(diagnostic.charUnit,'javascript_utf16_code_units');assert.equal(diagnostic.byteUnit,'utf8');}
+ answerVariant='multi_fact';const beforeMultiCalls=providerCalls,beforeMultiErrors=validationEvents.length;
+ const multiFactAnswer=await runVsiAnswer(input);
+ assert.equal(providerCalls-beforeMultiCalls,2);assert.equal(validationEvents.length,beforeMultiErrors);
+ assert.equal(multiFactAnswer.citations.length,2,'four exact premises retain two independent originals, not four');
+ assert.deepEqual(new Set(multiFactAnswer.citations.map(c=>c.sourceType)),new Set(['shared_xero','shared_google_sheets']));
+ for(const citation of multiFactAnswer.citations){const original=metrics.canonical.find(source=>source.sourceId===citation.sourceId);assert(original);assert.equal(citation.url,original.url);assert.equal(citation.snapshotHash,original.snapshotHash);}
+ assert.match(multiFactAnswer.content,/Interpretation \(unverified hypothesis\)/);
+ assert.equal((multiFactAnswer.content.match(/Recorded observation:/g)||[]).length,4);
  for(const [variant,stage,reason]of[
   ['json','answer_json','malformed_json'],['schema','answer_schema','schema_invalid'],
   ['citation','citation_resolution','unknown_citation'],['url','citation_resolution','unverified_url'],
   ['quote','qualitative_interpretation','interpretation_premise_changed'],
   ['number','qualitative_interpretation','interpretation_unsupported_characters'],
-  ['cause','qualitative_interpretation','interpretation_assertion_denied']]){
+  ['cause','qualitative_interpretation','interpretation_assertion_denied'],
+  ['duplicate_premise','qualitative_interpretation','interpretation_duplicate_premise'],
+  ['same_original','qualitative_interpretation','interpretation_distinct_dependencies_required'],
+  ['invented_multi_quote','qualitative_interpretation','interpretation_premise_changed']]){
   answerVariant=variant;const before=validationEvents.length,calls=providerCalls;
   await assert.rejects(runVsiAnswer(input),error=>{
    assert.equal(error.usage.validationFailure.stage,stage);assert.equal(error.usage.validationFailure.reason,reason);
@@ -125,5 +151,5 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  for(const kind of ['revoked','foreign']){providerCalls=0;revoked=kind==='revoked';foreign=kind==='foreign';await assert.rejects(runVsiAnswer(input));assert.equal(providerCalls,0);}revoked=false;foreign=false;
  providerCalls=0;revokeAfterPlanner=true;await assert.rejects(runVsiAnswer(input),e=>e.usage.outcomeFailure==='evidence_unavailable');assert.equal(providerCalls,1);revokeAfterPlanner=false;revoked=false;
  providerCalls=0;await assert.rejects(runVsiAnswer({...input,contextSummary:'Required private conversation context. '.repeat(300),recentMessages:Array.from({length:8},(_,n)=>({role:n%2?'assistant':'user',content:'Earlier business context. '.repeat(220)}))}),e=>e.usage.outcomeFailure==='context_block');assert.equal(providerCalls,0,'unfit required context denied before any paid planner');
- console.log(JSON.stringify({passed:true,fixture:'synthetic mixed-source workspace with full product producer and request envelope',synthetic:true,initial:metrics.initial,final:metrics.final,requiredOriginalsRetained:true,canonicalManifestSourceCount:15,omittedCitationRejected:true,wrongWorkspaceAndRevocationDenied:true,unfitBeforeAnyProvider:true,allTwelveRetained:true,dependencyClosureAndAmbiguityDenials:true,historicalDependencyRequired:true,fullWireBytesChecked:true,coverageDisclosed:true,validationStageCases:7,contentFreeDiagnostics:true,externalCalls:0}));
+ console.log(JSON.stringify({passed:true,fixture:'synthetic mixed-source workspace with full product producer and request envelope',synthetic:true,initial:metrics.initial,final:metrics.final,requiredOriginalsRetained:true,canonicalManifestSourceCount:15,omittedCitationRejected:true,wrongWorkspaceAndRevocationDenied:true,unfitBeforeAnyProvider:true,allTwelveRetained:true,dependencyClosureAndAmbiguityDenials:true,historicalDependencyRequired:true,fullWireBytesChecked:true,coverageDisclosed:true,multiFactTwoOriginalInterpretation:true,validationStageCases:10,contentFreeDiagnostics:true,externalCalls:0}));
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -14,7 +14,7 @@ assert.equal(diagnose('answer_json',new SyntaxError(secret)).reason,'malformed_j
 for(const stage of ['shared_relationships','qualitative_interpretation','citation_resolution','public_source_coverage']){
  const result=diagnose(stage,new Error(secret));assert.deepEqual(result,{stage,category:'citation_validation',reason:'unclassified'});
 }
-for(const code of ['shared_relationship_dependency_missing','shared_relationship_citation_missing','shared_relationship_claim_changed','interpretation_premise_changed','interpretation_assertion_denied','interpretation_grounding_missing'])assert.equal(diagnose('qualitative_interpretation',new Error(code)).reason,code);
+for(const code of ['shared_relationship_dependency_missing','shared_relationship_citation_missing','shared_relationship_claim_changed','interpretation_duplicate_context_reference','interpretation_duplicate_premise','interpretation_premise_changed','interpretation_assertion_denied','interpretation_grounding_missing'])assert.equal(diagnose('qualitative_interpretation',new Error(code)).reason,code);
 assert.equal(diagnose('public_source_coverage',new Error('The live answer omitted its source.')).reason,'web_source_missing');
 assert.deepEqual(diagnose('citation_resolution',{message:secret,issues:[{path:[secret],message:secret}]}),{stage:'citation_resolution',category:'citation_validation',reason:'unclassified'});
 console.log(JSON.stringify({safeStageCategories:true,unknownMessagesAndFieldsWithheld:true,zodValuesAndMessagesWithheld:true,externalCalls:0}));

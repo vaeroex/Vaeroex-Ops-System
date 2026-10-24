@@ -30,12 +30,19 @@ const forbidden = /[\d$€£%]|\b(?:zero|one|two|three|four|five|six|seven|eight
 export function validateQualitativeInterpretation(value: unknown, sources: readonly SynthesisSource[]): QualitativeInterpretation {
   const claim = qualitativeInterpretationSchema.parse(value);
   const byRef = new Map(sources.map(source => [source.ref, source]));
-  if (byRef.size !== sources.length || new Set(claim.premises.map(p => p.ref)).size !== claim.premises.length) throw new Error("interpretation_duplicate_reference");
-  const used = claim.premises.map(p => {
+  if (byRef.size !== sources.length) throw new Error("interpretation_duplicate_context_reference");
+  const resolved = claim.premises.map(p => {
     const source = byRef.get(p.ref);
     if (!source || p.binding !== source.binding || !source.facts.includes(p.quote)) throw new Error("interpretation_premise_changed");
     return source;
   });
+  // A reference identifies an original with potentially several issued facts.
+  // Different exact facts may reuse it; the same premise may not be repeated.
+  const premiseKeys = new Set(claim.premises.map(p => JSON.stringify([p.ref, p.binding, p.quote])));
+  if (premiseKeys.size !== claim.premises.length) throw new Error("interpretation_duplicate_premise");
+  // Reusing an original never counts as independent corroboration and does not
+  // evade shared-dependency checks between different source references.
+  const used = [...new Map(resolved.map(source => [source.ref, source])).values()];
   if (new Set(used.map(s => s.binding)).size < 2) throw new Error("interpretation_distinct_dependencies_required");
   if(used.some((s,index)=>!s.dependencies.length||used.slice(0,index).some(previous=>previous.dependencies.some(id=>s.dependencies.includes(id))))) throw new Error("interpretation_distinct_dependencies_required");
   const environments = new Set(used.filter(s => s.environment !== "supporting").map(s => s.environment));
@@ -57,7 +64,9 @@ export function validateQualitativeInterpretation(value: unknown, sources: reado
   }
   const hypothesisWords = new Set(businessWords(claim.hypothesis));
   for (const premise of claim.premises) {
-    const otherWords=new Set(claim.premises.filter(p=>p!==premise).flatMap(p=>businessWords(p.quote)));
+    // Each quoted fact must contribute to the hypothesis relative to the other
+    // originals. Sibling facts from this original are not competing witnesses.
+    const otherWords=new Set(claim.premises.filter(p=>p.ref!==premise.ref).flatMap(p=>businessWords(p.quote)));
     if (!businessWords(premise.quote).some(word => !otherWords.has(word)&&hypothesisWords.has(word))) throw new Error("interpretation_grounding_missing");
   }
   return claim;
