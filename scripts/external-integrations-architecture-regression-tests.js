@@ -559,7 +559,7 @@ assert.deepEqual(approvedSquareQualificationPaths.filter(file => file.startsWith
 "only the twenty-three bounded provisioner files are exempt");
 assertionCount++;
 assert.deepEqual(JSON.parse(read("vercel.json")), {
-  git: { deploymentEnabled: { "codex/vsi-production-reasoning-release": false, "codex/vsi-prompts-retirement-only": false, "main": false, "codex/intelligence-health-consolidation": false, "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false, "codex/workspace-audit-security": false, "codex/workspace-audit-evidence": false, "codex/workspace-audit-workflows": false } },
+  git: { deploymentEnabled: { "codex/evidence-mapping-setup-only": false, "codex/vsi-production-reasoning-release": false, "codex/vsi-prompts-retirement-only": false, "main": false, "codex/intelligence-health-consolidation": false, "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false, "codex/workspace-audit-security": false, "codex/workspace-audit-evidence": false, "codex/workspace-audit-workflows": false } },
   crons: [
     { path: "/api/storage-capacity/maintenance", schedule: "*/15 * * * *" },
     { path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" }

@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
-import { sharedEvidenceRuntimeEnabled } from "@/lib/ai/shared-evidence/runtime-gate";
+import { evidenceMappingSetupEnabled } from "@/lib/ai/shared-evidence/mapping-gate";
 import { mappingOwner, mappingPreview, mappingTarget } from "@/lib/ai/shared-evidence/mapping";
 import { confirmMappingAction } from "./actions";
 
 export default async function EvidenceMappingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  if (!sharedEvidenceRuntimeEnabled()) notFound();
+  if (!evidenceMappingSetupEnabled()) notFound();
   const access = await requireWorkspaceAccess();
   if (!mappingOwner(access, access.workspaceId)) notFound();
   const query = await searchParams;
