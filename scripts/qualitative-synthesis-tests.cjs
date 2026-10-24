@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 require('./qbo-customer-test-support.cjs').installLoader({'server-only':{}});
 const {validateQualitativeInterpretation:validate,renderQualitativeInterpretation:render}=require('../lib/ai/shared-evidence/qualitative-synthesis.ts');
-assert.equal(require('../lib/ai/shared-evidence/qualitative-policy.ts').qualitativeSynthesisEnabled(),false);
+assert.equal(require('../lib/ai/shared-evidence/qualitative-policy.ts').qualitativeSynthesisEnabled(),true);
 const sources=[
  {ref:'file',binding:'a'.repeat(64),dependencies:['original-file'],facts:['The reviewed file reports delivery delays; coverage is incomplete and no cause is established.'],reported:'file',environment:'supporting'},
  {ref:'note',binding:'b'.repeat(64),dependencies:['original-note'],facts:['The approved Business Note reports staffing coverage; it is reported context, not measured performance.'],reported:'note',environment:'supporting'}
