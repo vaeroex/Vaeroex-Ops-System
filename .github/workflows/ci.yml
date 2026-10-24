@@ -380,6 +380,15 @@ jobs:
       - name: Security regression check
         run: pnpm security:check
 
+      - name: Enabled shared evidence and qualified synthesis regressions
+        run: |
+          node scripts/shared-evidence-consumer-tests.cjs
+          node scripts/shared-evidence-citation-reopen-tests.cjs
+          node scripts/shared-evidence-mapping-ui-tests.cjs
+          node scripts/qualitative-synthesis-tests.cjs
+          node scripts/vsi-failure-accounting-application-tests.cjs
+          node scripts/google-sheets-provider-policy-tests.cjs
+
       - name: VSI Luna and evidence boundary regressions
         run: pnpm test:vsi
 
