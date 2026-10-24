@@ -18,6 +18,9 @@ Module._resolveFilename = function(request, ...args) { return resolve.call(this,
 const load = Module._load;
 Module._load = function(request, ...args) {
   if (request === "server-only") return {};
+  // Provider routing is tested independently of optional shared admission/synthesis.
+  if (request === "@/lib/ai/shared-evidence/runtime-gate") return { sharedEvidenceRuntimeEnabled: () => false };
+  if (request === "@/lib/ai/shared-evidence/qualitative-policy") return { qualitativeSynthesisEnabled: () => false };
   if (args[0]?.filename === path.join(root, "lib/vsi/engine.ts") && request === "./retrieval") return {
     authorizeVsiRead: async () => ({}),
     retrieveVsiEvidence: async () => {

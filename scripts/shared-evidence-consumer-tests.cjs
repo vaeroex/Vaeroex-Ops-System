@@ -39,12 +39,14 @@ global.fetch=async(url,init)=>{
  const p=JSON.parse(body.input[1].content);
  const value=body.text.format.name==='vsi_research_plan_v1'
  ?{mode:'answer',businessEvidence:planBusiness,tier:'simple',clarification:'',publicTargets:[],objectives:[]}
- :(()=>{payload=p;const s=p.businessSources[0];return{content:s?`Stored observation [${s.id}].`:'General response.',citationIds:s?[s.id]:[]};})();
+ :(()=>{payload=p;const s=p.businessSources[0];return{content:s?`Stored observation [${s.id}].`:'General response.',citationIds:s?[s.id]:[],interpretations:[]};})();
  return new Response(JSON.stringify({model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:20},output_text:JSON.stringify(value)}),{status:200});
 };
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question:'Review our business sources',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:2}};
 (async()=>{
  let result=await runVsiAnswer(input);assert.equal(result.sharedManifestId,manifest);assert.equal(result.usage.providerCalls,2);
+ assert.equal(payload.qualitative_sources.length,2);
+ assert(payload.qualitative_sources.every(s=>s.facts.length&&s.binding&&s.dependencies.length));
  const scoped=JSON.parse(payload.businessSources[0].text);assert.equal(scoped.scope.entityId,id(30));assert.equal(scoped.scope.additive,false);assert.equal(payload.businessSources.length,2);
  assert.match(result.citations[0].url,/\/vsi_exchange\//);assert.equal(events.filter(e=>e==='provider').length,2);
  const {VSI_SUGGESTED_PROMPTS}=require('../lib/vsi/suggested-prompts.ts');
