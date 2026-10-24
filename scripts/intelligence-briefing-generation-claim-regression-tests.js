@@ -27,6 +27,8 @@ Module._resolveFilename = function resolveAlias(request, parent, isMain, options
 const originalLoad = Module._load;
 Module._load = function loadPatched(request, parent, isMain) {
   if (request === "server-only") return {};
+  // Archived claim invariants remain covered; the default closed boundary has its own test.
+  if (request === "./retirement") return { separateBriefingGenerationRetired: () => false };
   return originalLoad.call(this, request, parent, isMain);
 };
 

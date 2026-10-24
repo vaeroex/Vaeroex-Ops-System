@@ -1,4 +1,5 @@
 import "server-only";
+import { separateBriefingGenerationRetired } from "@/lib/ai/intelligence-briefing/retirement";
 
 import { resolveVaeroexModel, type VaeroexModelRoute } from "@/lib/ai/model-routing";
 import {
@@ -95,6 +96,7 @@ export function isFindingExplanationEnabled() {
 }
 
 export function isIntelligenceBriefingEnabled() {
+  if (separateBriefingGenerationRetired()) return false;
   return process.env.VAEROEX_INTELLIGENCE_BRIEFING_POLICY === INTELLIGENCE_BRIEFING_POLICY_SELECTOR;
 }
 

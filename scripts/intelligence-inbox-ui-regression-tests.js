@@ -98,7 +98,6 @@ test("Intelligence SSR dates match browser rendering across timezones and preser
   // rather than comparing a duplicate implementation of the formatting rules.
   const sources = [
     ["components/intelligence/IntelligenceSignalInbox.tsx", ["formatSignalDate", "formatLifecycleTimestamp"]],
-    ["components/intelligence/IntelligenceBriefingCards.tsx", ["generatedLabel"]],
   ];
   const functions = sources.map(([relative, names]) => {
     const filename = path.join(root, relative);
@@ -112,15 +111,14 @@ test("Intelligence SSR dates match browser rendering across timezones and preser
       leapDay: formatSignalDate("2024-02-29"),
       offsetInstant: formatSignalDate("2026-05-04T23:30:00-07:00"),
       lifecycle: formatLifecycleTimestamp("2026-07-18T00:00:00Z"),
-      generated: generatedLabel("2026-07-18T00:00:00Z"),
-      invalid: [formatSignalDate("invalid"), formatLifecycleTimestamp("invalid"), generatedLabel("invalid")]
+      invalid: [formatSignalDate("invalid"), formatLifecycleTimestamp("invalid")]
     }));`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
   const render = (zone) => JSON.parse(execFileSync(process.execPath, ["-e", program], { encoding: "utf8", env: { ...process.env, TZ: zone, LANG: "de_DE.UTF-8" } }));
   const server = render("UTC");
   assert.deepEqual(server, {
     reproduced: "Jul 18, 2026 UTC", reportingDay: "May 4, 2026", leapDay: "Feb 29, 2024",
-    offsetInstant: "May 5, 2026 UTC", lifecycle: "Jul 18, 2026, 12:00 AM UTC", generated: "Jul 18, 2026, 12:00 AM UTC",
-    invalid: ["Date unavailable", "Date unavailable", "Generation time unavailable"],
+    offsetInstant: "May 5, 2026 UTC", lifecycle: "Jul 18, 2026, 12:00 AM UTC",
+    invalid: ["Date unavailable", "Date unavailable"],
   });
   for (const zone of ["America/Los_Angeles", "Pacific/Honolulu", "Asia/Tokyo", "Pacific/Kiritimati"]) {
     assert.deepEqual(render(zone), server, `server/browser text must agree in ${zone}`);
@@ -128,19 +126,14 @@ test("Intelligence SSR dates match browser rendering across timezones and preser
   const previousZone = process.env.TZ;
   try {
     const { IntelligenceSignalInbox } = loadSource("components/intelligence/IntelligenceSignalInbox.tsx", sharedMocks);
-    const { IntelligenceBriefingCards } = loadSource("components/intelligence/IntelligenceBriefingCards.tsx", sharedMocks);
     const dated = card(0, { snapshot: { ...card(0).snapshot, lastUpdated: "2026-07-18T00:00:00Z" } });
     const props = { currentCards: [dated], historyCards: [], canManageLifecycle: false };
-    const state = (briefingType) => ({ briefingType, status: "current", eligibility: "limited", confidence: "Low", artifact: { generatedAt: "2026-07-18T00:00:00Z" }, period: { start: "2026-07-11", end: "2026-07-18", dayCount: 7, cutoff: "2026-07-18T00:00:00Z", timeZone: "UTC" } });
-    const renderMarkup = () => renderToStaticMarkup(React.createElement(React.Fragment, null,
-      React.createElement(IntelligenceSignalInbox, props),
-      React.createElement(IntelligenceBriefingCards, { states: { weekly: state("weekly"), monthly: state("monthly") }, generationEnabled: false })));
+    const renderMarkup = () => renderToStaticMarkup(React.createElement(IntelligenceSignalInbox, props));
     process.env.TZ = "UTC";
     const html = renderMarkup();
     assert.match(html, /<time dateTime="2026-07-18T00:00:00Z">Jul 18, 2026 UTC<\/time>/);
-    assert.match(html, /Last generated Jul 18, 2026, 12:00 AM UTC/);
     process.env.TZ = "America/Los_Angeles";
-    assert.equal(renderMarkup(), html, "the reproduced finding paragraph and briefing markup hydrate without text replacement");
+    assert.equal(renderMarkup(), html, "the finding markup hydrates without text replacement");
   } finally {
     if (previousZone === undefined) delete process.env.TZ;
     else process.env.TZ = previousZone;
@@ -274,26 +267,12 @@ test("confidence-filter fallback becomes the selection and survives clearing the
   } finally { global.window = previousWindow; }
 });
 
-test("unavailable briefings collapse only on request, retaining completed and generatable briefings", () => {
-  const { IntelligenceBriefingCards } = loadSource("components/intelligence/IntelligenceBriefingCards.tsx", sharedMocks);
-  const unavailable = (type) => ({ briefingType: type, status: "unavailable", eligibility: "no_eligible_evidence", confidence: "Low",
-    artifact: null, message: "Add eligible information", period: { start: "2026-09-01", end: "2026-09-29", dayCount: 30, cutoff: "2026-09-29T00:00:00Z", timeZone: "UTC" } });
-  const states = { weekly: unavailable("weekly"), monthly: unavailable("monthly") };
-  const render = (next, compactUnavailable = true) => renderToStaticMarkup(React.createElement(IntelligenceBriefingCards, { states: next, generationEnabled: true, compactUnavailable }));
-  assert.match(render(states), /<details[^>]*data-briefings-collapsed/);
-  assert.doesNotMatch(render(states), /<details[^>]*\bopen=/);
-  assert.match(render(states), /Add eligible information/);
-  assert.doesNotMatch(render(states, false), /data-briefings-collapsed/);
-  const complete = { ...states, weekly: { ...states.weekly, artifact: { generatedAt: "2026-09-29T00:00:00Z" } } };
-  assert.doesNotMatch(render(complete), /data-briefings-collapsed/);
-  assert.match(render(complete), /View Current Briefing/);
-  assert.doesNotMatch(render({ ...states, monthly: { ...states.monthly, status: "ready", eligibility: "limited" } }), /data-briefings-collapsed/);
-});
-
-test("the main route places findings before briefings without changing their data loading", () => {
+test("Intelligence directs new briefs to VSI and preserves saved history", () => {
   const source = fs.readFileSync(path.join(root, "app/app/intelligence/page.tsx"), "utf8");
-  assert.ok(source.indexOf("<IntelligenceSignalInbox") < source.indexOf("<IntelligenceBriefingCards"));
-  assert.match(source, /<IntelligenceBriefingCards[\s\S]*compactUnavailable/);
+  assert.ok(source.indexOf("<IntelligenceSignalInbox") < source.indexOf('id="intelligence-vsi-brief-heading"'));
+  assert.match(source, /Open VSI/);
+  assert.match(source, /Saved briefs/);
+  assert.doesNotMatch(source, /IntelligenceBriefingCards|loadWorkspaceIntelligenceBriefingStates/);
 });
 
 test("the selected finding shows the complete approved investigation", () => {

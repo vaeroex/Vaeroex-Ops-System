@@ -658,18 +658,10 @@ assert.equal(briefingStateFromPackage({ briefingPackage: changed, current: previ
 
 const originalSelector = process.env.VAEROEX_INTELLIGENCE_BRIEFING_POLICY;
 process.env.VAEROEX_INTELLIGENCE_BRIEFING_POLICY = INTELLIGENCE_BRIEFING_POLICY_SELECTOR;
-const policy = resolveIntelligenceBriefingGenerationPolicy({
+assert.throws(() => resolveIntelligenceBriefingGenerationPolicy({
   startedAtMs: Date.now(),
   structuredOutput: { name: "intelligence_briefing_v1", strict: true, schema: INTELLIGENCE_BRIEFING_JSON_SCHEMA }
-});
-assert.equal(policy.providerPolicy.id, INTELLIGENCE_BRIEFING_GPT56_POLICY_ID);
-assert.deepEqual(policy.providerPolicy.steps.map((step) => [step.provider, step.model, step.workflowConfiguration.reasoning.effort]), [
-  ["openai", "gpt-5.6-sol", "medium"],
-  ["openai", "gpt-5.6-terra", "medium"]
-]);
-assert.ok(policy.providerPolicy.steps.every((step) => step.workflowConfiguration.maxAttempts === 1 && step.workflowConfiguration.store === false));
-assert.ok(policy.providerPolicy.steps.every((step) => step.workflowConfiguration.structuredOutput.strict === true));
-assert.ok(policy.providerPolicy.steps.every((step) => step.workflowConfiguration.structuredOutput.schema === INTELLIGENCE_BRIEFING_JSON_SCHEMA));
+}), /not enabled/, "the old environment selector cannot re-enable retired generation");
 if (originalSelector === undefined) delete process.env.VAEROEX_INTELLIGENCE_BRIEFING_POLICY;
 else process.env.VAEROEX_INTELLIGENCE_BRIEFING_POLICY = originalSelector;
 
@@ -679,7 +671,6 @@ const migration = read("supabase/migrations/20260817185529_intelligence_briefing
 const viewer = read("components/intelligence/IntelligenceBriefingViewer.tsx");
 const evidenceLimits = read("components/intelligence/BriefingEvidenceLimits.tsx");
 const savedAnalysisRenderer = read("components/reports/SavedAnalysisRenderer.tsx");
-const cards = read("components/intelligence/IntelligenceBriefingCards.tsx");
 const intelligencePage = read("app/app/intelligence/page.tsx");
 const briefingPage = read("app/app/intelligence/briefings/page.tsx");
 assert.match(action, /buildWorkspaceIntelligenceBriefingPackage/);
@@ -705,29 +696,13 @@ assert.doesNotMatch(evidenceLimits, /<details[^>]*\sopen(?:=|\s|>)/, "evidence l
 assert.match(viewer, /Limited-evidence briefing/);
 assert.match(viewer, /Business Updates/);
 assert.doesNotMatch(viewer, /Approved reported context/);
-assert.match(cards, /Generate Weekly Briefing/);
-assert.match(cards, /Generate Monthly Briefing/);
-assert.match(cards, /Add business information/);
-assert.match(cards, /Last 7 days/);
-assert.match(cards, /Last 30 days/);
-assert.match(cards, /View Current Briefing/);
-assert.match(cards, /Generation unavailable/);
-assert.match(cards, /Evidence verification unavailable/);
-assert.match(cards, /No eligible evidence/);
-assert.match(cards, /Limited evidence/);
-assert.match(cards, /Ready to generate/);
-assert.match(cards, /Generating/);
-assert.match(cards, /No new information/);
-assert.match(cards, /No significant change/);
-assert.match(cards, /Generation failed/);
-assert.match(cards, /disabled=\{!canGenerate \|\| pending\}/, "generation remains visibly disabled when the server policy is off");
-assert.match(cards, /generateIntelligenceBriefingAction\(\{ briefingType: type \}\)/, "enabled controls reach the authenticated server action");
-assert.doesNotMatch(cards, /VAEROEX_INTELLIGENCE_BRIEFING_POLICY|gpt-5\.6|provider policy/, "customer UI must not expose provider configuration");
-assert.match(intelligencePage, /import \{ IntelligenceBriefingCards \}/);
-assert.match(intelligencePage, /<h2 id="intelligence-briefings-heading"[^>]*>Intelligence Briefings<\/h2>/);
-assert.match(intelligencePage, /<IntelligenceBriefingCards[\s\S]*states=\{briefingStates\}[\s\S]*generationEnabled=\{isIntelligenceBriefingEnabled\(\)\}/, "the main Intelligence route must mount briefing cards without a feature-gate conditional");
-assert.doesNotMatch(intelligencePage, /isIntelligenceBriefingEnabled\(\)\s*&&\s*<IntelligenceBriefingCards/, "the default-off policy must not hide the interface");
-assert.match(briefingPage, /<IntelligenceBriefingCards[\s\S]*generationEnabled=\{isIntelligenceBriefingEnabled\(\)\}/, "the dedicated briefing route must preserve visible disabled-state behavior");
+assert.doesNotMatch(intelligencePage, /IntelligenceBriefingCards|loadWorkspaceIntelligenceBriefingStates/);
+assert.match(intelligencePage, /Open VSI/);
+assert.match(intelligencePage, /Saved briefs/);
+assert.match(briefingPage, /loadCurrentIntelligenceBriefing/);
+assert.match(briefingPage, /Saved briefs/);
+assert.doesNotMatch(briefingPage, /generateIntelligenceBriefingAction|IntelligenceBriefingCards|generationEnabled/);
+assert.match(action, /separateBriefingGenerationRetired\(\)/);
 assert.doesNotMatch(`${action}\n${viewer}`, /app\/briefings|executive_brief/);
 
 console.log("Intelligence Briefing regressions passed.");

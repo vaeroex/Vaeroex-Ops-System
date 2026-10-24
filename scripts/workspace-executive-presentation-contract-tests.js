@@ -12,7 +12,6 @@ const ts = require("typescript");
 const contracts = [
   ["components/intelligence/ExecutiveHomepage.tsx", 4, "05eb10ae904d32cbee647c36f39e07966fd847b0cc5ccd254010d94015eac263", "0c4d7a3c8aac314730473b32958b237dc9e7627f72a18ba669fbbb8efcb4d96b"],
   ["components/intelligence/IntelligenceSignalInbox.tsx", 31, "014e053ef9e632b29178b1d9f8b19499dc42f562b59394e35014053298fcd8c2", "00d73a5fa2cfdc793a87b2efb9d670fb7418a6d2d77a4de4de5eb7ff02f83153"],
-  ["components/intelligence/IntelligenceBriefingCards.tsx", 3, "e169f19cd954d4cc4eeb92ecd55f2e192716eae7c19d0df56ce2e27d75243a51", "f5d450e5527cccc6c222a2c5855afa4fe86f4dcbf6e4948b9fd58012782534ec"],
   ["components/intelligence/IntelligenceBriefingViewer.tsx", 4, "fef1131de86d2a6686e912e95ede0b141f94ef758bd181a9022db813eed35433", "2aa8aea4c41e2607f0db118de38dd7db7bcf3cab298dc2cd878977abccb0e054"],
   ["app/app/intelligence/page.tsx", 1, "edadc1a1eeb3483f87ec570494cf2cbb56eb38889686b23ca325dbb86cb96002", "95aef36f602bd02dd8110bbecdca003be4ffed41958ac03406afa6cdc6563f98"],
   ["app/app/intelligence/briefings/page.tsx", 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "43f12ff66aaa0adb352107144abc5173dd62f63e32d2a8983e85dfefb539af9c"],
@@ -207,6 +206,22 @@ function withoutGoogleSheetsAuthority(source) {
 // only its exact reviewed hunks before checking the original data/action hashes.
 // A scope, token, handler or new-state substitution inside a hunk is rejected;
 // all untouched logic remains covered by the original frozen fingerprints.
+// Only the user-approved retirement hunks are reversed. Original data/action
+// fingerprints and their negative authorization tests still apply unchanged.
+const briefRetirement = require("./fixtures/vsi-brief-retirement-presentation-exception.json");
+function withoutBriefRetirement(file, source) {
+  const entry = briefRetirement.files.find(item => item.file === file);
+  if (!entry) return source;
+  for (const { before, after } of entry.changes) {
+    assert.equal(source.split(after).length, 2, "Require exactly the approved brief-retirement hunk");
+    source = source.replace(after, before);
+  }
+  return source;
+}
+function presentationSource(file) {
+  return withoutBriefRetirement(file, fs.readFileSync(path.join(__dirname, "..", file), "utf8"));
+}
+
 const intelligenceRefinement = require("./fixtures/intelligence-refinement-presentation-exception.json");
 const intelligencePagination = require("./fixtures/intelligence-pagination-presentation-exception.json");
 function withoutPagination(file, source) {
@@ -261,7 +276,7 @@ function withoutIntegrationResults(source) {
 
 for (const [file, count, actionsDigest, logicDigest] of contracts) {
   test(`${file} preserves the inventoried workflow beneath its presentation`, () => {
-    let source = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
+    let source = presentationSource(file);
     if (file === "components/intelligence/ExecutiveHomepage.tsx") {
       source = withoutHealthConsolidation(file, source);
       // User-requested visual comparison adds only a typed presentation prop.
@@ -293,7 +308,7 @@ for (const [file, count, actionsDigest, logicDigest] of contracts) {
 }
 
 test("current integration dashboard rejects changed imports, authorization, scope, props and restored sections", () => {
-  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  const source = presentationSource(intelligenceFile);
   const mutations = [
     ["@/components/integrations/CurrentIntegrations", "@/components/integrations/UnreviewedResults"],
     ["@/lib/integrations/dashboard/server", "@/lib/integrations/dashboard/unreviewed-server"],
@@ -317,7 +332,7 @@ test("current integration dashboard rejects changed imports, authorization, scop
 });
 
 test("dashboard exceptions reject missing, duplicate and extra bindings", () => {
-  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  const source = presentationSource(intelligenceFile);
   for (const binding of [...integrationResultAdditions, ...qboAccountingAdditions, ...workspaceAccessReplacements.map(([current]) => current)]) {
     assert(source.includes(binding));
     for (const replacement of ["", binding + binding]) {
@@ -330,7 +345,7 @@ test("dashboard exceptions reject missing, duplicate and extra bindings", () => 
 });
 
 test("Sheets authority exception rejects missing, duplicated, unscoped and substituted authority", () => {
-  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  const source = presentationSource(intelligenceFile);
   for (const [binding] of googleSheetsAuthorityReplacements) {
     assert(source.includes(binding));
     for (const replacement of ["", binding + binding]) {
@@ -358,7 +373,7 @@ test("Sheets authority exception rejects missing, duplicated, unscoped and subst
 });
 
 test("the integration exception still detects changes to existing Intelligence imports, queries and state", () => {
-  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  const source = presentationSource(intelligenceFile);
   const originalDigest = contracts.find(([file]) => file === intelligenceFile)[3];
   for (const [before, after] of [
     ['import Link from "next/link";', 'import Link from "other-link";'],
@@ -376,7 +391,7 @@ test("the integration exception still detects changes to existing Intelligence i
 });
 
 test("accounting exception rejects changed scope, timing and current evidence bindings", () => {
-  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  const source = presentationSource(intelligenceFile);
   for (const [before, after] of [
     ["qbo-customer/accounting-intelligence-server", "qbo-customer/unreviewed-server"],
     ["loadQboAccountingIntelligence(workspaceId, snapshotAsOf)", "loadQboAccountingIntelligence(otherWorkspace, snapshotAsOf)"],
@@ -394,7 +409,7 @@ test("accounting exception rejects changed scope, timing and current evidence bi
 
 
 test("source-parent completeness exception rejects altered scope, rows and consumer evidence", () => {
-  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  const source = presentationSource(intelligenceFile);
   for (const [before, after] of [
     ['loadSourceParentEligibilityResult({\n    supabase,\n    workspaceId,', 'loadSourceParentEligibilityResult({\n    supabase,\n    workspaceId: "other-workspace",'],
     ['loadSourceParentEligibilityResult({\n    supabase,', 'loadSourceParentEligibilityResult({\n    supabase: adminClient,'],
@@ -424,7 +439,7 @@ test("source-parent completeness exception rejects altered scope, rows and consu
 });
 
 test("source-parent completeness exception rejects missing, duplicate and extra bindings", () => {
-  const source = fs.readFileSync(path.join(__dirname, "..", intelligenceFile), "utf8");
+  const source = presentationSource(intelligenceFile);
   for (const [current, original] of sourceParentCompletenessReplacements) {
     assert(source.includes(current));
     for (const replacement of [original, current + current]) {
@@ -442,7 +457,7 @@ test("source-parent completeness exception rejects missing, duplicate and extra 
 
 test("Health relocation exception rejects missing, duplicate and altered reviewed hunks", () => {
   for (const { file, changes } of healthConsolidation.files) {
-    const source = withoutIntelligenceRefinement(file, fs.readFileSync(path.join(__dirname, "..", file), "utf8"));
+    const source = withoutIntelligenceRefinement(file, presentationSource(file));
     for (const { after } of changes) {
       for (const replacement of ["", after + after, after.replace(/\S/, "!")]) {
         assert.throws(() => withoutHealthConsolidation(file, source.replace(after, replacement)), assert.AssertionError);
@@ -454,7 +469,7 @@ test("Health relocation exception rejects missing, duplicate and altered reviewe
 
 test("Intelligence refinement exception rejects missing, duplicate and altered reviewed hunks", () => {
   for (const {file, changes} of intelligenceRefinement.files) {
-    const source = withoutPagination(file, fs.readFileSync(path.join(__dirname, "..", file), "utf8"));
+    const source = withoutPagination(file, presentationSource(file));
     for (const {after} of changes) {
       for (const replacement of ["", after + after, after.replace(/\S/, "!")]) {
         assert.throws(() => withoutIntelligenceRefinement(file, source.replace(after, replacement)), assert.AssertionError);
@@ -479,4 +494,20 @@ test("pagination exception rejects substitutions while retaining original action
     assert.throws(() => withoutPagination(intelligencePagination.file, source.replace(after, "")));
     assert.throws(() => withoutPagination(intelligencePagination.file, source.replace(after, after + after)));
   }
+});
+
+
+test("brief retirement keeps exact hunks and rejects missing, duplicate or changed bindings", () => {
+  for (const { file, changes, baselineSha256 } of briefRetirement.files) {
+    const source = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
+    assert.equal(digest(withoutBriefRetirement(file, source)), baselineSha256);
+    for (const { after } of changes) {
+      for (const replacement of ["", after + after, after.replace(/\S/, "!")]) {
+        assert.throws(() => withoutBriefRetirement(file, source.replace(after, replacement)), assert.AssertionError);
+      }
+    }
+  }
+  assert.equal(fs.existsSync(path.join(__dirname, "..", "components/intelligence/IntelligenceBriefingCards.tsx")), false);
+  const retirement = fs.readFileSync(path.join(__dirname, "..", "lib/ai/intelligence-briefing/retirement.ts"), "utf8");
+  assert.match(retirement, /return true/);
 });

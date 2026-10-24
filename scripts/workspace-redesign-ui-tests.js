@@ -172,7 +172,10 @@ async function main() {
           assert.match(html, /href="\/app\/integrations"/);
           assert.match(html, /aria-label="Refresh plug-in status"/);
           assert.match(html, /Current findings and history/);
-          assert.match(html, /id="intelligence-briefings-heading"/);
+          assert.match(html, /id="intelligence-vsi-brief-heading"/);
+          assert.match(html, /href="\/app\/si"/);
+          assert.match(html, /Saved briefs/);
+          assert.doesNotMatch(html, /Generate Weekly Briefing|Generate Monthly Briefing/);
           assert.match(html, /href="\/app\/intelligence\/briefings"/);
           assert.doesNotMatch(html, /Previously connected|Hidden plug-ins|View supporting data/);
         }

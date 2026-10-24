@@ -1,4 +1,5 @@
 "use server";
+import { separateBriefingGenerationRetired, SEPARATE_BRIEFING_RETIRED_MESSAGE } from "@/lib/ai/intelligence-briefing/retirement";
 
 import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadTicketFields } from "@/lib/integrations/google-sheets/read-authority";
 
@@ -70,6 +71,7 @@ function failedUsage(error: unknown, latencyMs: number, briefingType: Intelligen
 export async function generateIntelligenceBriefingAction(input: {
   briefingType: IntelligenceBriefingType;
 }): Promise<IntelligenceBriefingState> {
+  if (separateBriefingGenerationRetired()) return unavailable(isIntelligenceBriefingType(input?.briefingType) ? input.briefingType : "weekly", SEPARATE_BRIEFING_RETIRED_MESSAGE);
   const briefingType = input?.briefingType;
   if (!isIntelligenceBriefingType(briefingType)) return unavailable("weekly", "The briefing type is invalid.");
   const startedAt = Date.now();
