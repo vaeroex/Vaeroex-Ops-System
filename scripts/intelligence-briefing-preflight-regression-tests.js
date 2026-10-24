@@ -46,6 +46,7 @@ const asOf = "2026-08-17T12:00:00.000Z";
 
 function createSupabaseFixture({ tables = {}, errors = {} } = {}) {
   const calls = [];
+  const tickets = new Set();
 
   class Query {
     constructor(table) {
@@ -94,7 +95,21 @@ function createSupabaseFixture({ tables = {}, errors = {} } = {}) {
 
   return {
     calls,
-    client: { from: (table) => new Query(table) }
+    client: { from: (table) => new Query(table), async rpc(name, args) {
+      assert.ok(["begin_google_sheets_read_v1", "bind_google_sheets_read_v1"].includes(name), "preflight uses only read-ticket RPCs");
+      let ticketId;
+      if (name === "begin_google_sheets_read_v1") {
+        assert.equal(args.p_workspace_id, workspaceId);
+        ticketId = `55555555-5555-4555-8555-${String(tickets.size + 1).padStart(12, "0")}`;
+        tickets.add(ticketId);
+      } else {
+        ticketId = args.p_ticket_id;
+        assert.ok(tickets.has(ticketId), "binding retains its original minted ticket");
+        assert.ok(Array.isArray(args.p_sources));
+        assert.ok(args.p_sources.every(source => /^[0-9a-f-]{36}$/.test(source.id)));
+      }
+      return { data: { ticketId, epoch: 0, expiresAt: "2099-01-01T00:00:00.000Z" }, error: null };
+    } }
   };
 }
 
@@ -171,7 +186,7 @@ async function main() {
     deleted_at: null
   };
   const kpis = Array.from({ length: 47 }, (_, index) => ({
-    id: `kpi-production-shaped-${index + 1}`,
+    id: `66666666-6666-4666-8666-${String(index + 1).padStart(12, "0")}`,
     workspace_id: workspaceId,
     folder_id: null,
     name: `Production Metric ${String(index + 1).padStart(2, "0")}`,
@@ -193,7 +208,7 @@ async function main() {
     deleted_at: null
   }));
   const settings = kpis.map((row, index) => ({
-    id: `setting-production-shaped-${index + 1}`,
+    id: `77777777-7777-4777-8777-${String(index + 1).padStart(12, "0")}`,
     workspace_id: workspaceId,
     kpi_name: row.name,
     category: row.category,
