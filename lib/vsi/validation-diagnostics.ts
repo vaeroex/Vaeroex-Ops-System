@@ -5,7 +5,8 @@ export type VsiValidationStage = "answer_json" | "answer_schema" | "shared_relat
 
 const reasons = [
   "shared_relationship_dependency_missing", "shared_relationship_citation_missing", "shared_relationship_claim_changed",
-  "interpretation_duplicate_reference", "interpretation_premise_changed", "interpretation_distinct_dependencies_required",
+  "interpretation_duplicate_reference", "interpretation_duplicate_context_reference", "interpretation_duplicate_premise",
+  "interpretation_premise_changed", "interpretation_distinct_dependencies_required",
   "interpretation_environment_changed", "interpretation_qualification_required", "interpretation_unsupported_characters",
   "interpretation_assertion_denied", "interpretation_attribution_denied", "interpretation_unsupported_term", "interpretation_grounding_missing"
 ] as const;
