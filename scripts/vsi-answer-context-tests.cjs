@@ -25,7 +25,7 @@ const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getCl
  if(name==='validate_shared_evidence_manifest_v1')return {data:!revoked,error:revoked?{code:'42501'}:null};
  throw Error(`unexpected RPC ${name}`);
 }};
-const product={assistant:{name:'Vaeroex'},connections:{stored:'synthetic connection statuses'},catalog:'Maintained product facts. '.repeat(190)};
+const product={assistant:{name:'Vaeroex'},connections:{stored:'synthetic connection statuses'},catalog:'Maintained product facts. '.repeat(146)};
 const productSource={id:'P1',title:'Maintained product context',url:'/app/help',sourceType:'product_context',sourceId:null,evidenceDate:null,retrievedAt:'2026-10-01T00:00:00Z',snapshotHash:crypto.createHash('sha256').update(JSON.stringify(product)).digest('hex'),text:'Maintained product facts.',treatment:'record'};
 require('./qbo-customer-test-support.cjs').installLoader({
  'server-only':{},
@@ -66,16 +66,16 @@ const duplicate=structuredClone(pure);duplicate.qualitative_sources.push(duplica
 const many=structuredClone(pure);for(let n=3;n<=17;n++){const binding=n.toString(16).padStart(64,'0'),facts=[`Complete source group ${n}. `.repeat(20)];many.businessSources.push(source(`B${n}`,binding,facts));many.qualitative_sources.push(synth(`B${n}`,binding,facts));}
 many.businessSources.reverse();many.qualitative_sources.reverse();
 const manyPacked=JSON.parse(packVsiAnswerContext(many,'system',48000).json);assert.equal(manyPacked.businessSources.length,17);assert.deepEqual(manyPacked.businessSources.map(s=>s.id),many.businessSources.map(s=>s.id));assert.equal(new Set(manyPacked.businessSources.map(s=>s.sourceType)).size,2);
-let transport,originalChars=0,packedChars=0;
+let transport,originalChars=0,packedChars=0,serializedRequestChars=0,serializedRequestBytes=0;
 process.env.OPENAI_API_KEY='synthetic-global-unused';process.env.VAEROEX_VSI_MAX_INPUT_CHARS='32000';
 global.fetch=async(url,init)=>{
- providerCalls++;events.push('provider');assert.equal(url,'https://api.openai.com/v1/responses');assert.equal(init.headers.Authorization,'Bearer synthetic-dedicated-key');
+ providerCalls++;events.push('provider');assert(init.body.length<=32000);assert(Buffer.byteLength(init.body,'utf8')<=192000);assert.equal(url,'https://api.openai.com/v1/responses');assert.equal(init.headers.Authorization,'Bearer synthetic-dedicated-key');
  const body=JSON.parse(init.body),payload=JSON.parse(body.input[1].content);assert.equal(body.store,false);assert.equal(body.tools,undefined);assert.equal(body.model,'gpt-6-luna');
  assert(events.indexOf('seal_shared_evidence_manifest_v1')<events.indexOf('provider'));assert.equal(events.at(-2),'validate_shared_evidence_manifest_v1');
  let output;
  if(body.text.format.name==='vsi_research_plan_v1'){output={mode:'answer',businessEvidence:true,tier:'simple',clarification:'',publicTargets:[],objectives:[]};if(revokeAfterPlanner)revoked=true;}
  else {
-  answerCalls++;transport=payload;packedChars=body.input[0].content.length+body.input[1].content.length;assert(packedChars<=32000);assert.equal(payload.businessSources.length,2);assert.equal(payload.qualitative_sources.length,2);assert.deepEqual(payload.authoritativeProductContext,product);
+  answerCalls++;serializedRequestChars=init.body.length;serializedRequestBytes=Buffer.byteLength(init.body,'utf8');transport=payload;packedChars=body.input[0].content.length+body.input[1].content.length;assert(packedChars<=32000);assert.equal(payload.businessSources.length,2);assert.equal(payload.qualitative_sources.length,2);assert.deepEqual(payload.authoritativeProductContext,product);
   const expanded=structuredClone(payload);delete expanded.sharedObservationLayout;
   for(const source of expanded.businessSources){const record=JSON.parse(source.text);assert(record.observationsRef,'fixture must exercise compaction');const issued=payload.qualitative_sources.find(s=>s.ref===record.observationsRef);delete record.observationsRef;record.observations=issued.facts;source.text=JSON.stringify(record);}
   originalChars=JSON.stringify(expanded).length+body.input[0].content.length;assert(originalChars>32000,'reproduce the former post-premise context failure');
@@ -90,10 +90,10 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
 (async()=>{
  const answer=await runVsiAnswer(input);assert.equal(answer.sharedManifestId,manifest);assert.equal(answer.usage.providerCalls,2);assert.equal(answer.citations.length,2);assert.match(answer.content,/Interpretation \(unverified hypothesis\)/);
  for(const original of raw){const row=sharedRow(original,workspace),canonical=withVsiSourceSnapshot({id:row.hash,title:row.provider.replace(/[_-]/g,' '),url:`/app/sources/evidence/vsi_exchange/${request}?workspace=${workspace}#source-${row.hash}`,sourceType:`shared_${row.provider}`,sourceId:row.hash,evidenceDate:null,retrievedAt:transport.businessSources.find(s=>s.sourceId===row.hash).retrievedAt,text:JSON.stringify({scope:row.scope,observations:row.facts}),treatment:'record'});const saved=answer.citations.find(c=>c.sourceId===row.hash);assert(saved);assert.equal(saved.snapshotHash,canonical.snapshotHash);assert.equal(saved.url,canonical.url);assert.equal(transport.businessSources.find(s=>s.sourceId===row.hash).id,stableVsiCitationId(canonical));}
- const measured={originalChars,packedChars};
+ const measured={originalContextChars:originalChars,packedContextChars:packedChars,serializedRequestChars,serializedRequestBytes};
  for(const mode of ['unknown-citation','unsupported-cause']){answerMode=mode;await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.outcomeFailure==='citation_validation');}answerMode='valid';
  for(const kind of ['revoked','foreign']){providerCalls=0;answerCalls=0;revoked=kind==='revoked';foreign=kind==='foreign';await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.inputTokens===0);assert.equal(providerCalls,0);assert.equal(answerCalls,0);}revoked=false;foreign=false;
  providerCalls=0;answerCalls=0;revokeAfterPlanner=true;await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.providerCalls===1&&e.usage.outcomeFailure==='evidence_unavailable');assert.equal(providerCalls,1);assert.equal(answerCalls,0);revokeAfterPlanner=false;revoked=false;
- providerCalls=0;answerCalls=0;await assert.rejects(runVsiAnswer({...input,recentMessages:[{role:'user',content:'Historical conversation context. '.repeat(250)},{role:'assistant',content:'Prior explanation with no business citations. '.repeat(180)}]}),e=>e instanceof VsiEngineError&&e.usage.outcomeFailure==='context_block'&&/No additional source groups were dropped/.test(e.message));assert.equal(providerCalls,1);assert.equal(answerCalls,0);
- console.log(JSON.stringify({passed:true,fixture:'synthetic two-plugin full engine packing',...measured,sourceGroupsRetained:2,largerFixtureGroupsRetained:17,canonicalCitationsPreserved:true,revocationAndWrongWorkspaceDeniedBeforeProvider:true,unknownCitationAndCausalClaimDenied:true,revocationAfterPlanningStopsAnswer:true,unfitContextStopsBeforeAnswerCall:true,mockedRuntime:true,paidCalls:0}));
+ providerCalls=0;answerCalls=0;await assert.rejects(runVsiAnswer({...input,recentMessages:[{role:'user',content:'Historical conversation context. '.repeat(250)},{role:'assistant',content:'Prior explanation with no business citations. '.repeat(180)}]}),e=>e instanceof VsiEngineError&&e.usage.outcomeFailure==='context_block'&&/No canonical evidence was shortened/.test(e.message));assert.equal(providerCalls,0);assert.equal(answerCalls,0);
+ console.log(JSON.stringify({passed:true,fixture:'synthetic two-plugin full engine packing',...measured,sourceGroupsRetained:2,purePackerGroupsRetained:17,canonicalCitationsPreserved:true,revocationAndWrongWorkspaceDeniedBeforeProvider:true,unknownCitationAndCausalClaimDenied:true,revocationAfterPlanningStopsAnswer:true,unfitContextStopsBeforeAnswerCall:true,mockedRuntime:true,paidCalls:0}));
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -16,10 +16,11 @@ import { readVsiPrivateSummary } from "./summary";
 import { loadVsiProductContext } from "./product-context";
 import { VSI_PLANNER_PROMPT, VSI_PLAN_JSON_SCHEMA, VSI_PUBLIC_RESEARCH_JSON_SCHEMA, validateVsiResearchPlan,
   validateVsiPublicResearch, publicVsiUrl, priorVsiPublicTopics, prepareVsiHistory, selectVsiHistory, stableVsiCitationId, withVsiSourceSnapshot, boundedVsiPublicEvidence } from "./research";
-import type { VsiPublicResearchResult } from "./research";
+import type { VsiPublicResearchResult, VsiResearchTier } from "./research";
+import { explicitStoredVsiQuestion } from "./context-selection";
 import type { VsiAnswer, VsiCitation, VsiEvidenceResult, VsiMessage, VsiRunInput, VsiUsage } from "./types";
 import { vsiEvidenceWindow } from "./evidence-window";
-import { packVsiAnswerContext, serializeVsiAnswerContext, VsiAnswerContextLimit } from "./answer-context";
+import { packVsiAnswerContext, serializeVsiAnswerContext, serializeVsiProviderRequest, VsiAnswerContextLimit } from "./answer-context";
 
 const VSI_LIVE_FRESHNESS_INSTRUCTION = "For weather and other time-sensitive observations, describe the observation available in this lookup and give its source observation time. Compare that observation time with the supplied current lookup time, respecting the stated timezone. If the observation is more than about one hour old, explicitly say how old it is and that it may no longer reflect conditions now; never describe that reading as current or latest. If the observation time or timezone is missing or cannot be established, say its freshness cannot be verified and do not describe it as current or latest. Resolve today and tonight using the requested public location's local calendar date and the timezone established by its weather source, not the UTC/server date of the lookup. State the local date explicitly when giving today's conditions or tonight's forecast; the UTC lookup date can be a different calendar day. If the location timezone cannot be established, say so and do not guess a local date or label an uncertain forecast period today/tonight. Keep the observation time, forecast period and lookup time separate. A live lookup can return an older source; a fresh lookup timestamp does not make an older observation fresh.";
 
@@ -253,7 +254,8 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     if (usage.estimatedCostUsd >= config.requestReserveUsd) throw new VsiEngineError("This question reached its spending safeguard. Please narrow it and retry.", usage, false, "budget_block");
     const remaining = config.timeoutMs - (Date.now() - startedAt) - reserveAnswerMs;
     if (remaining < 4000) throw new VsiEngineError("This answer took too long. Please retry or ask a narrower question.", usage, false, "timeout");
-    if ((usage.providerCalls || 0) >= config.maxProviderCalls || Buffer.byteLength(JSON.stringify(body.input), "utf8") > config.maxProviderInputBytes) {
+    const serializedRequest = serializeVsiProviderRequest(body, config.maxOutputTokens);
+    if ((usage.providerCalls || 0) >= config.maxProviderCalls || serializedRequest.length > config.maxInputChars || Buffer.byteLength(serializedRequest, "utf8") > config.maxProviderInputBytes) {
       throw new VsiEngineError("This question exceeded its research context safeguard. Please narrow it and retry.", usage, false, "context_block");
     }
     // The shared provider guard rejects an open circuit synchronously, before fetch.
@@ -263,7 +265,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     try {
       const { response, value } = await consumeAIProviderResponse("openai", "https://api.openai.com/v1/responses", {
         method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...googleDataHeaders },
-        body: JSON.stringify({ store: false, stream: false, reasoning: { effort: "low" }, max_output_tokens: config.maxOutputTokens, ...body, model: VSI_MODEL })
+        body: serializedRequest
       }, async response => { try { return await response.json() as ProviderPayload; } catch { return {} as ProviderPayload; } },
       { ...getAIProviderRetrySettings("openai"), timeoutMs: remaining, maxRetries: 0 });
       addUsage(usage, value, response.headers.get("x-request-id"));
@@ -286,6 +288,58 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const selectedMessages = selectVsiHistory(input.recentMessages, input.question);
   const approvedPublicTopics = priorVsiPublicTopics(input.recentMessages, input.priorPublicResearchTopics);
   const plannerHistory = prepareVsiHistory(selectedMessages, [], input.question);
+  const sharedEvidence: VsiEvidenceResult | undefined = sharedPrepared && input.reservedRequest ? { sources: sharedPrepared.rows.map(row => ({
+    id: row.hash, title: row.provider.replace(/[_-]/g, " "), url: sharedTargetHref(input.workspaceId,"vsi_exchange",input.reservedRequest!.id,row.hash),
+    sourceType: `shared_${row.provider}`, sourceId: row.hash, evidenceDate: null, retrievedAt: new Date().toISOString(),
+    text: JSON.stringify({ scope: row.scope, observations: row.facts }), treatment: row.reported ? "reported_context" : "record"
+  })), limitations: [...sharedPrepared.limitations, `The selected stored-source window is ${sharedPrepared.start} through ${sharedPrepared.end}; other periods were not searched.`] } : undefined;
+  const makePayload = (evidence: VsiEvidenceResult, lookup: ReturnType<typeof boundedVsiPublicEvidence>["lookup"] | null, status: { tier: VsiResearchTier | null; rounds: number; partial: boolean; toolAllowanceExceeded: boolean; limitations: string[] }, datedPricingOnly: boolean, lookupPerformed: boolean) => {
+    const history = prepareVsiHistory(selectedMessages, [...evidence.sources, ...product!.sources], input.question);
+    return { question: input.question, now: new Date().toISOString(), privateConversationSummary: readVsiPrivateSummary(input.contextSummary),
+    recentConversation: history.messages.map(({ role, content }) => ({ role, content })), historicalSources: history.sources,
+    authoritativeProductContext: product!.authoritative, productSources: product!.sources.map(withVsiSourceSnapshot),
+    runtimeCapabilities: { publicWebResearch: "available", lookupThisTurn: lookupPerformed ? "performed" : "not_needed", externalActions: false, textOnly: true },
+    businessSources: evidence.sources.map(withVsiSourceSnapshot).map(source => ({ ...source, id: stableVsiCitationId(source) })),
+    sharedRelationships: sharedPrepared?.relationships.map(relationship=>({fact:relationship.fact,inputSourceIds:[...relationship.sourceHashes]})) || [],
+    qualitative_sources: [] as SynthesisSource[],
+    evidenceLimitations: [...evidence.limitations, ...product!.limitations],
+    sourceRequirements: { datedPricingOnly: datedPricingOnly },
+    livePublicLookup: lookup,
+    researchStatus: status };
+  };
+  const issuePremises = (payload: ReturnType<typeof makePayload>) => {
+  payload.qualitative_sources=payload.businessSources.flatMap(source=>{
+    const row=qualitativeSynthesisEnabled()?sharedPrepared?.rows.find(row=>row.hash===source.sourceId):undefined;
+    return row?[{ref:source.id,binding:row.hash,dependencies:[row.hash],facts:row.facts,reported:row.reported?row.provider==='file'?'file' as const:'note' as const:false as const,
+      environment:row.reported?'supporting' as const:row.scope.environment==='sandbox'?'sandbox' as const:'production' as const}]:[];
+  });
+  };
+  const answerRequest = (json: string, tier: VsiResearchTier) => ({ input: [{ role: "system", content: systemPrompt }, { role: "user", content: json }],
+    reasoning: { effort: tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, tier === "deep" ? 6000 : 4000),
+    text: { format: { type: "json_schema", name: "vsi_answer_v1", strict: true, schema: answerJsonSchema } } });
+  const packAnswer = (payload: ReturnType<typeof makePayload>, tier: VsiResearchTier, shared: boolean, phase: "preflight" | "answer") => {
+    try {
+      const packed = packVsiAnswerContext(payload, systemPrompt, config.maxInputChars, { selectRelevant: shared, maxBytes: config.maxProviderInputBytes,
+        requestJSON: json => serializeVsiProviderRequest(answerRequest(json,tier),config.maxOutputTokens) });
+      if (shared) console.info("[vsi-context-budget]", { phase, reason: "bounded_model_view", initial: packed.initialMetrics, final: packed.metrics });
+      return packed;
+    }
+    catch (error) {
+      if (error instanceof VsiAnswerContextLimit) {
+        console.error("[vsi-context-budget]", { phase, reason: "required_context_unfit", maxChars: config.maxInputChars, maxBytes: config.maxProviderInputBytes, ...error.metrics });
+        throw new VsiEngineError(shared ? "The required whole source scopes and workspace context do not fit within this answer's limit. No canonical evidence was shortened and no answer was generated. Please narrow the source scope or period."
+          : "This question and its sources are too large for one answer. Please narrow the question.", usage, false, "context_block");
+      }
+      if (error instanceof Error && error.message === "vsi_requested_source_unavailable") throw new VsiEngineError("A requested source is not available among the authorized evidence for this period. No answer was generated.",usage,false,"evidence_unavailable");
+      throw error;
+    }
+  };
+  // A stated stored-source question must fit a complete answer envelope before
+  // paying for its planner. General/public questions keep their existing planner.
+  if (sharedEvidence && explicitStoredVsiQuestion(input.question)) {
+    const preflight = makePayload(sharedEvidence,null,{tier:null,rounds:0,partial:false,toolAllowanceExceeded:false,limitations:[]},false,false);
+    issuePremises(preflight); packAnswer(preflight,"simple",true,"preflight");
+  }
   const plannerPayload = { question: input.question, now: new Date().toISOString(),
     privateConversationSummary: readVsiPrivateSummary(input.contextSummary), recentConversation: plannerHistory.messages.map(({ role, content }) => ({ role, content })), historicalSources: plannerHistory.sources,
     approvedPublicTopics, authoritativeProductContext: product.authoritative,
@@ -371,44 +425,28 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const previousQuestion = [...selectedMessages].reverse().find(message => message.role === "user")?.content || "";
   let evidence: VsiEvidenceResult = { sources: [], limitations: [] };
   try { if (plan.businessEvidence) {
-    if(sharedPrepared && input.reservedRequest) {
-      const targetId=input.reservedRequest.id;
-      evidence={sources:sharedPrepared.rows.map(row=>({id:row.hash,title:row.provider.replace(/[_-]/g," "),url:sharedTargetHref(input.workspaceId,"vsi_exchange",targetId,row.hash),sourceType:`shared_${row.provider}`,sourceId:row.hash,evidenceDate:null,retrievedAt:new Date().toISOString(),text:JSON.stringify({scope:row.scope,observations:row.facts}),treatment:row.reported?"reported_context":"record"})),limitations:[...sharedPrepared.limitations,`The selected stored-source window is ${sharedPrepared.start} through ${sharedPrepared.end}; other periods were not searched.`]};
-    } else evidence = await retrieveVsiEvidence(access, `${input.question}\n${previousQuestion.slice(0, 800)}`, new Date().toISOString(), input.readTicket);
+    if(sharedEvidence) evidence=sharedEvidence; else evidence = await retrieveVsiEvidence(access, `${input.question}\n${previousQuestion.slice(0, 800)}`, new Date().toISOString(), input.readTicket);
   } }
   catch { throw new VsiEngineError("Vaeroex could not check the permitted business sources for this answer. Please retry.", usage, false, "evidence_unavailable"); }
-  const history = prepareVsiHistory(selectedMessages, [...evidence.sources, ...product.sources], input.question);
   let publicSelection = boundedVsiPublicEvidence(webClaims, webSources, 16_000);
-  const payload = { question: input.question, now: new Date().toISOString(), privateConversationSummary: readVsiPrivateSummary(input.contextSummary),
-    recentConversation: history.messages.map(({ role, content }) => ({ role, content })), historicalSources: history.sources,
-    authoritativeProductContext: product.authoritative, productSources: product.sources.map(withVsiSourceSnapshot),
-    runtimeCapabilities: { publicWebResearch: "available", lookupThisTurn: plan.mode === "research" ? "performed" : "not_needed", externalActions: false, textOnly: true },
-    businessSources: evidence.sources.map(withVsiSourceSnapshot).map(source => ({ ...source, id: stableVsiCitationId(source) })),
-    sharedRelationships: sharedPrepared?.relationships.map(relationship=>({fact:relationship.fact,inputSourceIds:[...relationship.sourceHashes]})) || [],
-    qualitative_sources: [] as SynthesisSource[],
-    evidenceLimitations: [...evidence.limitations, ...product.limitations],
-    sourceRequirements: { datedPricingOnly: plan.objectives.includes("dated_pricing_only") },
-    livePublicLookup: webSources.length ? publicSelection.lookup : null,
-    researchStatus: { tier: plan.mode === "research" ? plan.tier : null, rounds: researchRounds, partial: researchPartial, toolAllowanceExceeded: usage.toolAllowanceExceeded === true, limitations: [...new Set(researchLimitations)].slice(-8) } };
+  const payload = makePayload(evidence,webSources.length ? publicSelection.lookup : null,
+    {tier:plan.mode === "research" ? plan.tier : null,rounds:researchRounds,partial:researchPartial,toolAllowanceExceeded:usage.toolAllowanceExceeded === true,limitations:[...new Set(researchLimitations)].slice(-8)},
+    plan.objectives.includes("dated_pricing_only"),plan.mode === "research");
   const sharedAnswer = Boolean(sharedPrepared && plan.businessEvidence);
   // Legacy retrieval retains its existing bounds. Admitted shared groups must
   // stay whole and present; packing happens after their issued premises exist.
-  if (!sharedAnswer) while (JSON.stringify(payload).length + systemPrompt.length > config.maxInputChars && payload.businessSources.length > 2) payload.businessSources.pop();
+  if (!sharedAnswer) while (serializeVsiProviderRequest(answerRequest(JSON.stringify(payload),plan.tier),config.maxOutputTokens).length > config.maxInputChars && payload.businessSources.length > 2) payload.businessSources.pop();
   payload.businessSources = payload.businessSources.filter(source => source.sourceType !== "financial_calculation"
     || source.inputSourceIds?.every(id => payload.businessSources.some(input => input.sourceType === "financial_report" && input.sourceId === id)));
   payload.sharedRelationships=payload.sharedRelationships.filter(signal=>signal.inputSourceIds.every(id=>payload.businessSources.some(source=>source.sourceId===id)));
-  payload.qualitative_sources=payload.businessSources.flatMap(source=>{
-    const row=qualitativeSynthesisEnabled()?sharedPrepared?.rows.find(row=>row.hash===source.sourceId):undefined;
-    return row?[{ref:source.id,binding:row.hash,dependencies:[row.hash],facts:row.facts,reported:row.reported?row.provider==='file'?'file' as const:'note' as const:false as const,
-      environment:row.reported?'supporting' as const:row.scope.environment==='sandbox'?'sandbox' as const:'production' as const}]:[];
-  });
+  issuePremises(payload);
   if (!sharedAnswer) {
-    while (JSON.stringify(payload).length + systemPrompt.length > config.maxInputChars && payload.recentConversation.length > 2) payload.recentConversation.shift();
-    while (JSON.stringify(payload).length + systemPrompt.length > config.maxInputChars && payload.historicalSources.length > 4) payload.historicalSources.pop();
-    if (JSON.stringify(payload).length + systemPrompt.length > config.maxInputChars) payload.recentConversation = payload.recentConversation.map(message => ({ ...message, content: message.content.slice(0, 3000) }));
+    while (serializeVsiProviderRequest(answerRequest(JSON.stringify(payload),plan.tier),config.maxOutputTokens).length > config.maxInputChars && payload.recentConversation.length > 2) payload.recentConversation.shift();
+    while (serializeVsiProviderRequest(answerRequest(JSON.stringify(payload),plan.tier),config.maxOutputTokens).length > config.maxInputChars && payload.historicalSources.length > 4) payload.historicalSources.pop();
+    if (serializeVsiProviderRequest(answerRequest(JSON.stringify(payload),plan.tier),config.maxOutputTokens).length > config.maxInputChars) payload.recentConversation = payload.recentConversation.map(message => ({ ...message, content: message.content.slice(0, 3000) }));
   }
   if (payload.livePublicLookup) {
-    const withoutLookup = serializeVsiAnswerContext({ ...payload, livePublicLookup: null }).json.length + systemPrompt.length;
+    const withoutLookup = serializeVsiProviderRequest(answerRequest(serializeVsiAnswerContext({ ...payload, livePublicLookup: null }).json,plan.tier),config.maxOutputTokens).length;
     publicSelection = boundedVsiPublicEvidence(webClaims, webSources, Math.max(0, Math.min(16_000, config.maxInputChars - withoutLookup - 1000)));
     payload.livePublicLookup = publicSelection.lookup;
     if (!publicSelection.citations.length) throw new VsiEngineError("The verified research is too large to summarize safely with this question. Please ask about a narrower part.", usage, false, "context_block");
@@ -417,28 +455,24 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
       payload.researchStatus.limitations.push(`${publicSelection.omittedClaims} additional verified findings from ${publicSelection.omittedSourceTitles.join(", ")} were left outside this bounded answer context. State that coverage is partial and offer a focused follow-up; do not claim those details were all assessed in the answer.`);
     }
   }
-  let packedContext;
-  try { packedContext = packVsiAnswerContext(payload, systemPrompt, config.maxInputChars); }
-  catch (error) {
-    if (!(error instanceof VsiAnswerContextLimit)) throw error;
-    throw new VsiEngineError(sharedAnswer
-      ? "The admitted source groups and workspace context do not fit within this answer's context limit. No additional source groups were dropped and no answer was generated."
-      : "This question and its sources are too large for one answer. Please narrow the question.", usage, false, "context_block");
-  }
+  const packedContext = packAnswer(payload,plan.tier,sharedAnswer,"answer");
+  const selected = new Set(packedContext.sourceIds);
+  const selectedBusiness = payload.businessSources.filter(source => selected.has(source.id));
+  const selectedHashes = new Set(selectedBusiness.map(source => source.sourceId));
+  const selectedRelationships = payload.sharedRelationships.filter(signal => signal.inputSourceIds.every(id => selectedHashes.has(id)));
+  const selectedPremises = payload.qualitative_sources.filter(source => selected.has(source.ref));
   usage.researchStatus = plan.mode === "research" ? payload.researchStatus.partial ? "partial" : "completed" : "not_required";
-  usage.evidenceLimitations = payload.evidenceLimitations.length > 0 || payload.researchStatus.limitations.length > 0;
-  const reply = await call({ input: [{ role: "system", content: systemPrompt }, { role: "user", content: packedContext.json }],
-    reasoning: { effort: plan.tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, plan.tier === "deep" ? 6000 : 4000),
-    text: { format: { type: "json_schema", name: "vsi_answer_v1", strict: true, schema: answerJsonSchema } } });
+  usage.evidenceLimitations = payload.evidenceLimitations.length > 0 || payload.researchStatus.limitations.length > 0 || packedContext.metrics.omittedSourceGroups > 0;
+  const reply = await call(answerRequest(packedContext.json,plan.tier));
   let structuredAnswer;
   try { structuredAnswer = answerSchema.parse(JSON.parse(outputText(reply))); }
   catch { throw new VsiEngineError("Vaeroex could not verify this answer and its sources. Please retry. Your question has not been counted.", usage, false, "output_validation"); }
   try {
-    validateSharedVsiRelationships(answerSchema.parse(structuredAnswer),payload.businessSources,payload.sharedRelationships);
-    const interpretations=structuredAnswer.interpretations.map(claim=>renderQualitativeInterpretation(claim,payload.qualitative_sources,ref=>` [${ref}]`));
-    const answer = validateVsiAnswer({content:[structuredAnswer.content,...interpretations].join("\n\n"),citationIds:[...new Set([...structuredAnswer.citationIds,...structuredAnswer.interpretations.flatMap(claim=>claim.premises.map(p=>p.ref))])]}, [...payload.businessSources, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]);
+    validateSharedVsiRelationships(answerSchema.parse(structuredAnswer),selectedBusiness,selectedRelationships);
+    const interpretations=structuredAnswer.interpretations.map(claim=>renderQualitativeInterpretation(claim,selectedPremises,ref=>` [${ref}]`));
+    const answer = validateVsiAnswer({content:[structuredAnswer.content,...interpretations].join("\n\n"),citationIds:[...new Set([...structuredAnswer.citationIds,...structuredAnswer.interpretations.flatMap(claim=>claim.premises.map(p=>p.ref))])]}, [...selectedBusiness, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]);
     if (webSources.length && !answer.citations.some(source => source.sourceType === "web")) throw new Error("The live answer omitted its source.");
-    return finish({ ...answer, ...(publicResearchTopics ? { publicResearchTopics } : {}) });
+    return finish({ ...answer, ...(packedContext.metrics.omittedSourceGroups ? {content: `Coverage: This is a partial review of selected stored evidence.\n\n${answer.content}`} : {}), ...(publicResearchTopics ? { publicResearchTopics } : {}) });
   } catch {
     throw new VsiEngineError("Vaeroex could not verify this answer and its sources. Please retry. Your question has not been counted.", usage, false, "citation_validation");
   }
