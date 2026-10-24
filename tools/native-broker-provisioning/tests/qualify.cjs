@@ -450,7 +450,10 @@ async function main() {
 }
 (async () => {
   let binaries;
-  try { binaries = await main(); } catch (error) { failure = error.safeStage ?? stage; }
+  try { binaries = await main(); } catch (error) {
+    // Keep the connection's test phase as well as its closed error category.
+    failure = error.safeStage?.startsWith("local_connect_") ? `${stage}_${error.safeStage}` : error.safeStage ?? stage;
+  }
   finally { if (fixture) try { await fixture.stop(); } catch { failure = "local_cluster_stop"; } }
   if (fixture && !failure) try {
     const saved = fixture.statBytes();

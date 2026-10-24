@@ -65,6 +65,23 @@ async function port() {
   await new Promise(resolve => socket.close(resolve));
   return value;
 }
+// Closed diagnostics only: never forward messages, role names, DSNs, key or certificate bytes.
+function connectionFailureStage(error, transport, principal) {
+  const own = name => error && typeof error === "object" ? Object.getOwnPropertyDescriptor(error, name)?.value : undefined;
+  const categories = new Map([
+    ["28P01", "password_rejected"], ["28000", "login_rejected"], ["42501", "permission_rejected"], ["53300", "connection_capacity"],
+    ["57P01", "server_shutdown"], ["57P02", "server_restarting"], ["57P03", "server_not_ready"],
+    ["ECONNREFUSED", "connection_refused"], ["ECONNRESET", "connection_reset"], ["ETIMEDOUT", "connection_timeout"],
+    ["EPIPE", "connection_closed"], ["ERR_TLS_CERT_ALTNAME_INVALID", "tls_identity"],
+    ["CERT_HAS_EXPIRED", "tls_expired"], ["CERT_NOT_YET_VALID", "tls_not_yet_valid"],
+    ["DEPTH_ZERO_SELF_SIGNED_CERT", "tls_trust"], ["SELF_SIGNED_CERT_IN_CHAIN", "tls_trust"],
+    ["UNABLE_TO_VERIFY_LEAF_SIGNATURE", "tls_trust"]
+  ]);
+  const category = categories.get(own("code")) ?? (own("message") === "timeout expired" ? "connection_timeout" : "unclassified");
+  const channel = transport === "tls" ? "tls" : transport === "socket" ? "socket" : "unknown";
+  const actor = principal === "candidate" ? "candidate" : principal === "admin" ? "admin" : "other";
+  return `local_connect_${channel}_${actor}_${category}`;
+}
 async function createFixture({ expandedOperator = false } = {}) {
   const versions = dependencies();
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "native-broker-synthetic-")));
@@ -84,7 +101,7 @@ async function createFixture({ expandedOperator = false } = {}) {
       connectionTimeoutMillis: 3000, statement_timeout: 6000, query_timeout: 7000,
       ...(transport === "tls" ? { ssl: { rejectUnauthorized: true, ca: fs.readFileSync(cert, "utf8") } } : {}) });
     client.on("error", () => undefined); clients.add(client);
-    try { await client.connect(); return client; } catch { await client.end().catch(() => undefined); clients.delete(client); failed("local_authentication_denied"); }
+    try { await client.connect(); return client; } catch (error) { await client.end().catch(() => undefined); clients.delete(client); failed(connectionFailureStage(error, transport, user === target ? "candidate" : user === admin ? "admin" : "other")); }
   }
   async function stop() {
     for (const client of clients) await client.end().catch(() => undefined);
@@ -168,4 +185,4 @@ GRANT SELECT,UPDATE,DELETE,TRUNCATE ON ALL TABLES IN SCHEMA private TO synthetic
       statBytes: () => Buffer.concat(stats.map(file => fs.existsSync(file) ? fs.readFileSync(file) : Buffer.alloc(0))) };
   } catch { await stop(); failed("fixture_bootstrap"); }
 }
-module.exports = { createFixture, failed, command, hash, env, pgRoot, admin, target, capability };
+module.exports = { createFixture, failed, command, hash, env, pgRoot, admin, target, capability, connectionFailureStage };

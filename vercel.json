@@ -3,6 +3,7 @@
     "deploymentEnabled": {
       "codex/evidence-mapping-setup-only": false,
       "codex/vsi-final-context-packing": false,
+      "codex/native-ci-connection-diagnostics": false,
       "codex/vsi-production-reasoning-release": false,
       "codex/vsi-prompts-retirement-only": false,
       "main": false,
