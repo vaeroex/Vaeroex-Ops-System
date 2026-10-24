@@ -20,7 +20,6 @@ module.exports = function(source) {
       import { HealthSnapshotUnavailable } from "@/components/intelligence/HealthSnapshotUnavailable";
       import { IntelligenceHealthSnapshot } from "@/components/intelligence/IntelligenceHealthSnapshot";
       import { IntelligenceReadiness } from "@/components/intelligence/IntelligenceReadiness";
-      import { IntelligenceBriefingCards } from "@/components/intelligence/IntelligenceBriefingCards";
       import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
       import { ErrorNotice } from "@/components/operations/ErrorNotice";
       import { CurrentIntegrations } from "@/components/integrations/CurrentIntegrations";
