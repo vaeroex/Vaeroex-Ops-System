@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS offline harness uses synchronous Node require hooks; no application lint rule is changed. */
 const assert = require('node:assert/strict');
 require('./qbo-customer-test-support.cjs').installLoader({ 'server-only': {} });
 const { validateSharedMemoryProjection } = require('../lib/ai/shared-evidence/memory-eligibility.ts');

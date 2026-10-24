@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS offline harness uses synchronous Node require hooks; no application lint rule is changed. */
 const assert=require('node:assert/strict'),React=require('react');
 const {renderToStaticMarkup}=require('react-dom/server');
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;

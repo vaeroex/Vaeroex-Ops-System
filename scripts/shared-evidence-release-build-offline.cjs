@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS offline harness uses synchronous Node require hooks; no application lint rule is changed. */
 // Build-process guard only. Never replaces a response or relaxes application checks.
 // Full compilation must fail if it unexpectedly needs an external data service.
 const http=require('node:http'),https=require('node:https'),net=require('node:net');

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS offline harness uses synchronous Node require hooks; no application lint rule is changed. */
 /* Actual settlement function, synthetic local clients only. No network or credentials. */
 const assert=require('node:assert/strict');
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;

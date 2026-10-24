@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS offline harness uses synchronous Node require hooks; no application lint rule is changed. */
 // Uses the current installed Node/Next only; never installs, downloads or deploys.
 const assert=require('node:assert/strict');
 const {spawnSync}=require('node:child_process');

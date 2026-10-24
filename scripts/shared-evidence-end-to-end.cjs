@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS offline harness uses synchronous Node require hooks; no application lint rule is changed. */
 /* Offline application + PGlite contract integration. Deterministic providers only.
  * Database fixture limitations remain explicit: not a browser, real PostgreSQL
  * concurrency, or full Supabase/document-provider trigger composition. */
 const assert=require('node:assert/strict');
 const {createHash}=require('node:crypto');
-module.exports=async function run({db,uuid,w,owner,session,entity,login,admin,map,read,newRequest,pluginCount=5}) {
+module.exports=async function run({db,uuid,w,owner,session,entity,login,admin,map,newRequest,pluginCount=5}) {
  const OriginalDate=Date;const fixedNow=OriginalDate.parse('2026-10-23T12:00:00Z');
  global.Date=class extends OriginalDate {constructor(...args){super(...(args.length?args:[fixedNow]));}static now(){return fixedNow;}};
  try {
@@ -13,7 +14,7 @@ module.exports=async function run({db,uuid,w,owner,session,entity,login,admin,ma
  const rpcNames=new Set(['discover_shared_evidence_v1','preview_shared_legacy_evidence_v1','read_shared_typed_evidence_v1','capture_legacy_evidence_v1','certify_shared_memory_semantics_v1','shared_evidence_dependencies_v1','seal_shared_evidence_manifest_v1','validate_shared_evidence_manifest_v1','vsi_mutate_v3','vsi_mutate_v2','complete_trusted_derived_run_v2','fail_trusted_derived_run_v1','reopen_shared_evidence_target_v1','reopen_shared_evidence_artifact_v1']);
  function client(role,actor=owner,sid=session){return {from:table=>{assert(['vsi_exchanges','vsi_requests','ai_agent_runs'].includes(table));const filters=[];const q={select:()=>q,eq:(key,value)=>{assert(/^[a-z_]+$/.test(key));filters.push([key,value]);return q;},maybeSingle:async()=>{await login(db,actor,sid,role);try{return{data:(await db.query(`select * from public.${table} where ${filters.map(([key],i)=>`${key}=$${i+1}`).join(' and ')}`,filters.map(([,value])=>value))).rows[0]||null,error:null};}catch(error){return{data:null,error:{code:error.code}};}}};return q;},auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:sid}},error:null})},rpc:async(name,args)=>{
   assert(rpcNames.has(name),name);const entries=Object.entries(args);entries.forEach(([key])=>assert(/^p_[a-z_]+$/.test(key)));
-  await login(db,actor,sid,role);try{return{data:(await db.query(`select public.${name}(${entries.map(([key],i)=>`${key}=>$${i+1}`).join(',')}) v`,entries.map(([,value])=>value&&typeof value==='object'&&!Array.isArray(value)?JSON.stringify(value):Array.isArray(value)&&name==='seal_shared_evidence_manifest_v1'&&Array.isArray(value)&&entries.find(([key,v])=>v===value)?.[0]==='p_sources'?JSON.stringify(value):value))).rows[0].v,error:null};}catch(error){console.error('synthetic RPC failed',name,error.code,error.message);return{data:null,error:{code:error.code,message:error.message}};}
+  await login(db,actor,sid,role);try{return{data:(await db.query(`select public.${name}(${entries.map(([key],i)=>`${key}=>$${i+1}`).join(',')}) v`,entries.map(([,value])=>value&&typeof value==='object'&&!Array.isArray(value)?JSON.stringify(value):Array.isArray(value)&&name==='seal_shared_evidence_manifest_v1'&&Array.isArray(value)&&entries.find(([,v])=>v===value)?.[0]==='p_sources'?JSON.stringify(value):value))).rows[0].v,error:null};}catch(error){console.error('synthetic RPC failed',name,error.code,error.message);return{data:null,error:{code:error.code,message:error.message}};}
  }};}
  const reader=client('authenticated'),service=client('service_role');
  async function bind(_reader,id,roots){assert.equal(id,activeTicket);await admin(db);const current=(await db.query('select sources from private.google_sheets_read_tickets where id=$1',[id])).rows[0].sources;

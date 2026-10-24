@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS offline harness uses synchronous Node require hooks; no application lint rule is changed. */
 // Offline package assembly. Never connects, applies SQL, changes a gate or runs CI.
 const fs=require('node:fs');
 const path=require('node:path');

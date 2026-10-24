@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS offline harness uses synchronous Node require hooks; no application lint rule is changed. */
 // Intercept the original socket implementation BEFORE loading the guard. A bug
 // records delegation and fails; it cannot open a socket or resolve an address.
 const assert=require('node:assert/strict');

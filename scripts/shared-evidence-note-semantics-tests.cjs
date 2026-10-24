@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS offline harness uses synchronous Node require hooks; no application lint rule is changed. */
 /* Offline semantic admission checks; no model or database calls. */
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');

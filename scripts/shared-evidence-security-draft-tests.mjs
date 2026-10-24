@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { read, draft1, draft2, draft3, deployed, definition, uuid, w, other, owner, member, owner2, session, memberSession, secondSession, entity, otherEntity, conn, sourceTables, login, admin, setup, map, capture, reopen, manifestSetup, seal, settlement, settle, newRequest, newBrief, finishedVsi, saveVsi, typedSetup, typedRead, typedSeal, sheetsFixture } from './shared-evidence-sql-fixture.mjs';
+import { read, uuid, w, other, owner, member, owner2, session, memberSession, secondSession, entity, otherEntity, conn, login, admin, setup, map, capture, reopen, manifestSetup, seal, settlement, settle, newRequest, newBrief, finishedVsi, saveVsi, typedSetup, typedRead, typedSeal, sheetsFixture } from './shared-evidence-sql-fixture.mjs';
 
 
 test('closed reader requires actual live owner JWT, no role grants or tenant substitution',async()=>{
@@ -255,7 +255,7 @@ test('review: copy of copy cannot hide deleted parent; sealed exchange identity 
 test('review: normal conversation deletion preserves billed request and makes inherited output unavailable',async()=>{
  const {db,ref}=await manifestSetup();try {
  await finishedVsi(db,ref);await login(db,owner,session,'service_role');
- const out=(await db.query('select vsi_mutate_v2($1,$2,$3,$4,$5) v',[w,owner,'delete',JSON.stringify({conversationId:uuid(102)}),session])).rows[0].v;
+ await db.query('select vsi_mutate_v2($1,$2,$3,$4,$5) v',[w,owner,'delete',JSON.stringify({conversationId:uuid(102)}),session]);
  await admin(db);assert.equal((await db.query('select count(*)::int n from vsi_conversations')).rows[0].n,0);
  const row=(await db.query('select conversation_id,cost_usd from vsi_requests where id=$1',[uuid(103)])).rows[0];assert.equal(row.conversation_id,null);assert.equal(Number(row.cost_usd),0.03);
  await db.query('delete from workspaces where id=$1',[w]);assert.equal((await db.query('select count(*)::int n from private.shared_evidence_artifact_manifests')).rows[0].n,0);
@@ -449,7 +449,7 @@ test('protected discovery, preview and stable target reopening preserve owner an
 
 
 test('empty manifest preserves general-answer accounting and cannot omit inherited evidence',async()=>{
- const {db,ref}=await manifestSetup();try {
+ const {db}=await manifestSetup();try {
  const empty=(id)=>db.query('select seal_shared_evidence_manifest_v1($1,$2,$3,1,$4,$5,$6) v',[w,'vsi_request',id,uuid(101),'[]',[]]);
  const sealed=(await empty(uuid(103))).rows[0].v;
  assert.equal((await db.query('select validate_shared_evidence_manifest_v1($1,$2,$3,$4,1) ok',[w,sealed.manifest_id,'vsi_request',uuid(103)])).rows[0].ok,true);
