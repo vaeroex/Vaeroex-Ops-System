@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "codex/vsi-production-reasoning-release": false,
       "codex/vsi-prompts-retirement-only": false,
       "main": false,
       "codex/intelligence-health-consolidation": false,
