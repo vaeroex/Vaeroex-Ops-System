@@ -44,7 +44,13 @@ packing.packVsiAnswerContext=(payload,...args)=>{const result=pack(payload,...ar
 const {runVsiAnswer}=require('../lib/vsi/engine.ts');
 
 process.env.VAEROEX_VSI_WORKSPACE_MONTHLY_BUDGET_USD='50';process.env.VAEROEX_VSI_MAX_OUTPUT_TOKENS='6000';process.env.VAEROEX_VSI_REQUEST_RESERVE_USD='0.25';process.env.OPENAI_API_KEY='synthetic-global-unused';process.env.VAEROEX_VSI_MAX_INPUT_CHARS='32000';
-let hiddenCitation=false,answerTemplate;
+let hiddenCitation=false,answerTemplate,answerVariant='valid';
+const validationEvents=[];
+const budgetEvents=[];
+const originalConsoleError=console.error;
+const originalConsoleInfo=console.info;
+console.error=(...args)=>{if(args[0]==='[vsi-validation]')validationEvents.push(args[1]);else if(args[0]==='[vsi-context-budget]')budgetEvents.push(args[1]);else originalConsoleError(...args);};
+console.info=(...args)=>{if(args[0]==='[vsi-context-budget]')budgetEvents.push(args[1]);else originalConsoleInfo(...args);};
 global.fetch=async(url,init)=>{
  providerCalls++; const body=JSON.parse(init.body),payload=JSON.parse(body.input[1].content);
  assert.equal(url,'https://api.openai.com/v1/responses');assert.equal(body.store,false);assert.equal(body.model,'gpt-6-luna');assert.equal(body.tools,undefined);assert(init.body.length<=32000,'entire serialized request including schema/envelope/escaping fits');
@@ -61,14 +67,39 @@ global.fetch=async(url,init)=>{
   const relevant=rows.filter(row=>row.sourceType==='shared_xero'||JSON.parse(row.text).scope.entityId===id(30));assert.equal(relevant.length,3);
   output={content:rows.map(row=>`Stored observations [${row.id}].`).join('\n'),citationIds:rows.map(row=>row.id),interpretations:[]};
   if(hiddenCitation)output.citationIds.push(measured.at(-1).canonical.find(row=>!measured.at(-1).selected.includes(row.id)).id);
+  if(answerVariant==='schema')output.content='';
+  if(answerVariant==='citation')output.citationIds.push('B999');
+  if(answerVariant==='url')output.content='Review https://not-issued.invalid/DO_NOT_LOG_SECRET.';
+  if(['quote','number','cause'].includes(answerVariant)){
+   output.interpretations=[{premises:payload.qualitative_sources.slice(0,2).map(p=>({ref:p.ref,binding:p.binding,quote:p.facts[0]})),hypothesis:'Stored observations may warrant a review.',missing_information:'What information is missing from these observations?',next_check:'Review these observations and their coverage.'}];
+   if(answerVariant==='quote')output.interpretations[0].premises[0].quote+=' DO_NOT_LOG_SECRET';
+   if(answerVariant==='number')output.interpretations[0].hypothesis='Stored observations may warrant a review of 123.';
+   if(answerVariant==='cause')output.interpretations[0].hypothesis='Stored observations may cause these review concerns.';
+  }
  }
- return new Response(JSON.stringify({model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:20},output_text:JSON.stringify(output)}),{status:200});
+ return new Response(JSON.stringify({model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:20},output_text:answerVariant==='json'&&body.text.format.name==='vsi_answer_v1'?'DO_NOT_LOG_SECRET invalid JSON':JSON.stringify(output)}),{status:200});
 };
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question:'Using only stored Xero evidence and synthetic Google Sheets dispatch and backlog operations canary observations, give a hypothetical executive brief. Do not search the web.',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}};
 (async()=>{
  const result=await runVsiAnswer(input);assert.equal(result.citations.length,3);assert.equal(providerCalls,2);assert.equal(answerCalls,1);
  const metrics=measured.at(-1);assert(metrics.initial.requestChars>32000);assert(metrics.final.requestChars<=32000);for(const m of [metrics.initial,metrics.final])assert.equal(m.contextChars+m.systemChars+m.inputFramingAndEscapingChars+m.schemaAndOutputFormatChars+m.otherRequestEnvelopeChars,m.requestChars);
  assert.match(result.content,/^Coverage: This is a partial review/);
+ assert(budgetEvents.length>=2);for(const diagnostic of budgetEvents){assert.equal(diagnostic.maxChars,32000);assert.equal(diagnostic.maxBytes,192000);assert.equal(diagnostic.charUnit,'javascript_utf16_code_units');assert.equal(diagnostic.byteUnit,'utf8');}
+ for(const [variant,stage,reason]of[
+  ['json','answer_json','malformed_json'],['schema','answer_schema','schema_invalid'],
+  ['citation','citation_resolution','unknown_citation'],['url','citation_resolution','unverified_url'],
+  ['quote','qualitative_interpretation','interpretation_premise_changed'],
+  ['number','qualitative_interpretation','interpretation_unsupported_characters'],
+  ['cause','qualitative_interpretation','interpretation_assertion_denied']]){
+  answerVariant=variant;const before=validationEvents.length,calls=providerCalls;
+  await assert.rejects(runVsiAnswer(input),error=>{
+   assert.equal(error.usage.validationFailure.stage,stage);assert.equal(error.usage.validationFailure.reason,reason);
+   assert.equal(error.usage.outcomeFailure,stage.startsWith('answer_')?'output_validation':'citation_validation');return true;
+  });
+  assert.equal(providerCalls-calls,2,'one planner and answer, no generation retry');assert.equal(validationEvents.length,before+1);
+  assert.doesNotMatch(JSON.stringify(validationEvents.at(-1)),/DO_NOT_LOG_SECRET|https:|00000000|[a-f0-9]{64}/);
+ }
+ answerVariant='valid';
  const {pluginProviders}=require('../lib/ai/shared-evidence/contracts.ts');
  const wire=json=>packing.serializeVsiProviderRequest({...answerTemplate,input:[answerTemplate.input[0],{role:'user',content:json}]},6000);
  const options={selectRelevant:true,requestJSON:wire,maxBytes:192000};
@@ -94,5 +125,5 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  for(const kind of ['revoked','foreign']){providerCalls=0;revoked=kind==='revoked';foreign=kind==='foreign';await assert.rejects(runVsiAnswer(input));assert.equal(providerCalls,0);}revoked=false;foreign=false;
  providerCalls=0;revokeAfterPlanner=true;await assert.rejects(runVsiAnswer(input),e=>e.usage.outcomeFailure==='evidence_unavailable');assert.equal(providerCalls,1);revokeAfterPlanner=false;revoked=false;
  providerCalls=0;await assert.rejects(runVsiAnswer({...input,contextSummary:'Required private conversation context. '.repeat(300),recentMessages:Array.from({length:8},(_,n)=>({role:n%2?'assistant':'user',content:'Earlier business context. '.repeat(220)}))}),e=>e.usage.outcomeFailure==='context_block');assert.equal(providerCalls,0,'unfit required context denied before any paid planner');
- console.log(JSON.stringify({passed:true,fixture:'synthetic mixed-source workspace with full product producer and request envelope',synthetic:true,initial:metrics.initial,final:metrics.final,requiredOriginalsRetained:true,canonicalManifestSourceCount:15,omittedCitationRejected:true,wrongWorkspaceAndRevocationDenied:true,unfitBeforeAnyProvider:true,allTwelveRetained:true,dependencyClosureAndAmbiguityDenials:true,historicalDependencyRequired:true,fullWireBytesChecked:true,coverageDisclosed:true,externalCalls:0}));
+ console.log(JSON.stringify({passed:true,fixture:'synthetic mixed-source workspace with full product producer and request envelope',synthetic:true,initial:metrics.initial,final:metrics.final,requiredOriginalsRetained:true,canonicalManifestSourceCount:15,omittedCitationRejected:true,wrongWorkspaceAndRevocationDenied:true,unfitBeforeAnyProvider:true,allTwelveRetained:true,dependencyClosureAndAmbiguityDenials:true,historicalDependencyRequired:true,fullWireBytesChecked:true,coverageDisclosed:true,validationStageCases:7,contentFreeDiagnostics:true,externalCalls:0}));
 })().catch(error=>{console.error(error);process.exitCode=1;});
