@@ -32,6 +32,8 @@ function fixture() {
     'server-only': {}, crypto: require('node:crypto'), zod: { z },
     '@/lib/integrations/google-sheets/read-authority': {},
     './summary': {},
+    './failure-accounting-gate': { vsiFailureAccountingEnabled: () => false },
+    '@/lib/ai/evidence-engine/hash': { evidenceEngineHash: value => JSON.stringify(value) },
     '@/lib/billing/get-subscription-status': { getSubscriptionStatus: async () => ({ allowed: state.entitled }) },
     '@/lib/supabase/server': { createSupabaseServerClient: async () => supabase },
     '@/lib/supabase/admin': { createSupabaseAdminClient: () => state.adminAvailable ? {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AnswerContent } from "@/components/vsi/AnswerContent";
+import { vsiCitationNavigationUrl } from "@/lib/vsi/citation-links";
 import { ComparisonCharts } from "@/components/charts/ComparisonCharts";
 import { briefingComparisons } from "@/lib/charts/briefing";
 import { Clock3, ShieldCheck } from "lucide-react";
@@ -108,7 +109,7 @@ export function SavedAnalysisRenderer({ envelope }: { envelope: SavedAnalysisEnv
               <p className="mt-1 text-xs font-semibold text-slate-500">{citation.sourceLabel} · {citation.sourceType}</p>
               <p className="mt-2 text-sm leading-6 text-slate-300">{citation.excerpt}</p>
               {citation.recordedAt ? <p className="mt-1 text-xs text-slate-500">Recorded {readableDate(citation.recordedAt)}</p> : null}
-              {citation.href ? <Link href={citation.href} className="mt-2 inline-flex text-xs font-semibold text-cyan-200 hover:underline">Open source</Link> : null}
+              {citation.href ? <Link href={vsiCitationNavigationUrl({ sourceType: citation.sourceType, url: citation.href }) as `/app/${string}`} className="mt-2 inline-flex text-xs font-semibold text-cyan-200 hover:underline">Open source</Link> : null}
             </li>
           ))}
         </ol>

@@ -1,3 +1,4 @@
+import { EvidenceMappingLink } from "@/components/integrations/EvidenceMappingLink";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -56,6 +57,7 @@ export default async function WixOrdersPage({ searchParams }: { searchParams?: P
         <p>Order totals are the values shown on orders. They are not net deposits, settled payments, or accounting revenue. Refund transactions are not included in this first version.</p>
       </div>
     </SectionCard>
+    {connection ? <EvidenceMappingLink workspaceId={access.workspaceId} provider={"wix-orders"} connectionId={connection.id} owner={owner} status={connection.status}/> : null}
     <SectionCard title="Connection" description="Only the workspace owner can connect or disconnect a Wix site.">
       {!available ? <p className="text-sm text-slate-600">Wix setup is being completed. Connection will appear here when ready.</p> :
         connectionError ? <p role="alert" className="text-sm text-red-700">Connection status is unavailable.</p> :

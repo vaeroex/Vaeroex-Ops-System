@@ -45,6 +45,11 @@ global.fetch=async(url,init)=>{
   if(mode==='wrong_model')return response({model:'gpt-6-sol',status:'completed',usage,output_text:'{}'});
   if(mode==='incomplete')return response({model:'gpt-6-luna',status:'incomplete',usage});
   const name=body.text?.format?.name,payload=JSON.parse(body.input[1].content);
+  if(name==='vsi_answer_v1') {
+    assert.equal(body.input[0].content,VSI_SYSTEM_PROMPT,'inactive synthesis preserves the current system prompt');
+    assert.deepEqual(body.text.format.schema.required,['content','citationIds']);
+    assert.equal(body.text.format.schema.properties.interpretations,undefined);
+  }
   if(name==='vsi_research_plan_v1'){
     currentRound=0;assert.equal(body.tools,undefined);
     const value=customPlan||plan('answer');

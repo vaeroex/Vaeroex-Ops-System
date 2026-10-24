@@ -28,6 +28,7 @@ const mocks = {
     VsiHttpError, vsiUuid: z.string().uuid(), questionHash: () => 'synthetic-question-hash',
     requireVsiAccess: async (_request, expected) => { accessChecks++; assert.equal(expected, workspaceId); return { workspaceId, userId: 'synthetic-actor', canEditBusinessNotes: true }; },
     loadVsiConversation: async (_access, id) => { assert.equal(id, conversationId); return { row: { context_summary: '', parent_conversation_id: null }, exchanges: [] }; },
+    settleFailedVsi: async (_access, input) => { mutations.push({ action: 'settle', input }); },
     mutateVsi: async (_access, action, input) => {
       mutations.push({ action, input });
       if (action === 'reserve') return { state: 'reserved', request: { id: reservationId, attempt: 2 } };
