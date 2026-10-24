@@ -70,6 +70,15 @@ const deps = {
     }
   }
 };
+// The HTTP layer now delegates settlement through named wrappers. Keep this
+// authority fixture's existing commit checks; shared settlement is qualified by
+// its separate application/SQL fixtures, not substituted here.
+deps['@/lib/vsi/storage'].settleGeneratedVsi = async (access, input, manifestId) => {
+  assert.equal(manifestId, undefined, 'this legacy-path fixture supplies no shared manifest');
+  return deps['@/lib/vsi/storage'].mutateVsi(access, 'settle', input);
+};
+deps['@/lib/vsi/storage'].settleFailedVsi = async (access, input) =>
+  deps['@/lib/vsi/storage'].mutateVsi(access, 'settle', { ...input, usage: { ...input.usage, failed: true } });
 const { vsiRoute } = load('lib/vsi/http.ts', deps);
 function request() { return new Request('https://synthetic.test/api/vsi/conversations/' + conversationId + '/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedWorkspaceId: workspaceId, message: 'Review our aggregate operations', requestId }) }); }
 (async () => {
@@ -100,7 +109,9 @@ function request() { return new Request('https://synthetic.test/api/vsi/conversa
   const { indexApprovedBusinessNote } = load('lib/ai/business-notes/indexing.ts', {
     crypto: require('node:crypto'),
     '@/lib/integrations/google-sheets/read-authority': authority,
-    '@/lib/ai/business-notes/review-context': { businessNoteUserAddedContextText: () => [] },
+    '@/lib/ai/business-notes/approved-context-text': load('lib/ai/business-notes/approved-context-text.ts', {
+      './review-context': { businessNoteUserAddedContextText: () => [] }
+    }),
     '@/lib/ai/evidence-index': { chunkEvidenceText: text => [text] },
     '@/lib/ai/usage': { estimateTokenCount: () => 20 },
     '@/lib/ai/providers/provider-manager': { createAIEmbeddings: async (_chunks, _timeout, options) => {
