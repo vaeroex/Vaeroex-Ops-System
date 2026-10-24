@@ -19,6 +19,7 @@ import { VSI_PLANNER_PROMPT, VSI_PLAN_JSON_SCHEMA, VSI_PUBLIC_RESEARCH_JSON_SCHE
 import type { VsiPublicResearchResult } from "./research";
 import type { VsiAnswer, VsiCitation, VsiEvidenceResult, VsiMessage, VsiRunInput, VsiUsage } from "./types";
 import { vsiEvidenceWindow } from "./evidence-window";
+import { packVsiAnswerContext, serializeVsiAnswerContext, VsiAnswerContextLimit } from "./answer-context";
 
 const VSI_LIVE_FRESHNESS_INSTRUCTION = "For weather and other time-sensitive observations, describe the observation available in this lookup and give its source observation time. Compare that observation time with the supplied current lookup time, respecting the stated timezone. If the observation is more than about one hour old, explicitly say how old it is and that it may no longer reflect conditions now; never describe that reading as current or latest. If the observation time or timezone is missing or cannot be established, say its freshness cannot be verified and do not describe it as current or latest. Resolve today and tonight using the requested public location's local calendar date and the timezone established by its weather source, not the UTC/server date of the lookup. State the local date explicitly when giving today's conditions or tonight's forecast; the UTC lookup date can be a different calendar day. If the location timezone cannot be established, say so and do not guess a local date or label an uncertain forecast period today/tonight. Keep the observation time, forecast period and lookup time separate. A live lookup can return an older source; a fresh lookup timestamp does not make an older observation fresh.";
 
@@ -389,8 +390,10 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     sourceRequirements: { datedPricingOnly: plan.objectives.includes("dated_pricing_only") },
     livePublicLookup: webSources.length ? publicSelection.lookup : null,
     researchStatus: { tier: plan.mode === "research" ? plan.tier : null, rounds: researchRounds, partial: researchPartial, toolAllowanceExceeded: usage.toolAllowanceExceeded === true, limitations: [...new Set(researchLimitations)].slice(-8) } };
-  // Bound whole records, not serialized fragments. Preserve the newest conversation and its source snapshot.
-  while (JSON.stringify(payload).length + systemPrompt.length > config.maxInputChars && payload.businessSources.length > 2) payload.businessSources.pop();
+  const sharedAnswer = Boolean(sharedPrepared && plan.businessEvidence);
+  // Legacy retrieval retains its existing bounds. Admitted shared groups must
+  // stay whole and present; packing happens after their issued premises exist.
+  if (!sharedAnswer) while (JSON.stringify(payload).length + systemPrompt.length > config.maxInputChars && payload.businessSources.length > 2) payload.businessSources.pop();
   payload.businessSources = payload.businessSources.filter(source => source.sourceType !== "financial_calculation"
     || source.inputSourceIds?.every(id => payload.businessSources.some(input => input.sourceType === "financial_report" && input.sourceId === id)));
   payload.sharedRelationships=payload.sharedRelationships.filter(signal=>signal.inputSourceIds.every(id=>payload.businessSources.some(source=>source.sourceId===id)));
@@ -399,11 +402,13 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     return row?[{ref:source.id,binding:row.hash,dependencies:[row.hash],facts:row.facts,reported:row.reported?row.provider==='file'?'file' as const:'note' as const:false as const,
       environment:row.reported?'supporting' as const:row.scope.environment==='sandbox'?'sandbox' as const:'production' as const}]:[];
   });
-  while (JSON.stringify(payload).length + systemPrompt.length > config.maxInputChars && payload.recentConversation.length > 2) payload.recentConversation.shift();
-  while (JSON.stringify(payload).length + systemPrompt.length > config.maxInputChars && payload.historicalSources.length > 4) payload.historicalSources.pop();
-  if (JSON.stringify(payload).length + systemPrompt.length > config.maxInputChars) payload.recentConversation = payload.recentConversation.map(message => ({ ...message, content: message.content.slice(0, 3000) }));
+  if (!sharedAnswer) {
+    while (JSON.stringify(payload).length + systemPrompt.length > config.maxInputChars && payload.recentConversation.length > 2) payload.recentConversation.shift();
+    while (JSON.stringify(payload).length + systemPrompt.length > config.maxInputChars && payload.historicalSources.length > 4) payload.historicalSources.pop();
+    if (JSON.stringify(payload).length + systemPrompt.length > config.maxInputChars) payload.recentConversation = payload.recentConversation.map(message => ({ ...message, content: message.content.slice(0, 3000) }));
+  }
   if (payload.livePublicLookup) {
-    const withoutLookup = JSON.stringify({ ...payload, livePublicLookup: null }).length + systemPrompt.length;
+    const withoutLookup = serializeVsiAnswerContext({ ...payload, livePublicLookup: null }).json.length + systemPrompt.length;
     publicSelection = boundedVsiPublicEvidence(webClaims, webSources, Math.max(0, Math.min(16_000, config.maxInputChars - withoutLookup - 1000)));
     payload.livePublicLookup = publicSelection.lookup;
     if (!publicSelection.citations.length) throw new VsiEngineError("The verified research is too large to summarize safely with this question. Please ask about a narrower part.", usage, false, "context_block");
@@ -412,12 +417,17 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
       payload.researchStatus.limitations.push(`${publicSelection.omittedClaims} additional verified findings from ${publicSelection.omittedSourceTitles.join(", ")} were left outside this bounded answer context. State that coverage is partial and offer a focused follow-up; do not claim those details were all assessed in the answer.`);
     }
   }
-  if (JSON.stringify(payload).length + systemPrompt.length > config.maxInputChars) {
-    throw new VsiEngineError("This question and its sources are too large for one answer. Please narrow the question.", usage, false, "context_block");
+  let packedContext;
+  try { packedContext = packVsiAnswerContext(payload, systemPrompt, config.maxInputChars); }
+  catch (error) {
+    if (!(error instanceof VsiAnswerContextLimit)) throw error;
+    throw new VsiEngineError(sharedAnswer
+      ? "The admitted source groups and workspace context do not fit within this answer's context limit. No additional source groups were dropped and no answer was generated."
+      : "This question and its sources are too large for one answer. Please narrow the question.", usage, false, "context_block");
   }
   usage.researchStatus = plan.mode === "research" ? payload.researchStatus.partial ? "partial" : "completed" : "not_required";
   usage.evidenceLimitations = payload.evidenceLimitations.length > 0 || payload.researchStatus.limitations.length > 0;
-  const reply = await call({ input: [{ role: "system", content: systemPrompt }, { role: "user", content: JSON.stringify(payload) }],
+  const reply = await call({ input: [{ role: "system", content: systemPrompt }, { role: "user", content: packedContext.json }],
     reasoning: { effort: plan.tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, plan.tier === "deep" ? 6000 : 4000),
     text: { format: { type: "json_schema", name: "vsi_answer_v1", strict: true, schema: answerJsonSchema } } });
   let structuredAnswer;

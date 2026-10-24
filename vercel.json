@@ -2,6 +2,7 @@
   "git": {
     "deploymentEnabled": {
       "codex/evidence-mapping-setup-only": false,
+      "codex/vsi-final-context-packing": false,
       "codex/vsi-production-reasoning-release": false,
       "codex/vsi-prompts-retirement-only": false,
       "main": false,
