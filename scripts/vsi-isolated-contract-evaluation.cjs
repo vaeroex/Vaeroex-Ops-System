@@ -2,8 +2,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {fork,execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
-const candidate='e08d83b33100aa2c5ee19031067156f968c0a70c';
-const runtimeTrees='040000 tree 8295029f519c64ea83e1c8c56f739245d24b460b\tapp\n040000 tree c2c357fea84b748e332ab7843de662994ba8b4b9\tlib';
+const candidate='658b8fd0b1a91fba11122486306fc8ef3e1f6d1e';
+const runtimeTrees='040000 tree 8295029f519c64ea83e1c8c56f739245d24b460b\tapp\n040000 tree 3123436eef0dae38d4c08d7301111d2deb57d333\tlib';
 const endpoint='https://api.openai.com/v1/responses';
 const limits=Object.freeze({questions:2,calls:4,callsPerQuestion:2,usd:1,reservePerCallUsd:.25,maxChars:48000,maxBytes:192000,maxOutputTokens:8000});
 const cases=Object.freeze([
@@ -121,7 +121,10 @@ function createEvaluation({outputDir,dispatch}={}){
 function mockDispatch({body,caseId='qualified-brief'}){
  assert(cases.some(test=>test.id===caseId),'unknown_fixture_case');
  const request=JSON.parse(body),payload=JSON.parse(request.input[1].content);
- const value=request.text.format.name==='vsi_research_plan_v1'?{mode:'answer',businessEvidence:true,tier:'simple',clarification:'',publicTargets:[],objectives:[]}:(()=>{
+ const value=request.text.format.name==='vsi_research_plan_v1'?(()=>{
+  const d=payload.sourceDiscovery,available=d?.status==='available'&&d.sourceGroups>=2&&['google_sheets','xero'].every(type=>d.sourceTypes?.includes(type));
+  return {mode:available?'answer':'clarify',businessEvidence:available,tier:'simple',clarification:available?'':'No eligible observations are established in this selected context. Which source, entity or period should be checked?',publicTargets:[],objectives:[]};
+ })():(()=>{
   const x=payload.qualitative_sources.find(s=>payload.businessSources.find(b=>b.id===s.ref)?.sourceType==='shared_xero');
   const s=payload.qualitative_sources.find(s=>payload.businessSources.find(b=>b.id===s.ref)?.sourceType==='shared_google_sheets');
   const interpretation=caseId==='qualified-brief'?{hypothesis:'Outstanding may warrant review alongside orders recorded on payment hold.',missing_information:'Whether outstanding and orders recorded on payment hold concern comparable records.',next_check:'Review outstanding alongside orders recorded on payment hold.'}:{hypothesis:'Invoice balance may warrant review alongside dispatches.',missing_information:'Whether invoice balance and dispatches concern comparable periods.',next_check:'Review invoice balance alongside dispatches.'};
@@ -129,24 +132,30 @@ function mockDispatch({body,caseId='qualified-brief'}){
  })();return Promise.resolve({httpStatus:200,model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:30},text:JSON.stringify(value)});
 }
 
-async function fixtureWorker(caseId){
+async function fixtureWorker(caseId,variant='present'){
  assert.equal(process.env.VAEROEX_SYNTHETIC_EVAL_WORKER,'1');assert.equal(typeof process.send,'function');
  for(const key of ['OPENAI_API_KEY','GOOGLE_SHEETS_OPENAI_API_KEY','GOOGLE_SHEETS_OPENAI_PROJECT_ID','GOOGLE_SHEETS_OPENAI_ORGANIZATION_ID','DATABASE_URL','SUPABASE_SERVICE_ROLE_KEY','NODE_OPTIONS'])assert.equal(process.env[key],undefined);
  const test=cases.find(c=>c.id===caseId);assert(test);
+ // Offline worker variants cannot be selected by createEvaluation or the paid CLI.
+ assert(['present','no_sources','missing_named_source','authority_denied','wrong_workspace','revoked_after_plan','ambiguous_scope'].includes(variant));
  const workspace=id(1),actor=id(2),session=id(3),request=id(caseId==='qualified-brief'?4:40),ticket=id(5),manifest=id(6);
  const ActualDate=Date;global.Date=class extends ActualDate{constructor(...args){super(...(args.length?args:['2026-10-24T00:00:00.000Z']));}static now(){return new ActualDate('2026-10-24T00:00:00.000Z').getTime();}};
- const {raw,captureReferenceId}=fixtureForCase(caseId);
+ const fixture=fixtureForCase(caseId),captureReferenceId=fixture.captureReferenceId;
+ const raw=variant==='no_sources'?[]:variant==='missing_named_source'?fixture.raw.filter(s=>s.provider==='xero'):fixture.raw;
+ if(variant==='wrong_workspace')raw[0].data.workspace_id=id(999);
+ const question=variant==='no_sources'?'Give a short executive brief using the stored workspace observations.':variant==='ambiguous_scope'?'Compare results for the other business and period.':test.question;
+ let plannerReturned=false;
  const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
   assert.equal(args.p_workspace_id,workspace);
-  if(name==='discover_shared_evidence_v1')return{data:{stage:'catalog_only',candidates:raw.map(s=>({provider:s.provider,identity:structuredClone(s.identity)})),truncated:false},error:null};
-  if(name==='read_shared_typed_evidence_v1'){assert.deepEqual(args.p_identity,raw[0].identity);return{data:{stage:'unadmitted',resolved:structuredClone(raw[0])},error:null};}
+  if(name==='discover_shared_evidence_v1')return variant==='authority_denied'?{data:null,error:{message:'synthetic_authority_denied'}}:{data:{stage:'catalog_only',candidates:raw.map(s=>({provider:s.provider,identity:structuredClone(s.identity)})),truncated:false},error:null};
+  if(name==='read_shared_typed_evidence_v1'){const source=raw.find(s=>s.provider==='google_sheets');assert(source);assert.deepEqual(args.p_identity,source.identity);return{data:{stage:'unadmitted',resolved:structuredClone(source)},error:null};}
   if(name==='preview_shared_legacy_evidence_v1'||name==='capture_legacy_evidence_v1'){
-   assert.equal(args.p_binding_id,raw[1].identity.binding_id);assert.equal(args.p_start,raw[1].identity.start);assert.equal(args.p_end,raw[1].identity.end);
-   return name==='capture_legacy_evidence_v1'?{data:{reference_id:captureReferenceId,source_hash:raw[1].hash},error:null}:{data:{stage:'unadmitted',resolved:structuredClone(raw[1])},error:null};
+   const source=raw.find(s=>s.provider==='xero');assert(source);assert.equal(args.p_binding_id,source.identity.binding_id);assert.equal(args.p_start,source.identity.start);assert.equal(args.p_end,source.identity.end);
+   return name==='capture_legacy_evidence_v1'?{data:{reference_id:captureReferenceId,source_hash:source.hash},error:null}:{data:{stage:'unadmitted',resolved:structuredClone(source)},error:null};
   }
   if(name==='shared_evidence_dependencies_v1')return{data:{manifestIds:[],readSources:[]},error:null};
-  if(name==='seal_shared_evidence_manifest_v1'){assert.equal(args.p_target_id,request);assert.equal(args.p_sources.length,2);return{data:{stage:'database_bound',manifest_id:manifest,provider_policy_required:true},error:null};}
-  if(name==='validate_shared_evidence_manifest_v1')return{data:true,error:null};throw Error('unexpected_fixture_rpc');
+  if(name==='seal_shared_evidence_manifest_v1'){assert.equal(args.p_target_id,request);assert.equal(args.p_sources.length,raw.length);return{data:{stage:'database_bound',manifest_id:manifest,provider_policy_required:true},error:null};}
+  if(name==='validate_shared_evidence_manifest_v1')return{data:!(variant==='revoked_after_plan'&&plannerReturned),error:null};throw Error('unexpected_fixture_rpc');
  }};
  require('./qbo-customer-test-support.cjs').installLoader({'server-only':{},'@supabase/supabase-js':{createClient:()=>{throw Error('database_client_denied');}},
   '@/lib/ai/shared-evidence/runtime-gate':{sharedEvidenceRuntimeEnabled:()=>true},'@/lib/ai/shared-evidence/qualitative-policy':{qualitativeSynthesisEnabled:()=>true},
@@ -158,18 +167,19 @@ async function fixtureWorker(caseId){
   '@/lib/supabase/admin':{createSupabaseAdminClient:()=>{throw Error('database_client_denied');}}
  });
  const pending=new Map();let serial=0,answerCount=0;console.info=()=>{};console.error=()=>{};
- process.on('message',message=>{if(message?.type==='provider_response'&&pending.has(message.request)){pending.get(message.request)(new Response(JSON.stringify(message.payload),{status:200}));pending.delete(message.request);}});
+ process.on('message',message=>{if(message?.type==='provider_response'&&pending.has(message.request)){if(message.request===1)plannerReturned=true;pending.get(message.request)(new Response(JSON.stringify(message.payload),{status:200}));pending.delete(message.request);}});
  global.fetch=async(url,init)=>{const n=++serial;assert(n<=2);const body=JSON.parse(init.body);if(body.text?.format?.name==='vsi_answer_v1')answerCount++;return new Promise(resolve=>{pending.set(n,resolve);process.send({type:'provider_request',request:n,caseId,url,body:init.body});});};
  const {runVsiAnswer}=require('../lib/vsi/engine.ts');
  try{
-  const answer=await runVsiAnswer({supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question:test.question,recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}});
+  const answer=await runVsiAnswer({supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question,recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}});
+  if(answerCount===0&&answer.usage.providerCalls===1&&!answer.noteDraft){process.send({type:'result',result:{mechanicalPass:false,failure:'planner_clarification',clarification:answer.content,citations:answer.citations,answerGenerationCalls:0,usage:{providerCalls:answer.usage.providerCalls,estimatedCostUsd:answer.usage.estimatedCostUsd},syntheticAuthorityOnly:true}});return;}
   assert.equal(answerCount,1);assert.equal(answer.citations.length,2);assert.deepEqual(new Set(answer.citations.map(c=>c.sourceType)),new Set(['shared_xero','shared_google_sheets']));
   process.send({type:'result',result:{mechanicalPass:true,answer:answer.content,citations:answer.citations,usage:{providerCalls:answer.usage.providerCalls,estimatedCostUsd:answer.usage.estimatedCostUsd},syntheticAuthorityOnly:true}});
- }catch(error){const diagnostic=error?.usage?.validationFailure;process.send({type:'result',result:{mechanicalPass:false,failure:diagnostic?'engine_validation_failed':'engine_failed',...(diagnostic?{diagnostic}:{})}});}
+ }catch(error){const diagnostic=error?.usage?.validationFailure,category=error?.usage?.outcomeFailure;process.send({type:'result',result:{mechanicalPass:false,failure:diagnostic?'engine_validation_failed':'engine_failed',...(diagnostic?{diagnostic}:{}),...(['application','evidence_unavailable','context_block','budget_block','provider','timeout','output_validation','citation_validation'].includes(category)?{engineCategory:category}:{})}});}
 }
 module.exports={candidate,cases,truth,limits,endpoint,checkRequest,createEvaluation,mockDispatch,fixtureForCase};
 if(require.main===module){
- if(process.argv[2]==='--fixture-worker')fixtureWorker(process.argv[3]).catch(()=>process.exit(1));
+ if(process.argv[2]==='--fixture-worker')fixtureWorker(process.argv[3],process.argv[4]).catch(()=>process.exit(1));
  else if(process.argv.length===3&&process.argv[2]==='--plan')console.log(JSON.stringify({candidate,cases,truth,limits,liveExecutionAvailable:false,credentialRoute:'not configured'}));
  else if(process.argv.length===4&&process.argv[2]==='--dry-run'){
   (async()=>{const evaluation=createEvaluation({outputDir:process.argv[3],dispatch:mockDispatch});await evaluation.runNext();const r=evaluation.snapshot();console.log(JSON.stringify({mockOnly:true,realModelQualified:false,state:r.state,calls:r.calls,reservedUsd:r.reservedUsd,questionsCompleted:r.results.length,artifactDirectory:evaluation.directory}));})().catch(error=>{const codes=['EEXIST','ENOENT','EACCES'];console.error(JSON.stringify({failure:'isolated_evaluation_failed',code:codes.includes(error.code)?error.code:'guard_failed'}));process.exitCode=1;});

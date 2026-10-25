@@ -343,10 +343,17 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     const preflight = makePayload(sharedEvidence,null,{tier:null,rounds:0,partial:false,toolAllowanceExceeded:false,limitations:[]},false,false);
     issuePremises(preflight); packAnswer(preflight,"simple",true,"preflight");
   }
-  const plannerPayload = { question: input.question, now: new Date().toISOString(),
+  // Permission-checked discovery is routing context, not business facts or proof
+  // of complete coverage. Values and canonical citations stay in answer context.
+  const sourceDiscovery = sharedEvidence && sharedPrepared && sharedManifestId ? {
+    status: sharedEvidence.sources.length ? "available" : "none_in_selected_context",
+    sourceTypes: [...new Set(sharedPrepared.rows.map(row => row.provider))], sourceGroups: sharedEvidence.sources.length,
+    window: { start: sharedPrepared.start, end: sharedPrepared.end }, observationsIncluded: false, coverageComplete: false
+  } : { status: "not_checked", sourceTypes: [], sourceGroups: null, window: null, observationsIncluded: false, coverageComplete: false };
+  const plannerPayload = { question: input.question, now: new Date().toISOString(), sourceDiscovery,
     privateConversationSummary: readVsiPrivateSummary(input.contextSummary), recentConversation: plannerHistory.messages.map(({ role, content }) => ({ role, content })), historicalSources: plannerHistory.sources,
     approvedPublicTopics, authoritativeProductContext: product.authoritative,
-    runtimeCapabilities: { publicWebResearch: "available", privateBusinessEvidence: "available_with_permissions", textOnly: true } };
+    runtimeCapabilities: { publicWebResearch: "available", privateBusinessEvidence: sourceDiscovery.status, textOnly: true } };
   const planned = await call({ input: [{ role: "system", content: VSI_PLANNER_PROMPT }, { role: "user", content: JSON.stringify(plannerPayload) }],
     max_output_tokens: 1600, text: { format: { type: "json_schema", name: "vsi_research_plan_v1", strict: true, schema: VSI_PLAN_JSON_SCHEMA } } }, 45_000);
   let plan;
