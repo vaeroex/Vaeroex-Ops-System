@@ -31,4 +31,13 @@ assert.deepEqual(diagnose('shared_answer_contract',coverage).coverage,{available
 assert(!JSON.stringify(diagnose('shared_answer_contract',coverage)).includes('DO_NOT_LOG_SECRET'));
 const invalidCounts=new SharedAnswerContractError('source_coverage',{availableReferences:Infinity,observedReferences:-1,requiredGroups:10000,missingGroups:'DO_NOT_LOG_SECRET'});
 assert.deepEqual(diagnose('shared_answer_contract',invalidCounts).coverage,{availableReferences:0,observedReferences:0,requiredGroups:999,missingGroups:0});
+for(const reason of ['unknown_ref','binding_mismatch','fact_index_out_of_bounds','source_dependencies_missing']){
+ const error=new SharedAnswerContractError('fact_reference',undefined,{reason,bindingMatchesOtherSource:true,ref:secret,binding:secret,answer:secret});
+ const result=diagnose('shared_answer_contract',error);assert.deepEqual(result.factReference,{reason,...(reason==='binding_mismatch'?{bindingMatchesOtherSource:true}:{})});
+ assert(!JSON.stringify(result).includes(secret));assert.equal(diagnose('citation_resolution',error).factReference,undefined);
+ error.factReference.reason=secret;assert.equal(diagnose('shared_answer_contract',error).factReference,undefined);
+}
+const malformedFactDiagnostic=new SharedAnswerContractError('fact_reference',undefined,{reason:'binding_mismatch',bindingMatchesOtherSource:secret});
+assert.deepEqual(diagnose('shared_answer_contract',malformedFactDiagnostic).factReference,{reason:'binding_mismatch'});
+malformedFactDiagnostic.rule='source_coverage';assert.equal(diagnose('shared_answer_contract',malformedFactDiagnostic).factReference,undefined);
 console.log(JSON.stringify({safeStageCategories:true,unknownMessagesAndFieldsWithheld:true,zodValuesAndMessagesWithheld:true,contractMetadataClosedEnumsOnly:true,externalCalls:0}));

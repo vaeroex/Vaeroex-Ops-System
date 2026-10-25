@@ -6,7 +6,8 @@ export type SynthesisSource = Readonly<{ ref: string; binding: string; dependenc
  * select immutable issued facts/results; the application renders their values,
  * dates, units and attribution. Draft narrative is never verified business data.
  * Reference validity does not establish semantic entailment or usefulness. */
-const factSelection = z.object({ ref: z.string().min(1).max(80), binding: z.string().regex(/^(?:sha256:)?[a-f0-9]{64}$/), factIndex: z.number().int().min(0).max(1999) }).strict();
+const factBindingPattern = "^[a-f0-9]{64}$";
+const factSelection = z.object({ ref: z.string().min(1).max(80), binding: z.string().length(64).regex(new RegExp(factBindingPattern)), factIndex: z.number().int().min(0).max(1999) }).strict();
 const draft = z.object({ premises: z.array(factSelection).max(24), text: z.string().trim().min(1).max(1600) }).strict();
 export const sharedAnswerSchema = z.object({
   observations: z.array(factSelection).max(96), results: z.array(z.string().regex(/^[a-f0-9]{64}$/)).max(12),
@@ -19,12 +20,14 @@ type Draft = z.infer<typeof draft>;
 export const sharedAnswerRules = ["context_reference", "fact_reference", "duplicate_fact", "source_coverage", "result_reference", "result_dependencies", "draft_support", "draft_format", "numeric_draft", "hypothesis_disabled", "independent_sources", "environment", "answer_bounds"] as const;
 export type SharedAnswerRule = typeof sharedAnswerRules[number];
 export type SharedAnswerCoverageDiagnostic = Readonly<{ availableReferences: number; observedReferences: number; requiredGroups: number; missingGroups: number }>;
+export const factReferenceReasons = ["unknown_ref", "binding_mismatch", "fact_index_out_of_bounds", "source_dependencies_missing"] as const;
+export type FactReferenceDiagnostic = Readonly<{ reason: typeof factReferenceReasons[number]; bindingMatchesOtherSource?: boolean }>;
 export class SharedAnswerContractError extends Error {
-  constructor(readonly rule: SharedAnswerRule, readonly coverage?: SharedAnswerCoverageDiagnostic) { super("shared_answer_contract_denied"); }
+  constructor(readonly rule: SharedAnswerRule, readonly coverage?: SharedAnswerCoverageDiagnostic, readonly factReference?: FactReferenceDiagnostic) { super("shared_answer_contract_denied"); }
 }
 const fail = (rule: SharedAnswerRule): never => { throw new SharedAnswerContractError(rule); };
 
-const factJson = { type: "object", additionalProperties: false, required: ["ref", "binding", "factIndex"], properties: { ref: { type: "string", minLength: 1, maxLength: 80 }, binding: { type: "string", pattern: "^(?:sha256:)?[a-f0-9]{64}$" }, factIndex: { type: "integer", minimum: 0, maximum: 1999 } } } as const;
+const factJson = { type: "object", additionalProperties: false, required: ["ref", "binding", "factIndex"], properties: { ref: { type: "string", minLength: 1, maxLength: 80 }, binding: { type: "string", minLength: 64, maxLength: 64, pattern: factBindingPattern }, factIndex: { type: "integer", minimum: 0, maximum: 1999 } } } as const;
 export const sharedDraftTextPattern = "^[^0-9$€£%\\[\\]<>\\r\\n]*$";
 const draftJson = { type: "object", additionalProperties: false, required: ["premises", "text"], properties: {
   premises: { type: "array", maxItems: 24, items: factJson }, text: { type: "string", minLength: 1, maxLength: 1600, pattern: sharedDraftTextPattern }
@@ -36,7 +39,7 @@ export const sharedAnswerJsonSchema = { type: "object", additionalProperties: fa
   }
 } as const;
 
-export const SHARED_ANSWER_INSTRUCTIONS = "Use the shared-answer schema, without content or citationIds. observations select complete issued qualitative_sources facts by ref, exact binding and zero-based factIndex. Include at least one observation from each answerSourceRequirements group; select relevant facts from other available originals only when useful. Context availability is not a claim or complete population coverage. Do not infer totals, trends or completeness from a selected subset. contextFactSources select productSources text at index zero or matching livePublicLookup claims in order, with issued binding. results select only supplied sharedRelationships ids with every exact input observed; never invent a calculation. The app renders facts, values, dates, units and attribution. Draft prose has no factual or calculation authority. hypotheses are optional unverified possibilities supported by at least two independent business originals; do not force a hypothesis when an evidence check is useful. missing_information and next_checks may use ordinary language, questions and negations; distinguish absent information from facts and ask a specific check before a decision, not generic review-alongside prose. Draft premises must be observed facts; use at most thirty source references. Use no URLs, inline citation markup or numeric literals in draft text; refer to adjacent observations instead. No business-word whitelist applies. Never invent causes, correspondence, completeness, actions performed or measured results. Draft usefulness needs manual review; valid references do not prove claims.";
+export const SHARED_ANSWER_INSTRUCTIONS = "Use the shared-answer schema, without content or citationIds. observations select complete issued qualitative_sources facts by ref, exact bare binding (64 lowercase hexadecimal characters, no sha256: prefix) and zero-based factIndex within that source’s facts array. Copy the binding from qualitative_sources or contextFactSources, not snapshotHash. Historical-only references are not issued fact selections. Include at least one observation from each answerSourceRequirements group; select relevant facts from other available originals only when useful. Context availability is not a claim or complete population coverage. Do not infer totals, trends or completeness from a selected subset. contextFactSources select productSources text at index zero or matching livePublicLookup claims in order, with issued binding. results select only supplied sharedRelationships ids with every exact input observed; never invent a calculation. The app renders facts, values, dates, units and attribution. Draft prose has no factual or calculation authority. hypotheses are optional unverified possibilities supported by at least two independent business originals; do not force a hypothesis when an evidence check is useful. missing_information and next_checks may use ordinary language, questions and negations; distinguish absent information from facts and ask a specific check before a decision, not generic review-alongside prose. Draft premises must be observed facts; use at most thirty source references. Use no URLs, inline citation markup or numeric literals in draft text; refer to adjacent observations instead. No business-word whitelist applies. Never invent causes, correspondence, completeness, actions performed or measured results. Draft usefulness needs manual review; valid references do not prove claims.";
 
 /** Reuse already-authorized app context and completed public lookup snapshots.
  * No extra retrieval, source text duplication, or historical-business promotion.
@@ -86,9 +89,16 @@ export function renderSharedAnswer(value: unknown, context: {
   const answer = sharedAnswerSchema.parse(value);
   const byRef = new Map(context.sources.map(source => [source.ref, source]));
   if (byRef.size !== context.sources.length) fail("context_reference");
+  const factFailure = (reason: FactReferenceDiagnostic["reason"], bindingMatchesOtherSource?: boolean): never => {
+    throw new SharedAnswerContractError("fact_reference", undefined, { reason,
+      ...(reason === "binding_mismatch" ? { bindingMatchesOtherSource } : {}) });
+  };
   const resolve = (selection: FactSelection) => {
     const source = byRef.get(selection.ref);
-    if (!source || source.binding !== selection.binding || selection.factIndex >= source.facts.length || !source.dependencies.length) return fail("fact_reference");
+    if (!source) return factFailure("unknown_ref");
+    if (source.binding !== selection.binding) return factFailure("binding_mismatch", context.sources.some(other => other !== source && other.binding === selection.binding));
+    if (selection.factIndex >= source.facts.length) return factFailure("fact_index_out_of_bounds");
+    if (!source.dependencies.length) return factFailure("source_dependencies_missing");
     return { source, fact: source.facts[selection.factIndex] };
   };
   const observed = new Map<string, ReturnType<typeof resolve>>();

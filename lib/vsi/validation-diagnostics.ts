@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SharedAnswerContractError, sharedAnswerRules, type SharedAnswerRule, type SharedAnswerCoverageDiagnostic } from "@/lib/ai/shared-evidence/answer-contract";
+import { SharedAnswerContractError, sharedAnswerRules, factReferenceReasons, type FactReferenceDiagnostic, type SharedAnswerRule, type SharedAnswerCoverageDiagnostic } from "@/lib/ai/shared-evidence/answer-contract";
 
 export type VsiValidationStage = "answer_json" | "answer_schema" | "shared_relationships"
   | "qualitative_interpretation" | "shared_answer_contract" | "planner_clarification" | "citation_resolution" | "public_source_coverage";
@@ -18,6 +18,7 @@ export type VsiValidationDiagnostic = Readonly<{
   schemaIssueCount?: number; schemaIssueCodes?: string[]; schemaFields?: string[];
   contractRule?: SharedAnswerRule;
   coverage?: SharedAnswerCoverageDiagnostic;
+  factReference?: FactReferenceDiagnostic;
 }>;
 
 const schemaCodes = new Set(["invalid_type", "invalid_value", "invalid_string", "invalid_format", "too_big", "too_small", "unrecognized_keys", "invalid_union", "custom"]);
@@ -40,7 +41,11 @@ export function vsiValidationDiagnostic(stage: VsiValidationStage, error: unknow
     ...(error.rule === "source_coverage" && error.coverage ? { coverage: {
       availableReferences: boundedCount(error.coverage.availableReferences), observedReferences: boundedCount(error.coverage.observedReferences),
       requiredGroups: boundedCount(error.coverage.requiredGroups), missingGroups: boundedCount(error.coverage.missingGroups)
-    } } : {}) };
+    } } : {}),
+    ...(error.rule === "fact_reference" && error.factReference && factReferenceReasons.some(reason => reason === error.factReference?.reason)
+      ? { factReference: { reason: error.factReference.reason,
+        ...(error.factReference.reason === "binding_mismatch" && typeof error.factReference.bindingMatchesOtherSource === "boolean"
+          ? { bindingMatchesOtherSource: error.factReference.bindingMatchesOtherSource } : {}) } } : {}) };
   if (error instanceof z.ZodError) {
     const issues = error.issues.slice(0, 32);
     return { stage, category, reason: "schema_invalid", schemaIssueCount: Math.min(error.issues.length, 999),

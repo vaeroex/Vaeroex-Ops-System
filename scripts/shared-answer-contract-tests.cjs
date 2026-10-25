@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- No network, credentials or production data. */
 const assert=require('node:assert/strict');
 require('./qbo-customer-test-support.cjs').installLoader({'server-only':{}});
-const {sharedAnswerSchema,renderSharedAnswer:render,renderSharedClarification,issueAnswerResults,issueContextFactSources,SharedAnswerContractError}=require('../lib/ai/shared-evidence/answer-contract.ts');
+const {sharedAnswerSchema,sharedAnswerJsonSchema,renderSharedAnswer:render,renderSharedClarification,issueAnswerResults,issueContextFactSources,SharedAnswerContractError}=require('../lib/ai/shared-evidence/answer-contract.ts');
 const {vsiValidationDiagnostic:diagnose}=require('../lib/vsi/validation-diagnostics.ts');
 const {sharedRow}=require('../lib/ai/shared-evidence/generation.ts');
 const {fixtureForCase}=require('./vsi-isolated-contract-evaluation.cjs');
@@ -35,6 +35,28 @@ denied({...good,observations:[{...good.observations[0],binding:'f'.repeat(64)},g
 denied({...good,observations:[{...good.observations[0],binding:good.observations[1].binding},good.observations[1]]},'fact_reference');
 denied({...good,observations:[{...good.observations[0],factIndex:1999},good.observations[1]]},'fact_reference');
 denied({...good,observations:[{...good.observations[0],factIndex:-1},good.observations[1]]});
+// The provider schema and local parser must describe the same exact issued
+// binding format. Never strip a prefix or repair an unissued model selection.
+const bindingPattern=new RegExp(sharedAnswerJsonSchema.properties.observations.items.properties.binding.pattern);
+const bindingSchema=sharedAnswerJsonSchema.properties.observations.items.properties.binding;
+assert.equal(bindingSchema.minLength,64);assert.equal(bindingSchema.maxLength,64);
+assert(bindingPattern.test(good.observations[0].binding));
+for(const binding of ['sha256:'+good.observations[0].binding,good.observations[0].binding.toUpperCase(),' '+good.observations[0].binding,good.observations[0].binding+'\n']){
+ assert(!(binding.length===64&&bindingPattern.test(binding)));
+ const altered={...good,observations:[{...good.observations[0],binding},good.observations[1]]},before=JSON.stringify(altered);
+ assert(!sharedAnswerSchema.safeParse(altered).success);denied(altered);assert.equal(JSON.stringify(altered),before);
+ const premiseOnly={...good,next_checks:[{premises:[{...good.observations[0],binding}],text:'Inspect the record.'}]};assert(!sharedAnswerSchema.safeParse(premiseOnly).success);
+}
+for(const [selection,reason,other] of [
+ [{...good.observations[0],ref:'HISTORICAL_ONLY'},'unknown_ref'],
+ [{...good.observations[0],binding:good.observations[1].binding},'binding_mismatch',true],
+ [{...good.observations[0],binding:'f'.repeat(64)},'binding_mismatch',false],
+ [{...good.observations[0],factIndex:sources[0].facts.length},'fact_index_out_of_bounds']
+])assert.throws(()=>render({...good,observations:[selection,good.observations[1]]},context),error=>{
+ assert.equal(error.rule,'fact_reference');assert.equal(error.factReference.reason,reason);
+ assert.deepEqual(diagnose('shared_answer_contract',error).factReference,{reason,...(other===undefined?{}:{bindingMatchesOtherSource:other})});return true;
+});
+assert.throws(()=>render(good,{...context,sources:sources.map(s=>({...s,dependencies:[]}))}),e=>e.factReference.reason==='source_dependencies_missing');
 denied({...good,observations:[good.observations[0],good.observations[0],good.observations[1]]},'duplicate_fact');
 denied({...good,observations:good.observations.slice(0,1)},'source_coverage');
 denied(good,'context_reference',{...context,sources:[...sources,sources[0]]});
@@ -68,6 +90,20 @@ assert.match(renderSharedClarification('Which records and period should be check
 for(const value of ['The balance is 999.','See https://not-issued.invalid','[B999] proves it.']){assert.throws(()=>renderSharedClarification(value),SharedAnswerContractError);negativeCases++;}
 const auxiliaries=issueContextFactSources([{id:'P1',text:'An application-owned plan description.',snapshotHash:'d'.repeat(64)}],{claims:[{text:'A completed public observation.',citationIds:['W1'],evidenceDate:null,dateProvenance:{kind:'unknown'}}],sources:[{id:'W1',retrievedAt:'2026-10-25T00:00:00Z'}]});
 assert(auxiliaries.every(s=>s.supportOnly));const auxSelections=auxiliaries.map(s=>({ref:s.ref,binding:s.binding,factIndex:0}));
+// Public indices are source-local after final lookup ordering, not positions
+// in the global claims array. Overlapping references must retain that mapping.
+const publicContext=issueContextFactSources([],{claims:[
+ {text:'Only the second public source.',citationIds:['W2'],evidenceDate:null,dateProvenance:{kind:'unknown'}},
+ {text:'A claim shared by both public sources.',citationIds:['W1','W2'],evidenceDate:null,dateProvenance:{kind:'unknown'}},
+ {text:'Only the first public source.',citationIds:['W1'],evidenceDate:null,dateProvenance:{kind:'unknown'}}
+],sources:[{id:'W1',retrievedAt:'2026-10-25T00:00:00Z'},{id:'W2',retrievedAt:'2026-10-25T00:00:00Z'}]});
+assert(publicContext[0].facts[0].startsWith('A claim shared'));assert(publicContext[0].facts[1].startsWith('Only the first'));
+assert(publicContext[1].facts[0].startsWith('Only the second'));assert(publicContext[1].facts[1].startsWith('A claim shared'));
+for(const source of publicContext)for(let factIndex=0;factIndex<source.facts.length;factIndex++){
+ const selected={observations:[{ref:source.ref,binding:source.binding,factIndex}],results:[],hypotheses:[],missing_information:[],next_checks:[]};
+ const result=positive(selected,{sources:publicContext,results:[],hypothesesEnabled:false,requiredRefs:[]});assert(result.content.includes(source.facts[factIndex].split(' Source date:')[0]));assert(result.content.includes('Source date: not established'));assert.deepEqual(result.citationIds,[source.ref]);
+}
+assert.throws(()=>render({observations:[{ref:'W1',binding:publicContext[0].binding,factIndex:2}],results:[],hypotheses:[],missing_information:[],next_checks:[]},{sources:publicContext,results:[],hypothesesEnabled:false,requiredRefs:[]}),e=>e.factReference.reason==='fact_index_out_of_bounds');
 const mixed=positive({...good,observations:[...good.observations,...auxSelections]},{...context,sources:[...sources,...auxiliaries],requiredRefs:sources.map(s=>s.ref)});assert(mixed.citationIds.includes('W1')&&mixed.citationIds.includes('P1'));assert(mixed.content.includes('Source date: not established'));
 denied({...good,observations:[...good.observations,...auxSelections],hypotheses:[{premises:auxSelections,text:'These contexts may establish a business conclusion.'}]},'independent_sources',{...context,sources:[...sources,...auxiliaries],requiredRefs:sources.map(s=>s.ref)});
 // Semantic honesty: source swaps/calculations in factual fields are rejected,
