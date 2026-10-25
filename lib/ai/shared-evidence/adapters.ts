@@ -11,6 +11,20 @@ const snapshot = z.object({ start: instantSchema, end: instantSchema, metrics: z
 const historyKeys = { xero: ["invoices", "billed", "outstanding", "bills", "purchases"],
   harvest: ["entries", "hours", "billable_hours", "running"], clockify: ["entries", "hours", "billable_hours", "running"] };
 const snapshotKeys = { "zoho-inventory": ["items", "low_stock"], toggl: ["projects", "hours"], katana: ["stock_rows", "unavailable"] };
+/** Stored reporting metrics use currency both for money and for Xero grouping.
+ * Resolve units from the provider contract, never from currency presence alone.
+ * This pure parser confers no source admission or calculation authority. */
+export function reportingMetricSemantics(provider: string, raw: unknown, kind: "history" | "snapshot") {
+  const row = metric.parse(raw);
+  const keys: Record<string, readonly string[]> = kind === "history" ? historyKeys : snapshotKeys;
+  if (!Object.hasOwn(keys, provider) || !keys[provider].includes(row.key)
+    || (provider === "xero") !== Boolean(row.currency)) throw new Error("invalid_metric");
+  const monetary = provider === "xero" && ["billed", "outstanding", "purchases"].includes(row.key);
+  const unit = monetary ? "currency" : row.key.includes("hours") ? "hours" : "count";
+  if (Number(row.value) < 0 || unit === "count" && (!/^-?\d+(?:\.0+)?$/.test(row.value)
+    || !Number.isSafeInteger(Number(row.value)))) throw new Error("invalid_metric_value");
+  return { unit, currency: monetary ? row.currency! : null, partition: row.currency ?? null };
+}
 function days(context: ParseContext) { return (Date.parse(context.end) - Date.parse(context.start)) / 86_400_000 + 1; }
 function boundedCoverage(context: ParseContext, covered: number, complete: number, first?: string | null, last?: string | null): ParseContext {
   if (complete > covered || covered > days(context) || first && first < context.start || last && last > context.end) throw new Error("invalid_coverage");
@@ -24,13 +38,10 @@ export function parseReportingHistory(provider: keyof typeof historyKeys, raw: u
   const scoped = boundedCoverage(context, report.coverage.days, report.coverage.completeDays, report.coverage.startDate, report.coverage.endDate);
   if (!report.hasHistory || !report.coverage.days) return parsed(provider, { ...scoped, coverage: "unknown" }, [], ["No imported coverage; missing is not zero."]);
   const rows = report.metrics.map(row => {
-    if (!historyKeys[provider].includes(row.key) || (provider === "xero") !== Boolean(row.currency)) throw new Error("invalid_metric");
-    const monetary = ["billed", "outstanding", "purchases"].includes(row.key);
-    const unit = monetary ? "currency" : row.key.includes("hours") ? "hours" : "count";
-    if (Number(row.value) < 0 || unit === "count" && !Number.isSafeInteger(Number(row.value))) throw new Error("invalid_metric_value");
+    const { unit, currency, partition } = reportingMetricSemantics(provider, row, "history");
     return observation(provider, scoped, row.key, row.value, unit,
       provider === "xero" ? "invoice_or_bill_date" : provider === "clockify" ? "own_entries_utc_start" : "visible_entries_spent_date",
-      row.key === "outstanding" ? "snapshot" : "period", monetary ? row.currency! : null, row.currency ?? null);
+      row.key === "outstanding" ? "snapshot" : "period", currency, partition);
   });
   return parsed(provider, scoped, rows, [provider === "xero"
     ? "Invoices are not recognized revenue; outstanding is the balance when imported, not a historical balance."
@@ -44,9 +55,8 @@ export function parseReportingSnapshot(provider: keyof typeof snapshotKeys, raw:
   const scoped = { ...context, timeZone: "UTC", coverage: "snapshot" as const,
     start: new Date(report.start).toISOString().slice(0, 10), end: new Date(report.end).toISOString().slice(0, 10) };
   const rows = report.metrics.map(row => {
-    if (!snapshotKeys[provider].includes(row.key) || row.currency) throw new Error("invalid_metric");
-    if (Number(row.value) < 0 || row.key !== "hours" && !Number.isSafeInteger(Number(row.value))) throw new Error("invalid_metric_value");
-    return observation(provider, scoped, row.key, row.value, row.key === "hours" ? "hours" : "count",
+    const { unit } = reportingMetricSemantics(provider, row, "snapshot");
+    return observation(provider, scoped, row.key, row.value, unit,
       provider === "toggl" ? "visible_active_projects" : "inventory_snapshot", provider === "toggl" && row.key === "hours" ? "lifetime" : "snapshot", null);
   });
   return parsed(provider, scoped, rows, [provider === "toggl" ? "Hours are lifetime totals of visible active projects, not this week's timesheet."
