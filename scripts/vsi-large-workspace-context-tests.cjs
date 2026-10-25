@@ -59,6 +59,8 @@ global.fetch=async(url,init)=>{
  if(body.text.format.name==='vsi_research_plan_v1') {output={mode:'answer',businessEvidence:true,tier:'simple',clarification:'',publicTargets:[],objectives:[]};if(revokeAfterPlanner)revoked=true;}
  else {
   answerCalls++; answerTemplate=structuredClone(body); assert.equal(init.body.length,measured.at(-1).final.requestChars);assert.equal(Buffer.byteLength(init.body,'utf8'),measured.at(-1).final.requestBytes);assert.equal(payload.productSources.length,6,'use actual product producer, not tiny one-source placeholder');
+  assert.match(body.input[0].content,/even in questions or negations/);
+  assert.match(body.text.format.schema.properties.interpretations.items.properties.missing_information.description,/even in questions or negations/);
   assert.equal(payload.contextCoverage.complete,false);assert.equal(payload.businessSources.length,3);
   assert.equal(payload.qualitative_sources.length,3);assert.equal(payload.contextCoverage.omittedSourceGroups,12);
   const rows=payload.businessSources;
@@ -70,11 +72,17 @@ global.fetch=async(url,init)=>{
   if(answerVariant==='schema')output.content='';
   if(answerVariant==='citation')output.citationIds.push('B999');
   if(answerVariant==='url')output.content='Review https://not-issued.invalid/DO_NOT_LOG_SECRET.';
-  if(['quote','number','cause'].includes(answerVariant)){
+  if(['quote','number','cause','certainty','record_linkage','calculation','formatting','negated_certainty','quantitative'].includes(answerVariant)){
    output.interpretations=[{premises:payload.qualitative_sources.slice(0,2).map(p=>({ref:p.ref,binding:p.binding,quote:p.facts[0]})),hypothesis:'Stored observations may warrant a review.',missing_information:'What information is missing from these observations?',next_check:'Review these observations and their coverage.'}];
    if(answerVariant==='quote')output.interpretations[0].premises[0].quote+=' DO_NOT_LOG_SECRET';
    if(answerVariant==='number')output.interpretations[0].hypothesis='Stored observations may warrant a review of 123.';
    if(answerVariant==='cause')output.interpretations[0].hypothesis='Stored observations may cause these review concerns.';
+   if(answerVariant==='certainty')output.interpretations[0].hypothesis='Stored observations may be a proven conclusion.';
+   if(answerVariant==='negated_certainty')output.interpretations[0].hypothesis='Stored observations may warrant review, not a proven conclusion.';
+   if(answerVariant==='record_linkage')output.interpretations[0].missing_information='Whether these observations are linked.';
+   if(answerVariant==='calculation')output.interpretations[0].next_check='Review the sum of these observations.';
+   if(answerVariant==='quantitative')output.interpretations[0].next_check='Review the ratio of these observations.';
+   if(answerVariant==='formatting')output.interpretations[0].next_check='Review these observations; check their coverage.';
   }
   if(['multi_fact','duplicate_premise','same_original','invented_multi_quote'].includes(answerVariant)){
    const xero=payload.qualitative_sources.find(p=>p.ref===rows.find(row=>row.sourceType==='shared_xero').id);
@@ -108,18 +116,25 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  for(const citation of multiFactAnswer.citations){const original=metrics.canonical.find(source=>source.sourceId===citation.sourceId);assert(original);assert.equal(citation.url,original.url);assert.equal(citation.snapshotHash,original.snapshotHash);}
  assert.match(multiFactAnswer.content,/Interpretation \(unverified hypothesis\)/);
  assert.equal((multiFactAnswer.content.match(/Recorded observation:/g)||[]).length,4);
- for(const [variant,stage,reason]of[
+ for(const [variant,stage,reason,assertionRule,authoredField]of[
   ['json','answer_json','malformed_json'],['schema','answer_schema','schema_invalid'],
   ['citation','citation_resolution','unknown_citation'],['url','citation_resolution','unverified_url'],
   ['quote','qualitative_interpretation','interpretation_premise_changed'],
   ['number','qualitative_interpretation','interpretation_unsupported_characters'],
-  ['cause','qualitative_interpretation','interpretation_assertion_denied'],
+  ['cause','qualitative_interpretation','interpretation_assertion_denied','causal_language','hypothesis'],
+  ['certainty','qualitative_interpretation','interpretation_assertion_denied','certainty_language','hypothesis'],
+  ['negated_certainty','qualitative_interpretation','interpretation_assertion_denied','certainty_language','hypothesis'],
+  ['record_linkage','qualitative_interpretation','interpretation_assertion_denied','record_linkage_language','missing_information'],
+  ['calculation','qualitative_interpretation','interpretation_assertion_denied','calculation_language','next_check'],
+  ['quantitative','qualitative_interpretation','interpretation_assertion_denied','quantitative_language','next_check'],
+  ['formatting','qualitative_interpretation','interpretation_assertion_denied','formatting','next_check'],
   ['duplicate_premise','qualitative_interpretation','interpretation_duplicate_premise'],
   ['same_original','qualitative_interpretation','interpretation_distinct_dependencies_required'],
   ['invented_multi_quote','qualitative_interpretation','interpretation_premise_changed']]){
   answerVariant=variant;const before=validationEvents.length,calls=providerCalls;
   await assert.rejects(runVsiAnswer(input),error=>{
    assert.equal(error.usage.validationFailure.stage,stage);assert.equal(error.usage.validationFailure.reason,reason);
+   assert.equal(error.usage.validationFailure.assertionRule,assertionRule);assert.equal(error.usage.validationFailure.authoredField,authoredField);
    assert.equal(error.usage.outcomeFailure,stage.startsWith('answer_')?'output_validation':'citation_validation');return true;
   });
   assert.equal(providerCalls-calls,2,'one planner and answer, no generation retry');assert.equal(validationEvents.length,before+1);
@@ -151,5 +166,5 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  for(const kind of ['revoked','foreign']){providerCalls=0;revoked=kind==='revoked';foreign=kind==='foreign';await assert.rejects(runVsiAnswer(input));assert.equal(providerCalls,0);}revoked=false;foreign=false;
  providerCalls=0;revokeAfterPlanner=true;await assert.rejects(runVsiAnswer(input),e=>e.usage.outcomeFailure==='evidence_unavailable');assert.equal(providerCalls,1);revokeAfterPlanner=false;revoked=false;
  providerCalls=0;await assert.rejects(runVsiAnswer({...input,contextSummary:'Required private conversation context. '.repeat(300),recentMessages:Array.from({length:8},(_,n)=>({role:n%2?'assistant':'user',content:'Earlier business context. '.repeat(220)}))}),e=>e.usage.outcomeFailure==='context_block');assert.equal(providerCalls,0,'unfit required context denied before any paid planner');
- console.log(JSON.stringify({passed:true,fixture:'synthetic mixed-source workspace with full product producer and request envelope',synthetic:true,initial:metrics.initial,final:metrics.final,requiredOriginalsRetained:true,canonicalManifestSourceCount:15,omittedCitationRejected:true,wrongWorkspaceAndRevocationDenied:true,unfitBeforeAnyProvider:true,allTwelveRetained:true,dependencyClosureAndAmbiguityDenials:true,historicalDependencyRequired:true,fullWireBytesChecked:true,coverageDisclosed:true,multiFactTwoOriginalInterpretation:true,validationStageCases:10,contentFreeDiagnostics:true,externalCalls:0}));
+ console.log(JSON.stringify({passed:true,fixture:'synthetic mixed-source workspace with full product producer and request envelope',synthetic:true,initial:metrics.initial,final:metrics.final,requiredOriginalsRetained:true,canonicalManifestSourceCount:15,omittedCitationRejected:true,wrongWorkspaceAndRevocationDenied:true,unfitBeforeAnyProvider:true,allTwelveRetained:true,dependencyClosureAndAmbiguityDenials:true,historicalDependencyRequired:true,fullWireBytesChecked:true,coverageDisclosed:true,multiFactTwoOriginalInterpretation:true,validationStageCases:16,assertionRuleAndFieldCases:7,authoredContractInPromptAndSchema:true,contentFreeDiagnostics:true,externalCalls:0}));
 })().catch(error=>{console.error(error);process.exitCode=1;});
