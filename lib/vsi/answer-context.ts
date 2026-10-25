@@ -52,6 +52,9 @@ export function serializeVsiAnswerContext<T extends AnswerContext>(payload: T) {
       || Object.hasOwn(record, "observationsRef")) return source;
     const context = { ...record };
     delete context.observations;
+    // Date metadata participates in the canonical snapshot. Deduplicate it only
+    // when the issued index-aligned metadata is identical, never truncate it.
+    if (Object.hasOwn(record, "factTimes") && JSON.stringify(record.factTimes) === JSON.stringify(issued.factTimes)) delete context.factTimes;
     compactedSources++;
     return { ...source, text: JSON.stringify({ ...context, observationsRef: source.id }) };
   });

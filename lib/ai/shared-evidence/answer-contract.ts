@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { evidenceEngineHash } from "@/lib/ai/evidence-engine/hash";
-export type SynthesisSource = Readonly<{ ref: string; binding: string; dependencies: readonly string[]; facts: readonly string[]; reported: "file" | "note" | false; environment: "production" | "sandbox" | "supporting"; installation?: string; provider?: string; supportOnly?: boolean }>;
+import { expandFactTimes, selectedFactTimeLines, type FactTime, type FactTimeGroup } from "./fact-time";
+export type SynthesisSource = Readonly<{ ref: string; binding: string; dependencies: readonly string[]; facts: readonly string[]; factTimes?: readonly FactTimeGroup[]; reported: "file" | "note" | false; environment: "production" | "sandbox" | "supporting"; installation?: string; provider?: string; supportOnly?: boolean }>;
 
 /** Shared business answers have no free-form factual content field. Models
  * select immutable issued facts/results; the application renders their values,
@@ -39,7 +40,7 @@ export const sharedAnswerJsonSchema = { type: "object", additionalProperties: fa
   }
 } as const;
 
-export const SHARED_ANSWER_INSTRUCTIONS = "Use the shared-answer schema, without content or citationIds. observations select complete issued qualitative_sources facts by ref, exact bare binding (64 lowercase hexadecimal characters, no sha256: prefix) and zero-based factIndex within that source’s facts array. Copy the binding from qualitative_sources or contextFactSources, not snapshotHash. Historical-only references are not issued fact selections. Include at least one observation from each answerSourceRequirements group; select relevant facts from other available originals only when useful. Context availability is not a claim or complete population coverage. Do not infer totals, trends or completeness from a selected subset. contextFactSources select productSources text at index zero or matching livePublicLookup claims in order, with issued binding. results select only supplied sharedRelationships ids with every exact input observed; never invent a calculation. The app renders facts, values, dates, units and attribution. Draft prose has no factual or calculation authority. hypotheses are optional unverified possibilities supported by at least two independent business originals; do not force a hypothesis when an evidence check is useful. missing_information and next_checks may use ordinary language, questions and negations; distinguish absent information from facts and ask a specific check before a decision, not generic review-alongside prose. Draft premises must be observed facts; use at most thirty source references. Use no URLs, inline citation markup or numeric literals in draft text; refer to adjacent observations instead. No business-word whitelist applies. Never invent causes, correspondence, completeness, actions performed or measured results. Draft usefulness needs manual review; valid references do not prove claims.";
+export const SHARED_ANSWER_INSTRUCTIONS = "Use the shared-answer schema, without content or citationIds. observations select complete issued qualitative_sources facts by ref, exact bare binding (64 lowercase hexadecimal characters, no sha256: prefix) and zero-based factIndex within that source’s facts array. Copy the binding from qualitative_sources or contextFactSources, not snapshotHash. Historical-only references are not issued fact selections. Include at least one observation from each answerSourceRequirements group; select relevant facts from other available originals only when useful. Context availability is not a claim or complete population coverage. Do not infer totals, trends or completeness from a selected subset. contextFactSources select productSources text at index zero or matching livePublicLookup claims in order, with issued binding. results select only supplied sharedRelationships ids with every exact input observed; never invent a calculation. The app renders facts, values, dates, units and attribution. factTimes groups are application-issued: factIndexes identify their exact facts; use each selected fact’s date basis and valueTiming. Invoice/bill dates, supplied row dates, balances at import, retrieval timestamps and source selection windows are distinct. Never treat overlapping windows or matching date labels as measurement alignment; when selected dates differ, explain that limitation rather than saying for those dates or the same period. A stored record contribution is not an account/day total, including zero contributions. Draft prose has no factual or calculation authority. hypotheses are optional unverified possibilities supported by at least two independent business originals; do not force a hypothesis when an evidence check is useful. missing_information and next_checks may use ordinary language, questions and negations; distinguish absent information from facts and ask a specific check before a decision, not generic review-alongside prose. Draft premises must be observed facts; use at most thirty source references. Use no URLs, inline citation markup or numeric literals in draft text; refer to adjacent observations instead. No business-word whitelist applies. Never invent causes, correspondence, completeness, actions performed or measured results. Draft usefulness needs manual review; valid references do not prove claims.";
 
 /** Reuse already-authorized app context and completed public lookup snapshots.
  * No extra retrieval, source text duplication, or historical-business promotion.
@@ -89,6 +90,11 @@ export function renderSharedAnswer(value: unknown, context: {
   const answer = sharedAnswerSchema.parse(value);
   const byRef = new Map(context.sources.map(source => [source.ref, source]));
   if (byRef.size !== context.sources.length) fail("context_reference");
+  const timesByRef = new Map<string, FactTime[]>();
+  for (const source of context.sources) if (source.factTimes) {
+    try { timesByRef.set(source.ref,expandFactTimes(source.factTimes,source.facts.length)); }
+    catch { fail("context_reference"); }
+  }
   const factFailure = (reason: FactReferenceDiagnostic["reason"], bindingMatchesOtherSource?: boolean): never => {
     throw new SharedAnswerContractError("fact_reference", undefined, { reason,
       ...(reason === "binding_mismatch" ? { bindingMatchesOtherSource } : {}) });
@@ -99,7 +105,7 @@ export function renderSharedAnswer(value: unknown, context: {
     if (source.binding !== selection.binding) return factFailure("binding_mismatch", context.sources.some(other => other !== source && other.binding === selection.binding));
     if (selection.factIndex >= source.facts.length) return factFailure("fact_index_out_of_bounds");
     if (!source.dependencies.length) return factFailure("source_dependencies_missing");
-    return { source, fact: source.facts[selection.factIndex] };
+    return { source, fact: source.facts[selection.factIndex], time: timesByRef.get(source.ref)?.[selection.factIndex] ?? null };
   };
   const observed = new Map<string, ReturnType<typeof resolve>>();
   for (const selection of answer.observations) {
@@ -155,15 +161,17 @@ export function renderSharedAnswer(value: unknown, context: {
   const scopeLines = observedSources.flatMap(source => {
     const scope = context.scopes?.get(source.ref);if (!scope) return [];
     const value = (key: string) => typeof scope[key] === "string" ? displayIssuedText(scope[key] as string) : "not established";
-    return [`Source reporting window: ${value("start")} through ${value("end")}; scope time zone ${value("timeZone")}; scope currency ${value("currency")}; coverage ${value("coverage")}. These fields do not establish cross-source comparability. [${source.ref}]`];
+    return [`${scope.windowKind === "retrieval_selection" ? "Source retrieval selection window" : "Source reporting window"}: ${value("start")} through ${value("end")}; scope time zone ${value("timeZone")}; scope currency ${value("currency")}; coverage ${value("coverage")}. These fields do not establish cross-source comparability or selected fact dates.${source.provider==='xero'?' Xero metrics are stored record contributions, not account/day totals; zero contributions do not establish absence of account activity.':''} [${source.ref}]`];
   });
+  const dateLines = observedSources.some(source => source.factTimes)
+    ? selectedFactTimeLines([...observed.values()].filter(item => !item.source.supportOnly).map(item => ({ref:item.source.ref,time:item.time}))) : [];
   const results = chosenResults.map(result => `${displayIssuedText(result.fact)} ${context.sources.filter(source => result.inputSourceIds.includes(source.binding)).map(source => `[${source.ref}]`).join(" ")}`);
   const hypotheses = answer.hypotheses.map(item => `Hypothesis (unverified model draft): ${validateDraft(item, true)}`);
   const missing = answer.missing_information.map(item => `Missing information / limitation (model assessment): ${validateDraft(item, false)}`);
   const checks = answer.next_checks.map(item => `Recommended check (model draft; not performed): ${validateDraft(item, false)}`);
   if (!observations.length && !results.length && !hypotheses.length && !missing.length && !checks.length) fail("source_coverage");
   const content = [observations.length ? `Stored observations (source-reported, not independently verified):\n${observations.join("\n")}` : "",
-    ...scopeLines,
+    ...scopeLines, ...dateLines,
     results.length ? `Application-issued results / boundaries:\n${results.join("\n")}` : "", ...hypotheses, ...missing, ...checks,
     "Draft reasoning is not a verified finding, calculation or completed action. Source presence does not establish record correspondence, causation, complete coverage or comparable periods."].filter(Boolean).join("\n\n");
   if (content.length > 24_000 || citations.size > 30) fail("answer_bounds");

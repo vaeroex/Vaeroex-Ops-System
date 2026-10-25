@@ -5,7 +5,25 @@ import { validateSharedMemoryProjection } from "./memory-eligibility";
 export const sharedCitationTarget = z.object({ workspaceId: z.string().uuid(),
   kind: z.enum(["report", "briefing_run", "vsi_exchange"]), id: z.string().uuid(), revision: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict().refine(t=>t.kind!=="report"||Boolean(t.revision));
 type Target = z.infer<typeof sharedCitationTarget>;
-type Reader = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }> };
+type CitationResult = { data: unknown; error: unknown };
+type CitationRequest = PromiseLike<CitationResult> & { abortSignal?(signal: AbortSignal): PromiseLike<CitationResult> };
+type Reader = { rpc(name: string, args: Record<string, unknown>): CitationRequest };
+async function readCitationWithDeadline(request: CitationRequest): Promise<CitationResult> {
+  const controller = new AbortController();
+  const response = request.abortSignal?.(controller.signal) ?? request;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    // End the protected page's wait even if a transport does not honor abort.
+    return await Promise.race([response, new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => {
+        controller.abort();
+        reject(new Error("shared_citation_unavailable"));
+      }, 10_000);
+    })]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 export function sharedCitationHref(raw: Target) {
   const t=sharedCitationTarget.parse(raw);
   return `/app/sources/evidence/${t.kind}/${t.id}?workspace=${t.workspaceId}${t.revision?`&revision=${t.revision}`:""}` as const;
@@ -13,8 +31,8 @@ export function sharedCitationHref(raw: Target) {
 /** Reopen the exact saved revision, never substitute a latest record or list. */
 export async function reopenSharedCitation(reader: Reader, target: Target) {
   const t=sharedCitationTarget.parse(target);
-  const result=await reader.rpc(t.revision?"reopen_shared_evidence_artifact_v1":"reopen_shared_evidence_target_v1", { p_workspace_id:t.workspaceId,
-    p_artifact_kind:t.kind,p_artifact_id:t.id,...(t.revision?{p_expected_revision:t.revision}:{}) });
+  const result=await readCitationWithDeadline(reader.rpc(t.revision?"reopen_shared_evidence_artifact_v1":"reopen_shared_evidence_target_v1", { p_workspace_id:t.workspaceId,
+    p_artifact_kind:t.kind,p_artifact_id:t.id,...(t.revision?{p_expected_revision:t.revision}:{}) }));
   if(result.error) throw new Error("shared_citation_unavailable");
   const output=z.object({ stage:z.literal("revalidated_saved_evidence"),artifact_kind:z.literal(t.kind),artifact_id:z.literal(t.id),
     artifact_revision:t.revision?z.literal(t.revision):z.string().regex(/^[a-f0-9]{64}$/),projections:z.array(z.object({identity:z.record(z.unknown()),hash:z.string().regex(/^[a-f0-9]{64}$/),data:z.record(z.unknown())})).max(24) }).parse(result.data);
