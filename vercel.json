@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "codex/vsi-source-coverage-contract": false,
       "codex/evidence-mapping-setup-only": false,
       "codex/vsi-final-context-packing": false,
       "codex/vsi-relevant-context-packing": false,

@@ -495,7 +495,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const decodedAnswer = validateAt("answer_json", () => JSON.parse(outputText(reply)));
   const structuredAnswer = sharedAnswer ? validateAt("answer_schema", () => sharedAnswerSchema.parse(decodedAnswer)) : validateAt("answer_schema", () => answerSchema.parse(decodedAnswer));
   const composed = sharedAnswer
-    ? validateAt("shared_answer_contract", () => renderSharedAnswer(structuredAnswer,{sources:[...selectedPremises,...issueContextFactSources(payload.productSources,payload.livePublicLookup)],requiredRefs:selectedPremises.map(source=>source.ref),results:selectedRelationships,hypothesesEnabled:qualitativeSynthesisEnabled(),scopes:new Map(selectedPremises.map(source=>[source.ref,sharedPrepared!.rows.find(row=>row.hash===source.binding)!.scope]))}))
+    ? validateAt("shared_answer_contract", () => renderSharedAnswer(structuredAnswer,{sources:[...selectedPremises,...issueContextFactSources(payload.productSources,payload.livePublicLookup)],requiredSourceGroups:packedContext.requiredSourceGroups,results:selectedRelationships,hypothesesEnabled:qualitativeSynthesisEnabled(),scopes:new Map(selectedPremises.map(source=>[source.ref,sharedPrepared!.rows.find(row=>row.hash===source.binding)!.scope]))}))
     : validateAt("shared_relationships", () => {
       const legacy = answerSchema.parse(structuredAnswer);
       if (legacy.interpretations.length) throw new Error("Interpretations require current admitted source composition before citation validation.");
@@ -503,5 +503,6 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     });
   const answer = validateAt("citation_resolution", () => validateVsiAnswer(composed, [...selectedBusiness, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]));
   validateAt("public_source_coverage", () => { if (webSources.length && !answer.citations.some(source => source.sourceType === "web")) throw new Error("The live answer omitted its source."); });
-  return finish({ ...answer, ...(packedContext.metrics.omittedSourceGroups ? {content: `Coverage: This is a partial review of selected stored evidence.\n\n${answer.content}`} : sharedPrepared && !sharedAnswer ? {content:`No stored business observations were used for this general response.\n\n${answer.content}`} : {}), ...(publicResearchTopics ? { publicResearchTopics } : {}) });
+  const partialBusinessReview = packedContext.metrics.omittedSourceGroups > 0 || (sharedAnswer && selectedBusiness.some(source => !answer.citations.some(citation => citation.id === source.id)));
+  return finish({ ...answer, ...(partialBusinessReview ? {content: `Coverage: This is a partial review of selected stored evidence.\n\n${answer.content}`} : sharedPrepared && !sharedAnswer ? {content:`No stored business observations were used for this general response.\n\n${answer.content}`} : {}), ...(publicResearchTopics ? { publicResearchTopics } : {}) });
 }

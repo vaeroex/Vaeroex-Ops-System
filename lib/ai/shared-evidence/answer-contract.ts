@@ -18,8 +18,9 @@ type FactSelection = z.infer<typeof factSelection>;
 type Draft = z.infer<typeof draft>;
 export const sharedAnswerRules = ["context_reference", "fact_reference", "duplicate_fact", "source_coverage", "result_reference", "result_dependencies", "draft_support", "draft_format", "numeric_draft", "hypothesis_disabled", "independent_sources", "environment", "answer_bounds"] as const;
 export type SharedAnswerRule = typeof sharedAnswerRules[number];
+export type SharedAnswerCoverageDiagnostic = Readonly<{ availableReferences: number; observedReferences: number; requiredGroups: number; missingGroups: number }>;
 export class SharedAnswerContractError extends Error {
-  constructor(readonly rule: SharedAnswerRule) { super("shared_answer_contract_denied"); }
+  constructor(readonly rule: SharedAnswerRule, readonly coverage?: SharedAnswerCoverageDiagnostic) { super("shared_answer_contract_denied"); }
 }
 const fail = (rule: SharedAnswerRule): never => { throw new SharedAnswerContractError(rule); };
 
@@ -35,7 +36,7 @@ export const sharedAnswerJsonSchema = { type: "object", additionalProperties: fa
   }
 } as const;
 
-export const SHARED_ANSWER_INSTRUCTIONS = "Use the shared-answer schema, without content or citationIds. observations select complete issued qualitative_sources facts by ref, exact binding and zero-based factIndex; choose relevant facts while including every selected business original. contextFactSources select productSources text at index zero or matching livePublicLookup claims in order, with issued binding. results select only supplied sharedRelationships ids; never invent a calculation. The app renders facts, values, dates, units and attribution. Draft prose has no factual or calculation authority. hypotheses are optional unverified possibilities supported by at least two independent business originals; do not force a hypothesis when an evidence check is useful. missing_information and next_checks may use ordinary language, questions and negations; distinguish absent information from facts and ask a specific check before a decision, not generic review-alongside prose. Draft premises must be observed facts; use at most thirty source references. Use no URLs, inline citation markup or numeric literals in draft text; refer to adjacent observations instead. No business-word whitelist applies. Never invent causes, correspondence, completeness, actions performed or measured results. Draft usefulness needs manual review; valid references do not prove claims.";
+export const SHARED_ANSWER_INSTRUCTIONS = "Use the shared-answer schema, without content or citationIds. observations select complete issued qualitative_sources facts by ref, exact binding and zero-based factIndex. Include at least one observation from each answerSourceRequirements group; select relevant facts from other available originals only when useful. Context availability is not a claim or complete population coverage. Do not infer totals, trends or completeness from a selected subset. contextFactSources select productSources text at index zero or matching livePublicLookup claims in order, with issued binding. results select only supplied sharedRelationships ids with every exact input observed; never invent a calculation. The app renders facts, values, dates, units and attribution. Draft prose has no factual or calculation authority. hypotheses are optional unverified possibilities supported by at least two independent business originals; do not force a hypothesis when an evidence check is useful. missing_information and next_checks may use ordinary language, questions and negations; distinguish absent information from facts and ask a specific check before a decision, not generic review-alongside prose. Draft premises must be observed facts; use at most thirty source references. Use no URLs, inline citation markup or numeric literals in draft text; refer to adjacent observations instead. No business-word whitelist applies. Never invent causes, correspondence, completeness, actions performed or measured results. Draft usefulness needs manual review; valid references do not prove claims.";
 
 /** Reuse already-authorized app context and completed public lookup snapshots.
  * No extra retrieval, source text duplication, or historical-business promotion.
@@ -79,6 +80,7 @@ export function renderSharedClarification(value: string): string {
  * not by the model. Rendering repeats exact reference/dependency checks. */
 export function renderSharedAnswer(value: unknown, context: {
   sources: readonly SynthesisSource[]; results: readonly IssuedAnswerResult[]; hypothesesEnabled: boolean; requiredRefs?: readonly string[];
+  requiredSourceGroups?: readonly (readonly string[])[];
   scopes?: ReadonlyMap<string, Readonly<Record<string, unknown>>>
 }): { content: string; citationIds: string[] } {
   const answer = sharedAnswerSchema.parse(value);
@@ -94,7 +96,15 @@ export function renderSharedAnswer(value: unknown, context: {
     const key = keyOf(selection); if (observed.has(key)) fail("duplicate_fact");
     observed.set(key, resolve(selection));
   }
-  if ((context.requiredRefs ?? context.sources.map(source => source.ref)).some(ref => !byRef.has(ref) || !answer.observations.some(selection => selection.ref === ref))) fail("source_coverage");
+  const groups = context.requiredSourceGroups
+    ? [...context.requiredSourceGroups, ...(context.requiredRefs || []).map(ref => [ref])]
+    : (context.requiredRefs ?? context.sources.map(source => source.ref)).map(ref => [ref]);
+  if (groups.some(group => !group.length || group.some(ref => !byRef.has(ref)))) fail("context_reference");
+  const observedRefs = new Set(answer.observations.map(selection => selection.ref));
+  const missingGroups = groups.filter(group => !group.some(ref => observedRefs.has(ref))).length;
+  if (missingGroups) throw new SharedAnswerContractError("source_coverage", {
+    availableReferences: byRef.size, observedReferences: observedRefs.size, requiredGroups: groups.length, missingGroups
+  });
   const observedSources = [...new Map([...observed.values()].map(item => [item.source.ref,item.source])).values()];
   const observedEnvironments = new Set(observedSources.filter(source => source.environment !== "supporting").map(source => source.environment));
   const observedInstallations = new Set(observedSources.filter(source => source.environment === "sandbox").map(source => source.installation));

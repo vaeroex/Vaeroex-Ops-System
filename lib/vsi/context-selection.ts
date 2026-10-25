@@ -68,3 +68,28 @@ export function vsiContextGroups(sources: readonly Source[], relationships: read
   }
   return result.sort((a, b) => Number(b.required) - Number(a.required) || b.score - a.score || a.indexes[0] - b.indexes[0]);
 }
+
+/** Packing preserves whole scopes, but an answer need not recite every row it
+ * could read. Require a cited observation from each requested protected scope.
+ * Dependency joins used for packing must not merge independent provider/scope
+ * requirements. An unknown scope remains a single exact original. */
+export function vsiAnswerCoverageGroups(sources: readonly Source[], relationships: readonly { inputSourceIds: readonly string[] }[], question: string) {
+  const requested = new Set(requestedVsiProviders(question)), requirements: string[][] = [];
+  for (const group of vsiContextGroups(sources, relationships, question).filter(group => group.required)) {
+    const scopes = new Map<string, string[]>();
+    for (const index of group.indexes) {
+      const source = sources[index], provider = source.sourceType.replace(/^shared_/, "");
+      if (requested.size && !requested.has(provider)) continue;
+      let key = JSON.stringify([source.sourceType, source.id]);
+      try {
+        const scope = JSON.parse(source.text || "{}").scope;
+        if (scope?.entityBinding === "protected" && typeof scope.entityId === "string" && typeof scope.connectionId === "string") {
+          key = JSON.stringify([source.sourceType, scope.entityId, scope.connectionId]);
+        }
+      } catch { /* Unknown authority is never inferred from titles or values. */ }
+      scopes.set(key, [...(scopes.get(key) || []), source.id]);
+    }
+    requirements.push(...scopes.values());
+  }
+  return requirements;
+}

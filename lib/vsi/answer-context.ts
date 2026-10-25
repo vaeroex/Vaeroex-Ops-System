@@ -1,7 +1,7 @@
 import type { SynthesisSource } from "@/lib/ai/shared-evidence/answer-contract";
 import type { VsiCitation } from "./types";
 import { VSI_MODEL } from "./config";
-import { vsiContextGroups } from "./context-selection";
+import { vsiContextGroups, vsiAnswerCoverageGroups } from "./context-selection";
 
 type AnswerContext = {
   businessSources: Array<VsiCitation & { text?: string }>;
@@ -64,7 +64,10 @@ export function serializeVsiAnswerContext<T extends AnswerContext>(payload: T) {
 export function packVsiAnswerContext<T extends AnswerContext>(payload: T, systemPrompt: string, maxChars: number, options: PackingOptions = {}) {
   if (!Number.isSafeInteger(maxChars) || maxChars <= 0) throw new RangeError("invalid_vsi_context_budget");
   const measure = (view: AnswerContext) => {
-    const packed = serializeVsiAnswerContext(view);
+    const requiredSourceGroups = options.selectRelevant ? vsiAnswerCoverageGroups(view.businessSources, view.sharedRelationships || [], payload.question || "") : undefined;
+    const packed = serializeVsiAnswerContext(requiredSourceGroups ? { ...view, answerSourceRequirements: {
+      groups: requiredSourceGroups, rule: "Cite at least one issued observation from each group. Other available originals are optional context, not claims or proof of complete coverage."
+    } } : view);
     const wire = options.requestJSON?.(packed.json) || `${systemPrompt}${packed.json}`;
     const request = options.requestJSON ? JSON.parse(wire) : null;
     const inputChars = request ? JSON.stringify(request.input).length : packed.json.length + systemPrompt.length;
@@ -78,7 +81,7 @@ export function packVsiAnswerContext<T extends AnswerContext>(payload: T, system
       omittedSourceGroups: payload.businessSources.length - view.businessSources.length,
       sectionChars: Object.fromEntries(Object.entries(JSON.parse(packed.json)).map(([key, value]) => [key, JSON.stringify(value).length]))
     };
-    return { ...packed, serializedChars: wire.length, metrics, sourceIds: view.businessSources.map(source => source.id) };
+    return { ...packed, serializedChars: wire.length, metrics, sourceIds: view.businessSources.map(source => source.id), requiredSourceGroups };
   };
   const fits = (result: ReturnType<typeof measure>) => result.metrics.requestChars <= maxChars && result.metrics.requestBytes <= (options.maxBytes ?? Infinity);
   // The server keeps payload, sealed manifests and full canonical citations intact.
