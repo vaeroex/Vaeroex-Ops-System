@@ -28,9 +28,9 @@ const query={workspaceId:id(1),provider:'harvest',connectionId:id(3)};
 const form=()=>{const f=new FormData();for(const[k,v]of Object.entries({...query,entityId:id(4),incarnationHash:'a'.repeat(64),confirmation:'confirm'}))f.set(k,v);return f;};
 (async()=>{
  assert.equal(require('../lib/ai/shared-evidence/mapping-gate.ts').evidenceMappingSetupEnabled(),true);
- assert.equal(require('../lib/ai/shared-evidence/runtime-gate.ts').sharedEvidenceRuntimeEnabled(),false);
- assert.equal(require('../lib/ai/shared-evidence/qualitative-policy.ts').qualitativeSynthesisEnabled(),false);
- assert.equal(require('../lib/vsi/failure-accounting-gate.ts').vsiFailureAccountingEnabled(),false);
+ assert.equal(require('../lib/ai/shared-evidence/runtime-gate.ts').sharedEvidenceRuntimeEnabled(),true);
+ assert.equal(require('../lib/ai/shared-evidence/qualitative-policy.ts').qualitativeSynthesisEnabled(),true);
+ assert.equal(require('../lib/vsi/failure-accounting-gate.ts').vsiFailureAccountingEnabled(),true);
  const html=renderToStaticMarkup(await Page({searchParams:Promise.resolve(query)}));
  assert.match(html,/name="entityId" required=""/);assert.match(html,/value="" disabled="" selected=""/);assert.match(html,/type="checkbox"[^>]+required=""/);assert.match(html,/name="incarnationHash" value="a{64}"/);assert.match(html,/Synthetic entity/);assert.doesNotMatch(html,/<option[^>]+value="000[^>]+selected/);
  const link=renderToStaticMarkup(EvidenceMappingLink({...query,owner:true,status:'connected'}));assert.match(link,/evidence-mapping\?workspaceId=/);
@@ -59,5 +59,5 @@ const form=()=>{const f=new FormData();for(const[k,v]of Object.entries({...query
  await assert.rejects(Page({searchParams:Promise.resolve(query)}),/not_found/);
  await assert.rejects(confirmMappingAction(form()),/^Error: redirect:\/app\/integrations$/);
  assert.equal(rpcCalls,count);assert.equal(authCalls,authCount);
- console.log('Mapping setup: independent of all three disabled generation/accounting gates; actual link, page and action preserve owner/actor/workspace, explicit confirmation, version binding, disabled setup and fail-closed/no-retry behavior. Static render and mocked authenticated RPC only.');
+ console.log('Mapping setup: independent of the three generation/accounting gates; actual link, page and action preserve owner/actor/workspace, explicit confirmation, version binding, disabled setup and fail-closed/no-retry behavior. Static render and mocked authenticated RPC only.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

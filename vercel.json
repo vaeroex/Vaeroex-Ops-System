@@ -17,7 +17,8 @@
       "codex/square-gcp-sandbox-callback": false,
       "codex/workspace-audit-security": false,
       "codex/workspace-audit-evidence": false,
-      "codex/workspace-audit-workflows": false
+      "codex/workspace-audit-workflows": false,
+      "codex/vsi-consistent-hosted-canary": false
     }
   },
   "crons": [
