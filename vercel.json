@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "codex/vsi-fact-reference-hosted-canary": false,
       "codex/vsi-fact-reference-contract": false,
       "codex/vsi-source-coverage-contract": false,
       "codex/evidence-mapping-setup-only": false,
