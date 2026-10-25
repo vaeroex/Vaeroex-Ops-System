@@ -25,4 +25,10 @@ assert.doesNotMatch(JSON.stringify(diagnose('shared_answer_contract',restricted)
 assert.deepEqual(diagnose('citation_resolution',restricted),{stage:'citation_resolution',category:'citation_validation',reason:'unclassified'});
 const spoof=Object.assign(new Error('shared_answer_contract_denied'),{rule:'fact_reference'});
 assert.deepEqual(diagnose('shared_answer_contract',spoof),{stage:'shared_answer_contract',category:'citation_validation',reason:'unclassified'});
+const coverage=new SharedAnswerContractError('source_coverage',{availableReferences:13,observedReferences:2,requiredGroups:2,missingGroups:1});
+coverage.answer='DO_NOT_LOG_SECRET';coverage.coverage.privateSource='DO_NOT_LOG_SECRET';
+assert.deepEqual(diagnose('shared_answer_contract',coverage).coverage,{availableReferences:13,observedReferences:2,requiredGroups:2,missingGroups:1});
+assert(!JSON.stringify(diagnose('shared_answer_contract',coverage)).includes('DO_NOT_LOG_SECRET'));
+const invalidCounts=new SharedAnswerContractError('source_coverage',{availableReferences:Infinity,observedReferences:-1,requiredGroups:10000,missingGroups:'DO_NOT_LOG_SECRET'});
+assert.deepEqual(diagnose('shared_answer_contract',invalidCounts).coverage,{availableReferences:0,observedReferences:0,requiredGroups:999,missingGroups:0});
 console.log(JSON.stringify({safeStageCategories:true,unknownMessagesAndFieldsWithheld:true,zodValuesAndMessagesWithheld:true,contractMetadataClosedEnumsOnly:true,externalCalls:0}));

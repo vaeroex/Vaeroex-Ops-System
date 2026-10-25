@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SharedAnswerContractError, sharedAnswerRules, type SharedAnswerRule } from "@/lib/ai/shared-evidence/answer-contract";
+import { SharedAnswerContractError, sharedAnswerRules, type SharedAnswerRule, type SharedAnswerCoverageDiagnostic } from "@/lib/ai/shared-evidence/answer-contract";
 
 export type VsiValidationStage = "answer_json" | "answer_schema" | "shared_relationships"
   | "qualitative_interpretation" | "shared_answer_contract" | "planner_clarification" | "citation_resolution" | "public_source_coverage";
@@ -17,6 +17,7 @@ export type VsiValidationDiagnostic = Readonly<{
   stage: VsiValidationStage; category: "output_validation" | "citation_validation"; reason: Reason;
   schemaIssueCount?: number; schemaIssueCodes?: string[]; schemaFields?: string[];
   contractRule?: SharedAnswerRule;
+  coverage?: SharedAnswerCoverageDiagnostic;
 }>;
 
 const schemaCodes = new Set(["invalid_type", "invalid_value", "invalid_string", "invalid_format", "too_big", "too_small", "unrecognized_keys", "invalid_union", "custom"]);
@@ -35,7 +36,11 @@ const messages = new Map<string, Reason>([
 export function vsiValidationDiagnostic(stage: VsiValidationStage, error: unknown): VsiValidationDiagnostic {
   const category = stage === "answer_json" || stage === "answer_schema" || stage === "planner_clarification" ? "output_validation" : "citation_validation";
   if ((stage === "shared_answer_contract" || stage === "planner_clarification") && error instanceof SharedAnswerContractError) return { stage, category, reason: "shared_answer_contract_denied",
-    ...(sharedAnswerRules.some(rule => rule === error.rule) ? { contractRule: error.rule } : {}) };
+    ...(sharedAnswerRules.some(rule => rule === error.rule) ? { contractRule: error.rule } : {}),
+    ...(error.rule === "source_coverage" && error.coverage ? { coverage: {
+      availableReferences: boundedCount(error.coverage.availableReferences), observedReferences: boundedCount(error.coverage.observedReferences),
+      requiredGroups: boundedCount(error.coverage.requiredGroups), missingGroups: boundedCount(error.coverage.missingGroups)
+    } } : {}) };
   if (error instanceof z.ZodError) {
     const issues = error.issues.slice(0, 32);
     return { stage, category, reason: "schema_invalid", schemaIssueCount: Math.min(error.issues.length, 999),
@@ -45,3 +50,5 @@ export function vsiValidationDiagnostic(stage: VsiValidationStage, error: unknow
   return { stage, category, reason: stage === "answer_json" ? "malformed_json"
     : error instanceof Error ? messages.get(error.message) || "unclassified" : "unclassified" };
 }
+
+function boundedCount(value: number) { return Number.isSafeInteger(value) && value >= 0 ? Math.min(value, 999) : 0; }

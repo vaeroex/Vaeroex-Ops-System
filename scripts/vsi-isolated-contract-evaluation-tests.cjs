@@ -33,6 +33,7 @@ function checkPayloadIsolation(request){
  assert(!request.body.includes(cases.find(c=>c.id!==test.id).question));
  if(body.text.format.name==='vsi_research_plan_v1'){assert.equal(payload.businessSources,undefined);return;}
  const positive=request.caseId==='qualified-brief',sources=payload.businessSources;assert.equal(sources.length,2);assert.equal(payload.qualitative_sources.length,2);
+ assert.equal(payload.answerSourceRequirements.groups.length,2);assert.deepEqual(new Set(payload.answerSourceRequirements.groups.flat()),new Set(sources.map(s=>s.id)));assert(payload.answerSourceRequirements.groups.every(group=>group.length===1));
  const text=JSON.stringify([sources,payload.qualitative_sources]);
  if(positive){assert.match(text,/1200 USD/);assert.match(text,/payment hold: 3 count/);assert(!/50 USD|dispatches: 6 count|backlog: 4 count/.test(text));}
  else{assert.match(text,/invoice balance: 50 USD/);assert.match(text,/dispatches: 6 count/);assert.match(text,/backlog: 4 count/);assert(!/1200 USD|payment hold/.test(text));}
@@ -44,7 +45,7 @@ async function rejectedReply(change){
  await assert.rejects(evaluation.runNext(),/review_or_stop_required/);negativeCases++;return{evaluation,result,calls};
 }
 (async()=>{
- assert.equal(candidate,'c6ce9d7e6c161162cb53677cc642eea928ed5a29');assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
+ assert.equal(candidate,'c185cb0e669bf7ccd94805d04243f4bd8246fc01');assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
  checkFixtures();
  const first=createEvaluation({outputDir:output(),dispatch});const result=await first.runNext();
  assert.equal(dispatches,2);

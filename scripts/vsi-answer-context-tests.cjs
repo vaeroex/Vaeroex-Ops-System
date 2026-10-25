@@ -10,7 +10,7 @@ const scenario=padding=>[
 ];
 // Keep the positive case below the complete wire limit after prompt/schema changes.
 // The original four-copy filler shape is retained as an explicit denial below.
-const raw=scenario(3);
+const raw=scenario(2);
 const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
  events.push(name);
  if(name==='discover_shared_evidence_v1')return {data:{stage:'catalog_only',candidates:raw.map(s=>({provider:s.provider,identity:s.identity})),truncated:false},error:null};
