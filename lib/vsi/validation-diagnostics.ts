@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { QualitativeAssertionError, qualitativeAssertionRules, qualitativeAuthoredFields, type QualitativeAssertionRule, type QualitativeAuthoredField } from "@/lib/ai/shared-evidence/qualitative-synthesis";
 
 export type VsiValidationStage = "answer_json" | "answer_schema" | "shared_relationships"
   | "qualitative_interpretation" | "citation_resolution" | "public_source_coverage";
@@ -15,6 +16,7 @@ type Reason = typeof reasons[number] | "malformed_json" | "schema_invalid" | "un
 export type VsiValidationDiagnostic = Readonly<{
   stage: VsiValidationStage; category: "output_validation" | "citation_validation"; reason: Reason;
   schemaIssueCount?: number; schemaIssueCodes?: string[]; schemaFields?: string[];
+  assertionRule?: QualitativeAssertionRule; authoredField?: QualitativeAuthoredField;
 }>;
 
 const schemaCodes = new Set(["invalid_type", "invalid_value", "invalid_string", "invalid_format", "too_big", "too_small", "unrecognized_keys", "invalid_union", "custom"]);
@@ -32,6 +34,11 @@ const messages = new Map<string, Reason>([
  * keys, received values, quotes, source identities, URLs or provider output. */
 export function vsiValidationDiagnostic(stage: VsiValidationStage, error: unknown): VsiValidationDiagnostic {
   const category = stage === "answer_json" || stage === "answer_schema" ? "output_validation" : "citation_validation";
+  if (stage === "qualitative_interpretation" && error instanceof QualitativeAssertionError) {
+    return { stage, category, reason: "interpretation_assertion_denied",
+      ...(qualitativeAssertionRules.some(rule => rule === error.rule) ? { assertionRule: error.rule } : {}),
+      ...(qualitativeAuthoredFields.some(field => field === error.field) ? { authoredField: error.field } : {}) };
+  }
   if (error instanceof z.ZodError) {
     const issues = error.issues.slice(0, 32);
     return { stage, category, reason: "schema_invalid", schemaIssueCount: Math.min(error.issues.length, 999),

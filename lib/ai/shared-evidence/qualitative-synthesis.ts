@@ -11,11 +11,24 @@ export const qualitativeInterpretationSchema = z.object({
   next_check: z.string().trim().min(20).max(500)
 }).strict();
 export type QualitativeInterpretation = z.infer<typeof qualitativeInterpretationSchema>;
+export const qualitativeAuthoredFields = ["hypothesis", "missing_information", "next_check"] as const;
+export const qualitativeAssertionRules = ["quantitative_language", "causal_language", "certainty_language", "record_linkage_language", "calculation_language", "formatting", "restricted_language"] as const;
+export type QualitativeAuthoredField = typeof qualitativeAuthoredFields[number];
+export type QualitativeAssertionRule = typeof qualitativeAssertionRules[number];
+/** Static metadata only. Never retain the rejected field, match or premise. */
+export class QualitativeAssertionError extends Error {
+  constructor(readonly rule: QualitativeAssertionRule, readonly field: QualitativeAuthoredField) {
+    super("interpretation_assertion_denied");
+  }
+}
 export type SynthesisSource = Readonly<{ ref: string; binding: string; dependencies: readonly string[]; facts: readonly string[]; reported: "file" | "note" | false; environment: "production" | "sandbox" | "supporting"; installation?: string }>;
 export const qualitativeInterpretationJsonSchema = {
+  description: "All authored fields are single English sentences using exact premise business words and neutral review language, without new paraphrases or inflections. No source labels, references, URLs, brackets, braces, angle brackets, semicolons, line breaks or abbreviations; no numbers, dates or calculations.",
   type: "object", additionalProperties: false, required: ["premises", "hypothesis", "missing_information", "next_check"], properties: {
     premises: { type: "array", minItems: 2, maxItems: 8, items: { type: "object", additionalProperties: false, required: ["ref", "binding", "quote"], properties: { ref: { type: "string" }, binding: { type: "string" }, quote: { type: "string" } } } },
-    hypothesis: { type: "string" }, missing_information: { type: "string" }, next_check: { type: "string" }
+    hypothesis: { type: "string", description: "Contains may, might or could. The application adds the unverified label and disclaimer." },
+    missing_information: { type: "string", description: "Begins Whether, Which, What or How; ask about comparability, coverage or missing context. Restricted words remain prohibited even in questions or negations." },
+    next_check: { type: "string", description: "Begins Review, Inspect, Check, Verify, Collect or Compare." }
   }
 } as const;
 
@@ -26,6 +39,15 @@ const neutral = new Set(("a an the this these those it its their they them and o
 const words = (text: string) => text.toLowerCase().match(/[a-z]+(?:'[a-z]+)?/g) || [];
 const businessWords = (text: string) => words(text).filter(word => word.length > 2 && !neutral.has(word));
 const forbidden = /[\d$€£%]|\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|hundred|thousand|million|billion|percent|ratio|per.hour|profitability|caus(?:e[ds]?|ing)|because|due to|therefore|proves?|proven|guarantee[ds]?|definitely|correlat\w*|reconcil\w*|matched|linked|identical|attribut\w*|driv(?:e[sn]?|ing)|drove|result(?:s|ed|ing)? in|leads? to|offset\w*|higher than|lower than|greater than|less than|equals?|sum(?:med)?|add(?:ed|ing)?|combined total)\b/i;
+// Classification cannot change acceptance: the unchanged forbidden expression
+// above remains the gate. These groups only explain its content-free category.
+const assertionCategories: readonly (readonly [QualitativeAssertionRule, RegExp])[] = [
+  ["quantitative_language", /[\d$€£%]|\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|hundred|thousand|million|billion|percent|ratio|per.hour|profitability)\b/i],
+  ["causal_language", /\b(?:caus(?:e[ds]?|ing)|because|due to|therefore|driv(?:e[sn]?|ing)|drove|result(?:s|ed|ing)? in|leads? to)\b/i],
+  ["certainty_language", /\b(?:proves?|proven|guarantee[ds]?|definitely)\b/i],
+  ["record_linkage_language", /\b(?:correlat\w*|reconcil\w*|matched|linked|identical|attribut\w*)\b/i],
+  ["calculation_language", /\b(?:offset\w*|higher than|lower than|greater than|less than|equals?|sum(?:med)?|add(?:ed|ing)?|combined total)\b/i]
+];
 
 export function validateQualitativeInterpretation(value: unknown, sources: readonly SynthesisSource[]): QualitativeInterpretation {
   const claim = qualitativeInterpretationSchema.parse(value);
@@ -50,13 +72,14 @@ export function validateQualitativeInterpretation(value: unknown, sources: reado
   if (environments.size > 1 || installations.size > 1 || (installations.size && installations.has(undefined))) throw new Error("interpretation_environment_changed");
   if (!/\b(?:may|might|could)\b/i.test(claim.hypothesis) || !/^(?:Whether|Which|What|How)\b/i.test(claim.missing_information)
     || !/^(?:Review|Inspect|Check|Verify|Collect|Compare)\b/i.test(claim.next_check)) throw new Error("interpretation_qualification_required");
-  const authored = [claim.hypothesis, claim.missing_information, claim.next_check];
   const vocabulary = new Set(claim.premises.flatMap(p => words(p.quote)));
-  for (const text of authored) {
+  for (const field of qualitativeAuthoredFields) {
+    const text = claim[field];
     // The current product locale is English. Do not let invisible/non-Latin
     // assertions or Unicode numbers escape the bounded English token checks.
     if(!/^[\x20-\x7e\u2018\u2019\u201c\u201d\u2013\u2014]+$/u.test(text)||/\p{N}/u.test(text)) throw new Error("interpretation_unsupported_characters");
-    if (forbidden.test(text) || /[\n\r;<>\[\]{}]|https?:|[.!?].*\S/.test(text)) throw new Error("interpretation_assertion_denied");
+    if (forbidden.test(text)) throw new QualitativeAssertionError(assertionCategories.find(([, pattern]) => pattern.test(text))?.[0] || "restricted_language", field);
+    if (/[\n\r;<>\[\]{}]|https?:|[.!?].*\S/.test(text)) throw new QualitativeAssertionError("formatting", field);
     // Attribution lives only in application-issued premises; an interpretation
     // cannot move a fact to another plugin/file/note or assert a hidden join.
     if(/\b(?:Square|QuickBooks|Google Sheets|Clockify|Harvest|Katana|Zoho|Xero|Loyverse|Wix|Business Notes?|reviewed file|according to|says?|reports?|shows?|confirms?|same (?:entity|item|transaction|period|record))\b/i.test(text)) throw new Error("interpretation_attribution_denied");
