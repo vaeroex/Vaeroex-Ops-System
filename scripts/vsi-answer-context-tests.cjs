@@ -82,16 +82,18 @@ global.fetch=async(url,init)=>{
   const expanded=structuredClone(payload);delete expanded.sharedObservationLayout;
   for(const source of expanded.businessSources){const record=JSON.parse(source.text);assert(record.observationsRef,'fixture must exercise compaction');const issued=payload.qualitative_sources.find(s=>s.ref===record.observationsRef);delete record.observationsRef;record.observations=issued.facts;source.text=JSON.stringify(record);}
   originalChars=JSON.stringify(expanded).length+body.input[0].content.length;assert(originalChars>32000,'reproduce the former post-premise context failure');
-  const premises=payload.qualitative_sources.map(s=>({ref:s.ref,binding:s.binding,quote:s.facts[0]}));
-  output={content:payload.businessSources.map(s=>`Stored observations [${s.id}].`).join('\n'),citationIds:payload.businessSources.map(s=>s.id),interpretations:[{premises,hypothesis:'Invoice balance may warrant dispatch review.',missing_information:'Whether invoice balance and dispatch concern comparable periods.',next_check:'Review invoice balance alongside dispatch.'}]};
-  if(answerMode==='unknown-citation')output.citationIds.push('B999');
-  if(answerMode==='unsupported-cause')output.interpretations[0].hypothesis='Invoice balance caused dispatch.';
+  const {sharedReply,observationsFor}=require('./vsi-shared-answer-test-support.cjs');
+  output=sharedReply(payload);
+  output.hypotheses=[{premises:observationsFor(payload),text:'The invoice balance and dispatch observations may merit a closer look; this is not an established cause.'}];
+  if(answerMode==='unknown-citation')output.observations[0].ref='B999';
+  if(answerMode==='unsupported-cause')output.hypotheses[0].text='Invoice balance caused 123 dispatches.';
+
  }
  return new Response(JSON.stringify({model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:20},output_text:JSON.stringify(output)}),{status:200});
 };
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question:'Use stored Xero and synthetic Google Sheets evidence. Do not search the web.',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}};
 (async()=>{
- const answer=await runVsiAnswer(input);assert.equal(answer.sharedManifestId,manifest);assert.equal(answer.usage.providerCalls,2);assert.equal(answer.citations.length,2);assert.match(answer.content,/Interpretation \(unverified hypothesis\)/);
+ const answer=await runVsiAnswer(input);assert.equal(answer.sharedManifestId,manifest);assert.equal(answer.usage.providerCalls,2);assert.equal(answer.citations.length,2);assert.match(answer.content,/Hypothesis \(unverified model draft\)/);
  for(const original of raw){const row=sharedRow(original,workspace),canonical=withVsiSourceSnapshot({id:row.hash,title:row.provider.replace(/[_-]/g,' '),url:`/app/sources/evidence/vsi_exchange/${request}?workspace=${workspace}#source-${row.hash}`,sourceType:`shared_${row.provider}`,sourceId:row.hash,evidenceDate:null,retrievedAt:transport.businessSources.find(s=>s.sourceId===row.hash).retrievedAt,text:JSON.stringify({scope:row.scope,observations:row.facts}),treatment:'record'});const saved=answer.citations.find(c=>c.sourceId===row.hash);assert(saved);assert.equal(saved.snapshotHash,canonical.snapshotHash);assert.equal(saved.url,canonical.url);assert.equal(transport.businessSources.find(s=>s.sourceId===row.hash).id,stableVsiCitationId(canonical));}
  const measured={originalContextChars:originalChars,packedContextChars:packedChars,serializedRequestChars,serializedRequestBytes};
  for(const mode of ['unknown-citation','unsupported-cause']){answerMode=mode;await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.outcomeFailure==='citation_validation');}answerMode='valid';

@@ -20,14 +20,9 @@ function checkDiscovery(body,empty=false){
 }
 async function usefulMock(request){
  const reply=await mockDispatch(request),body=JSON.parse(request.body);
- if(body.text.format.name!=='vsi_answer_v1')return reply;
- const payload=JSON.parse(body.input[1].content),answer=JSON.parse(reply.text);
- const x=payload.qualitative_sources.find(s=>payload.businessSources.find(b=>b.id===s.ref)?.sourceType==='shared_xero');
- const s=payload.qualitative_sources.find(s=>payload.businessSources.find(b=>b.id===s.ref)?.sourceType==='shared_google_sheets');
- answer.content=x.facts.map(f=>`${f} [${x.ref}]`).join(' ')+' '+s.facts.map(f=>`${f} [${s.ref}]`).join(' ');
- if(request.caseId==='qualified-brief')answer.content+=' The recorded payment-hold status supports a qualified follow-up: check these orders alongside receivables, confirm each hold reason and current payment status, and obtain invoice/order identifiers before linking records or assigning an outstanding amount. Both sources have partial supplied coverage; no cause, matched balance, ratio, profit, cash loss or trend is established.';
- else{answer.interpretations=[];answer.content+=' The single-day balance and dispatch/backlog counts are different quantities with unknown coverage. They do not establish a billing-to-operations relationship or explain a delay. Check the invoice/order linkage, common observation window and population coverage before making a comparison.';}
- return {...reply,text:JSON.stringify(answer)};
+ if(body.text.format.name!=='vsi_shared_answer_v2')return reply;
+ const {usefulSharedReply}=require('./vsi-shared-answer-test-support.cjs');
+ return {...reply,text:JSON.stringify(usefulSharedReply(JSON.parse(body.input[1].content),request.caseId))};
 }
 function runCase(caseId,variant='present',planner){return new Promise((resolve,reject)=>{
  const requests=[],child=fork(path.join(__dirname,'vsi-isolated-contract-evaluation.cjs'),['--fixture-worker',caseId,variant],{env:{VAEROEX_SYNTHETIC_EVAL_WORKER:'1'},execArgv:[],stdio:['ignore','ignore','ignore','ipc']});
@@ -50,13 +45,13 @@ function runCase(caseId,variant='present',planner){return new Promise((resolve,r
   const {result,requests}=await runCase(test.id);assert(result.mechanicalPass);assert.equal(requests.length,2);assert.equal(result.citations.length,2);
   const payload=JSON.parse(requests[1].input[1].content);assert.equal(payload.businessSources.length,2);assert.equal(payload.qualitative_sources.length,2);
   const facts=JSON.stringify(payload.qualitative_sources);
-  if(test.id==='qualified-brief'){assert.match(facts,/1200 USD/);assert.match(facts,/payment hold: 3 count/);assert.match(result.answer,/obtain invoice\/order identifiers/);assert(!/invoice balance: 50 USD|dispatches: 6 count/.test(facts));}
+  if(test.id==='qualified-brief'){assert.match(facts,/1200 USD/);assert.match(facts,/payment hold: 3 count/);assert.match(result.answer,/existing invoice references/);assert(!/invoice balance: 50 USD|dispatches: 6 count/.test(facts));}
   else{assert.match(facts,/invoice balance: 50 USD/);assert.match(facts,/dispatches: 6 count/);assert.match(facts,/backlog: 4 count/);assert.match(result.answer,/do not establish a billing-to-operations relationship/);assert(!/1200 USD|payment hold/.test(facts));}
   answers.push(result);
  }
  assert(answers[0].citations.every(a=>answers[1].citations.every(b=>a.sourceId!==b.sourceId)));
  const absent=await runCase('qualified-brief','no_sources');assert.equal(absent.requests.length,1);assert.equal(absent.result.failure,'planner_clarification');assert.match(absent.result.clarification,/No eligible observations/);assert.equal(absent.result.answerGenerationCalls,0);assert.deepEqual(absent.result.citations,[]);
- const ambiguous=await runCase('qualified-brief','ambiguous_scope',{...retainedClarification,clarification:'Which business and period should I compare?'});assert.equal(ambiguous.requests.length,1);assert.equal(ambiguous.result.failure,'planner_clarification');assert.equal(ambiguous.result.clarification,'Which business and period should I compare?');
+ const ambiguous=await runCase('qualified-brief','ambiguous_scope',{...retainedClarification,clarification:'Which business and period should I compare?'});assert.equal(ambiguous.requests.length,1);assert.equal(ambiguous.result.failure,'planner_clarification');assert(ambiguous.result.clarification.includes('Which business and period should I compare?'));assert.match(ambiguous.result.clarification,/^Clarification requested \(model draft\):/);
  for(const variant of ['missing_named_source','authority_denied','wrong_workspace']){const denied=await runCase('qualified-brief',variant);assert.equal(denied.requests.length,0);assert.equal(denied.result.mechanicalPass,false);assert.equal(denied.result.engineCategory,'evidence_unavailable');}
  const revoked=await runCase('qualified-brief','revoked_after_plan');assert.equal(revoked.requests.length,1);assert.equal(revoked.result.engineCategory,'evidence_unavailable','source revocation stops before the answer request');
  const malformed=await runCase('qualified-brief','present',{...retainedClarification,mode:'invented'});assert.equal(malformed.requests.length,1);assert.equal(malformed.result.engineCategory,'output_validation');
@@ -65,7 +60,7 @@ function runCase(caseId,variant='present',planner){return new Promise((resolve,r
  // override an explicit clarification or label it as an unexpected crash.
  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'vsi-planner-replay-'));fs.chmodSync(temporary,0o700);
  const replay=createEvaluation({outputDir:path.join(temporary,'run'),dispatch:async request=>{assert.equal(JSON.parse(request.body).text.format.name,'vsi_research_plan_v1');checkDiscovery(JSON.parse(request.body));return {httpStatus:200,model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:30},text:JSON.stringify(retainedClarification)};}});
- const replayed=await replay.runNext();scenarios++;assert.equal(replayed.failure,'planner_clarification');assert.equal(replayed.clarification,retainedClarification.clarification);assert.equal(replay.snapshot().calls,1);assert.equal(replay.snapshot().state,'stopped');await assert.rejects(replay.runNext(),/review_or_stop_required/);assert.equal(replay.snapshot().reservedUsd,.25);
+ const replayed=await replay.runNext();scenarios++;assert.equal(replayed.failure,'planner_clarification');assert(replayed.clarification.includes(retainedClarification.clarification));assert.match(replayed.clarification,/^Clarification requested \(model draft\):/);assert.equal(replay.snapshot().calls,1);assert.equal(replay.snapshot().state,'stopped');await assert.rejects(replay.runNext(),/review_or_stop_required/);assert.equal(replay.snapshot().reservedUsd,.25);
  assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
  console.log(JSON.stringify({passed:true,scenarios,actualEnginePlannerInputAndAnswer:true,availableCompatibleAndSparseCases:true,emptyEvidenceClarifies:true,ambiguousScopeClarifies:true,requestedMissingAndUnauthorizedSourcesDenyBeforeModel:true,revokedSourceStopsBeforeAnswer:true,retained03ClarificationReplayedWithoutOverride:true,manualUsefulnessStillRequired:true,paidQuestionsUnchanged:2,externalCalls:0}));
 })().catch(error=>{console.error(error.message);process.exitCode=1;});

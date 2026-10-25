@@ -44,7 +44,7 @@ async function rejectedReply(change){
  await assert.rejects(evaluation.runNext(),/review_or_stop_required/);negativeCases++;return{evaluation,result,calls};
 }
 (async()=>{
- assert.equal(candidate,'658b8fd0b1a91fba11122486306fc8ef3e1f6d1e');assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
+ assert.equal(candidate,'c6ce9d7e6c161162cb53677cc642eea928ed5a29');assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
  checkFixtures();
  const first=createEvaluation({outputDir:output(),dispatch});const result=await first.runNext();
  assert.equal(dispatches,2);
@@ -58,8 +58,8 @@ async function rejectedReply(change){
  const all=files(first.directory);for(const file of all)assert.equal(fs.statSync(path.join(first.directory,file.name)).mode&0o777,0o600);
  const request=JSON.parse(all.find(f=>f.name==='qualified-brief-call-2-request.json').value);
  assert(request.body.input[0].content.length>10000,'actual full engine prompt, not a tiny test substitute');
- assert.match(request.body.input[0].content,/even in questions or negations/);
- assert.match(request.body.text.format.schema.properties.interpretations.items.description,/exact premise business words/);
+ assert.match(request.body.input[0].content,/No business-word whitelist applies/);
+ assert.equal(request.body.text.format.schema.properties.content,undefined);assert.equal(request.body.text.format.schema.properties.observations.items.properties.factIndex.type,'integer');
  assert.equal(request.body.store,false);assert.equal(request.body.stream,false);assert(request.chars<=48000&&request.bytes<=192000);
  const payload=JSON.parse(request.body.input[1].content);assert.equal(payload.productSources.length,6);
  assert.equal(payload.businessSources.length,2);assert.equal(payload.qualitative_sources.length,2);
@@ -76,15 +76,15 @@ async function rejectedReply(change){
  assert.throws(()=>checkRequest({url:'https://unapproved.invalid/v1/responses',body:JSON.stringify(request.body)},1));negativeCases++;
  assert.throws(()=>checkRequest({url:endpoint,body:JSON.stringify({...request.body,input:[{role:'system',content:'x'.repeat(48001)}]})},1));negativeCases++;
  assert.throws(()=>checkRequest({url:endpoint,body:JSON.stringify(request.body)},2));negativeCases++;
- const syntax=await rejectedReply((reply,request)=>JSON.parse(request.body).text.format.name==='vsi_answer_v1'?{...reply,text:'Synthetic retained response: not valid answer JSON.'}:reply);
+ const syntax=await rejectedReply((reply,request)=>JSON.parse(request.body).text.format.name==='vsi_shared_answer_v2'?{...reply,text:'Synthetic retained response: not valid answer JSON.'}:reply);
  assert.equal(syntax.result.diagnostic.stage,'answer_json');assert.equal(syntax.calls,2);
  assert.equal(JSON.parse(files(syntax.evaluation.directory).find(f=>f.name.endsWith('call-2-generated.json')).value).text,'Synthetic retained response: not valid answer JSON.','retain generated text before validation fails');
- const cause=await rejectedReply((reply,request)=>{if(JSON.parse(request.body).text.format.name!=='vsi_answer_v1')return reply;const value=JSON.parse(reply.text);value.interpretations[0].hypothesis='Invoice balance may cause dispatches.';return{...reply,text:JSON.stringify(value)};});
- assert.equal(cause.result.diagnostic.assertionRule,'causal_language');assert.equal(cause.result.diagnostic.authoredField,'hypothesis');assert.equal(cause.calls,2);
- const citation=await rejectedReply((reply,request)=>{if(JSON.parse(request.body).text.format.name!=='vsi_answer_v1')return reply;const value=JSON.parse(reply.text);value.citationIds.push('B999');return{...reply,text:JSON.stringify(value)};});
- assert.equal(citation.result.diagnostic.reason,'unknown_citation');
- const leakedPremise=await rejectedReply((reply,request)=>{if(JSON.parse(request.body).text.format.name!=='vsi_answer_v1')return reply;const value=JSON.parse(reply.text);value.interpretations[0].premises[0].quote='xero invoice balance: 50 USD; recorded 2026-10-14. Scope: stored synthetic invoice observations.';return{...reply,text:JSON.stringify(value)};});
- assert.equal(leakedPremise.result.diagnostic.reason,'interpretation_premise_changed','sparse-case premise is not evidence in the positive case');
+ const cause=await rejectedReply((reply,request)=>{if(JSON.parse(request.body).text.format.name!=='vsi_shared_answer_v2')return reply;const value=JSON.parse(reply.text);value.content='Invoice balance caused dispatches.';return{...reply,text:JSON.stringify(value)};});
+ assert.equal(cause.result.diagnostic.stage,'answer_schema');assert.equal(cause.result.diagnostic.reason,'schema_invalid');assert.equal(cause.calls,2);
+ const citation=await rejectedReply((reply,request)=>{if(JSON.parse(request.body).text.format.name!=='vsi_shared_answer_v2')return reply;const value=JSON.parse(reply.text);value.observations[0].ref='B999';return{...reply,text:JSON.stringify(value)};});
+ assert.equal(citation.result.diagnostic.contractRule,'fact_reference');
+ const leakedPremise=await rejectedReply((reply,request)=>{if(JSON.parse(request.body).text.format.name!=='vsi_shared_answer_v2')return reply;const value=JSON.parse(reply.text);value.observations[0].binding=fixtureForCase('unsupported-cause').raw[0].hash;return{...reply,text:JSON.stringify(value)};});
+ assert.equal(leakedPremise.result.diagnostic.contractRule,'fact_reference','sparse-case premise is not evidence in the positive case');
  const unsafeKey=['sk','proj','synthetictrap'.repeat(5)].join('-');
  const secretReply=await rejectedReply(reply=>({...reply,text:'Bearer '+unsafeKey}));assert.equal(secretReply.result.failure,'response_guard');assert.equal(secretReply.calls,1);
  assert(!files(secretReply.evaluation.directory).some(f=>f.value.includes(unsafeKey)));
@@ -93,8 +93,8 @@ async function rejectedReply(change){
  const wrongModel=await rejectedReply(reply=>({...reply,model:'other-model'}));assert.equal(wrongModel.calls,1);
  const rateLimited=await rejectedReply(reply=>({...reply,httpStatus:429}));assert.equal(rateLimited.calls,1);assert.equal(rateLimited.evaluation.snapshot().reservedUsd,.25);
  // A richer synthetic reply exercises the review gate and total budget, not model quality.
- const rich=createEvaluation({outputDir:output(),dispatch:async request=>{checkPayloadIsolation(request);const reply=await mockDispatch(request);if(JSON.parse(request.body).text.format.name==='vsi_answer_v1'){
-  const value=JSON.parse(reply.text);value.content=(request.caseId==='qualified-brief'?'As of import on 14 Oct 2026 at 17:00 UTC, the invented Xero observation records 1200 USD outstanding; the separate invented Sheets observation records 3 orders on payment hold. Partial supplied coverage supports a targeted review of payment-held orders alongside receivables, not a matched balance. Ask the owner to check the hold reason, invoice/order identifier and current payment status before linking any order to an invoice or assigning any outstanding amount. Neither the cause of a hold nor allocation, ratios, profit, cash loss or a trend is established. ':'Invoice balance observations describe an amount owing, not cash receipts. Dispatch and backlog counts do not identify which invoices they concern. Check the observation window and invoice population against dispatch records before drawing a relationship; the supplied records lack matching and completeness evidence. ')+value.content;if(request.caseId==='unsupported-cause')value.interpretations=[];return{...reply,text:JSON.stringify(value),ignoredHeaders:{Authorization:unsafeKey}};
+ const rich=createEvaluation({outputDir:output(),dispatch:async request=>{checkPayloadIsolation(request);const reply=await mockDispatch(request);if(JSON.parse(request.body).text.format.name==='vsi_shared_answer_v2'){
+  const {usefulSharedReply}=require('./vsi-shared-answer-test-support.cjs');const value=usefulSharedReply(JSON.parse(JSON.parse(request.body).input[1].content),request.caseId);return{...reply,text:JSON.stringify(value),ignoredHeaders:{Authorization:unsafeKey}};
  }return reply;}});
  const richFirst=await rich.runNext();assert(richFirst.mechanicalPass);assert(rich.review(review(richFirst)));
  const richSecond=await rich.runNext();assert(richSecond.mechanicalPass);assert(rich.review(review(richSecond)));

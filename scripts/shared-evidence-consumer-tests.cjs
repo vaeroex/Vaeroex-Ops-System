@@ -39,7 +39,7 @@ global.fetch=async(url,init)=>{
  const p=JSON.parse(body.input[1].content);
  const value=body.text.format.name==='vsi_research_plan_v1'
  ?{mode:'answer',businessEvidence:planBusiness,tier:'simple',clarification:'',publicTargets:[],objectives:[]}
- :(()=>{payload=p;const s=p.businessSources[0];return{content:s?`Stored observation [${s.id}].`:'General response.',citationIds:s?[s.id]:[]};})();
+ :(()=>{payload=p;if(body.text.format.name==='vsi_shared_answer_v2')return require('./vsi-shared-answer-test-support.cjs').sharedReply(p);return{content:'General response.',citationIds:[]};})();
  return new Response(JSON.stringify({model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:20},output_text:JSON.stringify(value)}),{status:200});
 };
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question:'Review our business sources',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:2}};

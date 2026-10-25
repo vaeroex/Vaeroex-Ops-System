@@ -2,8 +2,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {fork,execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
-const candidate='658b8fd0b1a91fba11122486306fc8ef3e1f6d1e';
-const runtimeTrees='040000 tree 8295029f519c64ea83e1c8c56f739245d24b460b\tapp\n040000 tree 3123436eef0dae38d4c08d7301111d2deb57d333\tlib';
+const candidate='c6ce9d7e6c161162cb53677cc642eea928ed5a29';
+const runtimeTrees="040000 tree 8295029f519c64ea83e1c8c56f739245d24b460b\tapp\n040000 tree 4650cc10e7fd06a4e3f3fe6a9a4f2c1f38181689\tlib";
 const endpoint='https://api.openai.com/v1/responses';
 const limits=Object.freeze({questions:2,calls:4,callsPerQuestion:2,usd:1,reservePerCallUsd:.25,maxChars:48000,maxBytes:192000,maxOutputTokens:8000});
 const cases=Object.freeze([
@@ -48,7 +48,7 @@ function checkRequest(message,call){
  const body=JSON.parse(message.body);assert.equal(body.model,'gpt-6-luna');assert.equal(body.store,false);
  for(const key of ['tools','tool_choice','previous_response_id','conversation','background','service_tier'])assert.equal(body[key],undefined);
  assert.equal(body.stream,false);
- assert.equal(body.text?.format?.name,call===0?'vsi_research_plan_v1':'vsi_answer_v1');
+ assert.equal(body.text?.format?.name,call===0?'vsi_research_plan_v1':'vsi_shared_answer_v2');
  assert(Number.isSafeInteger(body.max_output_tokens)&&body.max_output_tokens>0&&body.max_output_tokens<=limits.maxOutputTokens);
  assert(Number.isInteger(call)&&call>=0&&call<limits.callsPerQuestion);return body;
 }
@@ -56,7 +56,7 @@ function createEvaluation({outputDir,dispatch}={}){
  assert.equal(typeof dispatch,'function','no_live_transport_configured');unchangedRuntime();
  const directory=privateDirectory(outputDir);
  const report={candidate,synthetic:true,liveTransportProvidedByThisModule:false,realModelQualified:false,limits,calls:0,reservedUsd:0,knownStandardCostUsd:0,state:'ready',results:[],reviews:[]};
- let sequence=0,running=false;
+ let sequence=0,running=false,cancelActive;
  const write=(name,value)=>{const text=JSON.stringify(value,null,2)+'\n';assert(!secretLike.test(text),'credential_shaped_artifact_denied');fs.writeFileSync(path.join(directory,name),text,{mode:0o600,flag:'wx'});};
  const checkpoint=()=>write(`checkpoint-${String(++sequence).padStart(3,'0')}.json`,report);
  write('plan.json',{candidate,cases,truth,limits,credentialRoute:'not configured',meaningfulReasoningRequiresManualReview:true,productionSaveAndIngestionProved:false});checkpoint();
@@ -68,7 +68,8 @@ function createEvaluation({outputDir,dispatch}={}){
   const outcome=await new Promise(resolve=>{
    child=fork(__filename,['--fixture-worker',test.id],{cwd:root,env:{VAEROEX_SYNTHETIC_EVAL_WORKER:'1'},execArgv:[],stdio:['ignore','ignore','ignore','ipc']});
    const timer=setTimeout(()=>finish({mechanicalPass:false,failure:'engine_timeout'}),200000);
-   function finish(value){if(done)return;done=true;clearTimeout(timer);clearTimeout(transportTimer);activeAbort?.abort();child.kill();resolve(value);}
+   function finish(value){if(done)return;done=true;cancelActive=undefined;clearTimeout(timer);clearTimeout(transportTimer);activeAbort?.abort();child.kill();resolve(value);}
+   cancelActive=()=>finish({mechanicalPass:false,failure:'evaluation_stopped'});
    child.on('error',()=>finish({mechanicalPass:false,failure:'worker_failed'}));
    child.on('exit',()=>{if(!done)finish({mechanicalPass:false,failure:'worker_exited'});});
    child.on('message',async message=>{
@@ -89,6 +90,7 @@ function createEvaluation({outputDir,dispatch}={}){
      assert(Number.isSafeInteger(reply.usage?.input_tokens)&&reply.usage.input_tokens>=0&&reply.usage.input_tokens<=limits.maxBytes);
      assert(Number.isSafeInteger(reply.usage?.output_tokens)&&reply.usage.output_tokens>=0&&reply.usage.output_tokens<=limits.maxOutputTokens);
      const retained={model:reply.model,status:reply.status,text:reply.text,usage:{input_tokens:reply.usage.input_tokens,output_tokens:reply.usage.output_tokens}};
+     if(reply.transport){assert.equal(reply.transport.serviceTier,'default');assert(Number.isSafeInteger(reply.transport.wireChars)&&reply.transport.wireChars<=limits.maxChars);assert(Number.isSafeInteger(reply.transport.wireBytes)&&reply.transport.wireBytes<=limits.maxBytes);assert(Number.isFinite(reply.transport.costUpperBoundUsd)&&reply.transport.costUpperBoundUsd<=report.reservedUsd);retained.transport={serviceTier:'default',wireChars:reply.transport.wireChars,wireBytes:reply.transport.wireBytes,costUpperBoundUsd:reply.transport.costUpperBoundUsd};}
      // Write generated synthetic text BEFORE the engine parses or validates it.
      write(prefix+'-generated.json',retained);
      report.knownStandardCostUsd+=(retained.usage.input_tokens*.1+retained.usage.output_tokens*.5)/1000000;
@@ -114,7 +116,8 @@ function createEvaluation({outputDir,dispatch}={}){
   assert(!secretLike.test(JSON.stringify(retained)),'credential_shaped_review_denied');report.reviews.push(retained);
   report.state=!passed?'stopped':report.results.length===cases.length?'reviewed_not_real_model_proof':'ready';checkpoint();return passed;
  }
- return {runNext,review,snapshot:()=>structuredClone(report),directory};
+ function stop(){cancelActive?.();report.state='stopped';checkpoint();}
+ return {runNext,review,stop,snapshot:()=>structuredClone(report),directory};
 }
 
 // This mock is for credential-free smoke/safety tests only; no quality claim.
@@ -125,25 +128,27 @@ function mockDispatch({body,caseId='qualified-brief'}){
   const d=payload.sourceDiscovery,available=d?.status==='available'&&d.sourceGroups>=2&&['google_sheets','xero'].every(type=>d.sourceTypes?.includes(type));
   return {mode:available?'answer':'clarify',businessEvidence:available,tier:'simple',clarification:available?'':'No eligible observations are established in this selected context. Which source, entity or period should be checked?',publicTargets:[],objectives:[]};
  })():(()=>{
-  const x=payload.qualitative_sources.find(s=>payload.businessSources.find(b=>b.id===s.ref)?.sourceType==='shared_xero');
-  const s=payload.qualitative_sources.find(s=>payload.businessSources.find(b=>b.id===s.ref)?.sourceType==='shared_google_sheets');
-  const interpretation=caseId==='qualified-brief'?{hypothesis:'Outstanding may warrant review alongside orders recorded on payment hold.',missing_information:'Whether outstanding and orders recorded on payment hold concern comparable records.',next_check:'Review outstanding alongside orders recorded on payment hold.'}:{hypothesis:'Invoice balance may warrant review alongside dispatches.',missing_information:'Whether invoice balance and dispatches concern comparable periods.',next_check:'Review invoice balance alongside dispatches.'};
-  return {content:`Stored observations [${x.ref}] [${s.ref}].`,citationIds:[x.ref,s.ref],interpretations:[{premises:[x,s].map(p=>({ref:p.ref,binding:p.binding,quote:p.facts[0]})),...interpretation}]};
+  const {sharedReply}=require('./vsi-shared-answer-test-support.cjs');
+  const answer=sharedReply(payload);
+  answer.missing_information=[{premises:answer.observations,text:'Whether the source observations have adequate coverage for a useful review remains unclear.'}];
+  answer.next_checks=[{premises:answer.observations,text:'Review these observations and their scope alongside each other.'}];
+  return answer;
  })();return Promise.resolve({httpStatus:200,model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:30},text:JSON.stringify(value)});
 }
 
 async function fixtureWorker(caseId,variant='present'){
+ process.on('disconnect',()=>process.exit(1));
  assert.equal(process.env.VAEROEX_SYNTHETIC_EVAL_WORKER,'1');assert.equal(typeof process.send,'function');
  for(const key of ['OPENAI_API_KEY','GOOGLE_SHEETS_OPENAI_API_KEY','GOOGLE_SHEETS_OPENAI_PROJECT_ID','GOOGLE_SHEETS_OPENAI_ORGANIZATION_ID','DATABASE_URL','SUPABASE_SERVICE_ROLE_KEY','NODE_OPTIONS'])assert.equal(process.env[key],undefined);
  const test=cases.find(c=>c.id===caseId);assert(test);
  // Offline worker variants cannot be selected by createEvaluation or the paid CLI.
- assert(['present','no_sources','missing_named_source','authority_denied','wrong_workspace','revoked_after_plan','ambiguous_scope'].includes(variant));
+ assert(['present','no_sources','missing_named_source','authority_denied','wrong_workspace','revoked_after_plan','ambiguous_scope','mixed_public','closed_plan'].includes(variant));
  const workspace=id(1),actor=id(2),session=id(3),request=id(caseId==='qualified-brief'?4:40),ticket=id(5),manifest=id(6);
  const ActualDate=Date;global.Date=class extends ActualDate{constructor(...args){super(...(args.length?args:['2026-10-24T00:00:00.000Z']));}static now(){return new ActualDate('2026-10-24T00:00:00.000Z').getTime();}};
  const fixture=fixtureForCase(caseId),captureReferenceId=fixture.captureReferenceId;
  const raw=variant==='no_sources'?[]:variant==='missing_named_source'?fixture.raw.filter(s=>s.provider==='xero'):fixture.raw;
  if(variant==='wrong_workspace')raw[0].data.workspace_id=id(999);
- const question=variant==='no_sources'?'Give a short executive brief using the stored workspace observations.':variant==='ambiguous_scope'?'Compare results for the other business and period.':test.question;
+ const question=variant==='no_sources'?'Give a short executive brief using the stored workspace observations.':variant==='ambiguous_scope'?'Compare results for the other business and period.':variant==='mixed_public'?'Research Synthetic Public Co and compare it with stored Xero and synthetic Google Sheets observations.':variant==='closed_plan'?'Use only stored Xero and Google Sheets evidence for a brief.':test.question;
  let plannerReturned=false;
  const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
   assert.equal(args.p_workspace_id,workspace);
@@ -168,12 +173,12 @@ async function fixtureWorker(caseId,variant='present'){
  });
  const pending=new Map();let serial=0,answerCount=0;console.info=()=>{};console.error=()=>{};
  process.on('message',message=>{if(message?.type==='provider_response'&&pending.has(message.request)){if(message.request===1)plannerReturned=true;pending.get(message.request)(new Response(JSON.stringify(message.payload),{status:200}));pending.delete(message.request);}});
- global.fetch=async(url,init)=>{const n=++serial;assert(n<=2);const body=JSON.parse(init.body);if(body.text?.format?.name==='vsi_answer_v1')answerCount++;return new Promise(resolve=>{pending.set(n,resolve);process.send({type:'provider_request',request:n,caseId,url,body:init.body});});};
+ global.fetch=async(url,init)=>{const n=++serial;assert(n<=(variant==='mixed_public'?4:2));const body=JSON.parse(init.body);if(body.text?.format?.name==='vsi_shared_answer_v2')answerCount++;return new Promise(resolve=>{pending.set(n,resolve);process.send({type:'provider_request',request:n,caseId,url,body:init.body});});};
  const {runVsiAnswer}=require('../lib/vsi/engine.ts');
  try{
   const answer=await runVsiAnswer({supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question,recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}});
   if(answerCount===0&&answer.usage.providerCalls===1&&!answer.noteDraft){process.send({type:'result',result:{mechanicalPass:false,failure:'planner_clarification',clarification:answer.content,citations:answer.citations,answerGenerationCalls:0,usage:{providerCalls:answer.usage.providerCalls,estimatedCostUsd:answer.usage.estimatedCostUsd},syntheticAuthorityOnly:true}});return;}
-  assert.equal(answerCount,1);assert.equal(answer.citations.length,2);assert.deepEqual(new Set(answer.citations.map(c=>c.sourceType)),new Set(['shared_xero','shared_google_sheets']));
+  assert.equal(answerCount,1);assert.equal(answer.citations.length,variant==='mixed_public'?3:2);assert.deepEqual(new Set(answer.citations.map(c=>c.sourceType)),new Set(variant==='mixed_public'?['shared_xero','shared_google_sheets','web']:['shared_xero','shared_google_sheets']));
   process.send({type:'result',result:{mechanicalPass:true,answer:answer.content,citations:answer.citations,usage:{providerCalls:answer.usage.providerCalls,estimatedCostUsd:answer.usage.estimatedCostUsd},syntheticAuthorityOnly:true}});
  }catch(error){const diagnostic=error?.usage?.validationFailure,category=error?.usage?.outcomeFailure;process.send({type:'result',result:{mechanicalPass:false,failure:diagnostic?'engine_validation_failed':'engine_failed',...(diagnostic?{diagnostic}:{}),...(['application','evidence_unavailable','context_block','budget_block','provider','timeout','output_validation','citation_validation'].includes(category)?{engineCategory:category}:{})}});}
 }
