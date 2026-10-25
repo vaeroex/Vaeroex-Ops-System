@@ -4,10 +4,13 @@ const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const workspace=id(1),actor=id(2),session=id(3),request=id(4),ticket=id(5),manifest=id(6);
 let revoked=false,foreign=false,revokeAfterPlanner=false,answerMode='valid',providerCalls=0,answerCalls=0;
 const events=[];
-const raw=[
- {provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(10),authority_hash:'a'.repeat(64)},hash:'a'.repeat(64),data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(30),connection_id:id(31),date:'2026-10-14',time_zone:'UTC',metrics:Array.from({length:36},(_,n)=>({metric:`dispatch observation ${n} ${'synthetic operational review '.repeat(4)}`,value:String(n+1),unit:'count'})),read_sources:[]}},
- {provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'stored invoice observations',records:Array.from({length:18},(_,n)=>({day:'2026-10-14',metrics:[{key:`invoice balance ${n} ${'synthetic billing review '.repeat(4)}`,value:String(n+1),currency:'USD'}]})),read_sources:[]}}
+const scenario=padding=>[
+ {provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(10),authority_hash:'a'.repeat(64)},hash:'a'.repeat(64),data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(30),connection_id:id(31),date:'2026-10-14',time_zone:'UTC',metrics:Array.from({length:36},(_,n)=>({metric:`dispatch observation ${n} ${'synthetic operational review '.repeat(padding)}`,value:String(n+1),unit:'count'})),read_sources:[]}},
+ {provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'stored invoice observations',records:Array.from({length:18},(_,n)=>({day:'2026-10-14',metrics:[{key:`invoice balance ${n} ${'synthetic billing review '.repeat(padding)}`,value:String(n+1),currency:'USD'}]})),read_sources:[]}}
 ];
+// Keep the positive case below the complete wire limit after prompt/schema changes.
+// The original four-copy filler shape is retained as an explicit denial below.
+const raw=scenario(3);
 const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
  events.push(name);
  if(name==='discover_shared_evidence_v1')return {data:{stage:'catalog_only',candidates:raw.map(s=>({provider:s.provider,identity:s.identity})),truncated:false},error:null};
@@ -79,21 +82,25 @@ global.fetch=async(url,init)=>{
   const expanded=structuredClone(payload);delete expanded.sharedObservationLayout;
   for(const source of expanded.businessSources){const record=JSON.parse(source.text);assert(record.observationsRef,'fixture must exercise compaction');const issued=payload.qualitative_sources.find(s=>s.ref===record.observationsRef);delete record.observationsRef;record.observations=issued.facts;source.text=JSON.stringify(record);}
   originalChars=JSON.stringify(expanded).length+body.input[0].content.length;assert(originalChars>32000,'reproduce the former post-premise context failure');
-  const premises=payload.qualitative_sources.map(s=>({ref:s.ref,binding:s.binding,quote:s.facts[0]}));
-  output={content:payload.businessSources.map(s=>`Stored observations [${s.id}].`).join('\n'),citationIds:payload.businessSources.map(s=>s.id),interpretations:[{premises,hypothesis:'Invoice balance may warrant dispatch review.',missing_information:'Whether invoice balance and dispatch concern comparable periods.',next_check:'Review invoice balance alongside dispatch.'}]};
-  if(answerMode==='unknown-citation')output.citationIds.push('B999');
-  if(answerMode==='unsupported-cause')output.interpretations[0].hypothesis='Invoice balance caused dispatch.';
+  const {sharedReply,observationsFor}=require('./vsi-shared-answer-test-support.cjs');
+  output=sharedReply(payload);
+  output.hypotheses=[{premises:observationsFor(payload),text:'The invoice balance and dispatch observations may merit a closer look; this is not an established cause.'}];
+  if(answerMode==='unknown-citation')output.observations[0].ref='B999';
+  if(answerMode==='unsupported-cause')output.hypotheses[0].text='Invoice balance caused 123 dispatches.';
+
  }
  return new Response(JSON.stringify({model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:20},output_text:JSON.stringify(output)}),{status:200});
 };
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question:'Use stored Xero and synthetic Google Sheets evidence. Do not search the web.',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}};
 (async()=>{
- const answer=await runVsiAnswer(input);assert.equal(answer.sharedManifestId,manifest);assert.equal(answer.usage.providerCalls,2);assert.equal(answer.citations.length,2);assert.match(answer.content,/Interpretation \(unverified hypothesis\)/);
+ const answer=await runVsiAnswer(input);assert.equal(answer.sharedManifestId,manifest);assert.equal(answer.usage.providerCalls,2);assert.equal(answer.citations.length,2);assert.match(answer.content,/Hypothesis \(unverified model draft\)/);
  for(const original of raw){const row=sharedRow(original,workspace),canonical=withVsiSourceSnapshot({id:row.hash,title:row.provider.replace(/[_-]/g,' '),url:`/app/sources/evidence/vsi_exchange/${request}?workspace=${workspace}#source-${row.hash}`,sourceType:`shared_${row.provider}`,sourceId:row.hash,evidenceDate:null,retrievedAt:transport.businessSources.find(s=>s.sourceId===row.hash).retrievedAt,text:JSON.stringify({scope:row.scope,observations:row.facts}),treatment:'record'});const saved=answer.citations.find(c=>c.sourceId===row.hash);assert(saved);assert.equal(saved.snapshotHash,canonical.snapshotHash);assert.equal(saved.url,canonical.url);assert.equal(transport.businessSources.find(s=>s.sourceId===row.hash).id,stableVsiCitationId(canonical));}
  const measured={originalContextChars:originalChars,packedContextChars:packedChars,serializedRequestChars,serializedRequestBytes};
  for(const mode of ['unknown-citation','unsupported-cause']){answerMode=mode;await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.outcomeFailure==='citation_validation');}answerMode='valid';
  for(const kind of ['revoked','foreign']){providerCalls=0;answerCalls=0;revoked=kind==='revoked';foreign=kind==='foreign';await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.inputTokens===0);assert.equal(providerCalls,0);assert.equal(answerCalls,0);}revoked=false;foreign=false;
  providerCalls=0;answerCalls=0;revokeAfterPlanner=true;await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.providerCalls===1&&e.usage.outcomeFailure==='evidence_unavailable');assert.equal(providerCalls,1);assert.equal(answerCalls,0);revokeAfterPlanner=false;revoked=false;
  providerCalls=0;answerCalls=0;await assert.rejects(runVsiAnswer({...input,recentMessages:[{role:'user',content:'Historical conversation context. '.repeat(250)},{role:'assistant',content:'Prior explanation with no business citations. '.repeat(180)}]}),e=>e instanceof VsiEngineError&&e.usage.outcomeFailure==='context_block'&&/No canonical evidence was shortened/.test(e.message));assert.equal(providerCalls,0);assert.equal(answerCalls,0);
- console.log(JSON.stringify({passed:true,fixture:'synthetic two-plugin full engine packing',...measured,sourceGroupsRetained:2,purePackerGroupsRetained:17,canonicalCitationsPreserved:true,revocationAndWrongWorkspaceDeniedBeforeProvider:true,unknownCitationAndCausalClaimDenied:true,revocationAfterPlanningStopsAnswer:true,unfitContextStopsBeforeAnswerCall:true,mockedRuntime:true,paidCalls:0}));
+ raw.splice(0,raw.length,...scenario(4));providerCalls=0;answerCalls=0;
+ await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.outcomeFailure==='context_block'&&/No canonical evidence was shortened/.test(e.message));assert.equal(providerCalls,0);assert.equal(answerCalls,0);
+ console.log(JSON.stringify({passed:true,fixture:'synthetic two-plugin full engine packing',...measured,sourceGroupsRetained:2,purePackerGroupsRetained:17,canonicalCitationsPreserved:true,revocationAndWrongWorkspaceDeniedBeforeProvider:true,unknownCitationAndCausalClaimDenied:true,revocationAfterPlanningStopsAnswer:true,unfitContextStopsBeforeAnswerCall:true,originalOversizedFixtureDeniedBeforeProvider:true,mockedRuntime:true,paidCalls:0}));
 })().catch(e=>{console.error(e);process.exitCode=1;});

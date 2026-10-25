@@ -59,48 +59,46 @@ global.fetch=async(url,init)=>{
  if(body.text.format.name==='vsi_research_plan_v1') {output={mode:'answer',businessEvidence:true,tier:'simple',clarification:'',publicTargets:[],objectives:[]};if(revokeAfterPlanner)revoked=true;}
  else {
   answerCalls++; answerTemplate=structuredClone(body); assert.equal(init.body.length,measured.at(-1).final.requestChars);assert.equal(Buffer.byteLength(init.body,'utf8'),measured.at(-1).final.requestBytes);assert.equal(payload.productSources.length,6,'use actual product producer, not tiny one-source placeholder');
-  assert.match(body.input[0].content,/even in questions or negations/);
-  assert.match(body.text.format.schema.properties.interpretations.items.properties.missing_information.description,/even in questions or negations/);
+  assert.match(body.input[0].content,/No business-word whitelist applies/);
+  assert.equal(body.text.format.name,'vsi_shared_answer_v2');assert.equal(body.text.format.schema.properties.content,undefined);
   assert.equal(payload.contextCoverage.complete,false);assert.equal(payload.businessSources.length,3);
   assert.equal(payload.qualitative_sources.length,3);assert.equal(payload.contextCoverage.omittedSourceGroups,12);
   const rows=payload.businessSources;
   assert.equal(rows.filter(row=>row.sourceType==='shared_xero').length,1);
   assert.equal(rows.filter(row=>row.sourceType==='shared_google_sheets').length,2);
   const relevant=rows.filter(row=>row.sourceType==='shared_xero'||JSON.parse(row.text).scope.entityId===id(30));assert.equal(relevant.length,3);
-  output={content:rows.map(row=>`Stored observations [${row.id}].`).join('\n'),citationIds:rows.map(row=>row.id),interpretations:[]};
-  if(hiddenCitation)output.citationIds.push(measured.at(-1).canonical.find(row=>!measured.at(-1).selected.includes(row.id)).id);
-  if(answerVariant==='schema')output.content='';
-  if(answerVariant==='citation')output.citationIds.push('B999');
-  if(answerVariant==='url')output.content='Review https://not-issued.invalid/DO_NOT_LOG_SECRET.';
-  if(['quote','number','cause','certainty','record_linkage','calculation','formatting','negated_certainty','quantitative'].includes(answerVariant)){
-   output.interpretations=[{premises:payload.qualitative_sources.slice(0,2).map(p=>({ref:p.ref,binding:p.binding,quote:p.facts[0]})),hypothesis:'Stored observations may warrant a review.',missing_information:'What information is missing from these observations?',next_check:'Review these observations and their coverage.'}];
-   if(answerVariant==='quote')output.interpretations[0].premises[0].quote+=' DO_NOT_LOG_SECRET';
-   if(answerVariant==='number')output.interpretations[0].hypothesis='Stored observations may warrant a review of 123.';
-   if(answerVariant==='cause')output.interpretations[0].hypothesis='Stored observations may cause these review concerns.';
-   if(answerVariant==='certainty')output.interpretations[0].hypothesis='Stored observations may be a proven conclusion.';
-   if(answerVariant==='negated_certainty')output.interpretations[0].hypothesis='Stored observations may warrant review, not a proven conclusion.';
-   if(answerVariant==='record_linkage')output.interpretations[0].missing_information='Whether these observations are linked.';
-   if(answerVariant==='calculation')output.interpretations[0].next_check='Review the sum of these observations.';
-   if(answerVariant==='quantitative')output.interpretations[0].next_check='Review the ratio of these observations.';
-   if(answerVariant==='formatting')output.interpretations[0].next_check='Review these observations; check their coverage.';
+  const {sharedReply,observationsFor}=require('./vsi-shared-answer-test-support.cjs');
+  output=sharedReply(payload);
+  if(hiddenCitation){const omitted=measured.at(-1).canonical.find(row=>!measured.at(-1).selected.includes(row.id));output.observations.push({ref:omitted.id,binding:omitted.sourceId,factIndex:0});}
+  if(answerVariant==='schema')output.content='Unrestricted factual prose is denied.';
+  if(answerVariant==='citation')output.observations[0].ref='B999';
+  if(answerVariant==='url')output.next_checks=[{premises:output.observations,text:'Review https://not-issued.invalid/DO_NOT_LOG_SECRET.'}];
+  if(answerVariant==='quote')output.observations[0].quote='DO_NOT_LOG_SECRET';
+  if(answerVariant==='number')output.hypotheses=[{premises:observationsFor(payload).slice(0,2),text:'These observations explain 123 cases.'}];
+  if(answerVariant==='calculation')output.results=['f'.repeat(64)];
+  if(answerVariant==='quantitative')output.next_checks=[{premises:output.observations,text:'Review a 50% ratio.'}];
+  if(answerVariant==='formatting')output.next_checks=[{premises:output.observations,text:'Review <b>verified findings</b>.'}];
+  if(answerVariant==='unobserved_premise')output.next_checks=[{premises:[{...output.observations[0],factIndex:1999}],text:'Inspect the relevant source record.'}];
+  if(answerVariant==='source_label')output.observations[0].provider='UNAUTHORIZED_OVERRIDE';
+  if(['cause','certainty','record_linkage','negated_certainty'].includes(answerVariant)){
+   const text={cause:'These observations may cause changes.',certainty:'These observations prove a conclusion.',record_linkage:'Whether these observations are linked.',negated_certainty:'These observations are not a proven conclusion.'}[answerVariant];
+   // Natural prose is rendered only as unverified draft, never a finding.
+   output.missing_information=[{premises:output.observations,text}];
   }
   if(['multi_fact','duplicate_premise','same_original','invented_multi_quote'].includes(answerVariant)){
    const xero=payload.qualitative_sources.find(p=>p.ref===rows.find(row=>row.sourceType==='shared_xero').id);
    const sheets=payload.qualitative_sources.find(p=>p.ref===rows.find(row=>row.sourceType==='shared_google_sheets').id);
-   assert(xero.facts.length>=2&&sheets.facts.length>=2);
-   const premise=(source,n)=>({ref:source.ref,binding:source.binding,quote:source.facts[n]});
-   output={content:`Stored observations [${xero.ref}] [${sheets.ref}].`,citationIds:[xero.ref,sheets.ref],interpretations:[{
-    premises:[premise(xero,0),premise(xero,1),premise(sheets,0),premise(sheets,1)],
-    hypothesis:'Invoice balance may warrant review alongside dispatches and backlog.',
-    missing_information:'Whether invoice balance, dispatches and backlog concern comparable periods.',
-    next_check:'Review invoice balance alongside dispatches and backlog.'
-   }]};
-   if(answerVariant==='duplicate_premise')output.interpretations[0].premises[1]=premise(xero,0);
-   if(answerVariant==='same_original')output.interpretations[0].premises=[premise(xero,0),premise(xero,1)];
-   if(answerVariant==='invented_multi_quote')output.interpretations[0].premises[1].quote+=' DO_NOT_LOG_SECRET';
+   const premise=(source,n)=>({ref:source.ref,binding:source.binding,factIndex:n});
+   output=sharedReply(payload,{observations:observationsFor(payload)});
+   output.observations.push(premise(xero,1),premise(sheets,1));
+   output.hypotheses=[{premises:[premise(xero,0),premise(xero,1),premise(sheets,0),premise(sheets,1)],text:'Invoice balance may warrant review alongside dispatches and backlog; shared dates do not establish matched transactions.'}];
+   if(answerVariant==='duplicate_premise')output.hypotheses[0].premises[1]=premise(xero,0);
+   if(answerVariant==='same_original')output.hypotheses[0].premises=[premise(xero,0),premise(xero,1)];
+   if(answerVariant==='invented_multi_quote')output.observations[0].factIndex=1999;
   }
+
  }
- return new Response(JSON.stringify({model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:20},output_text:answerVariant==='json'&&body.text.format.name==='vsi_answer_v1'?'DO_NOT_LOG_SECRET invalid JSON':JSON.stringify(output)}),{status:200});
+ return new Response(JSON.stringify({model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:20},output_text:answerVariant==='json'&&body.text.format.name==='vsi_shared_answer_v2'?'DO_NOT_LOG_SECRET invalid JSON':JSON.stringify(output)}),{status:200});
 };
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question:'Using only stored Xero evidence and synthetic Google Sheets dispatch and backlog operations canary observations, give a hypothetical executive brief. Do not search the web.',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}};
 (async()=>{
@@ -111,34 +109,37 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  answerVariant='multi_fact';const beforeMultiCalls=providerCalls,beforeMultiErrors=validationEvents.length;
  const multiFactAnswer=await runVsiAnswer(input);
  assert.equal(providerCalls-beforeMultiCalls,2);assert.equal(validationEvents.length,beforeMultiErrors);
- assert.equal(multiFactAnswer.citations.length,2,'four exact premises retain two independent originals, not four');
+ assert.equal(multiFactAnswer.citations.length,3,'all selected originals remain cited; the hypothesis uses two independent originals');
  assert.deepEqual(new Set(multiFactAnswer.citations.map(c=>c.sourceType)),new Set(['shared_xero','shared_google_sheets']));
  for(const citation of multiFactAnswer.citations){const original=metrics.canonical.find(source=>source.sourceId===citation.sourceId);assert(original);assert.equal(citation.url,original.url);assert.equal(citation.snapshotHash,original.snapshotHash);}
- assert.match(multiFactAnswer.content,/Interpretation \(unverified hypothesis\)/);
- assert.equal((multiFactAnswer.content.match(/Recorded observation:/g)||[]).length,4);
- for(const [variant,stage,reason,assertionRule,authoredField]of[
+ assert.match(multiFactAnswer.content,/Hypothesis \(unverified model draft\)/);
+ assert.equal((multiFactAnswer.content.match(/Stored observation —/g)||[]).length,5);
+ for(const [variant,stage,reason,contractRule]of[
   ['json','answer_json','malformed_json'],['schema','answer_schema','schema_invalid'],
-  ['citation','citation_resolution','unknown_citation'],['url','citation_resolution','unverified_url'],
-  ['quote','qualitative_interpretation','interpretation_premise_changed'],
-  ['number','qualitative_interpretation','interpretation_unsupported_characters'],
-  ['cause','qualitative_interpretation','interpretation_assertion_denied','causal_language','hypothesis'],
-  ['certainty','qualitative_interpretation','interpretation_assertion_denied','certainty_language','hypothesis'],
-  ['negated_certainty','qualitative_interpretation','interpretation_assertion_denied','certainty_language','hypothesis'],
-  ['record_linkage','qualitative_interpretation','interpretation_assertion_denied','record_linkage_language','missing_information'],
-  ['calculation','qualitative_interpretation','interpretation_assertion_denied','calculation_language','next_check'],
-  ['quantitative','qualitative_interpretation','interpretation_assertion_denied','quantitative_language','next_check'],
-  ['formatting','qualitative_interpretation','interpretation_assertion_denied','formatting','next_check'],
-  ['duplicate_premise','qualitative_interpretation','interpretation_duplicate_premise'],
-  ['same_original','qualitative_interpretation','interpretation_distinct_dependencies_required'],
-  ['invented_multi_quote','qualitative_interpretation','interpretation_premise_changed']]){
+  ['citation','shared_answer_contract','shared_answer_contract_denied','fact_reference'],
+  ['url','shared_answer_contract','shared_answer_contract_denied','draft_format'],
+  ['quote','answer_schema','schema_invalid'],
+  ['number','shared_answer_contract','shared_answer_contract_denied','numeric_draft'],
+  ['calculation','shared_answer_contract','shared_answer_contract_denied','result_reference'],
+  ['quantitative','shared_answer_contract','shared_answer_contract_denied','numeric_draft'],
+  ['formatting','shared_answer_contract','shared_answer_contract_denied','draft_format'],
+  ['unobserved_premise','shared_answer_contract','shared_answer_contract_denied','draft_support'],
+  ['source_label','answer_schema','schema_invalid'],
+  ['duplicate_premise','shared_answer_contract','shared_answer_contract_denied','draft_support'],
+  ['same_original','shared_answer_contract','shared_answer_contract_denied','independent_sources'],
+  ['invented_multi_quote','shared_answer_contract','shared_answer_contract_denied','fact_reference']]){
   answerVariant=variant;const before=validationEvents.length,calls=providerCalls;
   await assert.rejects(runVsiAnswer(input),error=>{
    assert.equal(error.usage.validationFailure.stage,stage);assert.equal(error.usage.validationFailure.reason,reason);
-   assert.equal(error.usage.validationFailure.assertionRule,assertionRule);assert.equal(error.usage.validationFailure.authoredField,authoredField);
+   assert.equal(error.usage.validationFailure.contractRule,contractRule);
    assert.equal(error.usage.outcomeFailure,stage.startsWith('answer_')?'output_validation':'citation_validation');return true;
   });
   assert.equal(providerCalls-calls,2,'one planner and answer, no generation retry');assert.equal(validationEvents.length,before+1);
   assert.doesNotMatch(JSON.stringify(validationEvents.at(-1)),/DO_NOT_LOG_SECRET|https:|00000000|[a-f0-9]{64}/);
+ }
+ for(const variant of ['cause','certainty','record_linkage','negated_certainty']){
+  answerVariant=variant;const draftAnswer=await runVsiAnswer(input);assert.match(draftAnswer.content,/Missing information \/ limitation \(model assessment\)/);
+  assert(!draftAnswer.content.includes('Verified finding:'));const manualSemanticApproval=false;assert.equal(manualSemanticApproval,false,'mechanical prose acceptance is not usefulness or grounding proof');
  }
  answerVariant='valid';
  const {pluginProviders}=require('../lib/ai/shared-evidence/contracts.ts');
@@ -166,5 +167,5 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  for(const kind of ['revoked','foreign']){providerCalls=0;revoked=kind==='revoked';foreign=kind==='foreign';await assert.rejects(runVsiAnswer(input));assert.equal(providerCalls,0);}revoked=false;foreign=false;
  providerCalls=0;revokeAfterPlanner=true;await assert.rejects(runVsiAnswer(input),e=>e.usage.outcomeFailure==='evidence_unavailable');assert.equal(providerCalls,1);revokeAfterPlanner=false;revoked=false;
  providerCalls=0;await assert.rejects(runVsiAnswer({...input,contextSummary:'Required private conversation context. '.repeat(300),recentMessages:Array.from({length:8},(_,n)=>({role:n%2?'assistant':'user',content:'Earlier business context. '.repeat(220)}))}),e=>e.usage.outcomeFailure==='context_block');assert.equal(providerCalls,0,'unfit required context denied before any paid planner');
- console.log(JSON.stringify({passed:true,fixture:'synthetic mixed-source workspace with full product producer and request envelope',synthetic:true,initial:metrics.initial,final:metrics.final,requiredOriginalsRetained:true,canonicalManifestSourceCount:15,omittedCitationRejected:true,wrongWorkspaceAndRevocationDenied:true,unfitBeforeAnyProvider:true,allTwelveRetained:true,dependencyClosureAndAmbiguityDenials:true,historicalDependencyRequired:true,fullWireBytesChecked:true,coverageDisclosed:true,multiFactTwoOriginalInterpretation:true,validationStageCases:16,assertionRuleAndFieldCases:7,authoredContractInPromptAndSchema:true,contentFreeDiagnostics:true,externalCalls:0}));
+ console.log(JSON.stringify({passed:true,fixture:'synthetic mixed-source workspace with full product producer and request envelope',synthetic:true,initial:metrics.initial,final:metrics.final,requiredOriginalsRetained:true,canonicalManifestSourceCount:15,omittedCitationRejected:true,wrongWorkspaceAndRevocationDenied:true,unfitBeforeAnyProvider:true,allTwelveRetained:true,dependencyClosureAndAmbiguityDenials:true,historicalDependencyRequired:true,fullWireBytesChecked:true,coverageDisclosed:true,multiFactTwoOriginalInterpretation:true,validationStageCases:14,semanticDraftBoundaryCases:4,authoredContractInPromptAndSchema:true,contentFreeDiagnostics:true,externalCalls:0}));
 })().catch(error=>{console.error(error);process.exitCode=1;});

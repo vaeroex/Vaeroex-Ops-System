@@ -52,6 +52,10 @@ global.fetch=async(url,init)=>{
   }
   if(name==='vsi_research_plan_v1'){
     currentRound=0;assert.equal(body.tools,undefined);
+    assert.deepEqual(payload.sourceDiscovery,{status:'not_checked',sourceTypes:[],sourceGroups:null,window:null,observationsIncluded:false,coverageComplete:false},'the legacy path must not claim an actual source lookup or absence');
+    assert.equal(payload.runtimeCapabilities.privateBusinessEvidence,'not_checked');
+    assert.match(body.input[0].content,/Observation values are deliberately omitted from planning/);
+    assert.match(body.input[0].content,/preserve research mode when the user also requests new public research/);
     const value=customPlan||plan('answer');
     return response({model:'gpt-6-luna',status:'completed',usage,output_text:JSON.stringify(value)});
   }

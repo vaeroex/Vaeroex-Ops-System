@@ -81,12 +81,13 @@ module.exports=async function run({db,uuid,w,owner,session,entity,login,admin,ma
   assert.equal(url,'https://api.openai.com/v1/responses');providerCalls++;const body=JSON.parse(options.body),p=JSON.parse(body.input[1].content);let value;
   if(body.text.format.name==='vsi_research_plan_v1')value={mode:'answer',businessEvidence:true,tier:'simple',clarification:'',publicTargets:[],objectives:[]};
   else {assert.equal(p.businessSources.length,sourceCount);assert.equal(p.sharedRelationships.length,expectedRelationships);const rel=p.sharedRelationships[0];assert.equal(rel.inputSourceIds.length,2);
-   const refs=rel.inputSourceIds.map(id=>p.businessSources.find(s=>s.sourceId===id).id);value={content:p.sharedRelationships.map(r=>`${r.fact} ${r.inputSourceIds.map(id=>`[${p.businessSources.find(s=>s.sourceId===id).id}]`).join(' ')}`).join('\n')+'\n'+p.businessSources.filter(s=>!p.sharedRelationships.some(r=>r.inputSourceIds.includes(s.sourceId))).map(s=>`${JSON.parse(s.text).observations[0]} [${s.id}]`).join('\n'),citationIds:p.businessSources.map(s=>s.id)};
-   if(answerMode==='missing-citation')value={content:`${rel.fact} [${refs[0]}]`,citationIds:[refs[0]]};
-   if(answerMode==='invented-ratio')value={content:`Sales per hour are 15.43 USD. [${refs[0]}] [${refs[1]}]`,citationIds:refs};
-   if(answerMode==='invented-profit')value={content:`POS payments establish profit of 123.45 USD. [${refs[0]}] [${refs[1]}]`,citationIds:refs};
-   if(answerMode==='invented-cause')value={content:`Stock changed because of the supplier schedule. [${refs[0]}] [${refs[1]}]`,citationIds:refs};
-   if(answerMode==='reversed-boundary')value={content:`These records establish a matched transaction. [${refs[0]}] [${refs[1]}]`,citationIds:refs};
+   const {sharedReply}=require('./vsi-shared-answer-test-support.cjs');value=sharedReply(p);value.results=p.sharedRelationships.map(r=>r.id);
+   if(answerMode==='missing-citation')value.observations=value.observations.filter(o=>o.ref!==p.businessSources.at(-1).id);
+   if(answerMode==='invented-ratio')value.results=['f'.repeat(64)];
+   if(answerMode==='invented-profit')value.next_checks=[{premises:value.observations.slice(0,2),text:'POS payments establish profit of 123.45 USD.'}];
+   if(answerMode==='invented-cause')value.content='Stock changed because of the supplier schedule.';
+   if(answerMode==='reversed-boundary')value.results=[{id:rel.id,fact:'These records establish a matched transaction.'}];
+
   }
   return new Response(JSON.stringify({model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:100},output_text:JSON.stringify(value)}),{status:200});
  };
@@ -96,7 +97,7 @@ module.exports=async function run({db,uuid,w,owner,session,entity,login,admin,ma
   assert.equal(answer.citations.length,sourceCount);assert.equal(new Set(answer.citations.map(c=>c.url)).size,sourceCount);
   for(const [index,mode] of ['missing-citation','reversed-boundary','invented-ratio','invented-profit','invented-cause'].entries()) {
    answerMode=mode;const rejectedId=await newRequest(db,850+index*2);
-   await assert.rejects(runVsiAnswer({supabase:reader,workspaceId:w,actorUserId:owner,readTicket:{ticketId:ticket},question:'Question',recentMessages:[],requestId:uuid(851+index*2),reservedRequest:{id:rejectedId,attempt:1}}),e=>e.usage?.outcomeFailure==='citation_validation');
+   await assert.rejects(runVsiAnswer({supabase:reader,workspaceId:w,actorUserId:owner,readTicket:{ticketId:ticket},question:'Question',recentMessages:[],requestId:uuid(851+index*2),reservedRequest:{id:rejectedId,attempt:1}}),e=>e.usage?.outcomeFailure===(['invented-cause','reversed-boundary'].includes(mode)?'output_validation':'citation_validation'));
   }
   answerMode='valid';await settleGeneratedVsi({supabase:reader,workspaceId:w,userId:owner,sessionId:session},{id:request,conversationId:conversation,attempt:1,readTicketId:ticket,question:'Question',answer:answer.content,summary:'User asked Question',citations:answer.citations,usage:answer.usage},answer.sharedManifestId);
   const reopened=await reopenSharedCitation(reader,{workspaceId:w,kind:'vsi_exchange',id:request});assert.equal(reopened.length,sourceCount);assert.equal(new Set(reopened.map(r=>r.provider).filter(p=>!['file','business_note'].includes(p))).size,pluginCount);
