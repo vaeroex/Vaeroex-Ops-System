@@ -1,4 +1,4 @@
-import type { SynthesisSource } from "@/lib/ai/shared-evidence/qualitative-synthesis";
+import type { SynthesisSource } from "@/lib/ai/shared-evidence/answer-contract";
 import type { VsiCitation } from "./types";
 import { VSI_MODEL } from "./config";
 import { vsiContextGroups } from "./context-selection";

@@ -1,5 +1,6 @@
 import { validateSharedVsiRelationships } from "@/lib/ai/shared-evidence/vsi-validation";
-import { qualitativeInterpretationSchema, qualitativeInterpretationJsonSchema, renderQualitativeInterpretation, type SynthesisSource } from "@/lib/ai/shared-evidence/qualitative-synthesis";
+import type { SynthesisSource } from "@/lib/ai/shared-evidence/answer-contract";
+import { sharedAnswerSchema, sharedAnswerJsonSchema, renderSharedAnswer, renderSharedClarification, sharedDraftTextPattern, issueAnswerResults, issueContextFactSources, SHARED_ANSWER_INSTRUCTIONS } from "@/lib/ai/shared-evidence/answer-contract";
 import { qualitativeSynthesisEnabled } from "@/lib/ai/shared-evidence/qualitative-policy";
 import { sharedEvidenceRuntimeEnabled } from "@/lib/ai/shared-evidence/runtime-gate";
 import { prepareSharedGeneration, sealSharedGeneration, sharedTargetHref, sharedRpc, type SharedClient, type SharedPrepared } from "@/lib/ai/shared-evidence/generation";
@@ -38,17 +39,14 @@ ${VSI_LIVE_FRESHNESS_INSTRUCTION}
 ${VSI_SCOPE_COMPARISON_INSTRUCTION}
 When sourceRequirements.datedPricingOnly is true, quote a public price only if its supporting source has explicit source-specific date provenance. Do not quote undated prices in the answer, comparison, caveats or source description; explain that they were excluded. A historical source date without its provenance does not establish a dated price. Compare like-for-like offerings and retain meal, service, unit, minimum and starting-price qualifiers.
 No records are saved by answering. An explicit remember request is handled separately by application code, with a visible Business Note proposal and confirmation. Never claim that an ordinary conversation was saved as Business Memory. Do not solicit or repeat patient/regulated healthcare records, Social Security numbers, medical record numbers or insurance IDs.
-Use plain readable Markdown with modest headings only when useful. Avoid repetitive advice. Return exactly the required JSON object with content and citationIds. Use only supplied citation IDs. When asked for earlier source links, reference their supplied citations; the source cards retain the original URLs. Never invent a citation or link.
+Use plain readable Markdown with modest headings only when useful. Avoid repetitive advice. Return exactly the JSON object required by the supplied response schema. Use only supplied source references. When asked for earlier source links, reference their supplied citations; the source cards retain the original URLs. Never invent a citation or link.
 The supplied authoritativeProductContext and P sources describe the actual Vaeroex product, current plan, workspace access and supported navigation. Use that context when asked what you are, what the product does, how to use it, or what the plan includes. For questions about the active application, use this maintained context as the authority for the current product, plan, entitlement and capability facts. A public page or search cache may describe a different offering, release or public-page version; qualify that evidence and establish matching scope and dates before reporting a real inconsistency. Do not replace maintained app facts with an unverified public-page interpretation. Do not answer those questions from generic assumptions. Do not repeat internal implementation details unless they help the user.
 Runtime capabilities are authoritative: public research is available through the completed planning/lookup workflow. If no lookup was needed this turn, do not say you lack browsing or cannot search. Never apologize for an imaginary tool limitation. For a follow-up, answer the new intent using conversation context and its citations; do not restart the same overview or ask the user to paste sources already attached. For research, synthesize the material into a useful answer tailored to the question, compare sources, flag contradictions and gaps, distinguish the entity's own claims from independent corroboration, and give concrete implications. Research is bounded; do not claim it covers everything. If researchStatus.partial is true, clearly explain the specific remaining limitation. Never substitute suggestions to research for research that has already been performed.`;
 
-const QUALITATIVE_SYNTHESIS_INSTRUCTIONS = "Only interpretations may contain unverified qualitative hypotheses; keep them out of factual content. Counts do not establish themes or causes. Coexisting records need not support a business relationship. When no useful hypothesis fits, return interpretations: [] and explain the specific evidence limitation in factual content with both citations; do not substitute generic warrant-review-alongside wording. Identify the missing scope, coverage or observation needed to answer the question without inventing it. Quote complete qualitative_sources facts with exact ref/binding. A ref identifies an original: distinct facts may reuse it, but identical premises may not. Every fact must contribute; use at least two independent originals. Follow the field descriptions literally. Causal, certainty, record-linking, comparison and calculation words are forbidden even in questions or negations, including caused, because, proven, linked, matched, higher than, sum and ratio. Within interpretations, numbers and dates belong only in premises; factual content retains exact supplied values, dates and citations. The application adds labels and disclaimers; do not restate them. Never invent support.";
-
-const answerSchema = z.object({ content: z.string().trim().min(1).max(24_000), citationIds: z.array(z.string().regex(/^[BWP]\d+$/)).max(30), interpretations:z.array(qualitativeInterpretationSchema).max(3).default([]) }).strict();
+const answerSchema = z.object({ content: z.string().trim().min(1).max(24_000), citationIds: z.array(z.string().regex(/^[BWP]\d+$/)).max(30), interpretations:z.array(z.unknown()).max(3).default([]) }).strict();
 const answerJsonSchema = { type: "object", additionalProperties: false, properties: {
-  content: { type: "string" }, citationIds: { type: "array", items: { type: "string" } },
-  ...(qualitativeSynthesisEnabled() ? { interpretations: { type: "array", maxItems: 3, items: qualitativeInterpretationJsonSchema } } : {})
-}, required: ["content", "citationIds", ...(qualitativeSynthesisEnabled() ? ["interpretations"] : [])] };
+  content: { type: "string" }, citationIds: { type: "array", items: { type: "string" } }
+}, required: ["content", "citationIds"] };
 type ProviderPayload = { model?: string; status?: string; output_text?: string; output?: Array<{ type?: string; status?: string;
   action?: { type?: string; url?: string | null; sources?: Array<{ type?: string; url?: string }> };
   content?: Array<{ type?: string; text?: string; refusal?: string; annotations?: Array<{ type?: string; url?: string; title?: string }> }> }>;
@@ -203,7 +201,8 @@ export async function runVsiAnswer(input: VsiRunInput): Promise<VsiAnswer> {
   }
 }
 async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Promise<VsiAnswer> {
-  const systemPrompt = qualitativeSynthesisEnabled() ? `${VSI_SYSTEM_PROMPT}\n\n${QUALITATIVE_SYNTHESIS_INSTRUCTIONS}` : VSI_SYSTEM_PROMPT;
+  const systemPrompt = VSI_SYSTEM_PROMPT;
+  const sharedSystemPrompt = `${VSI_SYSTEM_PROMPT.replace("Cite specific supporting source IDs inline, such as [B1], and include them in citationIds.", "Select the supplied fact references; the application renders their citations.").replace("Do useful supported arithmetic and show the inputs.", "Numeric calculation results in a shared answer must be application-issued; never calculate them in draft prose.")}\n\n${SHARED_ANSWER_INSTRUCTIONS}`;
   const config = getVsiConfig(), usage = emptyVsiUsage();
   let access;
   try { access = await authorizeVsiRead(input); }
@@ -301,8 +300,9 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     authoritativeProductContext: product!.authoritative, productSources: product!.sources.map(withVsiSourceSnapshot),
     runtimeCapabilities: { publicWebResearch: "available", lookupThisTurn: lookupPerformed ? "performed" : "not_needed", externalActions: false, textOnly: true },
     businessSources: evidence.sources.map(withVsiSourceSnapshot).map(source => ({ ...source, id: stableVsiCitationId(source) })),
-    sharedRelationships: sharedPrepared?.relationships.map(relationship=>({fact:relationship.fact,inputSourceIds:[...relationship.sourceHashes]})) || [],
+    sharedRelationships: issueAnswerResults(sharedPrepared?.relationships.map(relationship=>({fact:relationship.fact,inputSourceIds:[...relationship.sourceHashes]})) || []),
     qualitative_sources: [] as SynthesisSource[],
+    contextFactSources: [] as { ref: string; binding: string; factCount: number }[],
     evidenceLimitations: [...evidence.limitations, ...product!.limitations],
     sourceRequirements: { datedPricingOnly: datedPricingOnly },
     livePublicLookup: lookup,
@@ -310,18 +310,19 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   };
   const issuePremises = (payload: ReturnType<typeof makePayload>) => {
   payload.qualitative_sources=payload.businessSources.flatMap(source=>{
-    const row=qualitativeSynthesisEnabled()?sharedPrepared?.rows.find(row=>row.hash===source.sourceId):undefined;
-    return row?[{ref:source.id,binding:row.hash,dependencies:[row.hash],facts:row.facts,reported:row.reported?row.provider==='file'?'file' as const:'note' as const:false as const,
+    const row=sharedPrepared?.rows.find(row=>row.hash===source.sourceId);
+    return row?[{ref:source.id,binding:row.hash,provider:row.provider,dependencies:[row.hash],facts:row.facts,reported:row.reported?row.provider==='file'?'file' as const:'note' as const:false as const,
       environment:row.reported?'supporting' as const:row.scope.environment==='sandbox'?'sandbox' as const:'production' as const}]:[];
   });
   };
-  const answerRequest = (json: string, tier: VsiResearchTier) => ({ input: [{ role: "system", content: systemPrompt }, { role: "user", content: json }],
+  const answerRequest = (json: string, tier: VsiResearchTier, shared = false) => ({ input: [{ role: "system", content: shared ? sharedSystemPrompt : systemPrompt }, { role: "user", content: json }],
     reasoning: { effort: tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, tier === "deep" ? 6000 : 4000),
-    text: { format: { type: "json_schema", name: "vsi_answer_v1", strict: true, schema: answerJsonSchema } } });
+    text: { format: { type: "json_schema", name: shared ? "vsi_shared_answer_v2" : "vsi_answer_v1", strict: true, schema: shared ? { ...sharedAnswerJsonSchema, properties: { ...sharedAnswerJsonSchema.properties, hypotheses: { ...sharedAnswerJsonSchema.properties.hypotheses, maxItems: qualitativeSynthesisEnabled() ? 3 : 0 } } } : answerJsonSchema } } });
   const packAnswer = (payload: ReturnType<typeof makePayload>, tier: VsiResearchTier, shared: boolean, phase: "preflight" | "answer") => {
     try {
-      const packed = packVsiAnswerContext(payload, systemPrompt, config.maxInputChars, { selectRelevant: shared, maxBytes: config.maxProviderInputBytes,
-        requestJSON: json => serializeVsiProviderRequest(answerRequest(json,tier),config.maxOutputTokens) });
+      if (shared) payload.contextFactSources = issueContextFactSources(payload.productSources,payload.livePublicLookup).map(source => ({ref:source.ref,binding:source.binding,factCount:source.facts.length}));
+      const packed = packVsiAnswerContext(payload, shared ? sharedSystemPrompt : systemPrompt, config.maxInputChars, { selectRelevant: shared, maxBytes: config.maxProviderInputBytes,
+        requestJSON: json => serializeVsiProviderRequest(answerRequest(json,tier,shared),config.maxOutputTokens) });
       if (shared) console.info("[vsi-context-budget]", { phase, reason: "bounded_model_view", maxChars: config.maxInputChars, maxBytes: config.maxProviderInputBytes,
         charUnit: "javascript_utf16_code_units", byteUnit: "utf8", initial: packed.initialMetrics, final: packed.metrics });
       return packed;
@@ -354,12 +355,18 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     privateConversationSummary: readVsiPrivateSummary(input.contextSummary), recentConversation: plannerHistory.messages.map(({ role, content }) => ({ role, content })), historicalSources: plannerHistory.sources,
     approvedPublicTopics, authoritativeProductContext: product.authoritative,
     runtimeCapabilities: { publicWebResearch: "available", privateBusinessEvidence: sourceDiscovery.status, textOnly: true } };
-  const planned = await call({ input: [{ role: "system", content: VSI_PLANNER_PROMPT }, { role: "user", content: JSON.stringify(plannerPayload) }],
-    max_output_tokens: 1600, text: { format: { type: "json_schema", name: "vsi_research_plan_v1", strict: true, schema: VSI_PLAN_JSON_SCHEMA } } }, 45_000);
+  const planned = await call({ input: [{ role: "system", content: sharedPrepared ? `${VSI_PLANNER_PROMPT}\nFor shared-data clarification, ask a plain question without numeric literals, URLs or citation markup; the application labels it as a draft, not an evidence-backed answer.` : VSI_PLANNER_PROMPT }, { role: "user", content: JSON.stringify(plannerPayload) }],
+    max_output_tokens: 1600, text: { format: { type: "json_schema", name: "vsi_research_plan_v1", strict: true, schema: sharedPrepared ? { ...VSI_PLAN_JSON_SCHEMA, properties: { ...VSI_PLAN_JSON_SCHEMA.properties, clarification: { ...VSI_PLAN_JSON_SCHEMA.properties.clarification, pattern: sharedDraftTextPattern } } } : VSI_PLAN_JSON_SCHEMA } } }, 45_000);
   let plan;
   try { plan = validateVsiResearchPlan(JSON.parse(outputText(planned)), input.question, approvedPublicTopics); }
   catch { throw new VsiEngineError("Vaeroex could not prepare a reliable answer plan. Please retry.", usage, false, "output_validation"); }
-  if (plan.mode === "clarify") return finish({ content: plan.clarification || "Which public business name, website or topic should I research?", citations: [] });
+  if (plan.mode === "clarify") {
+    let clarification = plan.clarification || "Which public business name, website or topic should I research?";
+    if (sharedPrepared) try { clarification = renderSharedClarification(clarification); }
+    catch (error) { usage.validationFailure = vsiValidationDiagnostic("planner_clarification",error);throw new VsiEngineError("Vaeroex could not verify the clarification format. Your question has not been counted.",usage,false,"output_validation"); }
+    return finish({ content: clarification, citations: [] });
+  }
+  if (sharedEvidence && explicitStoredVsiQuestion(input.question) && !plan.businessEvidence) throw new VsiEngineError("The plan did not select the required permitted workspace evidence. No business answer was generated.", usage, false, "evidence_unavailable");
 
   const webSources: VsiCitation[] = [], webClaims: VsiPublicResearchResult["claims"] = [];
   const researchLimitations: string[] = [];
@@ -473,7 +480,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const selectedPremises = payload.qualitative_sources.filter(source => selected.has(source.ref));
   usage.researchStatus = plan.mode === "research" ? payload.researchStatus.partial ? "partial" : "completed" : "not_required";
   usage.evidenceLimitations = payload.evidenceLimitations.length > 0 || payload.researchStatus.limitations.length > 0 || packedContext.metrics.omittedSourceGroups > 0;
-  const reply = await call(answerRequest(packedContext.json,plan.tier));
+  const reply = await call(answerRequest(packedContext.json,plan.tier,sharedAnswer));
   const validateAt = <T,>(stage: VsiValidationStage, check: () => T): T => {
     try { return check(); }
     catch (error) {
@@ -486,10 +493,15 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     }
   };
   const decodedAnswer = validateAt("answer_json", () => JSON.parse(outputText(reply)));
-  const structuredAnswer = validateAt("answer_schema", () => answerSchema.parse(decodedAnswer));
-  validateAt("shared_relationships", () => validateSharedVsiRelationships(structuredAnswer,selectedBusiness,selectedRelationships));
-  const interpretations=structuredAnswer.interpretations.map(claim=>validateAt("qualitative_interpretation", () => renderQualitativeInterpretation(claim,selectedPremises,ref=>` [${ref}]`)));
-  const answer = validateAt("citation_resolution", () => validateVsiAnswer({content:[structuredAnswer.content,...interpretations].join("\n\n"),citationIds:[...new Set([...structuredAnswer.citationIds,...structuredAnswer.interpretations.flatMap(claim=>claim.premises.map(p=>p.ref))])]}, [...selectedBusiness, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]));
+  const structuredAnswer = sharedAnswer ? validateAt("answer_schema", () => sharedAnswerSchema.parse(decodedAnswer)) : validateAt("answer_schema", () => answerSchema.parse(decodedAnswer));
+  const composed = sharedAnswer
+    ? validateAt("shared_answer_contract", () => renderSharedAnswer(structuredAnswer,{sources:[...selectedPremises,...issueContextFactSources(payload.productSources,payload.livePublicLookup)],requiredRefs:selectedPremises.map(source=>source.ref),results:selectedRelationships,hypothesesEnabled:qualitativeSynthesisEnabled(),scopes:new Map(selectedPremises.map(source=>[source.ref,sharedPrepared!.rows.find(row=>row.hash===source.binding)!.scope]))}))
+    : validateAt("shared_relationships", () => {
+      const legacy = answerSchema.parse(structuredAnswer);
+      if (legacy.interpretations.length) throw new Error("Interpretations require current admitted source composition before citation validation.");
+      validateSharedVsiRelationships(legacy,selectedBusiness,selectedRelationships);return legacy;
+    });
+  const answer = validateAt("citation_resolution", () => validateVsiAnswer(composed, [...selectedBusiness, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]));
   validateAt("public_source_coverage", () => { if (webSources.length && !answer.citations.some(source => source.sourceType === "web")) throw new Error("The live answer omitted its source."); });
-  return finish({ ...answer, ...(packedContext.metrics.omittedSourceGroups ? {content: `Coverage: This is a partial review of selected stored evidence.\n\n${answer.content}`} : {}), ...(publicResearchTopics ? { publicResearchTopics } : {}) });
+  return finish({ ...answer, ...(packedContext.metrics.omittedSourceGroups ? {content: `Coverage: This is a partial review of selected stored evidence.\n\n${answer.content}`} : sharedPrepared && !sharedAnswer ? {content:`No stored business observations were used for this general response.\n\n${answer.content}`} : {}), ...(publicResearchTopics ? { publicResearchTopics } : {}) });
 }

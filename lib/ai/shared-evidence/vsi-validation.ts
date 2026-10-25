@@ -1,10 +1,10 @@
 import type { VsiCitation } from "@/lib/vsi/types";
 
-export type SharedVsiRelationship = {fact:string;inputSourceIds:string[]};
+export type SharedVsiRelationship = {fact:string;inputSourceIds:readonly string[]};
 /** The closed comparison boundary is application-owned. Reject recognized joint
  * finance claims outside its exact text and require both supporting originals.
  * This is a bounded guard, not a general semantic/answer-quality proof. */
-export function validateSharedVsiRelationships(answer:{content:string;citationIds:string[]},sources:VsiCitation[],relationships:SharedVsiRelationship[]) {
+export function validateSharedVsiRelationships(answer:{content:string;citationIds:string[]},sources:VsiCitation[],relationships:readonly SharedVsiRelationship[]) {
  const cited=new Set([...answer.citationIds,...[...answer.content.matchAll(/\[([BWP]\d+)\]/g)].map(match=>match[1])]);
  let remaining=answer.content.replace(/\[([BWP]\d+)\]/g,'').trim();
  for(const relationship of relationships) {

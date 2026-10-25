@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { QualitativeAssertionError, QualitativeVocabularyError, qualitativeAssertionRules, qualitativeAuthoredFields, type QualitativeAssertionRule, type QualitativeAuthoredField } from "@/lib/ai/shared-evidence/qualitative-synthesis";
+import { SharedAnswerContractError, sharedAnswerRules, type SharedAnswerRule } from "@/lib/ai/shared-evidence/answer-contract";
 
 export type VsiValidationStage = "answer_json" | "answer_schema" | "shared_relationships"
-  | "qualitative_interpretation" | "citation_resolution" | "public_source_coverage";
+  | "qualitative_interpretation" | "shared_answer_contract" | "planner_clarification" | "citation_resolution" | "public_source_coverage";
 
 const reasons = [
   "shared_relationship_dependency_missing", "shared_relationship_citation_missing", "shared_relationship_claim_changed",
@@ -12,15 +12,15 @@ const reasons = [
   "interpretation_assertion_denied", "interpretation_attribution_denied", "interpretation_unsupported_term", "interpretation_grounding_missing"
 ] as const;
 type Reason = typeof reasons[number] | "malformed_json" | "schema_invalid" | "unknown_citation"
-  | "unverified_url" | "financial_input_missing" | "uncomposed_interpretation" | "web_source_missing" | "unclassified";
+  | "unverified_url" | "financial_input_missing" | "uncomposed_interpretation" | "web_source_missing" | "shared_answer_contract_denied" | "unclassified";
 export type VsiValidationDiagnostic = Readonly<{
   stage: VsiValidationStage; category: "output_validation" | "citation_validation"; reason: Reason;
   schemaIssueCount?: number; schemaIssueCodes?: string[]; schemaFields?: string[];
-  assertionRule?: QualitativeAssertionRule; authoredField?: QualitativeAuthoredField;
+  contractRule?: SharedAnswerRule;
 }>;
 
 const schemaCodes = new Set(["invalid_type", "invalid_value", "invalid_string", "invalid_format", "too_big", "too_small", "unrecognized_keys", "invalid_union", "custom"]);
-const schemaFields = new Set(["content", "citationIds", "interpretations", "premises", "ref", "binding", "quote", "hypothesis", "missing_information", "next_check"]);
+const schemaFields = new Set(["content", "citationIds", "interpretations", "premises", "ref", "binding", "quote", "hypothesis", "missing_information", "next_check", "observations", "results", "hypotheses", "next_checks", "factIndex", "text"]);
 const messages = new Map<string, Reason>([
   ...reasons.map(reason => [reason, reason] as const),
   ["Vaeroex could not verify the answer's citations. Please retry.", "unknown_citation"],
@@ -33,16 +33,9 @@ const messages = new Map<string, Reason>([
 /** Closed enums and counts only. Never return/log exception messages, unknown
  * keys, received values, quotes, source identities, URLs or provider output. */
 export function vsiValidationDiagnostic(stage: VsiValidationStage, error: unknown): VsiValidationDiagnostic {
-  const category = stage === "answer_json" || stage === "answer_schema" ? "output_validation" : "citation_validation";
-  if (stage === "qualitative_interpretation" && error instanceof QualitativeAssertionError) {
-    return { stage, category, reason: "interpretation_assertion_denied",
-      ...(qualitativeAssertionRules.some(rule => rule === error.rule) ? { assertionRule: error.rule } : {}),
-      ...(qualitativeAuthoredFields.some(field => field === error.field) ? { authoredField: error.field } : {}) };
-  }
-  if (stage === "qualitative_interpretation" && error instanceof QualitativeVocabularyError) {
-    return { stage, category, reason: "interpretation_unsupported_term",
-      ...(qualitativeAuthoredFields.some(field => field === error.field) ? { authoredField: error.field } : {}) };
-  }
+  const category = stage === "answer_json" || stage === "answer_schema" || stage === "planner_clarification" ? "output_validation" : "citation_validation";
+  if ((stage === "shared_answer_contract" || stage === "planner_clarification") && error instanceof SharedAnswerContractError) return { stage, category, reason: "shared_answer_contract_denied",
+    ...(sharedAnswerRules.some(rule => rule === error.rule) ? { contractRule: error.rule } : {}) };
   if (error instanceof z.ZodError) {
     const issues = error.issues.slice(0, 32);
     return { stage, category, reason: "schema_invalid", schemaIssueCount: Math.min(error.issues.length, 999),
