@@ -202,7 +202,7 @@ export async function runVsiAnswer(input: VsiRunInput): Promise<VsiAnswer> {
 }
 async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Promise<VsiAnswer> {
   const systemPrompt = VSI_SYSTEM_PROMPT;
-  const sharedSystemPrompt = `${VSI_SYSTEM_PROMPT.replace("Cite specific supporting source IDs inline, such as [B1], and include them in citationIds.", "Select the supplied fact references; the application renders their citations.").replace("Do useful supported arithmetic and show the inputs.", "Numeric calculation results in a shared answer must be application-issued; never calculate them in draft prose.")}\n\n${SHARED_ANSWER_INSTRUCTIONS}`;
+  const sharedSystemPrompt = `${VSI_SYSTEM_PROMPT.replace("Cite specific supporting source IDs inline, such as [B1], and include them in citationIds.", "Select the supplied fact references; the application renders their citations.").replace("You may explain prior research using the attached historical web source snapshots and their original dates; do not claim those snapshots were rechecked.", "Historical conversation and source snapshots provide dialogue context only. Select a historical reference only if it is also currently issued in qualitative_sources or contextFactSources; otherwise identify the missing eligible evidence without inventing a reference.").replace("Do useful supported arithmetic and show the inputs.", "Numeric calculation results in a shared answer must be application-issued; never calculate them in draft prose.")}\n\n${SHARED_ANSWER_INSTRUCTIONS}`;
   const config = getVsiConfig(), usage = emptyVsiUsage();
   let access;
   try { access = await authorizeVsiRead(input); }
