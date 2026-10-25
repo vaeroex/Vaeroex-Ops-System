@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 require('./qbo-customer-test-support.cjs').installLoader({'server-only':{}});
 const {z}=require('zod');
 const {vsiValidationDiagnostic:diagnose}=require('../lib/vsi/validation-diagnostics.ts');
-const {QualitativeAssertionError}=require('../lib/ai/shared-evidence/qualitative-synthesis.ts');
+const {QualitativeAssertionError,QualitativeVocabularyError}=require('../lib/ai/shared-evidence/qualitative-synthesis.ts');
 const secret='DO_NOT_LOG_SECRET https://private.invalid/customer';
 const bad=z.object({content:z.string().min(1),interpretations:z.array(z.object({quote:z.string().min(20)}).strict())}).strict().safeParse({content:'',interpretations:[{quote:'short',[secret]:secret}],[secret]:secret});
 assert(!bad.success);
@@ -26,4 +26,8 @@ assert.doesNotMatch(JSON.stringify(diagnose('qualitative_interpretation',restric
 assert.deepEqual(diagnose('citation_resolution',restricted),{stage:'citation_resolution',category:'citation_validation',reason:'interpretation_assertion_denied'});
 const spoof=Object.assign(new Error('interpretation_assertion_denied'),{rule:'causal_language',field:'hypothesis'});
 assert.deepEqual(diagnose('qualitative_interpretation',spoof),{stage:'qualitative_interpretation',category:'citation_validation',reason:'interpretation_assertion_denied'});
+const lexical=new QualitativeVocabularyError('missing_information');lexical.word=secret;lexical.sentence=secret;
+assert.deepEqual(diagnose('qualitative_interpretation',lexical),{stage:'qualitative_interpretation',category:'citation_validation',reason:'interpretation_unsupported_term',authoredField:'missing_information'});
+lexical.field=secret;assert.deepEqual(diagnose('qualitative_interpretation',lexical),{stage:'qualitative_interpretation',category:'citation_validation',reason:'interpretation_unsupported_term'});
+assert.doesNotMatch(JSON.stringify(diagnose('qualitative_interpretation',lexical)),/DO_NOT_LOG_SECRET|private.invalid|sentence|word/);
 console.log(JSON.stringify({safeStageCategories:true,unknownMessagesAndFieldsWithheld:true,zodValuesAndMessagesWithheld:true,assertionMetadataClosedEnumsOnly:true,externalCalls:0}));

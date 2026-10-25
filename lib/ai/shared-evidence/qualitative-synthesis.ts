@@ -21,14 +21,18 @@ export class QualitativeAssertionError extends Error {
     super("interpretation_assertion_denied");
   }
 }
+/** Field only: never attach the rejected word, sentence, quote or source. */
+export class QualitativeVocabularyError extends Error {
+  constructor(readonly field: QualitativeAuthoredField) { super("interpretation_unsupported_term"); }
+}
 export type SynthesisSource = Readonly<{ ref: string; binding: string; dependencies: readonly string[]; facts: readonly string[]; reported: "file" | "note" | false; environment: "production" | "sandbox" | "supporting"; installation?: string }>;
 export const qualitativeInterpretationJsonSchema = {
-  description: "All authored fields are single English sentences using exact premise business words and neutral review language, without new paraphrases or inflections. No source labels, references, URLs, brackets, braces, angle brackets, semicolons, line breaks or abbreviations; no numbers, dates or calculations.",
+  description: "All authored fields are single English sentences. Business terms must use exact premise business words, without new paraphrases or inflections. Questions and next checks may also assess source information, adequacy, sufficiency, clarity, reliability or limitations; this language is not factual support. No source labels, references, URLs, brackets, braces, angle brackets, semicolons, line breaks or abbreviations; no numbers, dates or calculations.",
   type: "object", additionalProperties: false, required: ["premises", "hypothesis", "missing_information", "next_check"], properties: {
     premises: { type: "array", minItems: 2, maxItems: 8, items: { type: "object", additionalProperties: false, required: ["ref", "binding", "quote"], properties: { ref: { type: "string" }, binding: { type: "string" }, quote: { type: "string" } } } },
     hypothesis: { type: "string", description: "Contains may, might or could. The application adds the unverified label and disclaimer." },
-    missing_information: { type: "string", description: "Begins Whether, Which, What or How; ask about comparability, coverage or missing context. Restricted words remain prohibited even in questions or negations." },
-    next_check: { type: "string", description: "Begins Review, Inspect, Check, Verify, Collect or Compare." }
+    missing_information: { type: "string", description: "Begins Whether, Which, What or How; ask about comparability, coverage or the adequacy, sufficiency or clarity of source information. Do not introduce a new business fact. Restricted words remain prohibited even in questions or negations." },
+    next_check: { type: "string", description: "Begins Review, Inspect, Check, Verify, Collect or Compare; request an evidence check, never assert an unverified business fact." }
   }
 } as const;
 
@@ -36,6 +40,11 @@ export const qualitativeInterpretationJsonSchema = {
 // Business-specific nouns must occur in the complete cited premises. This is
 // deliberately conservative; token reuse is not proof that a hypothesis follows.
 const neutral = new Set(("a an the this these those it its their they them and or but of to for with without in on at by as from into about between alongside across whether which what how if when may might could possible possibly potential hypothesis interpretation observations evidence context reported measured business review reviewing inspect inspecting check checking verify verifying collect collecting confirm compare comparing relevant relevance warrant warrants attention priority questions question understanding understand clarification clarify availability available timing pattern patterns uncertainty uncertain information missing unknown records record original originals scope coverage period periods same different difference differences entity entities item items transaction transactions matching comparable comparison compatibility completeness concern concerns support supported establish established causal conclusion conclusions not no is are be been being can cannot does do would should need needs needed more further separately remains remain only useful focus consider considering test testing before after must also each any all than then we you our your" ).split(/\s+/));
+// Speech-act distinction: questions/checks can assess the evidence itself. These
+// non-business words neither authorize a hypothesis nor satisfy premise grounding.
+// This is still a conservative lexical boundary, not a semantic fact verifier.
+const evidenceAssessment = new Set(("source sources data dataset datasets adequacy sufficiency clarity resolution reliability limitation limitations limit limits").split(/\s+/));
+const evidenceQuestions = new Set(("adequate adequately inadequate inadequately sufficient sufficiently insufficient insufficiently enough clear clearly unclear unresolved resolved reliable reliably unreliable limited").split(/\s+/));
 const words = (text: string) => text.toLowerCase().match(/[a-z]+(?:'[a-z]+)?/g) || [];
 const businessWords = (text: string) => words(text).filter(word => word.length > 2 && !neutral.has(word));
 const forbidden = /[\d$€£%]|\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|hundred|thousand|million|billion|percent|ratio|per.hour|profitability|caus(?:e[ds]?|ing)|because|due to|therefore|proves?|proven|guarantee[ds]?|definitely|correlat\w*|reconcil\w*|matched|linked|identical|attribut\w*|driv(?:e[sn]?|ing)|drove|result(?:s|ed|ing)? in|leads? to|offset\w*|higher than|lower than|greater than|less than|equals?|sum(?:med)?|add(?:ed|ing)?|combined total)\b/i;
@@ -83,7 +92,8 @@ export function validateQualitativeInterpretation(value: unknown, sources: reado
     // Attribution lives only in application-issued premises; an interpretation
     // cannot move a fact to another plugin/file/note or assert a hidden join.
     if(/\b(?:Square|QuickBooks|Google Sheets|Clockify|Harvest|Katana|Zoho|Xero|Loyverse|Wix|Business Notes?|reviewed file|according to|says?|reports?|shows?|confirms?|same (?:entity|item|transaction|period|record))\b/i.test(text)) throw new Error("interpretation_attribution_denied");
-    if (businessWords(text).some(word => !vocabulary.has(word))) throw new Error("interpretation_unsupported_term");
+    const asksAboutEvidence = field === "missing_information" || (field === "next_check" && /^(?:Review|Inspect|Check|Verify|Collect|Compare)\s+(?:whether|how)\b/i.test(text));
+    if (businessWords(text).some(word => !vocabulary.has(word) && !(field !== "hypothesis" && evidenceAssessment.has(word)) && !(asksAboutEvidence && evidenceQuestions.has(word)))) throw new QualitativeVocabularyError(field);
   }
   const hypothesisWords = new Set(businessWords(claim.hypothesis));
   for (const premise of claim.premises) {

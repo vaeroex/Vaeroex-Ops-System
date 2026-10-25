@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { QualitativeAssertionError, qualitativeAssertionRules, qualitativeAuthoredFields, type QualitativeAssertionRule, type QualitativeAuthoredField } from "@/lib/ai/shared-evidence/qualitative-synthesis";
+import { QualitativeAssertionError, QualitativeVocabularyError, qualitativeAssertionRules, qualitativeAuthoredFields, type QualitativeAssertionRule, type QualitativeAuthoredField } from "@/lib/ai/shared-evidence/qualitative-synthesis";
 
 export type VsiValidationStage = "answer_json" | "answer_schema" | "shared_relationships"
   | "qualitative_interpretation" | "citation_resolution" | "public_source_coverage";
@@ -37,6 +37,10 @@ export function vsiValidationDiagnostic(stage: VsiValidationStage, error: unknow
   if (stage === "qualitative_interpretation" && error instanceof QualitativeAssertionError) {
     return { stage, category, reason: "interpretation_assertion_denied",
       ...(qualitativeAssertionRules.some(rule => rule === error.rule) ? { assertionRule: error.rule } : {}),
+      ...(qualitativeAuthoredFields.some(field => field === error.field) ? { authoredField: error.field } : {}) };
+  }
+  if (stage === "qualitative_interpretation" && error instanceof QualitativeVocabularyError) {
+    return { stage, category, reason: "interpretation_unsupported_term",
       ...(qualitativeAuthoredFields.some(field => field === error.field) ? { authoredField: error.field } : {}) };
   }
   if (error instanceof z.ZodError) {
