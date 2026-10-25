@@ -4,10 +4,13 @@ const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const workspace=id(1),actor=id(2),session=id(3),request=id(4),ticket=id(5),manifest=id(6);
 let revoked=false,foreign=false,revokeAfterPlanner=false,answerMode='valid',providerCalls=0,answerCalls=0;
 const events=[];
-const raw=[
- {provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(10),authority_hash:'a'.repeat(64)},hash:'a'.repeat(64),data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(30),connection_id:id(31),date:'2026-10-14',time_zone:'UTC',metrics:Array.from({length:36},(_,n)=>({metric:`dispatch observation ${n} ${'synthetic operational review '.repeat(4)}`,value:String(n+1),unit:'count'})),read_sources:[]}},
- {provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'stored invoice observations',records:Array.from({length:18},(_,n)=>({day:'2026-10-14',metrics:[{key:`invoice balance ${n} ${'synthetic billing review '.repeat(4)}`,value:String(n+1),currency:'USD'}]})),read_sources:[]}}
+const scenario=padding=>[
+ {provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(10),authority_hash:'a'.repeat(64)},hash:'a'.repeat(64),data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(30),connection_id:id(31),date:'2026-10-14',time_zone:'UTC',metrics:Array.from({length:36},(_,n)=>({metric:`dispatch observation ${n} ${'synthetic operational review '.repeat(padding)}`,value:String(n+1),unit:'count'})),read_sources:[]}},
+ {provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'stored invoice observations',records:Array.from({length:18},(_,n)=>({day:'2026-10-14',metrics:[{key:`invoice balance ${n} ${'synthetic billing review '.repeat(padding)}`,value:String(n+1),currency:'USD'}]})),read_sources:[]}}
 ];
+// Keep the positive case below the complete wire limit after prompt/schema changes.
+// The original four-copy filler shape is retained as an explicit denial below.
+const raw=scenario(3);
 const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
  events.push(name);
  if(name==='discover_shared_evidence_v1')return {data:{stage:'catalog_only',candidates:raw.map(s=>({provider:s.provider,identity:s.identity})),truncated:false},error:null};
@@ -95,5 +98,7 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  for(const kind of ['revoked','foreign']){providerCalls=0;answerCalls=0;revoked=kind==='revoked';foreign=kind==='foreign';await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.inputTokens===0);assert.equal(providerCalls,0);assert.equal(answerCalls,0);}revoked=false;foreign=false;
  providerCalls=0;answerCalls=0;revokeAfterPlanner=true;await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.providerCalls===1&&e.usage.outcomeFailure==='evidence_unavailable');assert.equal(providerCalls,1);assert.equal(answerCalls,0);revokeAfterPlanner=false;revoked=false;
  providerCalls=0;answerCalls=0;await assert.rejects(runVsiAnswer({...input,recentMessages:[{role:'user',content:'Historical conversation context. '.repeat(250)},{role:'assistant',content:'Prior explanation with no business citations. '.repeat(180)}]}),e=>e instanceof VsiEngineError&&e.usage.outcomeFailure==='context_block'&&/No canonical evidence was shortened/.test(e.message));assert.equal(providerCalls,0);assert.equal(answerCalls,0);
- console.log(JSON.stringify({passed:true,fixture:'synthetic two-plugin full engine packing',...measured,sourceGroupsRetained:2,purePackerGroupsRetained:17,canonicalCitationsPreserved:true,revocationAndWrongWorkspaceDeniedBeforeProvider:true,unknownCitationAndCausalClaimDenied:true,revocationAfterPlanningStopsAnswer:true,unfitContextStopsBeforeAnswerCall:true,mockedRuntime:true,paidCalls:0}));
+ raw.splice(0,raw.length,...scenario(4));providerCalls=0;answerCalls=0;
+ await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.outcomeFailure==='context_block'&&/No canonical evidence was shortened/.test(e.message));assert.equal(providerCalls,0);assert.equal(answerCalls,0);
+ console.log(JSON.stringify({passed:true,fixture:'synthetic two-plugin full engine packing',...measured,sourceGroupsRetained:2,purePackerGroupsRetained:17,canonicalCitationsPreserved:true,revocationAndWrongWorkspaceDeniedBeforeProvider:true,unknownCitationAndCausalClaimDenied:true,revocationAfterPlanningStopsAnswer:true,unfitContextStopsBeforeAnswerCall:true,originalOversizedFixtureDeniedBeforeProvider:true,mockedRuntime:true,paidCalls:0}));
 })().catch(e=>{console.error(e);process.exitCode=1;});
