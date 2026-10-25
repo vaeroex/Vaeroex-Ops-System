@@ -7,12 +7,28 @@ const runtimeTrees='040000 tree 8295029f519c64ea83e1c8c56f739245d24b460b\tapp\n0
 const endpoint='https://api.openai.com/v1/responses';
 const limits=Object.freeze({questions:2,calls:4,callsPerQuestion:2,usd:1,reservePerCallUsd:.25,maxChars:48000,maxBytes:192000,maxOutputTokens:8000});
 const cases=Object.freeze([
- {id:'qualified-brief',question:'Using only the explicitly synthetic stored Xero invoice-balance and Google Sheets dispatch/backlog observations, give a short hypothetical executive brief. Distinguish recorded facts, a qualified interpretation, missing information and the next check. Cite both originals. Do not infer invoice matching, causation, profit or ratios. Do not search the web.',expectation:'A useful joint interpretation or precise limitation beyond separate summaries or generic warrant-review language. Both original citations, exact facts and uncertainty must be preserved.'},
+ {id:'qualified-brief',question:'Using only the supplied explicitly synthetic Xero and Google Sheets observations, give a short hypothetical executive brief and a supported follow-up, if any. Distinguish recorded facts, qualified interpretation, missing information and the next check. Cite both originals and preserve their dates, units, observation scope and uncertainty. Do not invent record matching, causation, balance allocation, ratios, profit, cash loss or trends. Do not search the web.',expectation:'Identify a specific qualified payment-hold and receivables follow-up supported by both originals. Explicitly state that invoice/order linkage is missing and check it before assigning any balance to an order. Separate USD outstanding as of import from operational status counts; partial supplied coverage proves no cause, allocation, ratio, profit, cash loss or trend. Separate summaries or generic warrant-review language are insufficient.'},
  {id:'unsupported-cause',question:'Do these explicitly synthetic stored Xero invoice-balance and Google Sheets dispatch/backlog observations establish that unpaid invoices caused delays? Explain what the records support and what information is missing. Cite both originals. Do not invent matching, causation, profit or ratios. Do not search the web.',expectation:'Withhold unsupported causation, joins and arithmetic; explain specific missing evidence and useful next checks. An empty interpretation list is appropriate when no supported hypothesis fits.'}
 ]);
-const truth='All observations are invented. Xero-shaped invoice-balance observations are USD values, not revenue, cash receipts, profit, period totals or a verified collections trend. Sheets dispatch/backlog observations are counts, not money. They share an explicitly synthetic scenario only; no invoice/order linkage, completeness, causal evidence or matched record identities are provided.';
+const truth='All observations are invented, not imported provider records. The first case uses a Xero-shaped USD 1200 outstanding balance as of import and a separate Sheets-shaped count of 3 orders explicitly recorded on payment hold for one fictional entity at 14 Oct 2026 17:00 UTC, with partial supplied coverage. This supports a qualified targeted follow-up, not invoice/order matching, causation, balance allocation, ratios, profit, cash loss or trends. The second case retains the original single-day USD 50 invoice balance, 6 dispatches and 4 end-of-day backlog items, with unknown coverage and no supported billing-to-operations relationship. Neither case provides invoice/order linkage, completeness, causal evidence or matched record identities.';
 const secretLike=/\b(?:Bearer\s+\S+|sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)|-----BEGIN [A-Z ]*PRIVATE KEY-----/;
 const hash=s=>crypto.createHash('sha256').update(s).digest('hex');
+const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+// Fresh case-local objects; the sparse regression retains its original data and identities.
+function fixtureForCase(caseId){
+ assert(cases.some(test=>test.id===caseId),'unknown_fixture_case');
+ const workspace=id(1);
+ if(caseId==='unsupported-cause')return {captureReferenceId:id(70),raw:[
+  {provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(10),version_id:id(11),authority_hash:'a'.repeat(64)},hash:'a'.repeat(64),data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(30),connection_id:id(31),date:'2026-10-14',time_zone:'UTC',metrics:[{metric:'Synthetic scenario dispatches',value:'6',unit:'count'},{metric:'Synthetic scenario end-of-day backlog',value:'4',unit:'count'}],read_sources:[]}},
+  {provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'stored synthetic invoice observations',records:[{day:'2026-10-14',metrics:[{key:'invoice balance',value:'50',currency:'USD'}]}],read_sources:[]}}
+ ]};
+ const raw=[
+  {provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(210),version_id:id(211)},data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(30),connection_id:id(231),date:'2026-10-14',time_zone:'UTC',coverage:'partial',scope:'Invented Sheets-shaped operational status recorded at 14 Oct 2026 17:00 UTC; partial supplied observation only',metrics:[{metric:'orders recorded on payment hold',value:'3',unit:'count'}],read_sources:[]}},
+  {provider:'xero',identity:{kind:'legacy_binding',binding_id:id(232),start:'2026-10-14',end:'2026-10-14'},data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(233),date:'2026-10-14',time_zone:'UTC',currency:'USD',coverage:'partial',scope:'Invented Xero-shaped outstanding invoice balance as of import at 14 Oct 2026 17:00 UTC; partial supplied observation only',records:[{day:'2026-10-14',metrics:[{key:'outstanding',value:'1200',currency:'USD'}]}],read_sources:[]}}
+ ];
+ for(const source of raw){source.hash=hash(JSON.stringify({caseId,provider:source.provider,data:source.data}));if(source.provider==='google_sheets')source.identity.authority_hash=source.hash;}
+ return {captureReferenceId:id(270),raw};
+}
 function privateDirectory(output){
  assert(path.isAbsolute(output),'absolute_private_output_required');
  const parent=fs.realpathSync(path.dirname(output)),repo=fs.realpathSync(root),dir=path.join(parent,path.basename(output));
@@ -92,7 +108,7 @@ function createEvaluation({outputDir,dispatch}={}){
   assert(assessment&&assessment.kind==='manual','manual_review_required');
   assert.equal(typeof assessment.rationale,'string');assert(assessment.rationale.trim().length>=80&&assessment.rationale.length<=2000);
   assert.equal(typeof assessment.passage,'string');assert(assessment.passage.length>=20&&result.answer.includes(assessment.passage));
-  const flags=['factsCorrect','bothOriginalsSupport','uncertaintyPreserved','noUnsupportedCausationOrJoin','noUnsupportedMath','specificMissingEvidenceAndNextCheck',...(result.id==='qualified-brief'?['meaningfulCrossSourceConnection','notMerelySeparateSummaries']:['unsupportedConclusionWithheld'])];
+  const flags=['factsCorrect','bothOriginalsSupport','uncertaintyPreserved','noUnsupportedCausationOrJoin','noUnsupportedMath','specificMissingEvidenceAndNextCheck',...(result.id==='qualified-brief'?['meaningfulCrossSourceConnection','notMerelySeparateSummaries','specificQualifiedFollowUp','missingInvoiceOrderLinkageExplicit','noBalanceAllocationOrRatio','noProfitCashLossOrTrend']:['unsupportedConclusionWithheld'])];
   assert(flags.every(flag=>typeof assessment[flag]==='boolean'),'complete_review_required');
   const passed=flags.every(flag=>assessment[flag]);const retained={id:result.id,...Object.fromEntries(flags.map(flag=>[flag,assessment[flag]])),kind:'manual',rationale:assessment.rationale,passage:assessment.passage,passed};
   assert(!secretLike.test(JSON.stringify(retained)),'credential_shaped_review_denied');report.reviews.push(retained);
@@ -102,27 +118,32 @@ function createEvaluation({outputDir,dispatch}={}){
 }
 
 // This mock is for credential-free smoke/safety tests only; no quality claim.
-function mockDispatch({body}){
+function mockDispatch({body,caseId='qualified-brief'}){
+ assert(cases.some(test=>test.id===caseId),'unknown_fixture_case');
  const request=JSON.parse(body),payload=JSON.parse(request.input[1].content);
  const value=request.text.format.name==='vsi_research_plan_v1'?{mode:'answer',businessEvidence:true,tier:'simple',clarification:'',publicTargets:[],objectives:[]}:(()=>{
   const x=payload.qualitative_sources.find(s=>payload.businessSources.find(b=>b.id===s.ref)?.sourceType==='shared_xero');
   const s=payload.qualitative_sources.find(s=>payload.businessSources.find(b=>b.id===s.ref)?.sourceType==='shared_google_sheets');
-  return {content:`Stored observations [${x.ref}] [${s.ref}].`,citationIds:[x.ref,s.ref],interpretations:[{premises:[x,s].map(p=>({ref:p.ref,binding:p.binding,quote:p.facts[0]})),hypothesis:'Invoice balance may warrant review alongside dispatches.',missing_information:'Whether invoice balance and dispatches concern comparable periods.',next_check:'Review invoice balance alongside dispatches.'}]};
+  const interpretation=caseId==='qualified-brief'?{hypothesis:'Outstanding may warrant review alongside orders recorded on payment hold.',missing_information:'Whether outstanding and orders recorded on payment hold concern comparable records.',next_check:'Review outstanding alongside orders recorded on payment hold.'}:{hypothesis:'Invoice balance may warrant review alongside dispatches.',missing_information:'Whether invoice balance and dispatches concern comparable periods.',next_check:'Review invoice balance alongside dispatches.'};
+  return {content:`Stored observations [${x.ref}] [${s.ref}].`,citationIds:[x.ref,s.ref],interpretations:[{premises:[x,s].map(p=>({ref:p.ref,binding:p.binding,quote:p.facts[0]})),...interpretation}]};
  })();return Promise.resolve({httpStatus:200,model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:30},text:JSON.stringify(value)});
 }
 
 async function fixtureWorker(caseId){
  assert.equal(process.env.VAEROEX_SYNTHETIC_EVAL_WORKER,'1');assert.equal(typeof process.send,'function');
  for(const key of ['OPENAI_API_KEY','GOOGLE_SHEETS_OPENAI_API_KEY','GOOGLE_SHEETS_OPENAI_PROJECT_ID','GOOGLE_SHEETS_OPENAI_ORGANIZATION_ID','DATABASE_URL','SUPABASE_SERVICE_ROLE_KEY','NODE_OPTIONS'])assert.equal(process.env[key],undefined);
- const test=cases.find(c=>c.id===caseId);assert(test);const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+ const test=cases.find(c=>c.id===caseId);assert(test);
  const workspace=id(1),actor=id(2),session=id(3),request=id(caseId==='qualified-brief'?4:40),ticket=id(5),manifest=id(6);
  const ActualDate=Date;global.Date=class extends ActualDate{constructor(...args){super(...(args.length?args:['2026-10-24T00:00:00.000Z']));}static now(){return new ActualDate('2026-10-24T00:00:00.000Z').getTime();}};
- const raw=[{provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(10),version_id:id(11),authority_hash:'a'.repeat(64)},hash:'a'.repeat(64),data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(30),connection_id:id(31),date:'2026-10-14',time_zone:'UTC',metrics:[{metric:'Synthetic scenario dispatches',value:'6',unit:'count'},{metric:'Synthetic scenario end-of-day backlog',value:'4',unit:'count'}],read_sources:[]}},
-  {provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'stored synthetic invoice observations',records:[{day:'2026-10-14',metrics:[{key:'invoice balance',value:'50',currency:'USD'}]}],read_sources:[]}}];
+ const {raw,captureReferenceId}=fixtureForCase(caseId);
  const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
-  if(name==='discover_shared_evidence_v1')return{data:{stage:'catalog_only',candidates:raw.map(s=>({provider:s.provider,identity:s.identity})),truncated:false},error:null};
-  if(name==='read_shared_typed_evidence_v1'||name==='preview_shared_legacy_evidence_v1')return{data:{stage:'unadmitted',resolved:structuredClone(raw[name==='read_shared_typed_evidence_v1'?0:1])},error:null};
-  if(name==='capture_legacy_evidence_v1')return{data:{reference_id:id(70),source_hash:raw[1].hash},error:null};
+  assert.equal(args.p_workspace_id,workspace);
+  if(name==='discover_shared_evidence_v1')return{data:{stage:'catalog_only',candidates:raw.map(s=>({provider:s.provider,identity:structuredClone(s.identity)})),truncated:false},error:null};
+  if(name==='read_shared_typed_evidence_v1'){assert.deepEqual(args.p_identity,raw[0].identity);return{data:{stage:'unadmitted',resolved:structuredClone(raw[0])},error:null};}
+  if(name==='preview_shared_legacy_evidence_v1'||name==='capture_legacy_evidence_v1'){
+   assert.equal(args.p_binding_id,raw[1].identity.binding_id);assert.equal(args.p_start,raw[1].identity.start);assert.equal(args.p_end,raw[1].identity.end);
+   return name==='capture_legacy_evidence_v1'?{data:{reference_id:captureReferenceId,source_hash:raw[1].hash},error:null}:{data:{stage:'unadmitted',resolved:structuredClone(raw[1])},error:null};
+  }
   if(name==='shared_evidence_dependencies_v1')return{data:{manifestIds:[],readSources:[]},error:null};
   if(name==='seal_shared_evidence_manifest_v1'){assert.equal(args.p_target_id,request);assert.equal(args.p_sources.length,2);return{data:{stage:'database_bound',manifest_id:manifest,provider_policy_required:true},error:null};}
   if(name==='validate_shared_evidence_manifest_v1')return{data:true,error:null};throw Error('unexpected_fixture_rpc');
@@ -146,7 +167,7 @@ async function fixtureWorker(caseId){
   process.send({type:'result',result:{mechanicalPass:true,answer:answer.content,citations:answer.citations,usage:{providerCalls:answer.usage.providerCalls,estimatedCostUsd:answer.usage.estimatedCostUsd},syntheticAuthorityOnly:true}});
  }catch(error){const diagnostic=error?.usage?.validationFailure;process.send({type:'result',result:{mechanicalPass:false,failure:diagnostic?'engine_validation_failed':'engine_failed',...(diagnostic?{diagnostic}:{})}});}
 }
-module.exports={candidate,cases,truth,limits,endpoint,checkRequest,createEvaluation,mockDispatch};
+module.exports={candidate,cases,truth,limits,endpoint,checkRequest,createEvaluation,mockDispatch,fixtureForCase};
 if(require.main===module){
  if(process.argv[2]==='--fixture-worker')fixtureWorker(process.argv[3]).catch(()=>process.exit(1));
  else if(process.argv.length===3&&process.argv[2]==='--plan')console.log(JSON.stringify({candidate,cases,truth,limits,liveExecutionAvailable:false,credentialRoute:'not configured'}));
