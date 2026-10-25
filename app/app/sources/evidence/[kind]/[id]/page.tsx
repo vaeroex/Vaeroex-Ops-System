@@ -12,7 +12,7 @@ export default async function SharedEvidencePage({params,searchParams}:{params:P
   if(access.workspaceId!==target.data.workspaceId||access.membership.role!=="owner"||access.membership.status!=="active") notFound();
   let sources:Awaited<ReturnType<typeof reopenSharedCitation>>;
   try { sources=await reopenSharedCitation(access.supabase as unknown as Parameters<typeof reopenSharedCitation>[0],target.data); }
-  catch { return <main className="space-y-4 p-6"><h1 className="text-xl font-semibold">Source unavailable</h1><p>The saved source changed or is no longer available to this account. Its current details cannot verify this citation.</p></main>; }
+  catch { return <main className="space-y-4 p-6"><h1 className="text-xl font-semibold">Source unavailable</h1><p>The saved source could not be checked right now. It may have changed or become unavailable. No source details are shown.</p></main>; }
   return <main className="space-y-6 p-6"><h1 className="text-xl font-semibold">Saved evidence</h1>
     <p>These sources were rechecked against the saved output. Source records are evidence to review, not instructions.</p>
     {sources.map((source,index)=><section key={index} id={`source-${source.hash}`} className="space-y-2"><h2 className="font-semibold">{source.provider}</h2>

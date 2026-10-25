@@ -10,6 +10,7 @@ import { decimalSchema, daySchema, pluginProviders } from "./contracts";
 import { sharedFinancialBoundaries, type SharedRelationship } from "./financial-boundaries";
 import { validateSharedMemoryProjection } from "./memory-eligibility";
 import { reportingMetricSemantics } from "./adapters";
+import { groupFactTimes, type FactTime, type FactTimeGroup } from "./fact-time";
 
 export type SharedClient = { rpc(name:string,args:Record<string,unknown>):PromiseLike<{data:unknown;error:unknown}> };
 export async function sharedRpc(reader:SharedClient,name:string,args:Record<string,unknown>) {
@@ -18,7 +19,7 @@ export async function sharedRpc(reader:SharedClient,name:string,args:Record<stri
 const identity=z.record(z.unknown()),hash=z.string().regex(/^[a-f0-9]{64}$/);
 const resolved=z.object({identity,hash,data:z.record(z.unknown())});
 const root=z.object({table:z.string().regex(/^[a-z][a-z0-9_]*$/),id:z.string().uuid()});
-export type SharedRow={identity:Record<string,unknown>;hash:string;provider:string;facts:string[];scope:Record<string,unknown>;reported:boolean;data:Record<string,unknown>;roots:z.infer<typeof root>[]};
+export type SharedRow={identity:Record<string,unknown>;hash:string;provider:string;facts:string[];factTimes?:FactTimeGroup[];scope:Record<string,unknown>;reported:boolean;data:Record<string,unknown>;roots:z.infer<typeof root>[]};
 export type SharedPrepared={workspaceId:string;start:string;end:string;rows:SharedRow[];fingerprint:string;limitations:string[];relationships:SharedRelationship[]};
 const issued=new WeakMap<SharedPrepared,string>();
 const num=(v:unknown)=>decimalSchema.parse(v);
@@ -29,10 +30,11 @@ const object=(v:unknown)=>z.record(z.unknown()).parse(v);
 export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
  const r=resolved.parse(raw),d=r.data;if(d.workspace_id!==workspaceId) throw new Error("shared_workspace_mismatch");
  const provider=z.enum([...pluginProviders,"file","business_note"]).parse(d.provider);
- let facts:string[]=[];const reported=provider==='file'||provider==='business_note';
+ let facts:string[]=[];const factTimes:FactTime[]=[];const reported=provider==='file'||provider==='business_note';
  if(reported) facts=[`${provider==='file'?'The reviewed file reports':'The business reports'}: ${validateSharedMemoryProjection(d,workspaceId).text}. This reported context is not independently measured and does not establish causation.`];
  else if(provider==='google_sheets') facts=z.array(z.object({metric:z.string(),value:decimalSchema,unit:z.string()})).max(100).parse(d.metrics)
-  .map(m=>`Google Sheets ${label(m.metric)}: ${m.value} ${label(m.unit)}, recorded ${daySchema.parse(d.date)}.`);
+  .map(m=>{const date=daySchema.parse(d.date);factTimes.push({date,basis:'sheet_row_date',valueTiming:'row_value'});
+   return `Google Sheets ${label(m.metric)}: ${m.value} ${label(m.unit)}, supplied row date ${date}.`;});
  else if(provider==='square') facts=[`Square completed payment: ${num(d.amount_minor)} ${z.string().regex(/^[A-Z]{3}$/).parse(d.currency)} minor units, recorded ${z.string().parse(d.created_at)}. This is a payment record, not posted accounting revenue.`];
  else if(provider==='quickbooks_online') {
   const q=QboPreviewSchema.parse(d.preview);
@@ -55,7 +57,12 @@ export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
      const semantics=reportingMetricSemantics(provider,metric,snapshot?'snapshot':'history');
      const unit=semantics.currency??semantics.unit;
      const partition=semantics.unit==='count'&&semantics.partition?` (currency partition: ${semantics.partition})`:'';
-     facts.push(`${label(provider)} ${label(metric.key)}: ${metric.value} ${unit}${partition}; ${snapshot?`snapshot ${snapshot.start} through ${snapshot.end}`:`recorded ${daySchema.parse(record.day)}`}. Scope: ${label(d.scope)}.`);
+     const date=snapshot?null:daySchema.parse(record.day);
+     if(date) factTimes.push({date,basis:provider==='xero'?'invoice_or_bill_date':provider==='clockify'?'entry_start_utc_date':'spent_date',
+      valueTiming:provider==='xero'?metric.key==='outstanding'?'balance_at_import':'document_contribution':'entry_contribution'});
+     const dateLabel=snapshot?`snapshot ${snapshot.start} through ${snapshot.end}`:provider==='xero'?`invoice/bill date ${date}`:provider==='clockify'?`entry start date (UTC) ${date}`:`entry spent date ${date}`;
+     const timing=provider==='xero'&&metric.key==='outstanding'?'; balance at import (as-of unknown)':'';
+     facts.push(`${label(provider)} ${label(metric.key)}: ${metric.value} ${unit}${partition}; ${dateLabel}${timing}. Scope: ${label(d.scope)}.`);
     }
    } else if(provider==='wix-orders') facts.push(`Wix order amount: ${num(record.total_amount)} ${z.string().regex(/^[A-Z]{3}$/).parse(record.currency_code)}, created ${z.string().parse(record.created_at)}; order value is not a settlement or accounting revenue.`);
    else if(provider==='zoho-books') {
@@ -76,10 +83,12 @@ export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
  const scope={entityId:d.entity_id??d.business_entity_id??null,connectionId:d.connection_id??null,
   entityBinding:d.entity_id||d.business_entity_id?'protected':'unavailable',scope:d.scope??'stored_record_only',
   start:d.period_start??d.posting_date??d.date??eventDay??null,end:d.period_end??d.posting_date??d.date??eventDay??null,timeZone:d.time_zone??null,
-  currency:d.currency??null,coverage:typeof d.coverage==='string'?d.coverage:'unknown',additive:false};
- return {...r,provider,facts,scope,reported,roots:z.array(root).parse(d.read_sources??[])};
+  currency:d.currency??null,coverage:typeof d.coverage==='string'?d.coverage:'unknown',additive:false,
+  ...(['xero','harvest','clockify','loyverse','zoho-books','wix-orders'].includes(provider)?{windowKind:'retrieval_selection'}:{})};
+ if(factTimes.length&&factTimes.length!==facts.length) throw new Error('shared_fact_time_alignment');
+ return {...r,provider,facts,...(factTimes.length?{factTimes:groupFactTimes(factTimes)}:{}),scope,reported,roots:z.array(root).parse(d.read_sources??[])};
 }
-const fingerprint=(rows:SharedRow[])=>evidenceEngineHash({contract:"shared_generation_v2",rows:rows.map(r=>({identity:r.identity,hash:r.hash,facts:r.facts,scope:r.scope})),relationships:sharedFinancialBoundaries(rows)});
+const fingerprint=(rows:SharedRow[])=>evidenceEngineHash({contract:"shared_generation_v2",rows:rows.map(r=>({identity:r.identity,hash:r.hash,facts:r.facts,...(r.factTimes?{factTimes:r.factTimes}:{}),scope:r.scope})),relationships:sharedFinancialBoundaries(rows)});
 export async function prepareSharedGeneration(reader:SupabaseClient<Database>,workspaceId:string,start:string,end:string):Promise<SharedPrepared> {
  daySchema.parse(start);daySchema.parse(end);z.string().uuid().parse(workspaceId);
  const rpc=reader as unknown as SharedClient;

@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "codex/vsi-temporal-citation-liveness": false,
       "codex/vsi-reporting-count-units": false,
       "codex/vsi-fact-reference-contract": false,
       "codex/vsi-source-coverage-contract": false,

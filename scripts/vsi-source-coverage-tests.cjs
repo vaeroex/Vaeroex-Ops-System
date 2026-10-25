@@ -43,7 +43,7 @@ let captured,fullReply,selectedSources,expectedPacked=7;
 global.fetch=async(url,init)=>{
  calls++;assert.equal(url,'https://api.openai.com/v1/responses');const body=JSON.parse(init.body),payload=JSON.parse(body.input[1].content);assert.equal(body.store,false);assert.equal(body.model,'gpt-6-luna');assert.equal(body.tools,undefined);assert(init.body.length<=48000);assert(Buffer.byteLength(init.body,'utf8')<=192000);
  if(body.text.format.name==='vsi_research_plan_v1'){if(revokeAfterPlanner)revoked=true;return new Response(JSON.stringify({model:body.model,status:'completed',usage:{input_tokens:10,output_tokens:10},output_text:JSON.stringify({mode:'answer',businessEvidence:true,tier:'simple',clarification:'',publicTargets:[],objectives:[]})}),{status:200});}
- answerCalls++;captured=payload;assert.equal(payload.businessSources.length,expectedPacked);assert.equal(payload.qualitative_sources.length,expectedPacked);assert.equal(payload.productSources.length,6);assert.equal(payload.answerSourceRequirements.groups.length,2);
+ answerCalls++;captured=payload;assert.equal(payload.businessSources.length,expectedPacked,JSON.stringify(budgets.at(-1)));assert.equal(payload.qualitative_sources.length,expectedPacked);assert.equal(payload.productSources.length,6);assert.equal(payload.answerSourceRequirements.groups.length,2);
  assert.match(body.input[0].content,/Historical conversation and source snapshots provide dialogue context only/);
  assert.match(body.input[0].content,/currently issued in qualitative_sources or contextFactSources/);
  assert.doesNotMatch(body.input[0].content,/You may explain prior research using the attached historical web source snapshots/);
@@ -70,6 +70,9 @@ global.fetch=async(url,init)=>{
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:id(5)},question:'Use stored Xero and explicitly synthetic Google Sheets dispatch/backlog operations canary observations for a hypothetical executive brief. No web research.',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}};
 (async()=>{
  const canonical=JSON.stringify(raw),answer=await runVsiAnswer(input);assert.equal(calls,2);assert.equal(answerCalls,1);assert.equal(answer.citations.length,2);assert.match(answer.content,/^Coverage: This is a partial review/);assert.match(answer.content,/outstanding.*50 USD/);assert.match(answer.content,/dispatches.*6 count/);assert.match(answer.content,/not establish invoice\/order correspondence/);assert.equal(JSON.stringify(raw),canonical);
+ assert.match(answer.content,/Selected fact dates: invoice\/bill date 2026-10-14/);
+ assert.match(answer.content,/Selected fact dates: supplied row date 2026-10-15/);
+ assert.match(answer.content,/selected date labels differ; same-period alignment is not established/);
  const measurement=budgets.at(-1);assert.equal(measurement.initial.sourceGroups,15);assert.equal(measurement.final.selectedSourceGroups,7);assert(measurement.initial.requestChars>48000);assert(measurement.final.requestChars<=48000);
  const groups=captured.answerSourceRequirements.groups;assert.deepEqual(groups.map(g=>g.length).sort(),[1,2]);
  // Use the actual engine's prepack payload, transmitted JSON and renderer context.
@@ -92,6 +95,9 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
   const canonicalSource=trace.canonical.qualitative_sources.find(s=>s.ref===source.ref),canonicalCitation=trace.canonical.businessSources.find(s=>s.id===source.ref),transportCitation=captured.businessSources.find(s=>s.id===source.ref),renderSource=renderContext.sources.find(s=>s.ref===source.ref);
   assert(canonicalSource&&canonicalCitation&&transportCitation&&renderSource);
   assert.deepEqual(source,canonicalSource);assert.deepEqual(renderSource,canonicalSource);
+  const rawSource=raw.find(row=>row.hash===source.binding);
+  assert.deepEqual(source.factTimes,require('../lib/ai/shared-evidence/generation.ts').sharedRow(rawSource,workspace).factTimes);
+  assert.deepEqual(source.factTimes,JSON.parse(canonicalCitation.text).factTimes);
   assert.equal(source.binding,canonicalCitation.sourceId);assert.deepEqual(source.facts,JSON.parse(canonicalCitation.text).observations);
   for(const field of ['id','sourceId','snapshotHash','url'])assert.equal(transportCitation[field],canonicalCitation[field]);
   const record=JSON.parse(transportCitation.text);if(record.observationsRef)assert.equal(record.observationsRef,source.ref);else assert.deepEqual(record.observations,source.facts);
@@ -140,7 +146,9 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  assert.throws(()=>renderSharedAnswer({observations:observations.slice(0,1),results:[issued.id],hypotheses:[],missing_information:[],next_checks:[]},{sources:exact,results:[issued],hypothesesEnabled:true,requiredSourceGroups:[[exact[0].ref]]}),e=>e.rule==='result_dependencies');
  // An answer is still partial when every available original fits in the input,
  // but only the relevant observations are actually selected for the answer.
- for(const source of raw.slice(7)){source.data.metrics=[{metric:'Unrelated archived worksheet',value:'1',unit:'count'}];source.hash=require('node:crypto').createHash('sha256').update(JSON.stringify({identity:source.identity,data:source.data})).digest('hex');}
+ // Compact only this final all-fit fixture; keep all 15 identities, authorization and coverage assertions.
+ raw[1].data.scope='Synthetic';
+ for(const source of raw.slice(3)){source.data.metrics=[{metric:'X',value:'1',unit:'count'}];source.hash=require('node:crypto').createHash('sha256').update(JSON.stringify({identity:source.identity,data:source.data})).digest('hex');}
  expectedPacked=15;mode='subset';const allAvailable=await runVsiAnswer(input);assert.equal(allAvailable.citations.length,2);assert.equal(captured.contextCoverage,undefined);assert.match(allAvailable.content,/^Coverage: This is a partial review/);
  for(const condition of ['foreign','revoked','revoked_after_plan']){mode='subset';foreign=condition==='foreign';revoked=condition==='revoked';revokeAfterPlanner=condition==='revoked_after_plan';calls=0;await assert.rejects(runVsiAnswer(input));assert.equal(calls,condition==='revoked_after_plan'?1:0);}foreign=false;revoked=false;revokeAfterPlanner=false;
  console.log(JSON.stringify({passed:true,canonicalOriginals:15,packedOriginals:7,intendedCoverageGroups:2,sheetsRowsInRequiredScope:2,subsetCitations:2,businessFactsProbed,productFactsProbed,referenceRejections,engineReferenceCases,prefixedBindingsRejectedAtSchema:true,canonicalTransportRendererMappingPreserved:true,historicalOnlyReferenceDenied:true,oldRuleFailureReproduced:true,secondRowAndOptionalSourcesNeedNotBecomeClaims:true,wrongConnectionCannotSatisfyIntent:true,missingProviderAndFabricatedBindingDenied:true,unobservedPremiseAndMissingCalculationInputDenied:true,tiesAndDependencyJoinsPreserveRequirements:true,allAvailableButSubsetAnswerStillPartial:true,authorityAndRevocationPreserved:true,fullWireChars:measurement.final.requestChars,externalCalls:0,semanticUsefulnessProved:false}));

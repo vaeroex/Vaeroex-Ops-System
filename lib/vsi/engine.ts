@@ -291,7 +291,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const sharedEvidence: VsiEvidenceResult | undefined = sharedPrepared && input.reservedRequest ? { sources: sharedPrepared.rows.map(row => ({
     id: row.hash, title: row.provider.replace(/[_-]/g, " "), url: sharedTargetHref(input.workspaceId,"vsi_exchange",input.reservedRequest!.id,row.hash),
     sourceType: `shared_${row.provider}`, sourceId: row.hash, evidenceDate: null, retrievedAt: new Date().toISOString(),
-    text: JSON.stringify({ scope: row.scope, observations: row.facts }), treatment: row.reported ? "reported_context" : "record"
+    text: JSON.stringify({ scope: row.scope, observations: row.facts, ...(row.factTimes ? {factTimes:row.factTimes} : {}) }), treatment: row.reported ? "reported_context" : "record"
   })), limitations: [...sharedPrepared.limitations, `The selected stored-source window is ${sharedPrepared.start} through ${sharedPrepared.end}; other periods were not searched.`] } : undefined;
   const makePayload = (evidence: VsiEvidenceResult, lookup: ReturnType<typeof boundedVsiPublicEvidence>["lookup"] | null, status: { tier: VsiResearchTier | null; rounds: number; partial: boolean; toolAllowanceExceeded: boolean; limitations: string[] }, datedPricingOnly: boolean, lookupPerformed: boolean) => {
     const history = prepareVsiHistory(selectedMessages, [...evidence.sources, ...product!.sources], input.question);
@@ -311,7 +311,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const issuePremises = (payload: ReturnType<typeof makePayload>) => {
   payload.qualitative_sources=payload.businessSources.flatMap(source=>{
     const row=sharedPrepared?.rows.find(row=>row.hash===source.sourceId);
-    return row?[{ref:source.id,binding:row.hash,provider:row.provider,dependencies:[row.hash],facts:row.facts,reported:row.reported?row.provider==='file'?'file' as const:'note' as const:false as const,
+    return row?[{ref:source.id,binding:row.hash,provider:row.provider,dependencies:[row.hash],facts:row.facts,...(row.factTimes?{factTimes:row.factTimes}:{}),reported:row.reported?row.provider==='file'?'file' as const:'note' as const:false as const,
       environment:row.reported?'supporting' as const:row.scope.environment==='sandbox'?'sandbox' as const:'production' as const}]:[];
   });
   };

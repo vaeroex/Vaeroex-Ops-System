@@ -48,6 +48,7 @@ const reporting = require('../lib/integrations/reporting/adapters.ts');
 const { resolveImportRange } = require('../lib/integrations/date-range.ts');
 const { parseReportingHistory, parseReportingSnapshot, reportingMetricSemantics } = require('../lib/ai/shared-evidence/adapters.ts');
 const { sharedRow, sharedTargetHref } = require('../lib/ai/shared-evidence/generation.ts');
+const { expandFactTimes } = require('../lib/ai/shared-evidence/fact-time.ts');
 const { renderSharedAnswer, sharedAnswerSchema, SharedAnswerContractError } = require('../lib/ai/shared-evidence/answer-contract.ts');
 const { reopenSharedCitation } = require('../lib/ai/shared-evidence/citation-reopen.ts');
 const { evidenceEngineHash } = require('../lib/ai/evidence-engine/hash.ts');
@@ -124,13 +125,23 @@ function invalidMetric(provider, kind, metric) {
         assert.equal(observation.dependencies[0].href, `/app/sources/${provider}`);
         const renderedUnit = currency ?? unit;
         const partitionText = unit === 'count' && partition ? ` (currency partition: ${partition})` : '';
-        const dateText = record.snapshot ? `snapshot ${record.snapshot.start} through ${record.snapshot.end}` : `recorded ${record.day}`;
-        expectedFacts.push(`${provider.replace(/[_-]/g, ' ')} ${metric.key.replace(/[_-]/g, ' ')}: ${metric.value} ${renderedUnit}${partitionText}; ${dateText}. Scope: synthetic reporting originals.`);
+        const dateText = record.snapshot ? `snapshot ${record.snapshot.start} through ${record.snapshot.end}` : provider === 'xero' ? `invoice/bill date ${record.day}` : provider === 'clockify' ? `entry start date (UTC) ${record.day}` : `entry spent date ${record.day}`;
+        const timing = provider === 'xero' && metric.key === 'outstanding' ? '; balance at import (as-of unknown)' : '';
+        const contribution = '';
+        expectedFacts.push(`${provider.replace(/[_-]/g, ' ')} ${metric.key.replace(/[_-]/g, ' ')}: ${metric.value} ${renderedUnit}${partitionText}; ${dateText}${timing}.${contribution} Scope: synthetic reporting originals.`);
         if (definition.kind === 'snapshot') assert.equal(observation.temporalKind, provider === 'toggl' && metric.key === 'hours' ? 'lifetime' : 'snapshot');
         observationsCompared++;
       }
     }
     assert.deepEqual(row.facts, expectedFacts, 'facts preserve record/key order and exact typed units');
+    if (provider === 'harvest' || provider === 'clockify') {
+      const times = expandFactTimes(row.factTimes, row.facts.length);
+      assert.equal(times.length, 8, 'completed and running records each retain all four contributions');
+      assert(times.every(time => time.date === day && time.valueTiming === 'entry_contribution'));
+      assert(times.every(time => time.basis === (provider === 'harvest' ? 'spent_date' : 'entry_start_utc_date')));
+      assert.match(row.facts[4], /entries: 0 count/);
+      assert.match(row.facts[7], /running: 1 count/);
+    }
     assert.equal(row.hash, originals[index].hash);
     assert.deepEqual(row.identity, originals[index].identity);
     assert.deepEqual(row.data, originals[index].data);
@@ -149,7 +160,7 @@ function invalidMetric(provider, kind, metric) {
   assert.deepEqual(partitions.map(value => [value.value, value.unit, value.currency, value.partition]), [['1', 'count', null, 'USD'], ['1', 'count', null, 'EUR']]);
   assert.notEqual(partitions[0].id, partitions[1].id);
 
-  const sources = rows.map((row, index) => ({ ref: `B${index + 1}`, binding: row.hash, dependencies: [row.hash], facts: row.facts,
+  const sources = rows.map((row, index) => ({ ref: `B${index + 1}`, binding: row.hash, dependencies: [row.hash], facts: row.facts, factTimes: row.factTimes,
     provider: row.provider, reported: false, environment: 'production' }));
   const answer = { observations: sources.flatMap(source => source.facts.map((_, factIndex) => ({ ref: source.ref, binding: source.binding, factIndex }))),
     results: [], hypotheses: [], missing_information: [], next_checks: [] };
@@ -158,6 +169,10 @@ function invalidMetric(provider, kind, metric) {
   const markup = renderToStaticMarkup(React.createElement(AnswerContent, { content: rendered.content }));
   for (const row of rows) for (const fact of row.facts) { assert(rendered.content.includes(fact)); assert(markup.includes(fact)); }
   assert.deepEqual(rendered.citationIds, sources.map(source => source.ref));
+  assert.match(rendered.content, /Selected fact dates: entry spent date 2026-10-14/);
+  assert.match(rendered.content, /Selected fact dates: entry start date \(UTC\) 2026-10-14/);
+  assert.match(rendered.content, /date-label comparison is incomplete/);
+  assert.doesNotMatch(rendered.content, /selected date labels differ|matching date labels alone/);
   assert.doesNotMatch(markup, /(?:invoices|bills): [\d.]+ (?:USD|EUR);/);
   const citation = { id: 'B1', title: 'Synthetic Xero', url: sharedTargetHref(workspace, 'vsi_exchange', id(50), xero.hash),
     sourceType: 'shared_xero', sourceId: xero.hash, evidenceDate: day, retrievedAt: observedAt };
