@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const workspace=id(1),actor=id(2),session=id(3),request=id(4),manifest=id(6);
 const sheet=(n,kind)=>({provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(100+n),version_id:id(200+n)},hash:(n+20).toString(16).padStart(64,'0'),data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(kind==='wanted'?30:90),connection_id:id(kind==='wanted'?31:kind==='large'?91:300+n),date:n%2?'2026-10-14':'2026-10-15',time_zone:'UTC',metrics:kind==='wanted'?[{metric:'Explicitly synthetic dispatch/backlog operations canary dispatches',value:'6',unit:'count'},{metric:'Explicitly synthetic end-of-day backlog',value:'4',unit:'count'}]:kind==='large'?Array.from({length:6},(_,m)=>({metric:`Unrelated archived worksheet ${m} ${'synthetic warehouse context '.repeat(4)}`,value:String(m+1),unit:'count'})):[{metric:'Unrelated optional worksheet observation',value:'2',unit:'count'}],read_sources:[]}});
-const raw=[sheet(0,'wanted'),{provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'Synthetic stored invoice observations',records:[{day:'2026-10-14',metrics:[{key:'invoice balance',value:'50',currency:'USD'}]}],read_sources:[]}},sheet(1,'wanted'),...Array.from({length:4},(_,n)=>sheet(n+2,'optional')),...Array.from({length:8},(_,n)=>sheet(n+6,'large'))];
+const raw=[sheet(0,'wanted'),{provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'Synthetic stored invoice observations',records:[{day:'2026-10-14',metrics:[{key:'invoices',value:'1',currency:'USD'},{key:'billed',value:'234',currency:'USD'},{key:'outstanding',value:'50',currency:'USD'},{key:'bills',value:'0',currency:'USD'},{key:'purchases',value:'0',currency:'USD'}]}],read_sources:[]}},sheet(1,'wanted'),...Array.from({length:4},(_,n)=>sheet(n+2,'optional')),...Array.from({length:8},(_,n)=>sheet(n+6,'large'))];
 let mode='subset',revoked=false,foreign=false,revokeAfterPlanner=false,calls=0,answerCalls=0;
 const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
  assert.equal(args.p_workspace_id,workspace);
@@ -48,8 +48,11 @@ global.fetch=async(url,init)=>{
  assert.match(body.input[0].content,/currently issued in qualitative_sources or contextFactSources/);
  assert.doesNotMatch(body.input[0].content,/You may explain prior research using the attached historical web source snapshots/);
  const sources=payload.qualitative_sources,sourceFor=hash=>sources.find(s=>s.binding===hash);
+ assert.match(sourceFor(raw[1].hash).facts[0],/invoices: 1 count \(currency partition: USD\)/);
+ assert.match(sourceFor(raw[1].hash).facts[1],/billed: 234 USD/);
+ assert.doesNotMatch(sourceFor(raw[1].hash).facts.join('\n'),/(?:invoices|bills): [\d.]+ USD;/);
  const pick=(source,pattern)=>({ref:source.ref,binding:source.binding,factIndex:Math.max(0,source.facts.findIndex(f=>pattern.test(f)))});
- const xero=pick(sourceFor(raw[1].hash),/invoice balance/),sheetA=pick(sourceFor(raw[0].hash),/dispatches/),sheetB=pick(sourceFor(raw[2].hash),/dispatches/),other=pick(sourceFor(raw[3].hash),/worksheet/);
+ const xero=pick(sourceFor(raw[1].hash),/outstanding/),sheetA=pick(sourceFor(raw[0].hash),/dispatches/),sheetB=pick(sourceFor(raw[2].hash),/dispatches/),other=pick(sourceFor(raw[3].hash),/worksheet/);
  const observations=mode==='missing_xero'?[sheetA]:mode==='wrong_sheet'?[xero,other]:mode==='second_date'?[xero,sheetB]:mode==='all'?sources.map(s=>pick(s,/.*/)):[xero,sheetA];
  const answer={observations,results:[],hypotheses:[],missing_information:[{premises:observations,text:'These observations have limited supplied coverage and do not establish invoice/order correspondence or a billing-to-operations relationship.'}],next_checks:[{premises:observations,text:'Check a common observation window, population coverage and existing invoice/order references before making a comparison.'}]};
  fullReply=structuredClone(answer);selectedSources=structuredClone(sources);
@@ -66,7 +69,7 @@ global.fetch=async(url,init)=>{
 };
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:id(5)},question:'Use stored Xero and explicitly synthetic Google Sheets dispatch/backlog operations canary observations for a hypothetical executive brief. No web research.',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}};
 (async()=>{
- const canonical=JSON.stringify(raw),answer=await runVsiAnswer(input);assert.equal(calls,2);assert.equal(answerCalls,1);assert.equal(answer.citations.length,2);assert.match(answer.content,/^Coverage: This is a partial review/);assert.match(answer.content,/invoice.balance.*50 USD/);assert.match(answer.content,/dispatches.*6 count/);assert.match(answer.content,/not establish invoice\/order correspondence/);assert.equal(JSON.stringify(raw),canonical);
+ const canonical=JSON.stringify(raw),answer=await runVsiAnswer(input);assert.equal(calls,2);assert.equal(answerCalls,1);assert.equal(answer.citations.length,2);assert.match(answer.content,/^Coverage: This is a partial review/);assert.match(answer.content,/outstanding.*50 USD/);assert.match(answer.content,/dispatches.*6 count/);assert.match(answer.content,/not establish invoice\/order correspondence/);assert.equal(JSON.stringify(raw),canonical);
  const measurement=budgets.at(-1);assert.equal(measurement.initial.sourceGroups,15);assert.equal(measurement.final.selectedSourceGroups,7);assert(measurement.initial.requestChars>48000);assert(measurement.final.requestChars<=48000);
  const groups=captured.answerSourceRequirements.groups;assert.deepEqual(groups.map(g=>g.length).sort(),[1,2]);
  // Use the actual engine's prepack payload, transmitted JSON and renderer context.

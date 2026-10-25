@@ -2,8 +2,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {fork,execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
-const candidate='5e34cc75e69e79292bbf7f4e2348c9fefecd2e9f';
-const runtimeTrees="040000 tree 8295029f519c64ea83e1c8c56f739245d24b460b\tapp\n040000 tree 3ad17c55ac87e5694400ff81fd563c527a4a4222\tlib";
+const candidate='fe0ca278404c8685d49904f0eb29895cdc08339f';
+const runtimeTrees="040000 tree 8295029f519c64ea83e1c8c56f739245d24b460b\tapp\n040000 tree 8b2b591d7aa21f30a6b0618c7cc18e1cbba99d56\tlib";
 const endpoint='https://api.openai.com/v1/responses';
 const limits=Object.freeze({questions:2,calls:4,callsPerQuestion:2,usd:1,reservePerCallUsd:.25,maxChars:48000,maxBytes:192000,maxOutputTokens:8000});
 const cases=Object.freeze([
@@ -14,13 +14,13 @@ const truth='All observations are invented, not imported provider records. The f
 const secretLike=/\b(?:Bearer\s+\S+|sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)|-----BEGIN [A-Z ]*PRIVATE KEY-----/;
 const hash=s=>crypto.createHash('sha256').update(s).digest('hex');
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
-// Fresh case-local objects; the sparse regression retains its original data and identities.
+// Fresh case-local objects; sparse values/identities retained with the actual stored outstanding metric key.
 function fixtureForCase(caseId){
  assert(cases.some(test=>test.id===caseId),'unknown_fixture_case');
  const workspace=id(1);
  if(caseId==='unsupported-cause')return {captureReferenceId:id(70),raw:[
   {provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(10),version_id:id(11),authority_hash:'a'.repeat(64)},hash:'a'.repeat(64),data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(30),connection_id:id(31),date:'2026-10-14',time_zone:'UTC',metrics:[{metric:'Synthetic scenario dispatches',value:'6',unit:'count'},{metric:'Synthetic scenario end-of-day backlog',value:'4',unit:'count'}],read_sources:[]}},
-  {provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'stored synthetic invoice observations',records:[{day:'2026-10-14',metrics:[{key:'invoice balance',value:'50',currency:'USD'}]}],read_sources:[]}}
+  {provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'stored synthetic invoice observations',records:[{day:'2026-10-14',metrics:[{key:'outstanding',value:'50',currency:'USD'}]}],read_sources:[]}}
  ]};
  const raw=[
   {provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(210),version_id:id(211)},data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(30),connection_id:id(231),date:'2026-10-14',time_zone:'UTC',coverage:'partial',scope:'Invented Sheets-shaped operational status recorded at 14 Oct 2026 17:00 UTC; partial supplied observation only',metrics:[{metric:'orders recorded on payment hold',value:'3',unit:'count'}],read_sources:[]}},

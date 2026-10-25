@@ -13,8 +13,8 @@ function checkFixtures(){
  const positive=fixtureForCase('qualified-brief'),sparse=fixtureForCase('unsupported-cause');
  assert.deepEqual(sparse,{captureReferenceId:id(70),raw:[
   {provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(10),version_id:id(11),authority_hash:'a'.repeat(64)},hash:'a'.repeat(64),data:{provider:'google_sheets',workspace_id:id(1),entity_id:id(30),connection_id:id(31),date:'2026-10-14',time_zone:'UTC',metrics:[{metric:'Synthetic scenario dispatches',value:'6',unit:'count'},{metric:'Synthetic scenario end-of-day backlog',value:'4',unit:'count'}],read_sources:[]}},
-  {provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:id(1),entity_id:id(30),connection_id:id(33),scope:'stored synthetic invoice observations',records:[{day:'2026-10-14',metrics:[{key:'invoice balance',value:'50',currency:'USD'}]}],read_sources:[]}}
- ]},'sparse fixture is unchanged');
+  {provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:id(1),entity_id:id(30),connection_id:id(33),scope:'stored synthetic invoice observations',records:[{day:'2026-10-14',metrics:[{key:'outstanding',value:'50',currency:'USD'}]}],read_sources:[]}}
+ ]},'sparse values, coverage and original identities are unchanged; key matches stored reporting contract');
  assert.equal(cases[1].question,'Do these explicitly synthetic stored Xero invoice-balance and Google Sheets dispatch/backlog observations establish that unpaid invoices caused delays? Explain what the records support and what information is missing. Cite both originals. Do not invent matching, causation, profit or ratios. Do not search the web.');
  assert.equal(cases[1].expectation,'Withhold unsupported causation, joins and arithmetic; explain specific missing evidence and useful next checks. An empty interpretation list is appropriate when no supported hypothesis fits.');
  assert(!/1200|payment.hold|receivables/i.test(cases[0].question),'neutral question does not supply the expected conclusion');
@@ -36,7 +36,7 @@ function checkPayloadIsolation(request){
  assert.equal(payload.answerSourceRequirements.groups.length,2);assert.deepEqual(new Set(payload.answerSourceRequirements.groups.flat()),new Set(sources.map(s=>s.id)));assert(payload.answerSourceRequirements.groups.every(group=>group.length===1));
  const text=JSON.stringify([sources,payload.qualitative_sources]);
  if(positive){assert.match(text,/1200 USD/);assert.match(text,/payment hold: 3 count/);assert(!/50 USD|dispatches: 6 count|backlog: 4 count/.test(text));}
- else{assert.match(text,/invoice balance: 50 USD/);assert.match(text,/dispatches: 6 count/);assert.match(text,/backlog: 4 count/);assert(!/1200 USD|payment hold/.test(text));}
+ else{assert.match(text,/outstanding: 50 USD/);assert.match(text,/dispatches: 6 count/);assert.match(text,/backlog: 4 count/);assert(!/1200 USD|payment hold/.test(text));}
  const fixture=fixtureForCase(test.id);for(const source of sources){const raw=fixture.raw.find(s=>source.sourceType==='shared_'+s.provider),scope=JSON.parse(source.text).scope;assert.equal(scope.connectionId,raw.data.connection_id);assert.equal(scope.coverage,positive?'partial':'unknown');if(positive){assert.equal(scope.start,'2026-10-14');assert.equal(scope.end,'2026-10-14');assert.equal(scope.timeZone,'UTC');}}
 }
 async function rejectedReply(change){
@@ -45,7 +45,7 @@ async function rejectedReply(change){
  await assert.rejects(evaluation.runNext(),/review_or_stop_required/);negativeCases++;return{evaluation,result,calls};
 }
 (async()=>{
- assert.equal(candidate,'5e34cc75e69e79292bbf7f4e2348c9fefecd2e9f');assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
+ assert.equal(candidate,'fe0ca278404c8685d49904f0eb29895cdc08339f');assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
  checkFixtures();
  const first=createEvaluation({outputDir:output(),dispatch});const result=await first.runNext();
  assert.equal(dispatches,2);
@@ -108,5 +108,5 @@ async function rejectedReply(change){
  const strippedPath=output(),stripped=spawnSync(process.execPath,[path.join(__dirname,'vsi-isolated-contract-evaluation.cjs'),'--dry-run',strippedPath],{encoding:'utf8',env:{OPENAI_API_KEY:unsafeKey,GOOGLE_SHEETS_OPENAI_API_KEY:unsafeKey,GOOGLE_SHEETS_OPENAI_PROJECT_ID:'must-not-inherit',GOOGLE_SHEETS_OPENAI_ORGANIZATION_ID:'must-not-inherit',DATABASE_URL:'postgresql://must-not-connect.invalid/db',SUPABASE_SERVICE_ROLE_KEY:unsafeKey,NODE_OPTIONS:'--no-warnings'}});
  assert.equal(stripped.status,0);assert.equal(JSON.parse(stripped.stdout).state,'awaiting_manual_review');assert(!files(strippedPath).some(f=>f.value.includes(unsafeKey)||f.value.includes('must-not-inherit')||f.value.includes('must-not-connect')));negativeCases++;
  const parallel=createEvaluation({outputDir:output(),dispatch});const pending=parallel.runNext();await assert.rejects(parallel.runNext(),/parallel_evaluation_denied/);negativeCases++;assert((await pending).mechanicalPass);
- console.log(JSON.stringify({passed:true,syntheticOnly:true,actualEnginePromptSchemaAndValidators:true,caseSpecificFixturesAndCitations:true,sparseFixtureAndQuestionUnchanged:true,positiveFollowUpAndMissingLinkageReviewRequired:true,crossCasePremiseRejected:true,privatePreValidationOutputRetention:true,qualityRequiresSeparateManualAssessment:true,genericReviewNotQualityPass:true,twoQuestionsFourCallsOneDollar:true,noLiveCLI:true,noProductionClients:true,noRealModelProof:true,negativeCases,externalCalls:0,artifactDirectory:temporary}));
+ console.log(JSON.stringify({passed:true,syntheticOnly:true,actualEnginePromptSchemaAndValidators:true,caseSpecificFixturesAndCitations:true,sparseValuesQuestionAndLimitationsPreserved:true,storedMetricKeyCorrected:true,positiveFollowUpAndMissingLinkageReviewRequired:true,crossCasePremiseRejected:true,privatePreValidationOutputRetention:true,qualityRequiresSeparateManualAssessment:true,genericReviewNotQualityPass:true,twoQuestionsFourCallsOneDollar:true,noLiveCLI:true,noProductionClients:true,noRealModelProof:true,negativeCases,externalCalls:0,artifactDirectory:temporary}));
 })().catch(()=>{console.error('isolated_evaluator_safety_test_failed');process.exitCode=1;});

@@ -6,10 +6,11 @@ let revoked=false,foreign=false,revokeAfterPlanner=false,answerMode='valid',prov
 const events=[];
 const scenario=padding=>[
  {provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(10),authority_hash:'a'.repeat(64)},hash:'a'.repeat(64),data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(30),connection_id:id(31),date:'2026-10-14',time_zone:'UTC',metrics:Array.from({length:36},(_,n)=>({metric:`dispatch observation ${n} ${'synthetic operational review '.repeat(padding)}`,value:String(n+1),unit:'count'})),read_sources:[]}},
- {provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'stored invoice observations',records:Array.from({length:18},(_,n)=>({day:'2026-10-14',metrics:[{key:`invoice balance ${n} ${'synthetic billing review '.repeat(padding)}`,value:String(n+1),currency:'USD'}]})),read_sources:[]}}
+ {provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'stored invoice observations',records:Array.from({length:18+6*padding},(_,n)=>({day:'2026-10-14',metrics:[{key:'outstanding',value:String(n+1),currency:'USD'}]})),read_sources:[]}}
 ];
 // Keep the positive case below the complete wire limit after prompt/schema changes.
-// The original four-copy filler shape is retained as an explicit denial below.
+// Payload volume uses valid repeated stored records, not invented metric keys.
+// The larger four-copy filler shape remains an explicit denial below.
 const raw=scenario(2);
 const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
  events.push(name);

@@ -9,6 +9,7 @@ import { QboPreviewSchema } from "@/lib/integrations/qbo-customer/contracts";
 import { decimalSchema, daySchema, pluginProviders } from "./contracts";
 import { sharedFinancialBoundaries, type SharedRelationship } from "./financial-boundaries";
 import { validateSharedMemoryProjection } from "./memory-eligibility";
+import { reportingMetricSemantics } from "./adapters";
 
 export type SharedClient = { rpc(name:string,args:Record<string,unknown>):PromiseLike<{data:unknown;error:unknown}> };
 export async function sharedRpc(reader:SharedClient,name:string,args:Record<string,unknown>) {
@@ -50,7 +51,12 @@ export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
    const snapshot=record.snapshot?object(record.snapshot):null;
    if(record.metrics||snapshot) {
     const metrics=z.array(z.object({key:z.string(),value:decimalSchema,currency:z.string().optional()})).parse(snapshot?.metrics??record.metrics);
-    for(const metric of metrics) facts.push(`${label(provider)} ${label(metric.key)}: ${metric.value}${metric.currency?` ${metric.currency}`:''}; ${snapshot?`snapshot ${snapshot.start} through ${snapshot.end}`:`recorded ${daySchema.parse(record.day)}`}. Scope: ${label(d.scope)}.`);
+    for(const metric of metrics) {
+     const semantics=reportingMetricSemantics(provider,metric,snapshot?'snapshot':'history');
+     const unit=semantics.currency??semantics.unit;
+     const partition=semantics.unit==='count'&&semantics.partition?` (currency partition: ${semantics.partition})`:'';
+     facts.push(`${label(provider)} ${label(metric.key)}: ${metric.value} ${unit}${partition}; ${snapshot?`snapshot ${snapshot.start} through ${snapshot.end}`:`recorded ${daySchema.parse(record.day)}`}. Scope: ${label(d.scope)}.`);
+    }
    } else if(provider==='wix-orders') facts.push(`Wix order amount: ${num(record.total_amount)} ${z.string().regex(/^[A-Z]{3}$/).parse(record.currency_code)}, created ${z.string().parse(record.created_at)}; order value is not a settlement or accounting revenue.`);
    else if(provider==='zoho-books') {
     if(record.counted!==true||record.currency!=='USD') continue;

@@ -16,7 +16,7 @@ function checkDiscovery(body,empty=false){
  assert.equal(input.runtimeCapabilities.privateBusinessEvidence,d.status);
  assert.equal(input.businessSources,undefined);assert.equal(input.qualitative_sources,undefined);
  assert.deepEqual(Object.keys(d).sort(),['coverageComplete','observationsIncluded','sourceGroups','sourceTypes','status','window']);
- assert(!/1200|payment hold|dispatches|invoice balance|00000000-/.test(JSON.stringify(d)),'planning gets only discovery metadata, no values, identities or raw scope labels');
+ assert(!/1200|payment hold|dispatches|invoice balance|outstanding|00000000-/.test(JSON.stringify(d)),'planning gets only discovery metadata, no values, identities or raw scope labels');
 }
 async function usefulMock(request){
  const reply=await mockDispatch(request),body=JSON.parse(request.body);
@@ -45,8 +45,8 @@ function runCase(caseId,variant='present',planner){return new Promise((resolve,r
   const {result,requests}=await runCase(test.id);assert(result.mechanicalPass);assert.equal(requests.length,2);assert.equal(result.citations.length,2);
   const payload=JSON.parse(requests[1].input[1].content);assert.equal(payload.businessSources.length,2);assert.equal(payload.qualitative_sources.length,2);
   const facts=JSON.stringify(payload.qualitative_sources);
-  if(test.id==='qualified-brief'){assert.match(facts,/1200 USD/);assert.match(facts,/payment hold: 3 count/);assert.match(result.answer,/existing invoice references/);assert(!/invoice balance: 50 USD|dispatches: 6 count/.test(facts));}
-  else{assert.match(facts,/invoice balance: 50 USD/);assert.match(facts,/dispatches: 6 count/);assert.match(facts,/backlog: 4 count/);assert.match(result.answer,/do not establish a billing-to-operations relationship/);assert(!/1200 USD|payment hold/.test(facts));}
+  if(test.id==='qualified-brief'){assert.match(facts,/1200 USD/);assert.match(facts,/payment hold: 3 count/);assert.match(result.answer,/existing invoice references/);assert(!/outstanding: 50 USD|dispatches: 6 count/.test(facts));}
+  else{assert.match(facts,/outstanding: 50 USD/);assert.match(facts,/dispatches: 6 count/);assert.match(facts,/backlog: 4 count/);assert.match(result.answer,/do not establish a billing-to-operations relationship/);assert(!/1200 USD|payment hold/.test(facts));}
   answers.push(result);
  }
  assert(answers[0].citations.every(a=>answers[1].citations.every(b=>a.sourceId!==b.sourceId)));
