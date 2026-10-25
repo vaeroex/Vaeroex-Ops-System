@@ -45,6 +45,7 @@ global.fetch=async(url,init)=>{
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question:'Review our business sources',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:2}};
 (async()=>{
  let result=await runVsiAnswer(input);assert.equal(result.sharedManifestId,manifest);assert.equal(result.usage.providerCalls,2);
+ assert.equal(payload.qualitative_sources.length,2);assert(payload.qualitative_sources.every(source=>source.facts.length&&source.binding&&source.dependencies.length));
  const scoped=JSON.parse(payload.businessSources[0].text);assert.equal(scoped.scope.entityId,id(30));assert.equal(scoped.scope.additive,false);assert.equal(payload.businessSources.length,2);
  assert.match(result.citations[0].url,/\/vsi_exchange\//);assert.equal(events.filter(e=>e==='provider').length,2);
  const {VSI_SUGGESTED_PROMPTS}=require('../lib/vsi/suggested-prompts.ts');
