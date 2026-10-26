@@ -1,6 +1,8 @@
 {
   "git": {
     "deploymentEnabled": {
+      "codex/vsi-citation-read-stages": false,
+      "codex/vsi-citation-read-stages-canary": false,
       "codex/vsi-citation-reopen-diagnosis": false,
       "codex/vsi-temporal-citation-liveness": false,
       "codex/vsi-reporting-count-units": false,
