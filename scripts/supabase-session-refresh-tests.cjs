@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Offline actual-SDK/Next regression harness. */
 const assert = require('node:assert/strict');
 const { AsyncLocalStorage } = require('node:async_hooks');
+const { mock } = require('node:test');
 const net = require('node:net');
 const { installLoader } = require('./qbo-customer-test-support.cjs');
 
@@ -24,10 +25,12 @@ global.fetch = async (input, init = {}) => {
     assert.equal(url.origin, origin, 'only intercepted .invalid transport is permitted');
     if (url.pathname === '/auth/v1/token') {
       state.refreshCalls++;
+      assert.equal(init.method, 'POST');
       assert.equal(url.searchParams.get('grant_type'), 'refresh_token');
       assert.equal(JSON.parse(init.body).refresh_token, state.old.refresh_token);
       state.entered?.resolve();
       if (state.release) await state.release.promise;
+      if (state.refreshResponse) return state.refreshResponse();
       return state.refreshDenied
         ? json({ code: 'refresh_token_not_found', error_code: 'refresh_token_not_found', msg: 'Synthetic rejection' }, 400)
         : json(state.fresh);
@@ -36,6 +39,7 @@ global.fetch = async (input, init = {}) => {
     state.userCalls++;
     const authorization = new Headers(init.headers).get('authorization');
     assert([state.old.access_token, state.fresh.access_token].some(token => authorization === `Bearer ${token}`));
+    if (state.userResponse) return state.userResponse();
     if (state.nullUser) return json(null);
     if (state.userUnavailable) return json({ code: 'unexpected_failure', msg: 'Synthetic temporary failure' }, 503);
     return state.userDenied
@@ -129,6 +133,21 @@ function persistBrowser(state, response) {
     else state.jar.set(cookie.name, cookie.value);
   }
 }
+const conflictResponse = () => json({ code: 'conflict', error_code: 'conflict', msg: 'Synthetic refresh conflict' }, 409);
+async function terminalConflict(state, result) {
+  const { response } = result, before = [...state.jar];
+  assert.equal(response.status, 503);
+  assert.equal(await response.text(), 'Session verification unavailable.');
+  assert.equal(response.headers.get('set-cookie'), null, 'conflict must neither delete nor reissue browser cookies');
+  assert.equal(response.cookies.getAll().length, 0);
+  for (const [name] of response.headers) {
+    assert(!name.startsWith('x-middleware-'), 'terminal conflict must not forward request headers or render downstream');
+    assert(!['cookie', 'authorization', 'x-user-id', 'x-workspace-id'].includes(name));
+  }
+  persistBrowser(state, response);
+  assert.deepEqual([...state.jar], before, 'a conflict response must leave the single browser jar byte-for-byte unchanged');
+  assert.equal(state.rscWriteAttempts, 0);
+}
 function reconstructed(jar) {
   if (jar.has(cookieName)) return jar.get(cookieName);
   let value = '';
@@ -199,6 +218,69 @@ async function concurrent(first, second) {
     persistBrowser(state, result.response);
     assert.equal(sessionFrom(state.jar).user.id, state.user.id);
     assert.equal(state.jar.get('unrelated-fixture'), `unrelated-${Number(state.user.id.slice(-12))}`);
+  }
+}
+
+async function sharedBrowserRace(n, outcomes, order) {
+  const initial = fixture(n, outcomes.includes('revoked') ? {} : { oldSize: 10000, freshSize: 0 });
+  const original = [...initial.jar], unrelated = initial.jar.get('unrelated-fixture'), workspace = initial.jar.get('workspace-fixture');
+  const requests = outcomes.map(outcome => ({
+    ...initial, outcome, entered: deferred(), release: deferred(),
+    ...(outcome === 'conflict' ? { refreshResponse: conflictResponse } : {}),
+    ...(outcome === 'revoked' ? { refreshDenied: true } : {})
+  }));
+  assert.equal(requests[0].jar, requests[1].jar, 'both requests must update the same browser cookie jar');
+  const pending = requests.map(state => run(state));
+  await enteredTogether(...requests);
+  for (const index of order) {
+    const state = requests[index];
+    state.release.resolve();
+    const result = await pending[index];
+    if (state.outcome === 'conflict') {
+      await terminalConflict(state, result);
+      assert.equal(state.userCalls, 0);
+    } else if (state.outcome === 'success') {
+      await guard(state, result);
+      persistBrowser(state, result.response);
+      assert.equal(sessionFrom(state.jar).refresh_token, state.fresh.refresh_token);
+      assert.equal(state.userCalls, 2);
+    } else {
+      assert.equal(result.response.status, 200, 'genuine rejection still reaches the original denying guard');
+      assert(result.response.cookies.getAll().length > 0);
+      assert(result.response.cookies.getAll().every(cookie => cookie.maxAge === 0));
+      await guard(state, result, false);
+      persistBrowser(state, result.response);
+      assert.equal(state.userCalls, 0);
+    }
+    assert.equal(state.refreshCalls, 1, 'each independently initiated request makes at most one fixture refresh');
+    assert.equal(state.rscWriteAttempts, 0);
+    assert.equal(state.jar.get('unrelated-fixture'), unrelated);
+    assert.equal(state.jar.get('workspace-fixture'), workspace);
+  }
+  const winner = requests.find(state => state.outcome === 'success');
+  if (!winner) {
+    assert.deepEqual([...initial.jar], original, 'all-conflict completion must retain the original browser jar');
+    return;
+  }
+  if (outcomes.includes('conflict')) {
+    assert.equal(sessionFrom(initial.jar).refresh_token, winner.fresh.refresh_token, 'either response order must retain the successful refresh');
+    const next = { ...winner, entered: undefined, release: undefined, refreshCalls: 0, userCalls: 0, configCalls: 0 };
+    const result = await run(next);
+    await guard(next, result);
+    assert.equal(next.refreshCalls, 0, 'the browser must use the winner on a later independent request');
+    assert.equal(next.userCalls, 2);
+  } else {
+    // These fixture responses are intentionally contradictory: the application must
+    // preserve ordinary provider rejection, not invent global rotation guarantees.
+    const last = requests[order.at(-1)].outcome;
+    assert.equal(Boolean(sessionFrom(initial.jar)), last === 'success', 'ordinary cookie response order remains visible');
+    const next = { ...winner, entered: undefined, release: undefined, userDenied: true, refreshCalls: 0, userCalls: 0, configCalls: 0 };
+    const result = await run(next);
+    await guard(next, result, false);
+    persistBrowser(next, result.response);
+    assert.equal(sessionFrom(initial.jar), null, 'a subsequent authoritative user revocation must deny even a late successful cookie');
+    assert.equal(next.refreshCalls, 0);
+    assert.equal(next.userCalls, last === 'success' ? 1 : 0);
   }
 }
 
@@ -347,12 +429,143 @@ async function concurrent(first, second) {
   const missingConfig = fixture(93, { configMissing: true }), unavailable = await run(missingConfig);
   assert.equal(missingConfig.configCalls, 1); assert.equal(missingConfig.refreshCalls + missingConfig.userCalls, 0);
   assert.equal(unavailable.response.cookies.getAll().length, 0); caseCount++;
+
+  const originalCases = caseCount;
+  assert.equal(originalCases, 29, 'retain every original session-persistence regression');
+  phase = 'valid_access_then_conflict_then_independent_recovery';
+  mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-26T00:00:00Z') });
+  try {
+    const boundary = fixture(100, { expired: false, refreshResponse: conflictResponse }), originalJar = [...fixture(100, { expired: false }).jar];
+    const baseline = await run(boundary);
+    await guard(boundary, baseline);
+    assert.equal(boundary.refreshCalls, 0); assert.equal(boundary.userCalls, 2);
+    assert.equal(baseline.response.cookies.getAll().length, 0, 'valid access does not establish refresh usability');
+    mock.timers.setTime((boundary.old.expires_at - 89) * 1000);
+    const conflict = await run(boundary);
+    await terminalConflict(boundary, conflict);
+    assert.equal(boundary.refreshCalls, 1); assert.equal(boundary.userCalls, 2);
+    assert.deepEqual([...boundary.jar], originalJar, 'crossing the synthetic expiry margin must not commit conflict deletions');
+    // A later request is explicitly initiated by the test; the middleware must
+    // not retry or claim that this synthetic Auth recovery is guaranteed.
+    boundary.refreshResponse = undefined;
+    boundary.fresh = fixture(100).fresh;
+    const recovered = await run(boundary);
+    await guard(boundary, recovered); persistBrowser(boundary, recovered.response);
+    assert.equal(boundary.refreshCalls, 2); assert.equal(boundary.userCalls, 4);
+    assert.equal(sessionFrom(boundary.jar).refresh_token, boundary.fresh.refresh_token);
+    assert(sessionFrom(boundary.jar).expires_at > boundary.old.expires_at);
+    const afterRecovery = await run(boundary);
+    await guard(boundary, afterRecovery);
+    assert.equal(boundary.refreshCalls, 2); assert.equal(boundary.userCalls, 6);
+    assert.equal(boundary.rscWriteAttempts, 0);
+    caseCount++;
+  } finally { mock.timers.reset(); }
+
+  phase = 'repeated_conflicts_are_one_call_per_independent_request';
+  const repeating = fixture(101, { oldSize: 10000, refreshResponse: conflictResponse }), repeatingJar = [...repeating.jar];
+  for (let request = 1; request <= 3; request++) {
+    const result = await run(repeating);
+    await terminalConflict(repeating, result);
+    assert.equal(repeating.refreshCalls, request); assert.equal(repeating.userCalls, 0);
+    assert.deepEqual([...repeating.jar], repeatingJar);
+  }
+  caseCount++;
+
+  phase = 'conflict_navigation_variants';
+  for (const options of [
+    { pathname: '/app/settings' },
+    { pathname: '/app/settings', method: 'HEAD' },
+    { pathname: '/app/settings?_rsc=synthetic', headers: { RSC: '1', 'next-router-state-tree': '["",{}]' } },
+    { pathname: '/app/settings?_rsc=synthetic', headers: { RSC: '1', 'next-router-prefetch': '1', purpose: 'prefetch' } }
+  ]) {
+    const state = fixture(102, { refreshResponse: conflictResponse });
+    await terminalConflict(state, await run(state, options));
+    assert.equal(state.refreshCalls, 1); assert.equal(state.userCalls, 0); caseCount++;
+  }
+
+  phase = 'spoofed_conflict_claims_cannot_create_exception';
+  const claims = fixture(103);
+  claims.user.user_metadata = { code: 'conflict', status: 409, refreshConflictResponse: true };
+  claims.fresh.user.user_metadata = { ...claims.user.user_metadata };
+  const ordinary = await run(claims, { headers: {
+    'x-refresh-conflict': 'true', 'x-auth-error-code': 'conflict', 'x-auth-status': '409', 'x-user-id': id(999)
+  } });
+  assert.equal(ordinary.response.status, 200);
+  assert(ordinary.response.cookies.getAll().length > 0);
+  await guard(claims, ordinary);
+  assert.equal(claims.refreshCalls, 1); assert.equal(claims.userCalls, 2); caseCount++;
+
+  const nonConflicts = [
+    ['wrong_status', () => json({ code: 'conflict', error_code: 'conflict', msg: 'Synthetic conflict' }, 400)],
+    ['wrong_code', () => json({ code: 'refresh_token_not_found', msg: 'Synthetic conflict text' }, 409)],
+    ['message_only', () => json({ msg: 'conflict', status: 409 }, 409)],
+    ['nested_code', () => json({ data: { code: 'conflict' }, msg: 'Synthetic conflict' }, 409)],
+    ['malformed_body', () => new Response('not-json', { status: 409, headers: { 'content-type': 'application/json' } })],
+    ['case_variant', () => json({ code: 'Conflict', msg: 'Synthetic conflict' }, 409)],
+    ['unrecognized_sdk_code', () => new Response(JSON.stringify({ code: 'conflict', msg: 'Synthetic conflict' }), {
+      status: 409, headers: { 'content-type': 'application/json' }
+    })]
+  ];
+  for (const [name, refreshResponse] of nonConflicts) {
+    phase = 'refresh_conflict_near_miss_' + name;
+    const denied = fixture(104, { refreshResponse }), result = await run(denied);
+    assert.equal(result.response.status, 200, 'a nonmatching Auth error must preserve the original denying path');
+    assert(result.response.cookies.getAll().length > 0);
+    assert(result.response.cookies.getAll().every(cookie => cookie.maxAge === 0));
+    await guard(denied, result, false); persistBrowser(denied, result.response);
+    assert.equal(sessionFrom(denied.jar), null);
+    assert.equal(denied.refreshCalls, 1); assert.equal(denied.userCalls, 0); caseCount++;
+  }
+
+  for (const code of ['refresh_token_not_found', 'refresh_token_already_used', 'session_expired']) {
+    phase = 'authoritative_refresh_rejection_' + code;
+    const denied = fixture(105, { refreshResponse: () => json({ code, error_code: code, msg: 'Synthetic authoritative rejection' }, 400) });
+    const result = await run(denied);
+    assert.equal(result.response.status, 200);
+    assert(result.response.cookies.getAll().length > 0);
+    assert(result.response.cookies.getAll().every(cookie => cookie.maxAge === 0));
+    await guard(denied, result, false); persistBrowser(denied, result.response);
+    assert.equal(sessionFrom(denied.jar), null);
+    assert.equal(denied.refreshCalls, 1); assert.equal(denied.userCalls, 0); caseCount++;
+  }
+
+  for (const expired of [false, true]) {
+    phase = expired ? 'user_409_after_successful_refresh' : 'user_409_without_refresh';
+    const denied = fixture(106, { expired, userResponse: () => {
+      const response = conflictResponse();
+      // A response URL or browser-supplied claim cannot turn this actual GET
+      // /user error into an observed POST refresh conflict.
+      Object.defineProperty(response, 'url', { value: origin + '/auth/v1/token?grant_type=refresh_token' });
+      return response;
+    } });
+    const result = await run(denied, { headers: { 'x-refresh-conflict': 'true' } });
+    assert.equal(result.response.status, 200, 'GET /user 409 is not the refresh exception');
+    await guard(denied, result, false);
+    assert.equal(denied.refreshCalls, expired ? 1 : 0); assert.equal(denied.userCalls, 2);
+    if (expired) assert(result.response.cookies.getAll().some(cookie => cookie.maxAge > 0), 'unrelated successful refresh cookies remain intact');
+    else assert.equal(result.response.cookies.getAll().length, 0);
+    assert.equal(denied.rscWriteAttempts, 0); caseCount++;
+  }
+
+  phase = 'shared_browser_success_then_conflict';
+  await sharedBrowserRace(110, ['success', 'conflict'], [0, 1]); caseCount++;
+  phase = 'shared_browser_conflict_then_success';
+  await sharedBrowserRace(111, ['success', 'conflict'], [1, 0]); caseCount++;
+  phase = 'shared_browser_all_conflicts';
+  await sharedBrowserRace(112, ['conflict', 'conflict'], [1, 0]); caseCount++;
+  phase = 'shared_browser_success_then_genuine_revocation';
+  await sharedBrowserRace(113, ['success', 'revoked'], [0, 1]); caseCount++;
+  phase = 'shared_browser_genuine_revocation_then_success';
+  await sharedBrowserRace(114, ['success', 'revoked'], [1, 0]); caseCount++;
+
   phase = 'transport_boundary';
   assert.deepEqual(transportErrors, []); assert.equal(networkAttempts, 0);
-  console.log(JSON.stringify({ passed: true, cases: caseCount, actualInstalledSDK: true, actualNextRequestResponse: true,
+  console.log(JSON.stringify({ passed: true, cases: caseCount, originalCases, addedConflictCases: caseCount - originalCases, actualInstalledSDK: true, actualNextRequestResponse: true,
     sameRequestAndConsecutiveRequestPersistence: true, chunkGrowthShrinkAndDeletion: true, originalSDKCookieOptions: true,
     separateAndSameUserConcurrency: true, isolatedMixedRefreshOutcomes: true, transientUserFailurePreservesCookies: true,
     guardsRemainAuthoritative: true, unexpected503RetainsCookies: true,
+    validAccessConflictAndIndependentRecovery: true, repeatedConflictRequests: 3, refreshConflictNoRetryOrCookieWrites: true,
+    preciseConflictNearMisses: nonConflicts.length, sharedBrowserResponseOrderCases: 5,
     preAuthRoutesAndActionsPreserved: true, externalCalls: 0, sdkErrorEvents,
     limitation: 'Synthetic Auth responses and cookie-jar application verify mechanics; not browser/deployment behavior or hosted session expiry/reuse.' }));
 })().catch(error => {

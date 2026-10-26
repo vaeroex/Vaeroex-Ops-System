@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { isAuthApiError } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import type { Database } from "@/lib/supabase/types";
@@ -24,8 +25,25 @@ export async function refreshWorkspaceSession(request: NextRequest) {
   const config = getSupabaseConfig();
   if (!config) return response;
 
+  // Observe only this client's actual refresh transport, never browser-provided
+  // claims/error text. Do not inspect or retain request bodies or token values.
+  const refreshEndpoint = new URL(`${config.url.replace(/\/$/, "")}/auth/v1/token`);
+  let refreshConflictResponse = false;
+  const transport = fetch.bind(globalThis);
   // Never share this client or cookie state between requests/users.
   const supabase = createServerClient<Database>(config.url, config.anonKey, {
+    global: { fetch: async (input, init) => {
+      const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      const result = await transport(input, init);
+      if (method.toUpperCase() === "POST" && url.origin === refreshEndpoint.origin &&
+          url.pathname === refreshEndpoint.pathname &&
+          url.searchParams.getAll("grant_type").length === 1 &&
+          url.searchParams.get("grant_type") === "refresh_token" && result.status === 409) {
+        refreshConflictResponse = true;
+      }
+      return result;
+    } },
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll(cookiesToSet) {
@@ -43,7 +61,15 @@ export async function refreshWorkspaceSession(request: NextRequest) {
   // of identity. Existing page/RPC guards remain authoritative, including when
   // Auth returns an invalid/revoked session. Never pass a trusted-user header.
   try {
-    await supabase.auth.getUser();
+    const { error } = await supabase.auth.getUser();
+    if (refreshConflictResponse && isAuthApiError(error) && error.status === 409 && error.code === "conflict") {
+      // The installed SDK removes its session on this non-retryable API error.
+      // A provider conflict does not establish revocation. Deny this request
+      // without committing those deletions OR reissuing the stale cookies:
+      // either would overwrite a concurrent successful browser response.
+      // No downstream rendering, cached identity, or automatic refresh retry.
+      return preventSessionCaching(new NextResponse("Session verification unavailable.", { status: 503 }));
+    }
   } catch {
     // Unexpected SDK/transport exceptions must not authorize a request or drop
     // an already-issued cookie batch. Do not expose raw Auth errors/headers.
