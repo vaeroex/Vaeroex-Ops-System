@@ -1,6 +1,7 @@
 {
   "git": {
     "deploymentEnabled": {
+      "codex/session-refresh-persistence": false,
       "codex/vsi-citation-read-stages": false,
       "codex/vsi-citation-read-stages-canary": false,
       "codex/vsi-citation-reopen-diagnosis": false,

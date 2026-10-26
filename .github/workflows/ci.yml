@@ -377,6 +377,10 @@ jobs:
       - name: Production build
         run: pnpm build
 
+      - name: Workspace session refresh persistence (synthetic loopback only)
+        timeout-minutes: 5
+        run: pnpm test:session-refresh
+
       - name: Security regression check
         run: pnpm security:check
 
