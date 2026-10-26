@@ -3,8 +3,9 @@ import type { CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import type { Database } from "@/lib/supabase/types";
+import type { SharedCitationReadTrace } from "@/lib/supabase/citation-read-trace";
 
-export async function createSupabaseServerClient() {
+export async function createSupabaseServerClient(citationTrace?: SharedCitationReadTrace) {
   const config = getSupabaseConfig();
 
   if (!config) {
@@ -13,7 +14,8 @@ export async function createSupabaseServerClient() {
 
   const cookieStore = await cookies();
 
-  return createServerClient<Database>(config.url, config.anonKey, {
+  const client = createServerClient<Database>(config.url, config.anonKey, {
+    ...(citationTrace ? { global: { fetch: citationTrace.wrapFetch(fetch.bind(globalThis), new URL(config.url).origin) } } : {}),
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -29,4 +31,6 @@ export async function createSupabaseServerClient() {
       }
     }
   });
+  if (citationTrace) client.auth.getSession = citationTrace.wrapSession(client.auth.getSession.bind(client.auth));
+  return client;
 }

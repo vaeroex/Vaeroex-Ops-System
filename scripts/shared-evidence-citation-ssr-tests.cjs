@@ -19,7 +19,9 @@ function session(expired = false) {
   return { access_token: token, refresh_token: 'synthetic-refresh-token', expires_at: expiresAt, expires_in: 3600, token_type: 'bearer', user };
 }
 const state = { mode: 'success', enabled: true, cookies: [], expectedToken: '', rpcCalls: 0, authCalls: 0,
-  refreshCalls: 0, cookieWrites: 0, aborts: 0, networkAttempts: 0, requests: [], signals: [], contractReads: [], warnings: [], transportErrors: [] };
+  refreshCalls: 0, cookieWrites: 0, aborts: 0, expiryCrossings: 0, bodyReads: 0,
+  networkAttempts: 0, requests: [], signals: [], contractReads: [], warnings: [], transportLogs: [], transportErrors: [],
+  finishRefresh: null, finishIgnoredRpc: null };
 const resetCookies = ({ chunked = false, expired = false, absent = false } = {}) => {
   const stored = session(expired), key = 'sb-citation-fixture-auth-token';
   state.expectedToken = stored.access_token;
@@ -59,9 +61,15 @@ const nativeFetch = async (input, options = {}) => {
   const url = new URL(input), headers = new Headers(options.headers);
   assert.equal(url.origin, origin, 'no provider, production, or external URL is allowed');
   assert.equal(headers.get('apikey'), anonKey);
+  if (options.signal?.aborted) throw new DOMException('PRIVATE_ALREADY_ABORTED', 'AbortError');
   if (url.pathname === '/auth/v1/token') {
     state.refreshCalls++; assert.equal(url.searchParams.get('grant_type'), 'refresh_token');
     assert.equal(JSON.parse(options.body).refresh_token, 'synthetic-refresh-token');
+    if (state.mode === 'refresh_stall') {
+      assert.equal(state.expiryCrossings, 1, 'refresh begins after the real access checks crossed the expiry margin');
+      assert.equal(options.signal, undefined, 'the citation RPC abort signal does not reach the auth refresh');
+      return new Promise(resolve => { state.finishRefresh = () => resolve(json(session())); });
+    }
     const refreshed = session(); state.expectedToken = refreshed.access_token; return json(refreshed);
   }
   assert.equal(headers.get('authorization'), `Bearer ${state.expectedToken}`, 'the actual SSR client must derive the token from its cookie session');
@@ -73,7 +81,16 @@ const nativeFetch = async (input, options = {}) => {
       workspaces: { id: workspace, name: 'Synthetic workspace', subscription_status: 'active', subscription_required: false } }]);
   }
   if (url.pathname === '/rest/v1/workspaces') { assert.equal(url.searchParams.get('id'), `eq.${workspace}`); return json([{ id: workspace, subscription_status: 'active', subscription_required: false }]); }
-  if (url.pathname === '/rest/v1/customer_subscriptions') { assert(url.searchParams.get('or').includes(`workspace_id.eq.${workspace}`)); return json([]); }
+  if (url.pathname === '/rest/v1/customer_subscriptions') {
+    assert(url.searchParams.get('or').includes(`workspace_id.eq.${workspace}`));
+    if (state.mode === 'refresh_stall') {
+      // Access checks used an unexpired session. The next session read, for the
+      // RPC, now falls inside auth-js's 90-second refresh margin.
+      mock.timers.setTime((fixtureExpiresAt - 89) * 1000);
+      state.expiryCrossings++;
+    }
+    return json([]);
+  }
   assert.equal(url.pathname, '/rest/v1/rpc/reopen_shared_evidence_target_v1');
   assert.equal(options.method, 'POST');
   const args = JSON.parse(options.body);
@@ -95,11 +112,23 @@ const nativeFetch = async (input, options = {}) => {
   if (state.mode === 'transport_failure') throw new Error('PRIVATE_TRANSPORT_DETAIL');
   if (state.mode === 'invalid_json') return new Response('{PRIVATE_INVALID_JSON', { status: 200 });
   if (state.mode === 'empty_success') return new Response(null, { status: 204 });
+  if (state.mode === 'body_stall') {
+    const response = new Response(new ReadableStream({ start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"stage":'));
+      options.signal.addEventListener('abort', () => controller.error(new DOMException('PRIVATE_BODY_ABORT', 'AbortError')), { once: true });
+    } }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const readBody = response.text.bind(response);
+    response.text = () => { state.bodyReads++; assert.equal(response.status, 200); return readBody(); };
+    return response;
+  }
   if (state.mode === 'stall' || state.mode === 'ignore_abort') {
     const ignore = state.mode === 'ignore_abort';
-    return new Promise((_, reject) => options.signal.addEventListener('abort', () => {
-      if (!ignore) reject(new DOMException('PRIVATE_ABORT_DETAIL', 'AbortError'));
-    }, { once: true }));
+    return new Promise((resolve, reject) => {
+      if (ignore) state.finishIgnoredRpc = () => resolve(json(packet));
+      options.signal.addEventListener('abort', () => {
+        if (!ignore) reject(new DOMException('PRIVATE_ABORT_DETAIL', 'AbortError'));
+      }, { once: true });
+    });
   }
   const response = structuredClone(packet);
   if (state.mode === 'malformed_stage') response.stage = 'unadmitted';
@@ -113,8 +142,12 @@ global.fetch = (...args) => nativeFetch(...args).catch(error => {
   throw error;
 });
 require('node:net').Socket.prototype.connect = () => { state.networkAttempts++; throw new Error('unmocked_network_forbidden'); };
-const originalWarn = console.warn;
-console.warn = (...args) => { state.warnings.push(args); };
+const originalWarn = console.warn, originalInfo = console.info;
+console.warn = (...args) => {
+  state.warnings.push(args);
+  if (args[0] === '[shared-citation-transport]') state.transportLogs.push({ level: 'warn', args });
+};
+console.info = (...args) => { state.transportLogs.push({ level: 'info', args }); };
 installLoader({
   'server-only': {},
   'next/navigation': { notFound: () => { throw new Error('NEXT_NOT_FOUND'); }, redirect: url => { throw new Error(`NEXT_REDIRECT:${url}`); } },
@@ -142,6 +175,41 @@ function diagnostics(start) {
   assert.doesNotMatch(JSON.stringify(value), /PRIVATE_|00000000-|synthetic|Bearer|eyJ|https?:|[a-f0-9]{64}/);
   return value;
 }
+const tracePhases = new Set(['read_entry', 'session_call_pending', 'session_call_settled', 'session_call_rejected',
+  'refresh_fetch_invoked', 'refresh_headers_received', 'refresh_body_read', 'refresh_body_complete',
+  'refresh_fetch_rejected', 'refresh_body_rejected', 'rpc_fetch_invoked', 'rpc_headers_received',
+  'rpc_body_read', 'rpc_body_complete', 'rpc_fetch_rejected', 'rpc_body_rejected', 'client_complete']);
+let traceChecks = 0, frozenDeadlineChecks = 0;
+function transport(start, outcome, phase, rpcStatus, refreshStatus = 'not_observed') {
+  const logs = state.transportLogs.slice(start);
+  assert.equal(logs.length, 1, 'one terminal transport event, with no per-phase logging');
+  const { level, args } = logs[0];
+  assert.equal(level, outcome === 'completed' ? 'info' : 'warn');
+  assert.equal(args.length, 2); assert.equal(args[0], '[shared-citation-transport]');
+  const value = args[1];
+  assert.deepEqual(Object.keys(value).sort(), ['elapsedMs', 'milestones', 'outcome', 'phase', 'refreshStatus', 'rpcStatus']);
+  assert.deepEqual([value.outcome, value.phase, value.rpcStatus, value.refreshStatus], [outcome, phase, rpcStatus, refreshStatus]);
+  assert(Object.isFrozen(value)); assert(Object.isFrozen(value.milestones));
+  assert(Object.hasOwn(value.milestones, 'read_entry')); assert(Object.hasOwn(value.milestones, 'session_call_pending'));
+  if (outcome === 'completed') {
+    for (const milestone of ['session_call_settled', 'rpc_fetch_invoked', 'rpc_headers_received', 'rpc_body_read', 'rpc_body_complete', 'client_complete']) {
+      assert(Object.hasOwn(value.milestones, milestone), `successful read records ${milestone}`);
+    }
+  }
+  for (const [name, duration] of Object.entries({ ...value.milestones, elapsedMs: value.elapsedMs })) {
+    assert(name === 'elapsedMs' || tracePhases.has(name));
+    assert(Number.isSafeInteger(duration) && duration >= 0 && duration <= 60000);
+    assert(duration <= value.elapsedMs);
+  }
+  assert.doesNotMatch(JSON.stringify(value), /PRIVATE_|00000000-|synthetic|Bearer|eyJ|https?:|[a-f0-9]{64}|Stored observations|access_token|refresh_token|workspace_id|source_id/i);
+  traceChecks++;
+  return value;
+}
+function settledSession(trace) {
+  assert(Object.hasOwn(trace.milestones, 'session_call_settled'));
+  assert.equal(Object.hasOwn(trace.milestones, 'session_call_rejected'), false);
+  assert.equal(Object.keys(trace.milestones).some(phase => phase.startsWith('refresh_')), false, 'guard-time refreshes are outside the armed trace');
+}
 (async () => {
   resetCookies();
   const beforeSaved = JSON.stringify(saved), beforePacket = JSON.stringify(packet);
@@ -150,15 +218,22 @@ function diagnostics(start) {
   const links = [...markup.matchAll(/href="([^"]*\/sources\/evidence\/[^"]*)"/g)].map(match => match[1].replaceAll('&amp;', '&'));
   assert.deepEqual(links, saved.citations.map(citation => citation.url));
   for (const href of links) {
+    const beforeAuth = state.authCalls, beforeRpc = state.rpcCalls, beforeTrace = state.transportLogs.length;
     const rendered = await invoke(href); assert.deepEqual(state.transportErrors, []);
+    assert.equal(state.authCalls, beforeAuth + 2); assert.equal(state.rpcCalls, beforeRpc + 1);
+    settledSession(transport(beforeTrace, 'completed', 'client_complete', '2xx'));
     assert.match(rendered, /Saved evidence/); assert.equal((rendered.match(/<section /g) || []).length, 6);
     for (const source of packet.projections) assert(rendered.includes(`id="source-${source.hash}"`));
     assert.doesNotMatch(rendered, /PRIVATE_|read_sources|Source unavailable/);
   }
   assert.equal(new Set(state.requests.map(args => JSON.stringify(args))).size, 1);
   assert(state.contractReads.every(read => read.length === 6));
-  resetCookies({ chunked: true }); assert.match(await invoke(links[0]), /Saved evidence/);
-  resetCookies({ expired: true }); assert.match(await invoke(links[0]), /Saved evidence/);
+  for (const cookieMode of [{ chunked: true }, { expired: true }]) {
+    const beforeAuth = state.authCalls, beforeRpc = state.rpcCalls, beforeTrace = state.transportLogs.length;
+    resetCookies(cookieMode); assert.match(await invoke(links[0]), /Saved evidence/);
+    assert.equal(state.authCalls, beforeAuth + 2); assert.equal(state.rpcCalls, beforeRpc + 1);
+    settledSession(transport(beforeTrace, 'completed', 'client_complete', '2xx'));
+  }
   assert(state.refreshCalls > 0); assert(state.cookieWrites > 0, 'actual SSR refresh tolerates read-only Server Component cookies');
   resetCookies();
   const expected = {
@@ -173,46 +248,110 @@ function diagnostics(start) {
   for (const mode of Object.keys(expected)) {
     state.mode = mode;
     for (const href of [links[0], links[1]]) {
-      const beforeCalls = state.rpcCalls, beforeWarnings = state.warnings.length;
+      const beforeCalls = state.rpcCalls, beforeWarnings = state.warnings.length,
+        beforeAuth = state.authCalls, beforeTrace = state.transportLogs.length;
       const rendered = await invoke(href); assert.match(rendered, /Source unavailable/);
       assert.doesNotMatch(rendered, /<section |PRIVATE_|Synthetic dispatches/);
       assert.equal(state.rpcCalls, beforeCalls + 1, 'single protected read; no retry or fragment-only fallback');
+      assert.equal(state.authCalls, beforeAuth + 2, 'observation adds no authentication requests');
       const diagnostic = diagnostics(beforeWarnings);
       assert.deepEqual([diagnostic.stage, diagnostic.category, diagnostic.sqlCode, diagnostic.httpStatus], expected[mode]);
+      const statusClass = mode === 'transport_failure' ? 'not_observed' : ['uncited_changed', 'rpc_denied'].includes(mode) ? '4xx' : mode === 'unknown_error' ? '5xx' : '2xx';
+      const trace = transport(beforeTrace, 'failed', 'client_complete', statusClass);
+      settledSession(trace);
+      assert(Object.hasOwn(trace.milestones, mode === 'transport_failure' ? 'rpc_fetch_rejected' : 'rpc_body_complete'));
       categories[mode] = diagnostic.category;
     }
   }
-  for (const mode of ['stall', 'ignore_abort']) {
+  state.mode = 'refresh_stall';
+  const beforeRefreshCalls = state.refreshCalls, beforeRefreshRpc = state.rpcCalls, beforeRefreshAuth = state.authCalls,
+    beforeRefreshWarnings = state.warnings.length, beforeRefreshAborts = state.aborts, beforeRefreshTrace = state.transportLogs.length;
+  mock.timers.enable({ apis: ['Date', 'setTimeout'], now: (fixtureExpiresAt - 91) * 1000 });
+  try {
+    let settled = false; const pending = invoke(links[0]).then(value => { settled = true; return value; });
+    for (let turn = 0; state.refreshCalls === beforeRefreshCalls && turn < 100; turn++) await nextTurn();
+    assert.equal(state.authCalls, beforeRefreshAuth + 2, 'both actual getUser checks completed before the refresh stall');
+    assert.equal(state.expiryCrossings, 1); assert.equal(state.refreshCalls, beforeRefreshCalls + 1);
+    assert.equal(state.rpcCalls, beforeRefreshRpc, 'RPC fetch has not started while token acquisition waits');
+    mock.timers.tick(9999); await nextTurn(); assert.equal(settled, false);
+    mock.timers.tick(1); await nextTurn(); assert.equal(settled, true);
+    const rendered = await pending; assert.match(rendered, /Source unavailable/); assert.doesNotMatch(rendered, /<section |PRIVATE_/);
+    assert.equal(state.rpcCalls, beforeRefreshRpc, 'the deadline can fire with zero RPC fetches');
+    assert.equal(state.aborts, beforeRefreshAborts, 'there was no RPC transport to receive the abort');
+    const diagnostic = diagnostics(beforeRefreshWarnings);
+    assert.deepEqual([diagnostic.stage, diagnostic.category, diagnostic.reason, diagnostic.sqlCode, diagnostic.httpStatus],
+      ['rpc_read', 'timeout', 'read_deadline_exceeded', null, null]);
+    const trace = transport(beforeRefreshTrace, 'deadline', 'refresh_fetch_invoked', 'not_observed');
+    assert.equal(Object.hasOwn(trace.milestones, 'session_call_settled'), false);
+    assert.equal(Object.keys(trace.milestones).some(phase => phase.startsWith('rpc_')), false);
+    const frozen = JSON.stringify(trace), warningCount = state.warnings.length;
+    state.finishRefresh(); await nextTurn();
+    assert.equal(JSON.stringify(trace), frozen, 'late auth/session settlement cannot rewrite the deadline snapshot');
+    assert.equal(state.transportLogs.length, beforeRefreshTrace + 1); assert.equal(state.warnings.length, warningCount);
+    assert.equal(state.rpcCalls, beforeRefreshRpc, 'the late already-aborted RPC is rejected before simulated transport dispatch');
+    assert.equal(state.authCalls, beforeRefreshAuth + 2); assert.equal(state.refreshCalls, beforeRefreshCalls + 1);
+    frozenDeadlineChecks++;
+  } finally { mock.timers.reset(); }
+  for (const mode of ['stall', 'ignore_abort', 'body_stall']) {
     state.mode = mode; const beforeCalls = state.rpcCalls, beforeAborts = state.aborts, beforeWarnings = state.warnings.length;
+    const beforeBodyReads = state.bodyReads, beforeTrace = state.transportLogs.length, beforeAuth = state.authCalls;
     mock.timers.enable({ apis: ['setTimeout'] });
     try {
       let settled = false; const pending = invoke(links[0]).then(value => { settled = true; return value; });
       for (let turn = 0; state.rpcCalls === beforeCalls && turn < 100; turn++) await nextTurn();
       assert.equal(state.rpcCalls, beforeCalls + 1);
+      assert.equal(state.authCalls, beforeAuth + 2);
+      if (mode === 'body_stall') assert.equal(state.bodyReads, beforeBodyReads + 1, 'PostgREST received HTTP 200 headers and began reading the unfinished body');
       mock.timers.tick(9999); await nextTurn(); assert.equal(settled, false); assert.equal(state.aborts, beforeAborts);
       mock.timers.tick(1); await nextTurn(); assert.equal(settled, true); assert.match(await pending, /Source unavailable/);
       assert.equal(state.aborts, beforeAborts + 1); assert.equal(diagnostics(beforeWarnings).category, 'timeout');
+      const trace = transport(beforeTrace, 'deadline', mode === 'body_stall' ? 'rpc_body_read' : 'rpc_fetch_invoked', mode === 'body_stall' ? '2xx' : 'not_observed');
+      settledSession(trace);
+      assert.equal(Object.hasOwn(trace.milestones, 'rpc_fetch_rejected'), false);
+      assert.equal(Object.hasOwn(trace.milestones, 'rpc_body_rejected'), false);
+      assert.equal(Object.hasOwn(trace.milestones, 'client_complete'), false);
+      const frozen = JSON.stringify(trace), warningCount = state.warnings.length;
+      if (mode === 'ignore_abort') state.finishIgnoredRpc();
+      await nextTurn();
+      assert.equal(JSON.stringify(trace), frozen, 'abort rejection or a late response cannot rewrite the deadline snapshot');
+      assert.equal(state.transportLogs.length, beforeTrace + 1); assert.equal(state.warnings.length, warningCount);
+      assert.equal(state.rpcCalls, beforeCalls + 1); assert.equal(state.authCalls, beforeAuth + 2);
+      frozenDeadlineChecks++;
+      if (mode === 'body_stall') {
+        const diagnostic = diagnostics(beforeWarnings);
+        assert.deepEqual([diagnostic.stage, diagnostic.reason, diagnostic.sqlCode, diagnostic.httpStatus],
+          ['rpc_read', 'read_deadline_exceeded', null, null], 'headers received is not the same as a completed PostgREST result');
+        assert.doesNotMatch(await pending, /<section |PRIVATE_/);
+      }
     } finally { mock.timers.reset(); }
   }
   state.mode = 'success';
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const beforeAborts = state.aborts, beforeWarnings = state.warnings.length;
+    const beforeAborts = state.aborts, beforeWarnings = state.warnings.length, beforeTrace = state.transportLogs.length,
+      beforeAuth = state.authCalls, beforeRpc = state.rpcCalls;
     assert.match(await invoke(links[0]), /Saved evidence/);
+    settledSession(transport(beforeTrace, 'completed', 'client_complete', '2xx'));
+    assert.equal(state.authCalls, beforeAuth + 2); assert.equal(state.rpcCalls, beforeRpc + 1);
     const successfulSignal = state.signals.at(-1);
     mock.timers.tick(10000); await nextTurn();
     assert.equal(successfulSignal.aborted, false);
     assert.equal(state.aborts, beforeAborts, 'a successful read clears its deadline instead of aborting later');
     assert.equal(state.warnings.length, beforeWarnings);
+    assert.equal(state.transportLogs.length, beforeTrace + 1);
   } finally { mock.timers.reset(); }
-  state.mode = 'success'; resetCookies({ absent: true }); const beforeUnauthenticated = state.rpcCalls;
+  state.mode = 'success'; resetCookies({ absent: true }); const beforeUnauthenticated = state.rpcCalls, beforeDeniedTrace = state.transportLogs.length;
   await assert.rejects(invoke(links[0]), /NEXT_REDIRECT:\/login/); assert.equal(state.rpcCalls, beforeUnauthenticated);
+  assert.equal(state.transportLogs.length, beforeDeniedTrace);
   resetCookies(); state.enabled = false; const beforeGate = state.authCalls;
   await assert.rejects(invoke(links[0]), /NEXT_NOT_FOUND/); assert.equal(state.authCalls, beforeGate);
+  assert.equal(state.transportLogs.length, beforeDeniedTrace);
   assert.equal(JSON.stringify(saved), beforeSaved); assert.equal(JSON.stringify(packet), beforePacket);
   assert.deepEqual(state.transportErrors, []); assert.equal(state.networkAttempts, 0);
   console.log(JSON.stringify({ passed: true, actualExchangeLinks: 3, actualPageAndSSRClient: true,
     cookieDerivedAuthorization: true, chunkedCookieAndReadOnlyRefresh: true, savedManifestSources: 6, citedSubset: 3,
-    rejectedRouteInvocations: 22, stalledInvocations: 2, categories, rawSavedBundleUnchanged: true,
+    rejectedRouteInvocations: 22, stalledInvocations: 4, preDispatchRefreshTimeouts: 1, headersReceivedBodyTimeouts: 1,
+    transportTraceChecks: traceChecks, frozenDeadlineChecks,
+    categories, rawSavedBundleUnchanged: true,
     sqlExecuted: false, browserLaunched: false, hostedRootCauseProved: false, externalCalls: 0, modelCalls: 0 }));
-})().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => { console.warn = originalWarn; });
+})().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => { console.warn = originalWarn; console.info = originalInfo; });

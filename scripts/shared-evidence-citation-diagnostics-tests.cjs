@@ -5,10 +5,24 @@ const { setImmediate: nextTurn } = require('node:timers/promises');
 require('./qbo-customer-test-support.cjs').installLoader({ 'server-only': {} });
 const { SharedCitationFailure, sharedCitationDiagnostic, sharedCitationRpcFailure } = require('../lib/ai/shared-evidence/citation-diagnostics.ts');
 const { reopenSharedCitation } = require('../lib/ai/shared-evidence/citation-reopen.ts');
+const { SharedCitationReadTrace } = require('../lib/supabase/citation-read-trace.ts');
 const target = { workspaceId: '00000000-0000-4000-8000-000000000001', kind: 'vsi_exchange', id: '00000000-0000-4000-8000-000000000002' };
 const marker = 'PRIVATE_SOURCE_TOKEN_SQL_AND_BODY_MUST_NEVER_LOG';
 const keys = ['category', 'elapsedMs', 'httpStatus', 'reason', 'sqlCode', 'stage'];
 let checks = 0;
+let traceChecks = 0;
+function inspectTrace(trace, outcome, phase) {
+  const snapshot = trace.finish(outcome);
+  assert.deepEqual(Object.keys(snapshot).sort(), ['elapsedMs', 'milestones', 'outcome', 'phase', 'refreshStatus', 'rpcStatus']);
+  assert.equal(snapshot.outcome, outcome); assert.equal(snapshot.phase, phase);
+  assert(Object.isFrozen(snapshot)); assert(Object.isFrozen(snapshot.milestones));
+  for (const value of [snapshot.elapsedMs, ...Object.values(snapshot.milestones)]) {
+    assert(Number.isSafeInteger(value) && value >= 0 && value <= 60000);
+  }
+  assert.doesNotMatch(JSON.stringify(snapshot), new RegExp(`${marker}|${target.id}|${target.workspaceId}|Bearer|https?:|authorization|body_value|session_value`));
+  traceChecks++;
+  return snapshot;
+}
 function inspect(error, stage, category, reason) {
   const diagnostic = sharedCitationDiagnostic(error);
   assert.deepEqual(Object.keys(diagnostic).sort(), keys);
@@ -111,5 +125,70 @@ const cases = [
       inspect(error, 'projection', 'projection_validation', reason); return true;
     });
   }
-  console.log(JSON.stringify({ passed: true, diagnosticBoundaries: checks, rawErrorRetained: false, acceptanceRelaxed: false, externalCalls: 0 }));
+  const origin='https://citation-fixture.invalid', endpoint=`${origin}/rest/v1/rpc/reopen_shared_evidence_target_v1`;
+  const options={method:'POST',headers:{authorization:marker},body:marker,signal:new AbortController().signal};
+  const trace=new SharedCitationReadTrace(); let fetches=0,reads=0;
+  const response=new Response(marker,{status:200,headers:{'private-header':marker}});
+  const originalText=response.text.bind(response); response.text=()=>{reads++;return originalText();};
+  const transport=trace.wrapFetch(async(input,init)=>{fetches++;assert.equal(input,endpoint);assert.equal(init,options);return response;},origin);
+  trace.begin();
+  const observed=await transport(endpoint,options);
+  assert.equal(fetches,1);assert.equal(reads,0,'observing response headers must not eagerly read the body');
+  assert.equal(observed.status,200);assert.equal(observed.bodyUsed,false);
+  assert.equal(await observed.text(),marker);assert.equal(observed.bodyUsed,true);assert.equal(reads,1);
+  trace.clientComplete();
+  const completed=inspectTrace(trace,'completed','client_complete');
+  assert.deepEqual(Object.keys(completed.milestones),['read_entry','rpc_fetch_invoked','rpc_headers_received','rpc_body_read','rpc_body_complete','client_complete']);
+  assert.equal(completed.rpcStatus,'2xx');assert.equal(completed.refreshStatus,'not_observed');
+  assert.equal(trace.finish('failed'),completed,'a late settlement cannot replace the final snapshot');
+
+  for(const disposition of ['resolve','reject']) {
+    const sessionTrace=new SharedCitationReadTrace();let settle,calls=0;
+    const pending=new Promise((resolve,reject)=>{settle=disposition==='resolve'?resolve:reject;});
+    const wrapped=sessionTrace.wrapSession(()=>{calls++;return pending;});
+    sessionTrace.begin();assert.equal(wrapped(),pending,'session observation returns the exact original promise');assert.equal(calls,1);
+    const stopped=inspectTrace(sessionTrace,'deadline','session_call_pending');
+    const untouched={get session_value(){throw new Error('session_result_must_not_be_inspected');}};
+    settle(untouched);await pending.catch(()=>{});await nextTurn();
+    assert.equal(sessionTrace.finish('failed'),stopped,'late session observers cannot rewrite a deadline');
+  }
+  for(const disposition of ['resolve','reject']) {
+    const sessionTrace=new SharedCitationReadTrace();const original=disposition==='resolve'?Promise.resolve({session_value:marker}):Promise.reject(new Error(marker));
+    sessionTrace.begin();const observed=sessionTrace.wrapSession(()=>original)();assert.equal(observed,original);
+    await observed.catch(error=>{assert.equal(error.message,marker);});await nextTurn();
+    inspectTrace(sessionTrace,disposition==='resolve'?'completed':'failed',disposition==='resolve'?'session_call_settled':'session_call_rejected');
+  }
+  // Operations invoked during guards stay unobserved even if they settle after begin().
+  const inactive=new SharedCitationReadTrace();let releaseGuard;
+  const guardPromise=new Promise(resolve=>{releaseGuard=resolve;});
+  assert.equal(inactive.wrapSession(()=>guardPromise)(),guardPromise);
+  const guardFetch=inactive.wrapFetch(()=>guardPromise,origin)(endpoint,options);
+  inactive.begin();releaseGuard(new Response(marker));await guardFetch;await nextTurn();
+  inspectTrace(inactive,'completed','read_entry');
+  for(const input of [`https://foreign.invalid/rest/v1/rpc/reopen_shared_evidence_target_v1`,`${origin}/rest/v1/private/${marker}`]) {
+    const unmatched=new SharedCitationReadTrace();unmatched.begin();const original=new Response(marker);
+    const result=await unmatched.wrapFetch(async(value,init)=>{assert.equal(value,input);assert.equal(init,options);return original;},origin)(input,options);
+    assert.equal(result,original);assert.equal(original.bodyUsed,false);inspectTrace(unmatched,'completed','read_entry');
+  }
+  for(const kind of ['rpc','refresh']) {
+    const destination=kind==='rpc'?endpoint:`${origin}/auth/v1/token?grant_type=refresh_token`;
+    const method=kind==='rpc'?'text':'json';const content=kind==='rpc'?marker:JSON.stringify({session_value:marker});
+    const good=new SharedCitationReadTrace();good.begin();
+    const observed=await good.wrapFetch(async()=>new Response(content,{status:200}),origin)(destination,options);
+    const result=await observed[method]();assert.deepEqual(result,kind==='rpc'?marker:{session_value:marker});
+    inspectTrace(good,'completed',`${kind}_body_complete`);
+    const failure=new Error(marker),failed=new SharedCitationReadTrace();failed.begin();
+    await assert.rejects(failed.wrapFetch(async()=>{throw failure;},origin)(destination,options),error=>error===failure);
+    inspectTrace(failed,'failed',`${kind}_fetch_rejected`);
+    const bodyFailed=new SharedCitationReadTrace();bodyFailed.begin();const broken=new Response(content,{status:403});
+    broken[method]=async()=>{throw failure;};
+    await assert.rejects((await bodyFailed.wrapFetch(async()=>broken,origin)(destination,options))[method](),error=>error===failure);
+    const snapshot=inspectTrace(bodyFailed,'failed',`${kind}_body_rejected`);assert.equal(snapshot[`${kind}Status`],'4xx');
+  }
+  // Independent requests cannot overwrite each other's milestones or final status.
+  const isolatedA=new SharedCitationReadTrace(),isolatedB=new SharedCitationReadTrace();isolatedA.begin();isolatedB.begin();
+  const late=isolatedA.wrapFetch(async()=>new Response(marker),origin)(endpoint,options);
+  const beforeLate=inspectTrace(isolatedA,'deadline','rpc_fetch_invoked');await late;
+  assert.equal(isolatedA.finish('failed'),beforeLate);inspectTrace(isolatedB,'completed','read_entry');
+  console.log(JSON.stringify({ passed: true, diagnosticBoundaries: checks, traceBoundaries:traceChecks, rawErrorRetained: false, acceptanceRelaxed: false, externalCalls: 0 }));
 })().catch(error => { console.error(error); process.exitCode = 1; });

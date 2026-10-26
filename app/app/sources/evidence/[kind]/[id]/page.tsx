@@ -3,17 +3,23 @@ import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access"
 import { sharedEvidenceRuntimeEnabled } from "@/lib/ai/shared-evidence/runtime-gate";
 import { reopenSharedCitation,sharedCitationTarget } from "@/lib/ai/shared-evidence/citation-reopen";
 import { sharedCitationDiagnostic } from "@/lib/ai/shared-evidence/citation-diagnostics";
+import { SharedCitationReadTrace } from "@/lib/supabase/citation-read-trace";
 
 export default async function SharedEvidencePage({params,searchParams}:{params:Promise<{kind:string;id:string}>;searchParams:Promise<{workspace?:string;revision?:string}>}) {
   if(!sharedEvidenceRuntimeEnabled()) notFound();
   const path=await params, query=await searchParams;
   const target=sharedCitationTarget.safeParse({workspaceId:query.workspace,kind:path.kind,id:path.id,revision:query.revision});
   if(!target.success) notFound();
-  const access=await requireWorkspaceAccess();
+  const trace=new SharedCitationReadTrace();
+  const access=await requireWorkspaceAccess(undefined,trace);
   if(access.workspaceId!==target.data.workspaceId||access.membership.role!=="owner"||access.membership.status!=="active") notFound();
   let sources:Awaited<ReturnType<typeof reopenSharedCitation>>;
-  try { sources=await reopenSharedCitation(access.supabase as unknown as Parameters<typeof reopenSharedCitation>[0],target.data); }
+  try {
+    sources=await reopenSharedCitation(access.supabase as unknown as Parameters<typeof reopenSharedCitation>[0],target.data,trace);
+    console.info("[shared-citation-transport]",trace.finish("completed"));
+  }
   catch (error) {
+    console.warn("[shared-citation-transport]",trace.finish("failed"));
     console.warn("[shared-citation]",sharedCitationDiagnostic(error));
     return <main className="space-y-4 p-6"><h1 className="text-xl font-semibold">Source unavailable</h1><p>The saved source could not be checked right now. It may have changed or become unavailable. No source details are shown.</p></main>;
   }
