@@ -125,7 +125,8 @@ assert.match(adminAccess, /supabase\.auth\.getUser\(\)/, "administrator identity
 assert.doesNotMatch(adminAccess, /user_metadata/, "administrator authorization must never trust user-editable metadata");
 
 const serverClient = read("lib/supabase/server.ts");
-assert.match(serverClient, /export async function createSupabaseServerClient\(\)/, "Supabase SSR clients must remain request-scoped");
+assert.match(serverClient, /export async function createSupabaseServerClient\(citationTrace\?: SharedCitationReadTrace\) \{/, "Supabase SSR clients must remain request-scoped with only the optional observation trace");
+assert.match(serverClient, /export async function createSupabaseServerClient[\s\S]+const cookieStore = await cookies\(\);[\s\S]+const client = createServerClient<Database>\(/, "each SSR request must acquire its own cookie store before creating its authenticated client");
 assert.doesNotMatch(serverClient, /^const\s+supabase\s*=\s*createServerClient/m, "authenticated Supabase clients must not be shared between requests");
 
 const supportActions = read("app/app/admin/support-requests/actions.ts");
