@@ -11,6 +11,7 @@
     "lint": "eslint . --max-warnings=59",
     "test:workspace-comparisons": "node scripts/workspace-comparison-tests.cjs && node scripts/vsi-save-analysis-tests.cjs && node scripts/vsi-saved-delete-tests.cjs",
     "typecheck": "tsc --noEmit",
+    "test:session-refresh": "node scripts/supabase-session-refresh-tests.cjs && node scripts/supabase-session-refresh-next-tests.cjs",
     "test:reporting-connectors": "node --test scripts/reporting-connectors-tests.cjs scripts/reporting-connectors-routes-tests.cjs scripts/reporting-connectors-db-tests.mjs",
     "test:reporting-connectors:browser": "node scripts/reporting-connectors-browser-tests.cjs",
     "test:reporting-connectors:oauth-browser": "node scripts/reporting-oauth-handoff-browser-tests.cjs",

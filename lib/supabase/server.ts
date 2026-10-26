@@ -26,7 +26,8 @@ export async function createSupabaseServerClient(citationTrace?: SharedCitationR
             cookieStore.set(name, value, options);
           });
         } catch {
-          // Server Components cannot set cookies. Middleware or Server Actions will refresh sessions.
+          // Workspace GET/HEAD middleware persists refreshes before rendering.
+          // Server Actions and Route Handlers have a writable cookie store.
         }
       }
     }
