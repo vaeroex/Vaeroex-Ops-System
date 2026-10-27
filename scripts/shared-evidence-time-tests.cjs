@@ -59,14 +59,15 @@ assert.doesNotMatch(allUnknown,/selected date labels differ|matching date labels
 // because its enclosing source also has period_start/period_end fields.
 const snapshotRaw={...xero,hash:'d'.repeat(64),data:{...xero.data,provider:'toggl',records:[{snapshot:{start:'2026-10-25T12:00:00Z',end:'2026-10-25T12:00:00Z',metrics:[{key:'projects',value:1}]}}]}};
 const snapshot=sharedRow(snapshotRaw,workspace);
-assert.equal(snapshot.factTimes,undefined);
+assert.deepEqual(expandFactTimes(snapshot.factTimes,1),[{date:'2026-10-25',basis:'snapshot_capture',valueTiming:'snapshot_at_capture',periodEnd:'2026-10-25',instant:'2026-10-25T12:00:00Z',endInstant:'2026-10-25T12:00:00Z',timeZone:'UTC'}]);
+assert.equal(snapshot.scope.windowKind,'retrieval_selection');
 const snapshotSource={...sources[1],binding:snapshot.hash,dependencies:[snapshot.hash],provider:snapshot.provider,facts:snapshot.facts,factTimes:snapshot.factTimes};
 const snapshotAnswer={...two,observations:[pick(0,2),{ref:snapshotSource.ref,binding:snapshot.hash,factIndex:0}]};
 const snapshotRendered=renderSharedAnswer(snapshotAnswer,{...context,sources:[sources[0],snapshotSource],scopes:new Map([['B1',rows[0].scope],['B2',snapshot.scope]])});
 assert.deepEqual(snapshotRendered.citationIds,['B1','B2']);
-assert.match(snapshotRendered.content,/Selected fact dates: not established\./);
-assert.match(snapshotRendered.content,/date-label comparison is incomplete/);
-assert.doesNotMatch(snapshotRendered.content,/selected date labels differ|matching date labels alone/);
+assert.match(snapshotRendered.content,/Selected fact dates: snapshot capture date 2026-10-25/);
+assert.match(snapshotRendered.content,/selected date labels differ/);
+assert.doesNotMatch(snapshotRendered.content,/date-label comparison is incomplete|matching date labels alone/);
 // Running records preserve zero completed-time contributions and a running
 // count; none of those facts may be classified as a completed entry.
 for(const provider of ['harvest','clockify']){
@@ -116,7 +117,7 @@ const residual={...answer,missing_information:[],next_checks:[{premises:observat
 assert.match(renderSharedAnswer(residual,context).content,/Recommended check \(model draft; not performed\)/);
 assert.match(renderSharedAnswer(residual,context).content,/for those dates/,'free proposed-check prose is still not semantic proof');
 (async()=>{
- const reader={rpc:async(name,args)=>({data:name==='discover_shared_evidence_v1'?{stage:'catalog_only',candidates:raw.map(r=>({provider:r.data.provider,identity:r.identity})),truncated:false}:{stage:'unadmitted',resolved:name==='preview_shared_legacy_evidence_v1'?xero:raw.find(r=>r.identity.source_id===args.p_identity.source_id)},error:null})};
+ const reader={rpc:async(name,args)=>({data:name==='discover_shared_evidence_v2'?{stage:'catalog_only',candidates:raw.map(r=>({provider:r.data.provider,identity:r.identity})),truncated:false,totalCandidates:raw.length,providerCounts:[...new Set(raw.map(r=>r.data.provider))].map(provider=>({provider,total:raw.filter(r=>r.data.provider===provider).length,returned:raw.filter(r=>r.data.provider===provider).length}))}:{stage:'unadmitted',resolved:name==='preview_shared_legacy_evidence_v1'?xero:raw.find(r=>r.identity.source_id===args.p_identity.source_id)},error:null})};
  const prepared=await prepareSharedGeneration(reader,workspace,'2026-09-26','2026-10-25');assertSharedPrepared(prepared);
  prepared.rows[0].factTimes[0].date='2026-10-14';assert.throws(()=>assertSharedPrepared(prepared),/preparation_changed/);negatives++;
  assert.equal(network,0);console.log(JSON.stringify({passed:true,selectedDateMismatch:true,equalDateNotComparability:true,incompleteDatesDoNotClaimComparison:true,runningEntriesNotClaimedComplete:true,unknownTimingPreserved:true,rawAndFactOrderPreserved:true,metadataSnapshotAndIntegrityBound:true,negativeCases:negatives,crossOriginalFalseLimitationRejected:true,residualFreeDraftStillRequiresReview:true,manualQualityReviewRequired:true,paidCalls:0}));

@@ -5,12 +5,12 @@ let events=[],denyValidation=false,gate=true,planBusiness=true,rootVersion=0,sea
 const workspace=id(1),actor=id(2),session=id(3),request=id(4),ticket=id(5),manifest=id(6);
 const sources=[
  {provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(10),authority_hash:'a'.repeat(64)},hash:'a'.repeat(64),data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(30),connection_id:id(31),date:'2026-10-01',time_zone:'UTC',metrics:[{metric:'Orders',value:'17',unit:'count'}],read_sources:[]}},
- {provider:'square',identity:{kind:'square_payment',connection_id:id(32),payment_id:'one',authority_hash:'b'.repeat(64)},hash:'b'.repeat(64),data:{provider:'square',workspace_id:workspace,entity_id:id(30),connection_id:id(32),created_at:'2026-10-01T12:00:00Z',amount_minor:'1200',currency:'USD',time_zone:'UTC',coverage:'unknown'}}
+ {provider:'square',identity:{kind:'square_payment',connection_id:id(32),payment_id:'one',authority_hash:'b'.repeat(64)},hash:'b'.repeat(64),data:{provider:'square',workspace_id:workspace,entity_id:id(30),connection_id:id(32),created_at:'2026-10-01T12:00:00Z',status:'COMPLETED',amount_minor:'1200',currency:'USD',time_zone:'UTC',coverage:'unknown'}}
 ];
 const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
  events.push(name);
- if(name==='discover_shared_evidence_v1')discovered.push({start:args.p_start,end:args.p_end});
- if(name==='discover_shared_evidence_v1')return {data:{stage:'catalog_only',candidates:(emptyCatalog?[]:sources).map(s=>({provider:s.provider,identity:s.identity})),truncated:false},error:null};
+ if(name==='discover_shared_evidence_v2')discovered.push({start:args.p_start,end:args.p_end});
+ if(name==='discover_shared_evidence_v2')return {data:require('./shared-discovery-test-support.cjs').completeCatalog((emptyCatalog?[]:sources).map(s=>({provider:s.provider,identity:s.identity}))),error:null};
  if(name==='read_shared_typed_evidence_v1')return {data:{stage:'unadmitted',resolved:sources.find(s=>s.identity.kind===args.p_identity.kind)},error:null};
  if(name==='shared_evidence_dependencies_v1')return {data:{manifestIds:[],readSources:[]},error:null};
  if(name==='seal_shared_evidence_manifest_v1'){sealedVersion=rootVersion;assert.equal(args.p_target_id,request);assert.equal(args.p_attempt,2);return{data:{stage:'database_bound',manifest_id:manifest,provider_policy_required:true},error:null};}
@@ -44,7 +44,7 @@ global.fetch=async(url,init)=>{
 };
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question:'Review our business sources',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:2}};
 (async()=>{
- let result=await runVsiAnswer(input);assert.equal(result.sharedManifestId,manifest);assert.equal(result.usage.providerCalls,2);
+ let result=await runVsiAnswer(input);assert.match(result.content,/Stored-source selection: Stored-source discovery used 30 UTC calendar days/);assert.match(result.content,/Other requested ranges are not searched as stated/);assert.equal(result.sharedManifestId,manifest);assert.equal(result.usage.providerCalls,2);
  const scoped=JSON.parse(payload.businessSources[0].text);assert.equal(scoped.scope.entityId,id(30));assert.equal(scoped.scope.additive,false);assert.equal(payload.businessSources.length,2);
  assert.match(result.citations[0].url,/\/vsi_exchange\//);assert.equal(events.filter(e=>e==='provider').length,2);
  const {VSI_SUGGESTED_PROMPTS}=require('../lib/vsi/suggested-prompts.ts');
@@ -54,6 +54,8 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  assert.deepEqual(discovered.at(-1),vsiEvidenceWindow(comparison));
  assert.equal((Date.parse(discovered.at(-1).end)-Date.parse(discovered.at(-1).start))/86400000,59);
  assert(payload.evidenceLimitations.some(l=>l.includes(discovered.at(-1).start)));
+ const comparisonAnswer=await runVsiAnswer({...input,question:comparison});assert.match(comparisonAnswer.content,/discovery used 60 UTC calendar days/);
+ for(const question of ['Review our sources over the last 90 days','Review all time business evidence']) {const bounded=await runVsiAnswer({...input,question});assert.match(bounded.content,/discovery used 30 UTC calendar days/);assert.match(bounded.content,/Other requested ranges are not searched as stated/);}
  events=[];denyValidation=true;await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.inputTokens===0);assert.equal(events.includes('provider'),false);
  denyValidation=false;events=[];planBusiness=false;result=await runVsiAnswer({...input,question:'Explain arithmetic'});assert.equal(result.sharedManifestId,manifest);assert.equal(payload.businessSources.length,0);
  emptyCatalog=true;denyValidation=false;events=[];planBusiness=false;

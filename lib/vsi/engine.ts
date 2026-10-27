@@ -21,7 +21,7 @@ import { VSI_PLANNER_PROMPT, VSI_PLAN_JSON_SCHEMA, VSI_PUBLIC_RESEARCH_JSON_SCHE
 import type { VsiPublicResearchResult, VsiResearchTier } from "./research";
 import { explicitStoredVsiQuestion } from "./context-selection";
 import type { VsiAnswer, VsiCitation, VsiEvidenceResult, VsiMessage, VsiRunInput, VsiUsage } from "./types";
-import { vsiEvidenceWindow } from "./evidence-window";
+import { vsiEvidenceWindowSelection } from "./evidence-window";
 import { packVsiAnswerContext, serializeVsiAnswerContext, serializeVsiProviderRequest, VsiAnswerContextLimit } from "./answer-context";
 import { vsiValidationDiagnostic, type VsiValidationStage } from "./validation-diagnostics";
 
@@ -213,11 +213,14 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   let product:Awaited<ReturnType<typeof loadVsiProductContext>>|undefined;
   let sharedManifestId:string|undefined;
   let sharedPrepared:SharedPrepared|undefined;
+  let sharedWindowLimitation: string | undefined;
   if(sharedEvidenceRuntimeEnabled()) {
     try {
       if(!input.reservedRequest) throw new Error("shared_request_binding_missing");
-      const { start, end } = vsiEvidenceWindow(input.question);
-      sharedPrepared=await prepareSharedGeneration(input.supabase,input.workspaceId,start,end);
+      const window = vsiEvidenceWindowSelection(input.question);
+      const { start, end } = window;
+      sharedWindowLimitation = window.limitation;
+      sharedPrepared=await prepareSharedGeneration(input.supabase,input.workspaceId,start,end,input.question);
       // Product context binds connection roots; finalize those before sealing.
       product=await loadVsiProductContext(access,input.readTicket);
       sharedManifestId=await sealSharedGeneration(input.supabase,sharedPrepared,{kind:"vsi_request",...input.reservedRequest,ticketId:input.readTicket.ticketId});
@@ -293,7 +296,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     id: row.hash, title: row.provider.replace(/[_-]/g, " "), url: sharedTargetHref(input.workspaceId,"vsi_exchange",input.reservedRequest!.id,row.hash),
     sourceType: `shared_${row.provider}`, sourceId: row.hash, evidenceDate: null, retrievedAt: new Date().toISOString(),
     text: JSON.stringify({ scope: row.scope, observations: row.facts, ...(row.factTimes ? {factTimes:row.factTimes} : {}) }), treatment: row.reported ? "reported_context" : "record"
-  })), limitations: [...sharedPrepared.limitations, `The selected stored-source window is ${sharedPrepared.start} through ${sharedPrepared.end}; other periods were not searched.`] } : undefined;
+  })), limitations: [...sharedPrepared.limitations, sharedWindowLimitation ?? `The selected stored-source window is ${sharedPrepared.start} through ${sharedPrepared.end}; other periods were not searched.`] } : undefined;
   const makePayload = (evidence: VsiEvidenceResult, lookup: ReturnType<typeof boundedVsiPublicEvidence>["lookup"] | null, status: { tier: VsiResearchTier | null; rounds: number; partial: boolean; toolAllowanceExceeded: boolean; limitations: string[] }, datedPricingOnly: boolean, lookupPerformed: boolean) => {
     const history = prepareVsiHistory(selectedMessages, [...evidence.sources, ...product!.sources], input.question);
     return { question: input.question, now: new Date().toISOString(), privateConversationSummary: readVsiPrivateSummary(input.contextSummary),
@@ -518,5 +521,12 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const answer = validateAt("citation_resolution", () => validateVsiAnswer(composed, [...selectedBusiness, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]));
   validateAt("public_source_coverage", () => { if (webSources.length && !answer.citations.some(source => source.sourceType === "web")) throw new Error("The live answer omitted its source."); });
   const partialBusinessReview = packedContext.metrics.omittedSourceGroups > 0 || (sharedAnswer && selectedBusiness.some(source => !answer.citations.some(citation => citation.id === source.id)));
-  return finish({ ...answer, ...(partialBusinessReview ? {content: `Coverage: This is a partial review of selected stored evidence.\n\n${answer.content}`} : sharedPrepared && !sharedAnswer ? {content:`No stored business observations were used for this general response.\n\n${answer.content}`} : {}), ...(publicResearchTopics ? { publicResearchTopics } : {}) });
+  // Discovery/omission claims are application-owned so an unsupported requested
+  // history range cannot be silently presented as having been searched.
+  const preparationCoverage = sharedAnswer && sharedPrepared ? sharedPrepared.limitations.slice(1) : [];
+  const disclosure = [partialBusinessReview ? "Coverage: This is a partial review of selected stored evidence." : "",
+    sharedAnswer && sharedWindowLimitation ? `Stored-source selection: ${sharedWindowLimitation}` : "",
+    ...preparationCoverage,
+    sharedPrepared && !sharedAnswer ? "No stored business observations were used for this general response." : ""].filter(Boolean).join("\n\n");
+  return finish({ ...answer, ...(disclosure ? {content:`${disclosure}\n\n${answer.content}`} : {}), ...(publicResearchTopics ? { publicResearchTopics } : {}) });
 }

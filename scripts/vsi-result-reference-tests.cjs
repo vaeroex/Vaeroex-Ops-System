@@ -31,7 +31,7 @@ const reader = { auth: {
   getClaims: async () => ({ data: { claims: { sub: actor, session_id: session } }, error: null })
 }, rpc: async (name, args) => {
   assert.equal(args.p_workspace_id, workspace);
-  if (name === 'discover_shared_evidence_v1') return { data: { stage: 'catalog_only', candidates: raw.map(row => ({ provider: row.data.provider, identity: row.identity })), truncated: false }, error: null };
+  if (name === 'discover_shared_evidence_v2') return { data: require('./shared-discovery-test-support.cjs').completeCatalog(raw.map(row => ({ provider: row.data.provider, identity: row.identity }))), error: null };
   if (name === 'preview_shared_legacy_evidence_v1' || name === 'read_shared_typed_evidence_v1') {
     const source = structuredClone(name === 'preview_shared_legacy_evidence_v1' ? xero : raw.find(row => row.identity.source_id === args.p_identity.source_id));
     if (foreign) source.data.workspace_id = id(999);

@@ -6,11 +6,12 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { bindGoogleSheetsRead } from "@/lib/integrations/google-sheets/read-authority";
 import { evidenceEngineHash } from "@/lib/ai/evidence-engine/hash";
 import { QboPreviewSchema } from "@/lib/integrations/qbo-customer/contracts";
-import { decimalSchema, daySchema, pluginProviders } from "./contracts";
+import { decimalSchema, daySchema, instantSchema, pluginProviders } from "./contracts";
 import { sharedFinancialBoundaries, type SharedRelationship } from "./financial-boundaries";
 import { validateSharedMemoryProjection } from "./memory-eligibility";
 import { reportingMetricSemantics } from "./adapters";
 import { groupFactTimes, type FactTime, type FactTimeGroup } from "./fact-time";
+import { decodeSharedDiscoveryCatalog, prioritizeSharedCandidates, prioritizeSharedRows, requestedSharedProviders } from "./generation-selection";
 
 export type SharedClient = { rpc(name:string,args:Record<string,unknown>):PromiseLike<{data:unknown;error:unknown}> };
 export async function sharedRpc(reader:SharedClient,name:string,args:Record<string,unknown>) {
@@ -20,7 +21,8 @@ const identity=z.record(z.unknown()),hash=z.string().regex(/^[a-f0-9]{64}$/);
 const resolved=z.object({identity,hash,data:z.record(z.unknown())});
 const root=z.object({table:z.string().regex(/^[a-z][a-z0-9_]*$/),id:z.string().uuid()});
 export type SharedRow={identity:Record<string,unknown>;hash:string;provider:string;facts:string[];factTimes?:FactTimeGroup[];salesInvoiceFactGroups?:number[][];scope:Record<string,unknown>;reported:boolean;data:Record<string,unknown>;roots:z.infer<typeof root>[]};
-export type SharedPrepared={workspaceId:string;start:string;end:string;rows:SharedRow[];fingerprint:string;limitations:string[];relationships:SharedRelationship[]};
+export type SharedProviderCoverage={provider:string;catalog:number;discovered:number;prepared:number;empty:number;unsupported:number;factBudgetOmitted:number;rowBudgetOmitted:number};
+export type SharedPrepared={workspaceId:string;start:string;end:string;rows:SharedRow[];fingerprint:string;limitations:string[];relationships:SharedRelationship[];coverage:{providers:SharedProviderCoverage[];requestedProviders:string[];maxCandidates:96;maxRows:24;maxFactChars:12000}};
 const issued=new WeakMap<SharedPrepared,string>();
 const num=(v:unknown)=>decimalSchema.parse(v);
 const label=(v:unknown)=>z.string().min(1).max(160).parse(v).replace(/[_-]/g," ");
@@ -37,35 +39,93 @@ function xeroContribution(metrics: readonly {key:string;value:string;currency?:s
  }
  return 'record contribution';
 }
+/** An authorized protected projection can legitimately have no usable facts. This typed
+ * outcome is never used for malformed fields, failed authority or stale binding. */
+export class SharedProjectionUnavailableError extends Error {
+ constructor(readonly provider: string, readonly reason: 'empty' | 'unsupported') {
+  super(`shared_projection_${reason}`); this.name='SharedProjectionUnavailableError';
+ }
+}
+const currencySchema=z.string().regex(/^[A-Z]{3}$/);
+const sourceStatus=z.string().min(1).max(40).refine(value=>!/[\u0000-\u001f\u007f]/.test(value));
+function retainedCaptureTimes(data:Record<string,unknown>,provider:string):Partial<FactTime> {
+ const timestamp=(key:string)=>data[key]===null?null:instantSchema.parse(data[key]);
+ if(provider==='quickbooks_online')return {
+  ...(Object.hasOwn(data,'observed_at')?{recordObservedAt:timestamp('observed_at')}:{}),
+  ...(Object.hasOwn(data,'synchronized_at')?{recordSynchronizedAt:timestamp('synchronized_at')}:{})
+ };
+ // SQL08/12 aliases connection.last_sync_at as observed_at. It is connection
+ // import metadata, not a row's business event or measurement timestamp.
+ if(provider==='google_sheets')return Object.hasOwn(data,'observed_at')?{connectionLastSyncAt:timestamp('observed_at')}:{};
+ return {};
+}
+function eventTime(value:unknown,basis:'payment_instant'|'receipt_instant'|'order_instant',valueTiming:'payment_record'|'receipt_record'|'order_record',zone:unknown='UTC'):FactTime {
+ const instant=instantSchema.parse(value),timeZone=z.string().min(1).max(80).parse(zone);
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(instant));
+ const date=daySchema.parse(['year','month','day'].map(type=>parts.find(part=>part.type===type)!.value).join('-'));
+ return {date,basis,valueTiming,instant,timeZone};
+}
 /** Exact stored observations only. Never sum invoice/order/payment/accounting totals,
  * infer a currency exponent, infer entity correspondence, or parse raw file text. */
 export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
  const r=resolved.parse(raw),d=r.data;if(d.workspace_id!==workspaceId) throw new Error("shared_workspace_mismatch");
  const provider=z.enum([...pluginProviders,"file","business_note"]).parse(d.provider);
- let facts:string[]=[];const factTimes:FactTime[]=[];const salesInvoiceFactGroups:number[][]=[];const reported=provider==='file'||provider==='business_note';
+ // Validate even empty sources before returning a nonfatal projection outcome.
+ const roots=z.array(root).parse(d.read_sources??[]),captureTimes=retainedCaptureTimes(d,provider);
+ for(const key of ['period_start','period_end','date','posting_date'])if(d[key]!==undefined&&d[key]!==null)daySchema.parse(d[key]);
+ if(typeof d.period_start==='string'&&typeof d.period_end==='string'&&d.period_start>d.period_end)throw new Error('shared_period_invalid');
+ if(d.time_zone!==undefined&&d.time_zone!==null)new Intl.DateTimeFormat('en',{timeZone:z.string().parse(d.time_zone)});
+ if(d.scope!==undefined)label(d.scope);
+ if(provider==='loyverse'&&d.currency!==undefined&&d.currency!==null)currencySchema.parse(d.currency);
+ let facts:string[]=[];let unavailableReason:'empty'|'unsupported'='empty';const factTimes:FactTime[]=[];const salesInvoiceFactGroups:number[][]=[];const reported=provider==='file'||provider==='business_note';
  if(reported) facts=[`${provider==='file'?'The reviewed file reports':'The business reports'}: ${validateSharedMemoryProjection(d,workspaceId).text}. This reported context is not independently measured and does not establish causation.`];
- else if(provider==='google_sheets') facts=z.array(z.object({metric:z.string(),value:decimalSchema,unit:z.string()})).max(100).parse(d.metrics)
-  .map(m=>{const date=daySchema.parse(d.date);factTimes.push({date,basis:'sheet_row_date',valueTiming:'row_value'});
-   return `Google Sheets ${label(m.metric)}: ${m.value} ${label(m.unit)}, supplied row date ${date}.`;});
- else if(provider==='square') facts=[`Square completed payment: ${num(d.amount_minor)} ${z.string().regex(/^[A-Z]{3}$/).parse(d.currency)} minor units, recorded ${z.string().parse(d.created_at)}. This is a payment record, not posted accounting revenue.`];
- else if(provider==='quickbooks_online') {
-  const q=QboPreviewSchema.parse(d.preview);
-  if(q.kind==='record') facts=Object.entries(q.amounts).map(([k,m])=>`QuickBooks ${label(d.record_type)} ${k}: ${num(m!.amount)} ${m!.currency}, posting date ${daySchema.parse(d.posting_date)}, ${label(d.basis)} basis.`);
-  else {
-   if(q.truncated||q.columns.length!==2||!/^(account|distribution account)$/i.test(q.columns[0].title||'')||!/^(total|amount|[A-Z]{3})$/i.test(q.columns[1].title||'')) throw new Error('shared_qbo_columns_unqualified');
+ else if(provider==='google_sheets') {daySchema.parse(d.date);facts=z.array(z.object({metric:z.string(),value:decimalSchema,unit:z.string()})).max(100).parse(d.metrics)
+  .map(m=>{const date=daySchema.parse(d.date);factTimes.push({date,basis:'sheet_row_date',valueTiming:'row_value',...captureTimes});
+   return `Google Sheets ${label(m.metric)}: ${m.value} ${label(m.unit)}, supplied row date ${date}.`;});}
+ else if(provider==='square') {
+  if(d.status!=='COMPLETED') throw new Error('shared_square_status_invalid');
+  const time=eventTime(d.created_at,'payment_instant','payment_record',d.time_zone);factTimes.push(time);
+  const amount=num(d.amount_minor);if(!/^-?\d+$/.test(amount)||Number(amount)<0)throw new Error('shared_square_minor_units_invalid');
+  facts=[`Square completed payment: ${amount} ${currencySchema.parse(d.currency)} minor units, recorded ${time.instant}. This is a payment record, not posted accounting revenue.`];
+ } else if(provider==='quickbooks_online') {
+  const q=QboPreviewSchema.parse(d.preview),currency=currencySchema.parse(d.currency);unavailableReason='unsupported';
+  if(q.kind==='record') {
+   if(['voided','deleted','inactive'].includes(q.status)||q.accounting.sourceCurrency!==currency||q.accounting.basis!==d.basis||q.temporal.postingDate!==d.posting_date)
+    throw new Error('shared_qbo_scope_invalid');
+   const date=d.posting_date===null?null:daySchema.parse(d.posting_date);
+   facts=Object.entries(q.amounts).map(([k,m])=>{
+    if(m!.currency!==currency)throw new Error('shared_qbo_currency_invalid');
+    factTimes.push({date,basis:'posting_date',valueTiming:k==='balance'?'balance_at_import':'document_contribution',...captureTimes});
+    return `QuickBooks ${label(d.record_type)} ${k}: ${num(m!.amount)} ${currency}, posting date ${date??'unknown'}, ${label(d.basis)} basis.${k==='balance'?' Balance at import; exact as-of time is not established by the posting date.':''}`;
+   });
+  } else {
+   const start=daySchema.parse(q.periodStart),end=daySchema.parse(q.periodEnd);
+   if(start>end||q.sourceCurrency!==currency||q.reportBasis!==d.basis||start!==d.period_start||end!==d.period_end
+    ||new Set(q.columns.map(column=>column.columnKey)).size!==q.columns.length
+    ||q.rows.some(row=>new Set(row.cells.map(cell=>cell.columnKey)).size!==row.cells.length))throw new Error('shared_qbo_scope_invalid');
+   if(q.truncated)throw new Error('shared_qbo_truncated');
+   if(q.columns.length!==2||!/^(account|distribution account)$/i.test(q.columns[0].title||'')||!/^(total|amount|[A-Z]{3})$/i.test(q.columns[1].title||'')) throw new SharedProjectionUnavailableError(provider,'unsupported');
    facts=q.rows.filter(row=>row.rowType==='summary').map(row=>{
     const name=row.cells.find(c=>c.columnKey===q.columns[0].columnKey)?.value;
     const amount=row.cells.find(c=>c.columnKey===q.columns[1].columnKey)?.value;
+    factTimes.push({date:start,periodEnd:end,basis:'report_period',valueTiming:'stored_report_value',...captureTimes});
     return `QuickBooks ${label(q.reportType)} stored summary ${label(name)}: ${num(amount)} ${q.sourceCurrency}, ${q.periodStart} through ${q.periodEnd}, ${q.reportBasis} basis. Summary rows may overlap and must not be added.`;
    });
   }
  } else {
-  const records=z.array(z.record(z.unknown())).max(2000).parse(d.records);
+  const records=z.array(z.record(z.unknown())).max(2000).parse(d.records);if(records.length)unavailableReason='unsupported';
   for(const record of records) {
    const snapshot=record.snapshot?object(record.snapshot):null;
    if(record.metrics||snapshot) {
     const metrics=z.array(z.object({key:z.string(),value:decimalSchema,currency:z.string().optional()})).parse(snapshot?.metrics??record.metrics);
     const contribution=provider==='xero'&&!snapshot?xeroContribution(metrics):null;
+    let snapshotTime:FactTime|null=null;
+    if(snapshot){
+     const instant=instantSchema.parse(snapshot.start),endInstant=instantSchema.parse(snapshot.end);
+     if(Date.parse(instant)>Date.parse(endInstant))throw new Error('shared_snapshot_time_invalid');
+     snapshotTime={date:daySchema.parse(new Date(instant).toISOString().slice(0,10)),periodEnd:daySchema.parse(new Date(endInstant).toISOString().slice(0,10)),
+      basis:'snapshot_capture',valueTiming:'snapshot_at_capture',instant,endInstant,timeZone:'UTC'};
+    }
     const invoiceGroup:number[]=[];
     for(const metric of metrics) {
      if(contribution==='sales-invoice contribution'&&['invoices','billed','outstanding'].includes(metric.key)) invoiceGroup.push(facts.length);
@@ -75,60 +135,95 @@ export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
      const date=snapshot?null:daySchema.parse(record.day);
      if(date) factTimes.push({date,basis:provider==='xero'?'invoice_or_bill_date':provider==='clockify'?'entry_start_utc_date':'spent_date',
       valueTiming:provider==='xero'?metric.key==='outstanding'?'balance_at_import':'document_contribution':'entry_contribution'});
+     else if(snapshotTime) factTimes.push(provider==='toggl'&&metric.key==='hours'
+      ?{date:null,basis:'lifetime_project_snapshot',valueTiming:'lifetime_through_capture',instant:snapshotTime.instant!,endInstant:snapshotTime.endInstant!,timeZone:'UTC'}:snapshotTime);
      const dateLabel=snapshot?`snapshot ${snapshot.start} through ${snapshot.end}`:provider==='xero'?`invoice/bill date ${date}`:provider==='clockify'?`entry start date (UTC) ${date}`:`entry spent date ${date}`;
      if(contribution) {
-      // Provider and scope remain in the source context and renderer attribution.
-      // Avoid repeating them in every contribution without dropping any facts.
       const dated=contribution==='record contribution'?`${contribution}; invoice/bill date ${date}`:`${contribution} dated ${date}`;
       const timing=metric.key==='outstanding'?'; balance at import; as-of unknown':'';
       facts.push(`${label(metric.key)}: ${metric.value} ${unit}${partition}; ${dated}${timing}.`);
-     } else facts.push(`${label(provider)} ${label(metric.key)}: ${metric.value} ${unit}${partition}; ${dateLabel}. Scope: ${label(d.scope)}.`);
+     } else facts.push(`${label(provider)} ${label(metric.key)}: ${metric.value} ${unit}${partition}; ${dateLabel}. Scope: ${label(d.scope)}.${provider==='toggl'&&metric.key==='hours'?' Lifetime visible-active-project total; beginning unknown, not hours worked during the snapshot capture interval.':''}`);
     }
     if(invoiceGroup.length) salesInvoiceFactGroups.push(invoiceGroup);
-   } else if(provider==='wix-orders') facts.push(`Wix order amount: ${num(record.total_amount)} ${z.string().regex(/^[A-Z]{3}$/).parse(record.currency_code)}, created ${z.string().parse(record.created_at)}; order value is not a settlement or accounting revenue.`);
-   else if(provider==='zoho-books') {
-    if(record.counted!==true||record.currency!=='USD') continue;
-    facts.push(`Zoho Books stored ${label(z.array(z.unknown()).parse(record.key)[2])}: ${num(record.total)} USD, recorded ${daySchema.parse(record.day)}. This record does not establish cash received or profit.`);
+   } else if(provider==='wix-orders') {
+    const time=eventTime(record.created_at,'order_instant','order_record'),amount=num(record.total_amount),status=sourceStatus.parse(record.payment_status);
+    if(Number(amount)<0)throw new Error('shared_wix_amount_invalid');factTimes.push(time);
+    facts.push(`Wix approved order amount: ${amount} ${currencySchema.parse(record.currency_code)}, created ${time.instant}; stored payment status ${JSON.stringify(status)}. Order value and status are not a settlement or accounting revenue.`);
+   } else if(provider==='zoho-books') {
+    const counted=z.boolean().parse(record.counted),currency=currencySchema.parse(record.currency),key=z.array(z.unknown()).min(4).parse(record.key);
+    const kind=z.enum(['invoice','expense']).parse(key[2]),date=daySchema.parse(record.day),total=num(record.total),outstanding=num(record.outstanding);
+    if(Number(total)<0||Number(outstanding)<0||kind==='expense'&&Number(outstanding)!==0)throw new Error('shared_zoho_amount_invalid');
+    if(!counted||currency!=='USD')continue;
+    facts.push(`Zoho Books stored ${kind}: ${total} USD, document date ${date}. This record does not establish cash received or profit.`);
+    factTimes.push({date,basis:'invoice_or_expense_date',valueTiming:'document_contribution'});
+    if(kind==='invoice'){
+     facts.push(`Zoho Books invoice outstanding: ${outstanding} USD; document date ${date}; balance at import, exact as-of time unknown. This is not a historical balance on the document date.`);
+     factTimes.push({date,basis:'invoice_or_expense_date',valueTiming:'balance_at_import'});
+    }
    } else if(provider==='loyverse') {
-    // This reader has no verified merchant currency. Never expose its money as a usable total.
-    facts.push(`Loyverse receipt recorded ${z.string().parse(record.created_at)}; ${record.cancelled===true?'cancelled':'not marked cancelled'}. Monetary comparison is unavailable because currency is not established by this projection.`);
+    const time=eventTime(record.receipt_date,'receipt_instant','receipt_record'),created=instantSchema.parse(record.created_at),updated=instantSchema.parse(record.updated_at);
+    const type=z.enum(['SALE','REFUND']).parse(record.receipt_type),cancelled=z.boolean().parse(record.cancelled);
+    const total=num(record.total_money),tax=num(record.total_tax),discount=num(record.total_discount);
+    const currency=d.currency===null||d.currency===undefined?null:currencySchema.parse(d.currency);
+    factTimes.push(time);
+    facts.push(`Loyverse ${type} receipt dated ${time.instant}; created ${created}; updated ${updated}; ${cancelled?'cancelled, excluded from active sale/refund comparisons':'not marked cancelled'}. Creation time selects this import, not the possibly backdated receipt date.${currency?` Stored total ${total} ${currency}; tax ${tax} ${currency}; discount ${discount} ${currency}. Stored signs are preserved; tax and discount are separate components, not amounts to add to or subtract from the total. A refund remains separate from a sale; this is not accounting revenue.`:' Monetary comparison is unavailable because protected merchant currency is not established.'}`);
    } else throw new Error('shared_projection_unsupported');
   }
  }
- if(!facts.length||facts.some(f=>f.length>8000)) throw new Error('shared_projection_empty_or_large');
- let eventDay:string|null=null;
- if(provider==='square'&&typeof d.created_at==='string'&&typeof d.time_zone==='string') {
-  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:d.time_zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(d.created_at));
-  eventDay=daySchema.parse(['year','month','day'].map(type=>parts.find(part=>part.type===type)!.value).join('-'));
- }
+ if(facts.some(f=>f.length>8000)) throw new Error('shared_projection_large');
+ if(!facts.length)throw new SharedProjectionUnavailableError(provider,unavailableReason);
+ const eventDay=provider==='square'?factTimes[0]?.date:null;
  const scope={entityId:d.entity_id??d.business_entity_id??null,connectionId:d.connection_id??null,
   entityBinding:d.entity_id||d.business_entity_id?'protected':'unavailable',scope:d.scope??'stored_record_only',
   start:d.period_start??d.posting_date??d.date??eventDay??null,end:d.period_end??d.posting_date??d.date??eventDay??null,timeZone:d.time_zone??null,
   currency:d.currency??null,coverage:typeof d.coverage==='string'?d.coverage:'unknown',additive:false,
-  ...(['xero','harvest','clockify','loyverse','zoho-books','wix-orders'].includes(provider)?{windowKind:'retrieval_selection'}:{})};
+  ...(['xero','harvest','clockify','loyverse','zoho-books','wix-orders','toggl','zoho-inventory','katana'].includes(provider)?{windowKind:'retrieval_selection'}:{})};
  if(factTimes.length&&factTimes.length!==facts.length) throw new Error('shared_fact_time_alignment');
- return {...r,provider,facts,...(factTimes.length?{factTimes:groupFactTimes(factTimes)}:{}),...(provider==='xero'?{salesInvoiceFactGroups}:{}),scope,reported,roots:z.array(root).parse(d.read_sources??[])};
+ return {...r,provider,facts,...(factTimes.length?{factTimes:groupFactTimes(factTimes)}:{}),...(provider==='xero'?{salesInvoiceFactGroups}:{}),scope,reported,roots};
 }
+
 const fingerprint=(rows:SharedRow[])=>evidenceEngineHash({contract:"shared_generation_v2",rows:rows.map(r=>({identity:r.identity,hash:r.hash,facts:r.facts,...(r.factTimes?{factTimes:r.factTimes}:{}),...(r.salesInvoiceFactGroups?{salesInvoiceFactGroups:r.salesInvoiceFactGroups}:{}),scope:r.scope})),relationships:sharedFinancialBoundaries(rows)});
-export async function prepareSharedGeneration(reader:SupabaseClient<Database>,workspaceId:string,start:string,end:string):Promise<SharedPrepared> {
+export async function prepareSharedGeneration(reader:SupabaseClient<Database>,workspaceId:string,start:string,end:string,question=''):Promise<SharedPrepared> {
  daySchema.parse(start);daySchema.parse(end);z.string().uuid().parse(workspaceId);
- const rpc=reader as unknown as SharedClient;
- const catalog=z.object({stage:z.literal('catalog_only'),candidates:z.array(z.object({provider:z.string(),identity})).max(97),truncated:z.boolean()}).parse(await sharedRpc(rpc,'discover_shared_evidence_v1',{p_workspace_id:workspaceId,p_start:start,p_end:end}));
- const rows:SharedRow[]=[];let omitted=catalog.truncated;let chars=0;
- for(const candidate of catalog.candidates.slice(0,96)) {
-  if(rows.length===24) {omitted=true;break;}
+ const rpc=reader as unknown as SharedClient,requestedProviders=requestedSharedProviders(question);
+ // v2 is an explicit SQL dependency: never silently fall back to discovery that
+ // truncated requested providers before relevance was considered.
+ const catalog=decodeSharedDiscoveryCatalog(await sharedRpc(rpc,'discover_shared_evidence_v2',{
+  p_workspace_id:workspaceId,p_start:start,p_end:end,p_preferred_providers:requestedProviders}));
+ const providers:SharedProviderCoverage[]=catalog.providerCounts.map(count=>({provider:count.provider,catalog:count.total,discovered:count.returned,
+  prepared:0,empty:0,unsupported:0,factBudgetOmitted:0,rowBudgetOmitted:0}));
+ const coverageFor=(provider:string)=>providers.find(row=>row.provider===provider)!;
+ const available:SharedRow[]=[];
+ for(const candidate of prioritizeSharedCandidates(catalog.candidates,requestedProviders)) {
   const i=candidate.identity;
   const raw=await sharedRpc(rpc,i.kind==='legacy_binding'?'preview_shared_legacy_evidence_v1':'read_shared_typed_evidence_v1',i.kind==='legacy_binding'
    ?{p_workspace_id:workspaceId,p_binding_id:i.binding_id,p_start:i.start,p_end:i.end}:{p_workspace_id:workspaceId,p_identity:i});
   const preview=z.object({stage:z.literal('unadmitted'),resolved}).parse(raw);
-  // Any unknown, stale or unauthorized input stops the candidate before provider use.
-  const row=sharedRow(preview.resolved,workspaceId);if(row.provider!==candidate.provider) throw new Error('shared_provider_mismatch');
-  const size=JSON.stringify(row.facts).length;
-  if(chars+size>12000){omitted=true;continue;}chars+=size;rows.push(row);
+  if(preview.resolved.data.provider!==candidate.provider)throw new Error('shared_provider_mismatch');
+  try { available.push(sharedRow(preview.resolved,workspaceId)); }
+  catch(error) {
+   // Only an explicitly recognized, authorized empty/unsupported shape can be
+   // omitted. RPC errors, invalid values, foreign workspaces and stale bindings
+   // are never caught here, even when neighboring usable evidence exists.
+   if(!(error instanceof SharedProjectionUnavailableError)||error.provider!==candidate.provider)throw error;
+   coverageFor(candidate.provider)[error.reason]++;
+  }
  }
- const prepared={workspaceId,start,end,rows,relationships:sharedFinancialBoundaries(rows),fingerprint:fingerprint(rows),limitations:[
+ const rows:SharedRow[]=[];let chars=0;
+ for(const row of prioritizeSharedRows(available,requestedProviders,question)) {
+  const coverage=coverageFor(row.provider),size=JSON.stringify(row.facts).length;
+  if(rows.length===24){coverage.rowBudgetOmitted++;continue;}
+  if(chars+size>12000){coverage.factBudgetOmitted++;continue;}
+  chars+=size;rows.push(row);coverage.prepared++;
+ }
+ const limitations=[
   'Stored observations have source-specific periods and units. Coverage is not proven complete; do not sum overlapping accounting, invoice, order or payment evidence or infer causation.',
-  ...(omitted?['Some whole source groups were omitted by the evidence budget. This is not an exhaustive audit.']:[])]};
+  ...providers.filter(count=>count.catalog!==count.prepared).map(count=>`${count.provider}: ${count.prepared} whole source groups prepared from ${count.catalog} catalog candidates; ${count.catalog-count.discovered} outside the discovery cap, ${count.empty} authorized empty, ${count.unsupported} unsupported typed projection, ${count.factBudgetOmitted} outside the fact-character budget, ${count.rowBudgetOmitted} outside the row budget. Omitted details were not assessed; missing is not zero.`),
+  ...requestedProviders.filter(provider=>!rows.some(row=>row.provider===provider)).map(provider=>`Requested source ${provider} has no usable evidence in this bounded preparation. Do not substitute another provider or claim it was reviewed.`),
+ ];
+ if(providers.some(count=>count.factBudgetOmitted||count.rowBudgetOmitted))limitations.push('Some whole source groups were omitted by the evidence budget. This is not an exhaustive audit.');
+ const prepared:SharedPrepared={workspaceId,start,end,rows,relationships:sharedFinancialBoundaries(rows),fingerprint:fingerprint(rows),limitations,
+  coverage:{providers,requestedProviders,maxCandidates:96,maxRows:24,maxFactChars:12000}};
  issued.set(prepared,evidenceEngineHash(prepared));return prepared;
 }
 export function assertSharedPrepared(p:SharedPrepared) {

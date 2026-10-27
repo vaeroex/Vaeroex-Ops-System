@@ -131,7 +131,7 @@ function invalidMetric(provider, kind, metric) {
         if (provider === 'xero' && !record.snapshot) {
           const family = metrics.find(value => value.key === 'invoices').value === 1 ? 'sales-invoice' : 'purchase-bill';
           expectedFacts.push(`${metric.key}: ${metric.value} ${renderedUnit}${partitionText}; ${family} contribution dated ${record.day}${metric.key === 'outstanding' ? '; balance at import; as-of unknown' : ''}.`);
-        } else expectedFacts.push(`${provider.replace(/[_-]/g, ' ')} ${metric.key.replace(/[_-]/g, ' ')}: ${metric.value} ${renderedUnit}${partitionText}; ${dateText}${timing}.${contribution} Scope: synthetic reporting originals.`);
+        } else expectedFacts.push(`${provider.replace(/[_-]/g, ' ')} ${metric.key.replace(/[_-]/g, ' ')}: ${metric.value} ${renderedUnit}${partitionText}; ${dateText}${timing}.${contribution} Scope: synthetic reporting originals.${provider==='toggl'&&metric.key==='hours'?' Lifetime visible-active-project total; beginning unknown, not hours worked during the snapshot capture interval.':''}`);
         if (definition.kind === 'snapshot') assert.equal(observation.temporalKind, provider === 'toggl' && metric.key === 'hours' ? 'lifetime' : 'snapshot');
         observationsCompared++;
       }

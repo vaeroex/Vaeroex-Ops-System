@@ -118,7 +118,7 @@ const manyAnswer = { ...answer, observations: many, next_checks: [], missing_inf
 const allDates = renderSharedAnswer(manyAnswer, context);
 assert.equal((allDates.content.match(/Application date check:/g) || []).length, 1);
 assert.match(allDates.content, /invoice\/bill date 2026-10-15/); assert.match(allDates.content, /invoice\/bill date 2026-10-12/);
-assert.match(allDates.content, /exact observation time is unavailable/); assert.doesNotMatch(allDates.content, /Selected-date comparison/);
+assert.match(allDates.content, /historical balance as-of time is not established/); assert.doesNotMatch(allDates.content, /Selected-date comparison/);
 assert.equal(renderSharedAnswer({ ...manyAnswer, missing_information: [] }, context).content, allDates.content, 'closed subset cannot narrow or duplicate the all-observed date assessment');
 const businessSources = rows.map((row, i) => withVsiSourceSnapshot({ id: sources[i].ref, title: row.provider, url: `/app/synthetic-source/${i}`, sourceType: `shared_${row.provider}`, sourceId: row.hash, evidenceDate: null, retrievedAt: '2026-10-27T00:00:00Z', text: JSON.stringify({ scope: row.scope, observations: row.facts, factTimes: row.factTimes, ...(row.salesInvoiceFactGroups ? { salesInvoiceFactGroups: row.salesInvoiceFactGroups } : {}) }) }));
 const payload = { question, businessSources, qualitative_sources: sources, sharedRelationships: [], evidenceLimitations: [] }, before = JSON.stringify(payload);
@@ -150,7 +150,7 @@ async function actualEngineChecks() {
   getClaims: async () => ({ data: { claims: { sub: actor, session_id: id(504) } }, error: null })
  }, rpc: async (name, args) => {
   assert.equal(args.p_workspace_id, workspace);
-  if (name === 'discover_shared_evidence_v1') return { data: { stage: 'catalog_only', candidates: engineRaw.map(r => ({ provider: r.data.provider, identity: r.identity })), truncated: false }, error: null };
+  if (name === 'discover_shared_evidence_v2') return { data: require('./shared-discovery-test-support.cjs').completeCatalog(engineRaw.map(r => ({ provider: r.data.provider, identity: r.identity }))), error: null };
   if (name === 'preview_shared_legacy_evidence_v1' || name === 'read_shared_typed_evidence_v1') return { data: { stage: 'unadmitted', resolved: structuredClone(name === 'preview_shared_legacy_evidence_v1' ? engineRaw[0] : engineRaw.find(r => r.identity.source_id === args.p_identity.source_id)) }, error: null };
   if (name === 'capture_legacy_evidence_v1') return { data: { reference_id: id(505), source_hash: engineRaw[0].hash }, error: null };
   if (name === 'shared_evidence_dependencies_v1') return { data: { manifestIds: [], readSources: [] }, error: null };

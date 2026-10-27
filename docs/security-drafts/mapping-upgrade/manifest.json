@@ -1,0 +1,28 @@
+{
+  "status": "inactive_local_review_only",
+  "functions": [
+    "private.resolve_legacy_evidence_v1",
+    "public.discover_shared_evidence_v2",
+    "public.discover_shared_evidence_v1"
+  ],
+  "sources": [
+    {
+      "source": "docs/security-drafts/01-legacy-evidence.sql",
+      "sha256": "f2cee96b4c15f3089a211ebe17564b1432df2d5f1c4b96d630f1c93330d639aa"
+    },
+    {
+      "source": "docs/security-drafts/11-generation-discovery.sql",
+      "sha256": "bd587620b0b485bf2ad2ad156acf5e821d2d73f6290c3e898393962266f9952b"
+    },
+    {
+      "source": "docs/security-drafts/11-generation-discovery.sql",
+      "sha256": "bd587620b0b485bf2ad2ad156acf5e821d2d73f6290c3e898393962266f9952b"
+    }
+  ],
+  "forwardSha256": "472872246ead7d3095c0e29c9e9fe21b75a28ea1552848031441144f5e27da51",
+  "applied": false,
+  "dataMutations": false,
+  "newPublicRpc": "discover_shared_evidence_v2",
+  "callers": "authenticated with existing owner/live-session checks",
+  "requiresSeparateHostedApproval": true
+}

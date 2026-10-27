@@ -2,7 +2,7 @@ import { pluginProviders } from "@/lib/ai/shared-evidence/contracts";
 import type { VsiCitation } from "./types";
 
 type Source = VsiCitation & { text?: string; inputSourceIds?: string[] };
-const aliases: Record<string, string[]> = { quickbooks_online: ["quickbooks", "qbo"], google_sheets: ["google sheets", "spreadsheet"], "wix-orders": ["wix orders", "wix"], business_note: ["business note", "approved note"], file: ["processed file", "reviewed file"] };
+const aliases: Record<string, string[]> = { quickbooks_online: ["quickbooks", "qbo"], google_sheets: ["google sheets", "sheets", "spreadsheet"], "wix-orders": ["wix orders", "wix"], business_note: ["business note", "approved note"], file: ["processed file", "reviewed file"] };
 const providers = [...pluginProviders, "file", "business_note"];
 const names = (provider: string) => aliases[provider] || [provider.replace(/[_-]/g, " ")];
 const normalized = (value: string) => ` ${value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
@@ -16,6 +16,11 @@ export function explicitStoredVsiQuestion(question: string) {
 }
 const stop = new Set("using use only the and from last days give short hypothetical executive brief connect supported with explicitly invented cite both originals retain dates units distinguish facts qualified interpretations missing information do not infer matching causation profit ratios search web stored evidence observations source sources records recorded workspace business our my what how compare review could should would data are is to in of for a an this that as or by at on".split(" "));
 const tokens = (text: string) => new Set((text.toLowerCase().match(/[a-z]{3,}/g) || []).filter(word => !stop.has(word)).map(word => word.replace(/s$/, "")));
+export function vsiRelevanceScore(question: string, sourceText: string): number {
+  const query = tokens(question), words = tokens(sourceText);
+  for (const provider of providers) for (const name of names(provider)) for (const token of tokens(name)) query.delete(token);
+  return [...query].filter(word => words.has(word)).length;
+}
 
 /** Relevance chooses a model view of already authorized originals. It never
  * creates entity correspondence or changes sealed evidence. All rows of the
@@ -42,8 +47,6 @@ export function vsiContextGroups(sources: readonly Source[], relationships: read
     const indexes = ids.flatMap(id => byHash.has(id) ? [byHash.get(id)!] : []);
     for (const index of indexes.slice(1)) join(indexes[0], index);
   }
-  const query = tokens(question);
-  for (const provider of providers) for (const name of names(provider)) for (const token of tokens(name)) query.delete(token);
   const groups = new Map<number, { indexes: number[]; providers: Set<string>; score: number; required: boolean }>();
   sources.forEach((source, index) => {
     const key = root(index), group = groups.get(key) || { indexes: [], providers: new Set<string>(), score: 0, required: false };
@@ -52,8 +55,7 @@ export function vsiContextGroups(sources: readonly Source[], relationships: read
     groups.set(key, group);
   });
   for (const group of groups.values()) {
-    const words = tokens(group.indexes.map(index => `${sources[index].title} ${sources[index].text || ""}`).join(" "));
-    group.score = [...query].filter(word => words.has(word)).length;
+    group.score = vsiRelevanceScore(question, group.indexes.map(index => `${sources[index].title} ${sources[index].text || ""}`).join(" "));
   }
   const result = [...groups.values()], requested = requestedVsiProviders(question);
   for (const provider of requested) {

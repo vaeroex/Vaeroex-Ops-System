@@ -10,7 +10,7 @@ const raw=[sheets(0,true),{provider:'xero',identity:{kind:'legacy_binding',bindi
 
 const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
  events.push(name);
- if(name==='discover_shared_evidence_v1')return {data:{stage:'catalog_only',candidates:raw.map(s=>({provider:s.provider,identity:s.identity})),truncated:false},error:null};
+ if(name==='discover_shared_evidence_v2')return {data:require('./shared-discovery-test-support.cjs').completeCatalog(raw.map(s=>({provider:s.provider,identity:s.identity}))),error:null};
  if(name==='read_shared_typed_evidence_v1'||name==='preview_shared_legacy_evidence_v1'){
   const source=structuredClone(name==='read_shared_typed_evidence_v1'?raw.find(row=>row.identity.source_id===args.p_identity.source_id):raw[1]);if(foreign)source.data.workspace_id=id(99);
   return {data:{stage:'unadmitted',resolved:source},error:null};

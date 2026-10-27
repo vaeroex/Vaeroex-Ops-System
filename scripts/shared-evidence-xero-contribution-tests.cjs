@@ -12,7 +12,7 @@ const reader = { auth: {
   getClaims: async () => ({ data: { claims: { sub: actor, session_id: id(93) } }, error: null })
 }, rpc: async (name, args) => {
   assert.equal(args.p_workspace_id, workspace);
-  if (name === 'discover_shared_evidence_v1') return { data: { stage: 'catalog_only', candidates: engineRaw.map(row => ({ provider: row.data.provider, identity: row.identity })), truncated: false }, error: null };
+  if (name === 'discover_shared_evidence_v2') return { data: { stage: 'catalog_only', candidates: engineRaw.map(row => ({ provider: row.data.provider, identity: row.identity })), truncated: false, totalCandidates: engineRaw.length, providerCounts: [...new Set(engineRaw.map(row=>row.data.provider))].map(provider=>({provider,total:engineRaw.filter(row=>row.data.provider===provider).length,returned:engineRaw.filter(row=>row.data.provider===provider).length})) }, error: null };
   if (name === 'preview_shared_legacy_evidence_v1' || name === 'read_shared_typed_evidence_v1') return { data: { stage: 'unadmitted', resolved: structuredClone(name === 'preview_shared_legacy_evidence_v1' ? engineRaw[0] : engineRaw.find(row => row.identity.source_id === args.p_identity.source_id)) }, error: null };
   if (name === 'capture_legacy_evidence_v1') return { data: { reference_id: id(94), source_hash: engineRaw[0].hash }, error: null };
   if (name === 'shared_evidence_dependencies_v1') return { data: { manifestIds: [], readSources: [] }, error: null };
@@ -100,7 +100,7 @@ const harvest = sharedRow({ ...raw, data: { ...raw.data, provider: 'harvest', re
 assert.deepEqual(harvest.facts, ['harvest hours: 1.25 hours; entry spent date 2026-10-13. Scope: synthetic stored records.']);
 const toggl = sharedRow({ ...raw, data: { ...raw.data, provider: 'toggl', records: [{ snapshot: { start: '2026-10-13T00:00:00Z', end: '2026-10-13T00:00:00Z', metrics: [{ key: 'projects', value: 1 }] } }] } }, workspace);
 assert.deepEqual(toggl.facts, ['toggl projects: 1 count; snapshot 2026-10-13T00:00:00Z through 2026-10-13T00:00:00Z. Scope: synthetic stored records.']);
-assert.equal(toggl.factTimes, undefined);
+assert.deepEqual(expandFactTimes(toggl.factTimes,1),[{date:'2026-10-13',basis:'snapshot_capture',valueTiming:'snapshot_at_capture',periodEnd:'2026-10-13',instant:'2026-10-13T00:00:00Z',endInstant:'2026-10-13T00:00:00Z',timeZone:'UTC'}]);
 const sheet = (hash, n, input) => sharedRow({ identity: { kind: 'sheets_ticket_source', source_id: id(n), version_id: id(n + 1) }, hash,
   data: { provider: 'google_sheets', workspace_id: workspace, entity_id: entity, connection_id: id(n + 2), date: '2026-10-14', time_zone: 'UTC', metrics: input, read_sources: [] } }, workspace);
 const small = sheet('b'.repeat(64), 20, [{ metric: 'dispatches', value: 6, unit: 'count' }]);

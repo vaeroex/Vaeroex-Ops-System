@@ -25,7 +25,7 @@ assert.match(result.content,/Dates across all selected business observations \(a
 assert.match(result.content,/selected date labels differ; same-period alignment is not established/);
 assert.match(result.content,/invoice\/bill date 2026-10-13/);
 assert.doesNotMatch(result.content,/invoice\/bill date 2026-10-14|invoice\/bill date 2026-10-15/);
-assert.match(result.content,/balances at import; their exact observation time is unavailable here, not the document date/);
+assert.match(result.content,/balances at import; historical balance as-of time is not established by document dates or capture\/sync timestamps/);
 assert.deepEqual(result.citationIds,['B1','B2']);
 assert.equal((result.content.match(/Application date check:/g)||[]).length,1,'a full comparison must not repeat the identical date block');
 const subset=pass(answer(observed,[pick(x),pick(g)])).content;
