@@ -1,6 +1,6 @@
 import { validateSharedVsiRelationships } from "@/lib/ai/shared-evidence/vsi-validation";
 import type { SynthesisSource } from "@/lib/ai/shared-evidence/answer-contract";
-import { sharedAnswerSchema, sharedAnswerJsonSchema, renderSharedAnswer, renderSharedClarification, sharedDraftTextPattern, issueAnswerResults, issueContextFactSources, SHARED_ANSWER_INSTRUCTIONS } from "@/lib/ai/shared-evidence/answer-contract";
+import { sharedAnswerSchema, sharedAnswerJsonSchemaForResults, SharedAnswerContractError, renderSharedAnswer, renderSharedClarification, sharedDraftTextPattern, issueAnswerResults, issueContextFactSources, SHARED_ANSWER_INSTRUCTIONS } from "@/lib/ai/shared-evidence/answer-contract";
 import { qualitativeSynthesisEnabled } from "@/lib/ai/shared-evidence/qualitative-policy";
 import { sharedEvidenceRuntimeEnabled } from "@/lib/ai/shared-evidence/runtime-gate";
 import { prepareSharedGeneration, sealSharedGeneration, sharedTargetHref, sharedRpc, type SharedClient, type SharedPrepared } from "@/lib/ai/shared-evidence/generation";
@@ -317,7 +317,9 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   };
   const answerRequest = (json: string, tier: VsiResearchTier, shared = false) => ({ input: [{ role: "system", content: shared ? sharedSystemPrompt : systemPrompt }, { role: "user", content: json }],
     reasoning: { effort: tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, tier === "deep" ? 6000 : 4000),
-    text: { format: { type: "json_schema", name: shared ? "vsi_shared_answer_v2" : "vsi_answer_v1", strict: true, schema: shared ? { ...sharedAnswerJsonSchema, properties: { ...sharedAnswerJsonSchema.properties, hypotheses: { ...sharedAnswerJsonSchema.properties.hypotheses, maxItems: qualitativeSynthesisEnabled() ? 3 : 0 } } } : answerJsonSchema } } });
+    // Derive from this exact packed JSON, not the larger canonical payload.
+    // The same factory participates in every packing measurement and transport.
+    text: { format: { type: "json_schema", name: shared ? "vsi_shared_answer_v2" : "vsi_answer_v1", strict: true, schema: shared ? sharedAnswerJsonSchemaForResults(JSON.parse(json).sharedRelationships, qualitativeSynthesisEnabled()) : answerJsonSchema } } });
   const packAnswer = (payload: ReturnType<typeof makePayload>, tier: VsiResearchTier, shared: boolean, phase: "preflight" | "answer") => {
     try {
       if (shared) payload.contextFactSources = issueContextFactSources(payload.productSources,payload.livePublicLookup).map(source => ({ref:source.ref,binding:source.binding,factCount:source.facts.length}));
@@ -328,6 +330,12 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
       return packed;
     }
     catch (error) {
+      if (error instanceof SharedAnswerContractError) {
+        const diagnostic = vsiValidationDiagnostic("answer_request_contract", error);
+        usage.validationFailure = diagnostic;
+        console.error("[vsi-validation]", diagnostic);
+        throw new VsiEngineError("Workspace calculation results could not be verified before generation.", usage, false, "evidence_unavailable");
+      }
       if (error instanceof VsiAnswerContextLimit) {
         console.error("[vsi-context-budget]", { phase, reason: "required_context_unfit", maxChars: config.maxInputChars, maxBytes: config.maxProviderInputBytes,
           charUnit: "javascript_utf16_code_units", byteUnit: "utf8", ...error.metrics });

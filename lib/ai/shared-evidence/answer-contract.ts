@@ -27,10 +27,15 @@ export type SharedAnswerRule = typeof sharedAnswerRules[number];
 export type SharedAnswerCoverageDiagnostic = Readonly<{ availableReferences: number; observedReferences: number; requiredGroups: number; missingGroups: number }>;
 export const factReferenceReasons = ["unknown_ref", "binding_mismatch", "fact_index_out_of_bounds", "source_dependencies_missing"] as const;
 export type FactReferenceDiagnostic = Readonly<{ reason: typeof factReferenceReasons[number]; bindingMatchesOtherSource?: boolean }>;
+export const resultReferenceReasons = ["invalid_issued_id", "duplicate_issued_id", "duplicate_selected_id", "unknown_selected_id"] as const;
+export type ResultReferenceDiagnostic = Readonly<{ reason: typeof resultReferenceReasons[number]; issuedCount: number; selectedCount: number }>;
 export class SharedAnswerContractError extends Error {
-  constructor(readonly rule: SharedAnswerRule, readonly coverage?: SharedAnswerCoverageDiagnostic, readonly factReference?: FactReferenceDiagnostic) { super("shared_answer_contract_denied"); }
+  constructor(readonly rule: SharedAnswerRule, readonly coverage?: SharedAnswerCoverageDiagnostic, readonly factReference?: FactReferenceDiagnostic, readonly resultReference?: ResultReferenceDiagnostic) { super("shared_answer_contract_denied"); }
 }
 const fail = (rule: SharedAnswerRule): never => { throw new SharedAnswerContractError(rule); };
+const resultFailure = (reason: ResultReferenceDiagnostic["reason"], issuedCount: number, selectedCount: number): never => {
+  throw new SharedAnswerContractError("result_reference", undefined, undefined, { reason, issuedCount, selectedCount });
+};
 
 const factJson = { type: "object", additionalProperties: false, required: ["ref", "binding", "factIndex"], properties: { ref: { type: "string", minLength: 1, maxLength: 80 }, binding: { type: "string", minLength: 64, maxLength: 64, pattern: factBindingPattern }, factIndex: { type: "integer", minimum: 0, maximum: 1999 } } } as const;
 export const sharedDraftTextPattern = "^[^0-9$€£%\\[\\]<>\\r\\n]*$";
@@ -46,6 +51,22 @@ export const sharedAnswerJsonSchema = { type: "object", additionalProperties: fa
     hypotheses: { type: "array", maxItems: 3, items: draftJson }, missing_information: { type: "array", maxItems: 6, items: { anyOf: [draftJson,timeComparisonJson] } }, next_checks: { type: "array", maxItems: 6, items: draftJson }
   }
 } as const;
+
+/** Constrain generation to the exact results in this packed request. This is
+ * not calculation authority: rendering still verifies IDs, hashes, observed
+ * dependencies and uniqueness independently, including provider violations.
+ * Keep the base schema immutable between requests. */
+export function sharedAnswerJsonSchemaForResults(results: readonly { id: string }[], hypothesesEnabled: boolean) {
+  if (!Array.isArray(results)) resultFailure("invalid_issued_id", 0, 0);
+  const ids = results.map(result => result?.id);
+  if (ids.some(id => typeof id !== "string" || id.length !== 64 || !/^[a-f0-9]{64}$/.test(id))) resultFailure("invalid_issued_id", ids.length, 0);
+  if (new Set(ids).size !== ids.length) resultFailure("duplicate_issued_id", ids.length, 0);
+  return { ...sharedAnswerJsonSchema, properties: { ...sharedAnswerJsonSchema.properties,
+    results: { ...sharedAnswerJsonSchema.properties.results, maxItems: Math.min(12, ids.length),
+      items: { ...sharedAnswerJsonSchema.properties.results.items, ...(ids.length ? { enum: ids } : {}) } },
+    hypotheses: { ...sharedAnswerJsonSchema.properties.hypotheses, maxItems: hypothesesEnabled ? 3 : 0 }
+  } };
+}
 
 export const SHARED_ANSWER_INSTRUCTIONS = "Use the shared-answer schema, no content/citationIds. Select observations by issued ref, exact bare binding (64 lowercase hex, never sha256: or snapshotHash), and source-local zero-based factIndex. Historical-only refs are invalid. Observe each answerSourceRequirements group; other facts only when relevant. Availability/subsets prove neither totals, trends nor completeness. contextFactSources indexes follow product text or public claims. results use only issued sharedRelationships IDs with all inputs observed; invent no calculation. The app renders factual values, units, dates and attribution. For billing/collections prefer sales-invoice contributions, not purchase-bill invoice zeros; preserve valid zero-value invoices. factTimes indexes bind each fact: document/row dates, balances at import, retrieval times and selection windows differ; even equal dates prove no measurement alignment. For cross-original missing_information use {kind: selected_fact_time_comparison, premises: observed fact selections}, never text/dates/verdicts. The app computes this limitation. Single-original missing_information may use text. Put specific missing linkage/coverage/status questions in next_checks; do not move factual recaps there. hypotheses are optional unverified possibilities requiring two independent originals; never force one. Draft premises must be observed. Drafts have no factual authority: invent no cause, correspondence, completeness, performed action or result; do not contradict the app date check. No URLs, inline citations or numeric literals in prose; refer to observations. No business-word whitelist applies. Use ordinary questions/negation and a concrete check before a decision, not generic review-alongside prose. Valid references do not prove semantic correctness or usefulness; manual review remains required.";
 
@@ -133,9 +154,10 @@ export function renderSharedAnswer(value: unknown, context: {
   const observedInstallations = new Set(observedSources.filter(source => source.environment === "sandbox").map(source => source.installation));
   if (observedEnvironments.size > 1 || observedInstallations.size > 1 || (observedInstallations.size && observedInstallations.has(undefined))) fail("environment");
   const resultById = new Map(context.results.map(result => [result.id, result]));
-  if (resultById.size !== context.results.length || new Set(answer.results).size !== answer.results.length) fail("result_reference");
+  if (resultById.size !== context.results.length) resultFailure("duplicate_issued_id", context.results.length, answer.results.length);
+  if (new Set(answer.results).size !== answer.results.length) resultFailure("duplicate_selected_id", context.results.length, answer.results.length);
   const chosenResults = answer.results.map(id => {
-    const result = resultById.get(id); if (!result) return fail("result_reference");
+    const result = resultById.get(id); if (!result) return resultFailure("unknown_selected_id", context.results.length, answer.results.length);
     // An id is an exact application-issued result, not a request to recalculate.
     if (issueAnswerResults([result])[0].id !== id || !result.inputSourceIds.length
       || result.inputSourceIds.some(binding => ![...observed.values()].some(item => item.source.binding === binding))) return fail("result_dependencies");
