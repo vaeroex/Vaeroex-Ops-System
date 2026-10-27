@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- No network, credentials or production data. */
 const assert=require('node:assert/strict');
 require('./qbo-customer-test-support.cjs').installLoader({'server-only':{}});
-const {sharedAnswerSchema,sharedAnswerJsonSchema,renderSharedAnswer:render,renderSharedClarification,issueAnswerResults,issueContextFactSources,SharedAnswerContractError}=require('../lib/ai/shared-evidence/answer-contract.ts');
+const {sharedAnswerSchema,sharedAnswerJsonSchema,sharedAnswerJsonSchemaForResults,renderSharedAnswer:render,renderSharedClarification,issueAnswerResults,issueContextFactSources,SharedAnswerContractError}=require('../lib/ai/shared-evidence/answer-contract.ts');
 const {vsiValidationDiagnostic:diagnose}=require('../lib/vsi/validation-diagnostics.ts');
 const {sharedRow}=require('../lib/ai/shared-evidence/generation.ts');
 const {fixtureForCase}=require('./vsi-isolated-contract-evaluation.cjs');
@@ -24,8 +24,9 @@ const sparse=sourcesFor('unsupported-cause');const sparseText=positive(usefulSha
 // Whole retained Evaluation04 legacy response cannot bypass the new contract.
 denied({content:'The retained synthetic brief.',citationIds:['B1','B2'],interpretations:[]});
 const retained={...sharedReply(payload),hypotheses:[{premises:good.observations,text:'The Google Sheets orders on payment hold and the Xero outstanding invoice balance may each merit follow-up.'}],missing_information:[{premises:good.observations,text:'Whether the partial supplied observations have sufficient coverage to assess the status of the Google Sheets orders on payment hold and the Xero outstanding invoice balance.'}],next_checks:[{premises:good.observations,text:'Review the source records for the Google Sheets orders on payment hold and the Xero outstanding invoice balance, including their scope and coverage.'}]};
-const retainedText=positive(retained);assert(retainedText.content.includes('Hypothesis (unverified model draft)'));const retainedUseful=false;assert.equal(retainedUseful,false,'Generic review remains a failed manual assessment; mechanical pass is not quality.');
-for(const question of ['Which invoice, if any, is linked to each payment-held order?','How could the observations be compared without assuming a causal link?','What information would establish whether these observations concern matched records?','Does the source explain why an order is held?'])positive({...good,missing_information:[{premises:good.observations,text:question}]});
+denied(retained,'temporal_assessment_required');
+const retainedText=positive({...retained,missing_information:good.missing_information});assert(retainedText.content.includes('Hypothesis (unverified model draft)'));const retainedUseful=false;assert.equal(retainedUseful,false,'Generic review remains a failed manual assessment; mechanical pass is not quality.');
+for(const question of ['Which invoice, if any, is linked to each payment-held order?','How could the observations be compared without assuming a causal link?','What information would establish whether these observations concern matched records?','Does the source explain why an order is held?'])positive({...good,next_checks:[{premises:good.observations,text:question}]});
 denied({...good,content:'Xero records a fabricated balance.'});
 denied({...good,scopes:{B1:'Invented scope override.'}});
 denied({...good,observations:[{...good.observations[0],quote:'Invented fact.'},good.observations[1]]});
@@ -67,6 +68,36 @@ const withResult=positive({...good,results:[result.id]},{...context,results:[res
 denied({...good,results:[result.id,result.id]},'result_reference',{...context,results:[result]});
 denied({...good,results:[result.id]},'result_dependencies',{...context,results:[{...result,fact:'Fabricated financial result.'}]});
 const unbound=issueAnswerResults([{fact:'Result with missing input.',inputSourceIds:['f'.repeat(64)]}])[0];denied({...good,results:[unbound.id]},'result_dependencies',{...context,results:[unbound]});
+// Output schema constrains selection; it never substitutes for independent
+// rendering validation or silently drops unavailable/duplicate selections.
+const baseSchemaBefore=JSON.stringify(sharedAnswerJsonSchema);
+const noResults=sharedAnswerJsonSchemaForResults([],false);
+assert.equal(noResults.properties.results.maxItems,0);assert.equal(noResults.properties.results.items.enum,undefined);
+assert.equal(noResults.properties.hypotheses.maxItems,0);
+const oneResult=sharedAnswerJsonSchemaForResults([result],true);
+assert.deepEqual(oneResult.properties.results.items.enum,[result.id]);assert.equal(oneResult.properties.results.maxItems,1);
+assert.equal(oneResult.properties.hypotheses.maxItems,3);
+positive({...good,results:[]},{...context,results:[result]});
+for(const [ctx,selected,reason] of [
+ [context,[result.id],'unknown_selected_id'],
+ [context,[result.id,result.id],'duplicate_selected_id'],
+ [{...context,results:[result]},[result.id,result.id],'duplicate_selected_id'],
+ [{...context,results:[result,result]},[],'duplicate_issued_id']
+])assert.throws(()=>render({...good,results:selected},ctx),e=>{
+ assert.equal(e.rule,'result_reference');assert.deepEqual(e.resultReference,{reason,issuedCount:ctx.results.length,selectedCount:selected.length});
+ assert.deepEqual(diagnose('shared_answer_contract',e).resultReference,e.resultReference);return true;
+});
+for(const malformed of [undefined,null,{},[null],[{id:'f'.repeat(63)}],[{id:'f'.repeat(64)+'\n'}],[{id:'F'.repeat(64)}],[{id:'DO_NOT_LOG_SECRET'}]]){
+ assert.throws(()=>sharedAnswerJsonSchemaForResults(malformed,true),e=>e instanceof SharedAnswerContractError&&e.resultReference.reason==='invalid_issued_id');
+}
+assert.throws(()=>sharedAnswerJsonSchemaForResults([result,result],true),e=>e.resultReference.reason==='duplicate_issued_id');
+const manyResults=Array.from({length:15},(_,n)=>issueAnswerResults([{fact:`Synthetic result ${n}.`,inputSourceIds:sources.map(s=>s.binding)}])[0]);
+assert.equal(sharedAnswerJsonSchemaForResults(manyResults,true).properties.results.maxItems,12);
+assert.deepEqual(sharedAnswerJsonSchemaForResults(manyResults,true).properties.results.items.enum,manyResults.map(r=>r.id));
+oneResult.properties.results.items.enum.push('e'.repeat(64));
+assert.deepEqual(sharedAnswerJsonSchemaForResults([result],true).properties.results.items.enum,[result.id]);
+assert.equal(sharedAnswerJsonSchemaForResults([],true).properties.results.maxItems,0);
+assert.equal(JSON.stringify(sharedAnswerJsonSchema),baseSchemaBefore,'request-specific enums never mutate shared base schema');
 denied({...good,next_checks:[{premises:[],text:'Inspect the records before deciding.'}]},'draft_support');
 denied({...good,next_checks:[{premises:[{...good.observations[0],factIndex:1}],text:'Inspect the records before deciding.'}]},'draft_support');
 denied({...good,next_checks:[{premises:[good.observations[0],good.observations[0]],text:'Inspect the records before deciding.'}]},'draft_support');
@@ -77,7 +108,7 @@ const hypothesis={premises:good.observations,text:'The payment-held orders and o
 // merely occur in the intermediate contract string.
 const React=require('react'),{renderToStaticMarkup}=require('react-dom/server'),{AnswerContent}=require('../components/vsi/AnswerContent.tsx');
 const draftMarkup=renderToStaticMarkup(React.createElement(AnswerContent,{content:render({...good,hypotheses:[hypothesis]},context).content}));
-for(const label of ['Hypothesis (unverified model draft)','Missing information / limitation (model assessment)','Recommended check (model draft; not performed)','Draft reasoning is not a verified finding, calculation or completed action.'])assert(draftMarkup.includes(label));
+for(const label of ['Hypothesis (unverified model draft)','Dates across all selected business observations (application-computed)','Recommended check (model draft; not performed)','Draft reasoning is not a verified finding, calculation or completed action.'])assert(draftMarkup.includes(label));
 const clarificationMarkup=renderToStaticMarkup(React.createElement(AnswerContent,{content:renderSharedClarification('Which records and period should be checked?')}));assert(clarificationMarkup.includes('Clarification requested (model draft):'));
 denied({...good,hypotheses:[hypothesis]},'hypothesis_disabled',{...context,hypothesesEnabled:false});
 denied({...good,hypotheses:[{...hypothesis,premises:[good.observations[0]]}]},'independent_sources');

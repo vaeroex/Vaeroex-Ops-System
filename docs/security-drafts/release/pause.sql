@@ -11,5 +11,6 @@ revoke execute on function public.preview_legacy_evidence_mapping_v1(uuid,text,u
 -- Later discovery/preview entry points also stop admitting new contexts.
 revoke execute on function public.preview_shared_legacy_evidence_v1(uuid,uuid,date,date),
  public.discover_shared_evidence_v1(uuid,date,date),
+ public.discover_shared_evidence_v2(uuid,date,date,text[]),
  public.shared_evidence_dependencies_v1(uuid,uuid) from authenticated;
 commit;

@@ -1,6 +1,7 @@
+import { invoiceSelections, InvoiceSelectionMetadataError } from "@/lib/ai/shared-evidence/invoice-selection";
 import { validateSharedVsiRelationships } from "@/lib/ai/shared-evidence/vsi-validation";
 import type { SynthesisSource } from "@/lib/ai/shared-evidence/answer-contract";
-import { sharedAnswerSchema, sharedAnswerJsonSchema, renderSharedAnswer, renderSharedClarification, sharedDraftTextPattern, issueAnswerResults, issueContextFactSources, SHARED_ANSWER_INSTRUCTIONS } from "@/lib/ai/shared-evidence/answer-contract";
+import { sharedAnswerSchema, sharedAnswerJsonSchemaForResults, SharedAnswerContractError, renderSharedAnswer, renderSharedClarification, sharedDraftTextPattern, issueAnswerResults, issueContextFactSources, SHARED_ANSWER_INSTRUCTIONS } from "@/lib/ai/shared-evidence/answer-contract";
 import { qualitativeSynthesisEnabled } from "@/lib/ai/shared-evidence/qualitative-policy";
 import { sharedEvidenceRuntimeEnabled } from "@/lib/ai/shared-evidence/runtime-gate";
 import { prepareSharedGeneration, sealSharedGeneration, sharedTargetHref, sharedRpc, type SharedClient, type SharedPrepared } from "@/lib/ai/shared-evidence/generation";
@@ -20,7 +21,7 @@ import { VSI_PLANNER_PROMPT, VSI_PLAN_JSON_SCHEMA, VSI_PUBLIC_RESEARCH_JSON_SCHE
 import type { VsiPublicResearchResult, VsiResearchTier } from "./research";
 import { explicitStoredVsiQuestion } from "./context-selection";
 import type { VsiAnswer, VsiCitation, VsiEvidenceResult, VsiMessage, VsiRunInput, VsiUsage } from "./types";
-import { vsiEvidenceWindow } from "./evidence-window";
+import { vsiEvidenceWindowSelection } from "./evidence-window";
 import { packVsiAnswerContext, serializeVsiAnswerContext, serializeVsiProviderRequest, VsiAnswerContextLimit } from "./answer-context";
 import { vsiValidationDiagnostic, type VsiValidationStage } from "./validation-diagnostics";
 
@@ -212,11 +213,14 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   let product:Awaited<ReturnType<typeof loadVsiProductContext>>|undefined;
   let sharedManifestId:string|undefined;
   let sharedPrepared:SharedPrepared|undefined;
+  let sharedWindowLimitation: string | undefined;
   if(sharedEvidenceRuntimeEnabled()) {
     try {
       if(!input.reservedRequest) throw new Error("shared_request_binding_missing");
-      const { start, end } = vsiEvidenceWindow(input.question);
-      sharedPrepared=await prepareSharedGeneration(input.supabase,input.workspaceId,start,end);
+      const window = vsiEvidenceWindowSelection(input.question);
+      const { start, end } = window;
+      sharedWindowLimitation = window.limitation;
+      sharedPrepared=await prepareSharedGeneration(input.supabase,input.workspaceId,start,end,input.question);
       // Product context binds connection roots; finalize those before sealing.
       product=await loadVsiProductContext(access,input.readTicket);
       sharedManifestId=await sealSharedGeneration(input.supabase,sharedPrepared,{kind:"vsi_request",...input.reservedRequest,ticketId:input.readTicket.ticketId});
@@ -292,7 +296,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     id: row.hash, title: row.provider.replace(/[_-]/g, " "), url: sharedTargetHref(input.workspaceId,"vsi_exchange",input.reservedRequest!.id,row.hash),
     sourceType: `shared_${row.provider}`, sourceId: row.hash, evidenceDate: null, retrievedAt: new Date().toISOString(),
     text: JSON.stringify({ scope: row.scope, observations: row.facts, ...(row.factTimes ? {factTimes:row.factTimes} : {}) }), treatment: row.reported ? "reported_context" : "record"
-  })), limitations: [...sharedPrepared.limitations, `The selected stored-source window is ${sharedPrepared.start} through ${sharedPrepared.end}; other periods were not searched.`] } : undefined;
+  })), limitations: [...sharedPrepared.limitations, sharedWindowLimitation ?? `The selected stored-source window is ${sharedPrepared.start} through ${sharedPrepared.end}; other periods were not searched.`] } : undefined;
   const makePayload = (evidence: VsiEvidenceResult, lookup: ReturnType<typeof boundedVsiPublicEvidence>["lookup"] | null, status: { tier: VsiResearchTier | null; rounds: number; partial: boolean; toolAllowanceExceeded: boolean; limitations: string[] }, datedPricingOnly: boolean, lookupPerformed: boolean) => {
     const history = prepareVsiHistory(selectedMessages, [...evidence.sources, ...product!.sources], input.question);
     return { question: input.question, now: new Date().toISOString(), privateConversationSummary: readVsiPrivateSummary(input.contextSummary),
@@ -311,13 +315,18 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const issuePremises = (payload: ReturnType<typeof makePayload>) => {
   payload.qualitative_sources=payload.businessSources.flatMap(source=>{
     const row=sharedPrepared?.rows.find(row=>row.hash===source.sourceId);
-    return row?[{ref:source.id,binding:row.hash,provider:row.provider,dependencies:[row.hash],facts:row.facts,...(row.factTimes?{factTimes:row.factTimes}:{}),reported:row.reported?row.provider==='file'?'file' as const:'note' as const:false as const,
+    return row?[{ref:source.id,binding:row.hash,provider:row.provider,dependencies:[row.hash],facts:row.facts,...(row.salesInvoiceFactGroups?{salesInvoiceFactGroups:row.salesInvoiceFactGroups}:{}),...(row.factTimes?{factTimes:row.factTimes}:{}),reported:row.reported?row.provider==='file'?'file' as const:'note' as const:false as const,
       environment:row.reported?'supporting' as const:row.scope.environment==='sandbox'?'sandbox' as const:'production' as const}]:[];
   });
   };
-  const answerRequest = (json: string, tier: VsiResearchTier, shared = false) => ({ input: [{ role: "system", content: shared ? sharedSystemPrompt : systemPrompt }, { role: "user", content: json }],
+  const answerRequest = (json: string, tier: VsiResearchTier, shared = false) => {
+    const view = shared ? JSON.parse(json) : null;
+    return ({ input: [{ role: "system", content: shared ? sharedSystemPrompt : systemPrompt }, { role: "user", content: json }],
     reasoning: { effort: tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, tier === "deep" ? 6000 : 4000),
-    text: { format: { type: "json_schema", name: shared ? "vsi_shared_answer_v2" : "vsi_answer_v1", strict: true, schema: shared ? { ...sharedAnswerJsonSchema, properties: { ...sharedAnswerJsonSchema.properties, hypotheses: { ...sharedAnswerJsonSchema.properties.hypotheses, maxItems: qualitativeSynthesisEnabled() ? 3 : 0 } } } : answerJsonSchema } } });
+    // Derive from this exact packed JSON, not the larger canonical payload.
+    // The same factory participates in every packing measurement and transport.
+    text: { format: { type: "json_schema", name: shared ? "vsi_shared_answer_v2" : "vsi_answer_v1", strict: true, schema: shared ? sharedAnswerJsonSchemaForResults(view.sharedRelationships, qualitativeSynthesisEnabled(), invoiceSelections(view.qualitative_sources,view.question), [...view.qualitative_sources,...view.contextFactSources].map((source: {ref:string})=>source.ref)) : answerJsonSchema } } });
+  };
   const packAnswer = (payload: ReturnType<typeof makePayload>, tier: VsiResearchTier, shared: boolean, phase: "preflight" | "answer") => {
     try {
       if (shared) payload.contextFactSources = issueContextFactSources(payload.productSources,payload.livePublicLookup).map(source => ({ref:source.ref,binding:source.binding,factCount:source.facts.length}));
@@ -328,12 +337,20 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
       return packed;
     }
     catch (error) {
+      if (error instanceof InvoiceSelectionMetadataError) throw new VsiEngineError("Workspace invoice selection metadata could not be verified before generation.", usage, false, "evidence_unavailable");
+      if (error instanceof SharedAnswerContractError) {
+        const diagnostic = vsiValidationDiagnostic("answer_request_contract", error);
+        usage.validationFailure = diagnostic;
+        console.error("[vsi-validation]", diagnostic);
+        throw new VsiEngineError("Workspace calculation results could not be verified before generation.", usage, false, "evidence_unavailable");
+      }
       if (error instanceof VsiAnswerContextLimit) {
         console.error("[vsi-context-budget]", { phase, reason: "required_context_unfit", maxChars: config.maxInputChars, maxBytes: config.maxProviderInputBytes,
           charUnit: "javascript_utf16_code_units", byteUnit: "utf8", ...error.metrics });
         throw new VsiEngineError(shared ? "The required whole source scopes and workspace context do not fit within this answer's limit. No canonical evidence was shortened and no answer was generated. Please narrow the source scope or period."
           : "This question and its sources are too large for one answer. Please narrow the question.", usage, false, "context_block");
       }
+      if (error instanceof Error && error.message === "vsi_sales_invoice_evidence_unavailable") throw new VsiEngineError("The requested Xero scope has no contributions with verified sales-invoice type markers. Purchase-bill or untyped values cannot substitute; no answer was generated.",usage,false,"evidence_unavailable");
       if (error instanceof Error && error.message === "vsi_requested_source_unavailable") throw new VsiEngineError("A requested source is not available among the authorized evidence for this period. No answer was generated.",usage,false,"evidence_unavailable");
       throw error;
     }
@@ -495,7 +512,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const decodedAnswer = validateAt("answer_json", () => JSON.parse(outputText(reply)));
   const structuredAnswer = sharedAnswer ? validateAt("answer_schema", () => sharedAnswerSchema.parse(decodedAnswer)) : validateAt("answer_schema", () => answerSchema.parse(decodedAnswer));
   const composed = sharedAnswer
-    ? validateAt("shared_answer_contract", () => renderSharedAnswer(structuredAnswer,{sources:[...selectedPremises,...issueContextFactSources(payload.productSources,payload.livePublicLookup)],requiredSourceGroups:packedContext.requiredSourceGroups,results:selectedRelationships,hypothesesEnabled:qualitativeSynthesisEnabled(),scopes:new Map(selectedPremises.map(source=>[source.ref,sharedPrepared!.rows.find(row=>row.hash===source.binding)!.scope]))}))
+    ? validateAt("shared_answer_contract", () => renderSharedAnswer(structuredAnswer,{question:input.question,sources:[...selectedPremises,...issueContextFactSources(payload.productSources,payload.livePublicLookup)],requiredSourceGroups:packedContext.requiredSourceGroups,results:selectedRelationships,hypothesesEnabled:qualitativeSynthesisEnabled(),scopes:new Map(selectedPremises.map(source=>[source.ref,sharedPrepared!.rows.find(row=>row.hash===source.binding)!.scope]))}))
     : validateAt("shared_relationships", () => {
       const legacy = answerSchema.parse(structuredAnswer);
       if (legacy.interpretations.length) throw new Error("Interpretations require current admitted source composition before citation validation.");
@@ -504,5 +521,12 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const answer = validateAt("citation_resolution", () => validateVsiAnswer(composed, [...selectedBusiness, ...payload.productSources, ...payload.historicalSources, ...publicSelection.citations]));
   validateAt("public_source_coverage", () => { if (webSources.length && !answer.citations.some(source => source.sourceType === "web")) throw new Error("The live answer omitted its source."); });
   const partialBusinessReview = packedContext.metrics.omittedSourceGroups > 0 || (sharedAnswer && selectedBusiness.some(source => !answer.citations.some(citation => citation.id === source.id)));
-  return finish({ ...answer, ...(partialBusinessReview ? {content: `Coverage: This is a partial review of selected stored evidence.\n\n${answer.content}`} : sharedPrepared && !sharedAnswer ? {content:`No stored business observations were used for this general response.\n\n${answer.content}`} : {}), ...(publicResearchTopics ? { publicResearchTopics } : {}) });
+  // Discovery/omission claims are application-owned so an unsupported requested
+  // history range cannot be silently presented as having been searched.
+  const preparationCoverage = sharedAnswer && sharedPrepared ? sharedPrepared.limitations.slice(1) : [];
+  const disclosure = [partialBusinessReview ? "Coverage: This is a partial review of selected stored evidence." : "",
+    sharedAnswer && sharedWindowLimitation ? `Stored-source selection: ${sharedWindowLimitation}` : "",
+    ...preparationCoverage,
+    sharedPrepared && !sharedAnswer ? "No stored business observations were used for this general response." : ""].filter(Boolean).join("\n\n");
+  return finish({ ...answer, ...(disclosure ? {content:`${disclosure}\n\n${answer.content}`} : {}), ...(publicResearchTopics ? { publicResearchTopics } : {}) });
 }

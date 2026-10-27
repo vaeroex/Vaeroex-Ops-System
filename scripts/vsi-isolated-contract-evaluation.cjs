@@ -2,8 +2,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {fork,execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
-const candidate='d9d5810f2384cb0d11a7c37df0c8467063e74429';
-const runtimeTrees="040000 tree d348001c9e91078f6c67cd13f93b36119d30cbf5\tapp\n040000 tree ff3ef96576fea64097e348ab9adb4f4737c8c71e\tlib";
+const candidate='eafef0f51a05be22d7445822966dae2f5971a9e2';
+const runtimeTrees="040000 tree d348001c9e91078f6c67cd13f93b36119d30cbf5\tapp\n040000 tree f5199d8beff98e334d4a919f93fda03d975e0b49\tlib";
 const endpoint='https://api.openai.com/v1/responses';
 const limits=Object.freeze({questions:2,calls:4,callsPerQuestion:2,usd:1,reservePerCallUsd:.25,maxChars:48000,maxBytes:192000,maxOutputTokens:8000});
 const cases=Object.freeze([
@@ -130,7 +130,7 @@ function mockDispatch({body,caseId='qualified-brief'}){
  })():(()=>{
   const {sharedReply}=require('./vsi-shared-answer-test-support.cjs');
   const answer=sharedReply(payload);
-  answer.missing_information=[{premises:answer.observations,text:'Whether the source observations have adequate coverage for a useful review remains unclear.'}];
+  answer.missing_information=[{kind:'selected_fact_time_comparison',premises:answer.observations}];
   answer.next_checks=[{premises:answer.observations,text:'Review these observations and their scope alongside each other.'}];
   return answer;
  })();return Promise.resolve({httpStatus:200,model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:30},text:JSON.stringify(value)});
@@ -152,7 +152,7 @@ async function fixtureWorker(caseId,variant='present'){
  let plannerReturned=false;
  const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
   assert.equal(args.p_workspace_id,workspace);
-  if(name==='discover_shared_evidence_v1')return variant==='authority_denied'?{data:null,error:{message:'synthetic_authority_denied'}}:{data:{stage:'catalog_only',candidates:raw.map(s=>({provider:s.provider,identity:structuredClone(s.identity)})),truncated:false},error:null};
+  if(name==='discover_shared_evidence_v2')return variant==='authority_denied'?{data:null,error:{message:'synthetic_authority_denied'}}:{data:require('./shared-discovery-test-support.cjs').completeCatalog(raw.map(s=>({provider:s.provider,identity:structuredClone(s.identity)}))),error:null};
   if(name==='read_shared_typed_evidence_v1'){const source=raw.find(s=>s.provider==='google_sheets');assert(source);assert.deepEqual(args.p_identity,source.identity);return{data:{stage:'unadmitted',resolved:structuredClone(source)},error:null};}
   if(name==='preview_shared_legacy_evidence_v1'||name==='capture_legacy_evidence_v1'){
    const source=raw.find(s=>s.provider==='xero');assert(source);assert.equal(args.p_binding_id,source.identity.binding_id);assert.equal(args.p_start,source.identity.start);assert.equal(args.p_end,source.identity.end);

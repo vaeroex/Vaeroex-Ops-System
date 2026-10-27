@@ -213,6 +213,15 @@ begin
   v_state := private.legacy_evidence_connection_v1(p_workspace_id,v_binding.provider,v_binding.connection_id);
   if v_state->>'incarnation_hash' <> v_binding.incarnation_hash then raise exception 'evidence_binding_changed' using errcode='42501'; end if;
   v_data := private.legacy_evidence_originals_v1(p_workspace_id,v_binding.provider,v_binding.connection_id,p_start,p_end);
+  -- Currency is protected connection metadata already included in the reviewed
+  -- incarnation above, not a label or a currency guessed from receipt amounts.
+  -- Keep NULL explicit when the retained connection has no established currency.
+  -- This intentionally changes Loyverse projection hashes; old references must
+  -- report changed rather than silently acquiring new monetary semantics.
+  if v_binding.provider='loyverse' then
+    v_data := v_data || jsonb_build_object('currency',(select c.currency_code from public.loyverse_connections c
+      where c.workspace_id=p_workspace_id and c.id=v_binding.connection_id));
+  end if;
   return v_data || jsonb_build_object('binding_id',p_binding_id,'binding_version',v_binding.binding_version,'business_entity_id',v_binding.business_entity_id,'incarnation_hash',v_binding.incarnation_hash,'scope',v_state->>'scope');
 end $$;
 

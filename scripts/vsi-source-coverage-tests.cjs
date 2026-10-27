@@ -7,7 +7,7 @@ const raw=[sheet(0,'wanted'),{provider:'xero',identity:{kind:'legacy_binding',bi
 let mode='subset',revoked=false,foreign=false,revokeAfterPlanner=false,calls=0,answerCalls=0;
 const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
  assert.equal(args.p_workspace_id,workspace);
- if(name==='discover_shared_evidence_v1')return{data:{stage:'catalog_only',candidates:raw.map(s=>({provider:s.provider,identity:s.identity})),truncated:false},error:null};
+ if(name==='discover_shared_evidence_v2')return{data:require('./shared-discovery-test-support.cjs').completeCatalog(raw.map(s=>({provider:s.provider,identity:s.identity}))),error:null};
  if(name==='read_shared_typed_evidence_v1'||name==='preview_shared_legacy_evidence_v1'){const source=structuredClone(name==='read_shared_typed_evidence_v1'?raw.find(s=>s.identity.source_id===args.p_identity.source_id):raw[1]);if(foreign)source.data.workspace_id=id(999);return{data:{stage:'unadmitted',resolved:source},error:null};}
  if(name==='capture_legacy_evidence_v1')return{data:{reference_id:id(70),source_hash:raw[1].hash},error:null};
  if(name==='shared_evidence_dependencies_v1')return{data:{manifestIds:[],readSources:[]},error:null};
@@ -54,7 +54,7 @@ global.fetch=async(url,init)=>{
  const pick=(source,pattern)=>({ref:source.ref,binding:source.binding,factIndex:Math.max(0,source.facts.findIndex(f=>pattern.test(f)))});
  const xero=pick(sourceFor(raw[1].hash),/outstanding/),sheetA=pick(sourceFor(raw[0].hash),/dispatches/),sheetB=pick(sourceFor(raw[2].hash),/dispatches/),other=pick(sourceFor(raw[3].hash),/worksheet/);
  const observations=mode==='missing_xero'?[sheetA]:mode==='wrong_sheet'?[xero,other]:mode==='second_date'?[xero,sheetB]:mode==='all'?sources.map(s=>pick(s,/.*/)):[xero,sheetA];
- const answer={observations,results:[],hypotheses:[],missing_information:[{premises:observations,text:'These observations have limited supplied coverage and do not establish invoice/order correspondence or a billing-to-operations relationship.'}],next_checks:[{premises:observations,text:'Check a common observation window, population coverage and existing invoice/order references before making a comparison.'}]};
+ const answer={observations,results:[],hypotheses:[],missing_information:observations.length<2?[]:[{kind:'selected_fact_time_comparison',premises:observations}],next_checks:[{premises:observations,text:'Check a common observation window, population coverage and existing invoice/order references before making a comparison.'}]};
  fullReply=structuredClone(answer);selectedSources=structuredClone(sources);
  if(mode==='bad_binding')answer.observations[0].binding='f'.repeat(64);
  if(mode==='wrong_binding')answer.observations[0].binding=answer.observations[1].binding;
@@ -69,7 +69,7 @@ global.fetch=async(url,init)=>{
 };
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:id(5)},question:'Use stored Xero and explicitly synthetic Google Sheets dispatch/backlog operations canary observations for a hypothetical executive brief. No web research.',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}};
 (async()=>{
- const canonical=JSON.stringify(raw),answer=await runVsiAnswer(input);assert.equal(calls,2);assert.equal(answerCalls,1);assert.equal(answer.citations.length,2);assert.match(answer.content,/^Coverage: This is a partial review/);assert.match(answer.content,/outstanding.*50 USD/);assert.match(answer.content,/dispatches.*6 count/);assert.match(answer.content,/not establish invoice\/order correspondence/);assert.equal(JSON.stringify(raw),canonical);
+ const canonical=JSON.stringify(raw),answer=await runVsiAnswer(input);assert.equal(calls,2);assert.equal(answerCalls,1);assert.equal(answer.citations.length,2);assert.match(answer.content,/^Coverage: This is a partial review/);assert.match(answer.content,/outstanding.*50 USD/);assert.match(answer.content,/dispatches.*6 count/);assert.match(answer.content,/does not establish record correspondence/);assert.equal(JSON.stringify(raw),canonical);
  assert.match(answer.content,/Selected fact dates: invoice\/bill date 2026-10-14/);
  assert.match(answer.content,/Selected fact dates: supplied row date 2026-10-15/);
  assert.match(answer.content,/selected date labels differ; same-period alignment is not established/);
@@ -148,8 +148,14 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  // but only the relevant observations are actually selected for the answer.
  // Compact only this final all-fit fixture; keep all 15 identities, authorization and coverage assertions.
  raw[1].data.scope='Synthetic';
+ // Explicit supported-window disclosure adds context. Keep this final all-fit
+ // case compact without reducing its source count, values, dates or bindings.
+ for(const source of [raw[0],raw[2]]){source.data.metrics[0].metric='dispatches';source.data.metrics[1].metric='backlog';source.hash=require('node:crypto').createHash('sha256').update(JSON.stringify({identity:source.identity,data:source.data})).digest('hex');}
  for(const source of raw.slice(3)){source.data.metrics=[{metric:'X',value:'1',unit:'count'}];source.hash=require('node:crypto').createHash('sha256').update(JSON.stringify({identity:source.identity,data:source.data})).digest('hex');}
- expectedPacked=15;mode='subset';const allAvailable=await runVsiAnswer(input);assert.equal(allAvailable.citations.length,2);assert.equal(captured.contextCoverage,undefined);assert.match(allAvailable.content,/^Coverage: This is a partial review/);
+ // Leave headroom for the real full prompt/schema while retaining the same
+ // Xero + synthetic Sheets scope intent and all 15 canonical originals.
+ const allFitInput={...input,question:'Stored Xero Google Sheets dispatches'};
+ expectedPacked=15;mode='subset';const allAvailable=await runVsiAnswer(allFitInput);assert.equal(allAvailable.citations.length,2);assert.equal(captured.contextCoverage,undefined);assert.match(allAvailable.content,/^Coverage: This is a partial review/);
  for(const condition of ['foreign','revoked','revoked_after_plan']){mode='subset';foreign=condition==='foreign';revoked=condition==='revoked';revokeAfterPlanner=condition==='revoked_after_plan';calls=0;await assert.rejects(runVsiAnswer(input));assert.equal(calls,condition==='revoked_after_plan'?1:0);}foreign=false;revoked=false;revokeAfterPlanner=false;
  console.log(JSON.stringify({passed:true,canonicalOriginals:15,packedOriginals:7,intendedCoverageGroups:2,sheetsRowsInRequiredScope:2,subsetCitations:2,businessFactsProbed,productFactsProbed,referenceRejections,engineReferenceCases,prefixedBindingsRejectedAtSchema:true,canonicalTransportRendererMappingPreserved:true,historicalOnlyReferenceDenied:true,oldRuleFailureReproduced:true,secondRowAndOptionalSourcesNeedNotBecomeClaims:true,wrongConnectionCannotSatisfyIntent:true,missingProviderAndFabricatedBindingDenied:true,unobservedPremiseAndMissingCalculationInputDenied:true,tiesAndDependencyJoinsPreserveRequirements:true,allAvailableButSubsetAnswerStillPartial:true,authorityAndRevocationPreserved:true,fullWireChars:measurement.final.requestChars,externalCalls:0,semanticUsefulnessProved:false}));
 })().catch(error=>{process.stderr.write(String(error.stack||error)+'\n');process.exitCode=1;});

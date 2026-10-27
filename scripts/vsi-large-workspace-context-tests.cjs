@@ -10,7 +10,7 @@ const raw=[sheets(0,true),{provider:'xero',identity:{kind:'legacy_binding',bindi
 
 const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
  events.push(name);
- if(name==='discover_shared_evidence_v1')return {data:{stage:'catalog_only',candidates:raw.map(s=>({provider:s.provider,identity:s.identity})),truncated:false},error:null};
+ if(name==='discover_shared_evidence_v2')return {data:require('./shared-discovery-test-support.cjs').completeCatalog(raw.map(s=>({provider:s.provider,identity:s.identity}))),error:null};
  if(name==='read_shared_typed_evidence_v1'||name==='preview_shared_legacy_evidence_v1'){
   const source=structuredClone(name==='read_shared_typed_evidence_v1'?raw.find(row=>row.identity.source_id===args.p_identity.source_id):raw[1]);if(foreign)source.data.workspace_id=id(99);
   return {data:{stage:'unadmitted',resolved:source},error:null};
@@ -82,7 +82,7 @@ global.fetch=async(url,init)=>{
   if(answerVariant==='source_label')output.observations[0].provider='UNAUTHORIZED_OVERRIDE';
   if(['cause','certainty','record_linkage','negated_certainty'].includes(answerVariant)){
    const text={cause:'These observations may cause changes.',certainty:'These observations prove a conclusion.',record_linkage:'Whether these observations are linked.',negated_certainty:'These observations are not a proven conclusion.'}[answerVariant];
-   // Natural prose is rendered only as unverified draft, never a finding.
+   // Cross-original limitation prose cannot supply a temporal assertion.
    output.missing_information=[{premises:output.observations,text}];
   }
   if(['multi_fact','duplicate_premise','same_original','invented_multi_quote'].includes(answerVariant)){
@@ -138,8 +138,7 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
   assert.doesNotMatch(JSON.stringify(validationEvents.at(-1)),/DO_NOT_LOG_SECRET|https:|00000000|[a-f0-9]{64}/);
  }
  for(const variant of ['cause','certainty','record_linkage','negated_certainty']){
-  answerVariant=variant;const draftAnswer=await runVsiAnswer(input);assert.match(draftAnswer.content,/Missing information \/ limitation \(model assessment\)/);
-  assert(!draftAnswer.content.includes('Verified finding:'));const manualSemanticApproval=false;assert.equal(manualSemanticApproval,false,'mechanical prose acceptance is not usefulness or grounding proof');
+  answerVariant=variant;await assert.rejects(runVsiAnswer(input),error=>error.usage.validationFailure.contractRule==='temporal_assessment_required');
  }
  answerVariant='valid';
  const {pluginProviders}=require('../lib/ai/shared-evidence/contracts.ts');
