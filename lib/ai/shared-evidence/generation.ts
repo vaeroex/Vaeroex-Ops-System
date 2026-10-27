@@ -25,6 +25,18 @@ const issued=new WeakMap<SharedPrepared,string>();
 const num=(v:unknown)=>decimalSchema.parse(v);
 const label=(v:unknown)=>z.string().min(1).max(160).parse(v).replace(/[_-]/g," ");
 const object=(v:unknown)=>z.record(z.unknown()).parse(v);
+/** Opposite-family zero metrics remain selectable; only exact count markers
+ * establish the stored record's contribution family, never its money value. */
+function xeroContribution(metrics: readonly {key:string;value:string;currency?:string}[]): string {
+ const invoices=metrics.filter(metric=>metric.key==='invoices'),bills=metrics.filter(metric=>metric.key==='bills');
+ if(invoices.length===1&&bills.length===1&&invoices[0].currency
+  &&metrics.every(metric=>metric.currency===invoices[0].currency)) {
+  const zero=(value:string)=>/^-?0+(?:\.0+)?$/.test(value),one=(value:string)=>/^0*1(?:\.0+)?$/.test(value);
+  if(one(invoices[0].value)&&zero(bills[0].value)) return 'sales-invoice contribution';
+  if(zero(invoices[0].value)&&one(bills[0].value)) return 'purchase-bill contribution';
+ }
+ return 'record contribution';
+}
 /** Exact stored observations only. Never sum invoice/order/payment/accounting totals,
  * infer a currency exponent, infer entity correspondence, or parse raw file text. */
 export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
@@ -53,6 +65,7 @@ export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
    const snapshot=record.snapshot?object(record.snapshot):null;
    if(record.metrics||snapshot) {
     const metrics=z.array(z.object({key:z.string(),value:decimalSchema,currency:z.string().optional()})).parse(snapshot?.metrics??record.metrics);
+    const contribution=provider==='xero'&&!snapshot?xeroContribution(metrics):null;
     for(const metric of metrics) {
      const semantics=reportingMetricSemantics(provider,metric,snapshot?'snapshot':'history');
      const unit=semantics.currency??semantics.unit;
@@ -61,8 +74,13 @@ export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
      if(date) factTimes.push({date,basis:provider==='xero'?'invoice_or_bill_date':provider==='clockify'?'entry_start_utc_date':'spent_date',
       valueTiming:provider==='xero'?metric.key==='outstanding'?'balance_at_import':'document_contribution':'entry_contribution'});
      const dateLabel=snapshot?`snapshot ${snapshot.start} through ${snapshot.end}`:provider==='xero'?`invoice/bill date ${date}`:provider==='clockify'?`entry start date (UTC) ${date}`:`entry spent date ${date}`;
-     const timing=provider==='xero'&&metric.key==='outstanding'?'; balance at import (as-of unknown)':'';
-     facts.push(`${label(provider)} ${label(metric.key)}: ${metric.value} ${unit}${partition}; ${dateLabel}${timing}. Scope: ${label(d.scope)}.`);
+     if(contribution) {
+      // Provider and scope remain in the source context and renderer attribution.
+      // Avoid repeating them in every contribution without dropping any facts.
+      const dated=contribution==='record contribution'?`${contribution}; invoice/bill date ${date}`:`${contribution} dated ${date}`;
+      const timing=metric.key==='outstanding'?'; balance at import; as-of unknown':'';
+      facts.push(`${label(metric.key)}: ${metric.value} ${unit}${partition}; ${dated}${timing}.`);
+     } else facts.push(`${label(provider)} ${label(metric.key)}: ${metric.value} ${unit}${partition}; ${dateLabel}. Scope: ${label(d.scope)}.`);
     }
    } else if(provider==='wix-orders') facts.push(`Wix order amount: ${num(record.total_amount)} ${z.string().regex(/^[A-Z]{3}$/).parse(record.currency_code)}, created ${z.string().parse(record.created_at)}; order value is not a settlement or accounting revenue.`);
    else if(provider==='zoho-books') {

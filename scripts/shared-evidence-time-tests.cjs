@@ -23,12 +23,12 @@ const raw=[xero,sheet(1,'2026-10-14'),sheet(2,'2026-10-15')],before=JSON.stringi
 const sources=rows.map((row,i)=>({ref:`B${i+1}`,binding:row.hash,dependencies:[row.hash],facts:row.facts,factTimes:row.factTimes,reported:false,environment:'production',provider:row.provider}));
 const pick=(n,factIndex)=>({ref:sources[n].ref,binding:sources[n].binding,factIndex});
 const observations=[pick(0,0),pick(0,2),pick(0,5),pick(0,7),pick(1,0),pick(2,1)];
-const answer={observations,results:[],hypotheses:[],missing_information:[{premises:observations,text:'The selected document and supplied row dates differ. These records do not establish matching measurement periods or invoice/order correspondence.'}],next_checks:[{premises:observations,text:'Confirm the balance observation time and obtain date-aligned order and invoice references before comparing collections with dispatch activity.'}]};
+const answer={observations,results:[],hypotheses:[],missing_information:[{kind:'selected_fact_time_comparison',premises:observations}],next_checks:[{premises:observations,text:'Confirm the balance observation time and obtain date-aligned order and invoice references before comparing collections with dispatch activity.'}]};
 const context={sources,results:[],hypothesesEnabled:false,scopes:new Map(rows.map((row,i)=>[sources[i].ref,row.scope]))};
 assert.equal(rows[0].facts.length,15);assert.equal(expandFactTimes(rows[0].factTimes,15).length,15);
 assert.deepEqual(expandFactTimes(rows[0].factTimes,15)[2],{date:'2026-10-13',basis:'invoice_or_bill_date',valueTiming:'balance_at_import'});
 assert.equal(expandFactTimes(rows[0].factTimes,15)[10].date,'2026-10-16');
-assert.match(rows[0].facts[2],/invoice\/bill date 2026-10-13/);
+assert.match(rows[0].facts[2],/purchase-bill contribution dated 2026-10-13/);
 assert.match(rows[0].facts[2],/balance at import/);
 assert.match(rows[0].facts[2],/as-of unknown/);
 assert.match(renderSharedAnswer(answer,context).content,/stored record contributions, not account\/day totals/);
@@ -105,14 +105,19 @@ for(const variant of ['missing','different']){
 const changed=withVsiSourceSnapshot({...businessSources[0],snapshotHash:undefined,text:JSON.stringify({...JSON.parse(businessSources[0].text),factTimes:rows[0].factTimes.map(time=>({...time,date:'2026-10-14'}))})});
 assert.notEqual(changed.snapshotHash,businessSources[0].snapshotHash);assert.equal(changed.sourceId,businessSources[0].sourceId);
 assert.equal(JSON.stringify(raw),before,'canonical source data/hash/key order unchanged');
-// The retained false prose is not fixed by valid IDs or labels: manual review
-// still rejects it. This regression explicitly refuses a semantic-proof claim.
-const misleading=structuredClone(answer);misleading.missing_information[0].text='The Xero records contain invoice and outstanding-balance observations for those dates.';
-assert.match(renderSharedAnswer(misleading,context).content,/for those dates/);
-assert.match(renderSharedAnswer(misleading,context).content,/same-period alignment is not established/);
+// The known false cross-original limitation is now structurally rejected;
+// independent free-draft channels remain explicitly unverified, not repaired.
+const retainedFalse='The Xero records contain invoice and outstanding-balance observations for those dates.';
+const misleading=structuredClone(answer);misleading.missing_information=[{premises:observations,text:retainedFalse}];
+assert.throws(()=>renderSharedAnswer(misleading,context),error=>error.rule==='temporal_assessment_required');negatives++;
+assert.doesNotMatch(rendered.content,/for those dates/);
+assert.match(rendered.content,/Selected-date comparison \(application-computed from cited premises\)/);
+const residual={...answer,missing_information:[],next_checks:[{premises:observations,text:retainedFalse}]};
+assert.match(renderSharedAnswer(residual,context).content,/Recommended check \(model draft; not performed\)/);
+assert.match(renderSharedAnswer(residual,context).content,/for those dates/,'free proposed-check prose is still not semantic proof');
 (async()=>{
  const reader={rpc:async(name,args)=>({data:name==='discover_shared_evidence_v1'?{stage:'catalog_only',candidates:raw.map(r=>({provider:r.data.provider,identity:r.identity})),truncated:false}:{stage:'unadmitted',resolved:name==='preview_shared_legacy_evidence_v1'?xero:raw.find(r=>r.identity.source_id===args.p_identity.source_id)},error:null})};
  const prepared=await prepareSharedGeneration(reader,workspace,'2026-09-26','2026-10-25');assertSharedPrepared(prepared);
  prepared.rows[0].factTimes[0].date='2026-10-14';assert.throws(()=>assertSharedPrepared(prepared),/preparation_changed/);negatives++;
- assert.equal(network,0);console.log(JSON.stringify({passed:true,selectedDateMismatch:true,equalDateNotComparability:true,incompleteDatesDoNotClaimComparison:true,runningEntriesNotClaimedComplete:true,unknownTimingPreserved:true,rawAndFactOrderPreserved:true,metadataSnapshotAndIntegrityBound:true,negativeCases:negatives,unsupportedTemporalProseStillRenders:true,manualQualityReviewRequired:true,paidCalls:0}));
+ assert.equal(network,0);console.log(JSON.stringify({passed:true,selectedDateMismatch:true,equalDateNotComparability:true,incompleteDatesDoNotClaimComparison:true,runningEntriesNotClaimedComplete:true,unknownTimingPreserved:true,rawAndFactOrderPreserved:true,metadataSnapshotAndIntegrityBound:true,negativeCases:negatives,crossOriginalFalseLimitationRejected:true,residualFreeDraftStillRequiresReview:true,manualQualityReviewRequired:true,paidCalls:0}));
 })().catch(error=>{console.error(error);process.exitCode=1;});

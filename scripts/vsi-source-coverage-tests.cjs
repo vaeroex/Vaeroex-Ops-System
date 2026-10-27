@@ -54,7 +54,7 @@ global.fetch=async(url,init)=>{
  const pick=(source,pattern)=>({ref:source.ref,binding:source.binding,factIndex:Math.max(0,source.facts.findIndex(f=>pattern.test(f)))});
  const xero=pick(sourceFor(raw[1].hash),/outstanding/),sheetA=pick(sourceFor(raw[0].hash),/dispatches/),sheetB=pick(sourceFor(raw[2].hash),/dispatches/),other=pick(sourceFor(raw[3].hash),/worksheet/);
  const observations=mode==='missing_xero'?[sheetA]:mode==='wrong_sheet'?[xero,other]:mode==='second_date'?[xero,sheetB]:mode==='all'?sources.map(s=>pick(s,/.*/)):[xero,sheetA];
- const answer={observations,results:[],hypotheses:[],missing_information:[{premises:observations,text:'These observations have limited supplied coverage and do not establish invoice/order correspondence or a billing-to-operations relationship.'}],next_checks:[{premises:observations,text:'Check a common observation window, population coverage and existing invoice/order references before making a comparison.'}]};
+ const answer={observations,results:[],hypotheses:[],missing_information:observations.length<2?[]:[{kind:'selected_fact_time_comparison',premises:observations}],next_checks:[{premises:observations,text:'Check a common observation window, population coverage and existing invoice/order references before making a comparison.'}]};
  fullReply=structuredClone(answer);selectedSources=structuredClone(sources);
  if(mode==='bad_binding')answer.observations[0].binding='f'.repeat(64);
  if(mode==='wrong_binding')answer.observations[0].binding=answer.observations[1].binding;
@@ -69,7 +69,7 @@ global.fetch=async(url,init)=>{
 };
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:id(5)},question:'Use stored Xero and explicitly synthetic Google Sheets dispatch/backlog operations canary observations for a hypothetical executive brief. No web research.',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}};
 (async()=>{
- const canonical=JSON.stringify(raw),answer=await runVsiAnswer(input);assert.equal(calls,2);assert.equal(answerCalls,1);assert.equal(answer.citations.length,2);assert.match(answer.content,/^Coverage: This is a partial review/);assert.match(answer.content,/outstanding.*50 USD/);assert.match(answer.content,/dispatches.*6 count/);assert.match(answer.content,/not establish invoice\/order correspondence/);assert.equal(JSON.stringify(raw),canonical);
+ const canonical=JSON.stringify(raw),answer=await runVsiAnswer(input);assert.equal(calls,2);assert.equal(answerCalls,1);assert.equal(answer.citations.length,2);assert.match(answer.content,/^Coverage: This is a partial review/);assert.match(answer.content,/outstanding.*50 USD/);assert.match(answer.content,/dispatches.*6 count/);assert.match(answer.content,/does not establish record correspondence/);assert.equal(JSON.stringify(raw),canonical);
  assert.match(answer.content,/Selected fact dates: invoice\/bill date 2026-10-14/);
  assert.match(answer.content,/Selected fact dates: supplied row date 2026-10-15/);
  assert.match(answer.content,/selected date labels differ; same-period alignment is not established/);

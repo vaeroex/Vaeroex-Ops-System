@@ -1,6 +1,8 @@
 {
   "git": {
     "deploymentEnabled": {
+      "codex/vsi-cross-source-date-contract": false,
+      "codex/vsi-cross-source-date-quality-canary": false,
       "codex/session-refresh-conflict": false,
       "codex/session-refresh-persistence": false,
       "codex/vsi-citation-read-stages": false,

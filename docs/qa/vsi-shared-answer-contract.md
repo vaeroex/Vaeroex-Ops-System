@@ -1,5 +1,13 @@
 # Local shared-answer contract v2
 
+The current local date/selection correction is described in
+[Cross-source selection and date comparison](vsi-cross-source-date-contract.md).
+Cross-original `missing_information` now uses a closed, application-computed
+selected-fact date comparison; free text in that field is limited to one
+business original. Specific multi-source evidence questions remain proposed
+`next_checks`. The historical qualification receipts below are not receipts for
+this latest local candidate.
+
 This candidate is inactive. It does not authorize publication, deployment,
 credentials, inference, SQL changes or activation. Existing three gates remain
 false. The general/public answer contract remains available when no stored

@@ -128,7 +128,10 @@ function invalidMetric(provider, kind, metric) {
         const dateText = record.snapshot ? `snapshot ${record.snapshot.start} through ${record.snapshot.end}` : provider === 'xero' ? `invoice/bill date ${record.day}` : provider === 'clockify' ? `entry start date (UTC) ${record.day}` : `entry spent date ${record.day}`;
         const timing = provider === 'xero' && metric.key === 'outstanding' ? '; balance at import (as-of unknown)' : '';
         const contribution = '';
-        expectedFacts.push(`${provider.replace(/[_-]/g, ' ')} ${metric.key.replace(/[_-]/g, ' ')}: ${metric.value} ${renderedUnit}${partitionText}; ${dateText}${timing}.${contribution} Scope: synthetic reporting originals.`);
+        if (provider === 'xero' && !record.snapshot) {
+          const family = metrics.find(value => value.key === 'invoices').value === 1 ? 'sales-invoice' : 'purchase-bill';
+          expectedFacts.push(`${metric.key}: ${metric.value} ${renderedUnit}${partitionText}; ${family} contribution dated ${record.day}${metric.key === 'outstanding' ? '; balance at import; as-of unknown' : ''}.`);
+        } else expectedFacts.push(`${provider.replace(/[_-]/g, ' ')} ${metric.key.replace(/[_-]/g, ' ')}: ${metric.value} ${renderedUnit}${partitionText}; ${dateText}${timing}.${contribution} Scope: synthetic reporting originals.`);
         if (definition.kind === 'snapshot') assert.equal(observation.temporalKind, provider === 'toggl' && metric.key === 'hours' ? 'lifetime' : 'snapshot');
         observationsCompared++;
       }

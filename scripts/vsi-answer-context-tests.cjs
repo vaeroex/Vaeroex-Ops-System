@@ -70,7 +70,7 @@ const duplicate=structuredClone(pure);duplicate.qualitative_sources.push(duplica
 const many=structuredClone(pure);for(let n=3;n<=17;n++){const binding=n.toString(16).padStart(64,'0'),facts=[`Complete source group ${n}. `.repeat(20)];many.businessSources.push(source(`B${n}`,binding,facts));many.qualitative_sources.push(synth(`B${n}`,binding,facts));}
 many.businessSources.reverse();many.qualitative_sources.reverse();
 const manyPacked=JSON.parse(packVsiAnswerContext(many,'system',48000).json);assert.equal(manyPacked.businessSources.length,17);assert.deepEqual(manyPacked.businessSources.map(s=>s.id),many.businessSources.map(s=>s.id));assert.equal(new Set(manyPacked.businessSources.map(s=>s.sourceType)).size,2);
-let transport,originalChars=0,packedChars=0,serializedRequestChars=0,serializedRequestBytes=0;
+let transport,originalChars=0,originalRequestChars=0,packedChars=0,serializedRequestChars=0,serializedRequestBytes=0;
 process.env.OPENAI_API_KEY='synthetic-global-unused';process.env.VAEROEX_VSI_MAX_INPUT_CHARS='32000';
 global.fetch=async(url,init)=>{
  providerCalls++;events.push('provider');assert(init.body.length<=32000);assert(Buffer.byteLength(init.body,'utf8')<=192000);assert.equal(url,'https://api.openai.com/v1/responses');assert.equal(init.headers.Authorization,'Bearer synthetic-dedicated-key');
@@ -82,7 +82,9 @@ global.fetch=async(url,init)=>{
   answerCalls++;serializedRequestChars=init.body.length;serializedRequestBytes=Buffer.byteLength(init.body,'utf8');transport=payload;packedChars=body.input[0].content.length+body.input[1].content.length;assert(packedChars<=32000);assert.equal(payload.businessSources.length,2);assert.equal(payload.qualitative_sources.length,2);assert.deepEqual(payload.authoritativeProductContext,product);
   const expanded=structuredClone(payload);delete expanded.sharedObservationLayout;
   for(const source of expanded.businessSources){const record=JSON.parse(source.text);assert(record.observationsRef,'fixture must exercise compaction');const issued=payload.qualitative_sources.find(s=>s.ref===record.observationsRef);delete record.observationsRef;record.observations=issued.facts;source.text=JSON.stringify(record);}
-  originalChars=JSON.stringify(expanded).length+body.input[0].content.length;assert(originalChars>32000,'reproduce the former post-premise context failure');
+  originalChars=JSON.stringify(expanded).length+body.input[0].content.length;
+  originalRequestChars=JSON.stringify({...body,input:[body.input[0],{...body.input[1],content:JSON.stringify(expanded)}]}).length;
+  assert(originalRequestChars>32000,'the duplicated full request including prompt/schema/envelope exceeds the unchanged limit');
   const {sharedReply,observationsFor}=require('./vsi-shared-answer-test-support.cjs');
   output=sharedReply(payload);
   output.hypotheses=[{premises:observationsFor(payload),text:'The invoice balance and dispatch observations may merit a closer look; this is not an established cause.'}];
@@ -96,7 +98,7 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
 (async()=>{
  const answer=await runVsiAnswer(input);assert.equal(answer.sharedManifestId,manifest);assert.equal(answer.usage.providerCalls,2);assert.equal(answer.citations.length,2);assert.match(answer.content,/Hypothesis \(unverified model draft\)/);
  for(const original of raw){const row=sharedRow(original,workspace),canonical=withVsiSourceSnapshot({id:row.hash,title:row.provider.replace(/[_-]/g,' '),url:`/app/sources/evidence/vsi_exchange/${request}?workspace=${workspace}#source-${row.hash}`,sourceType:`shared_${row.provider}`,sourceId:row.hash,evidenceDate:null,retrievedAt:transport.businessSources.find(s=>s.sourceId===row.hash).retrievedAt,text:JSON.stringify({scope:row.scope,observations:row.facts,...(row.factTimes?{factTimes:row.factTimes}:{})}),treatment:'record'});const saved=answer.citations.find(c=>c.sourceId===row.hash);assert(saved);assert.equal(saved.snapshotHash,canonical.snapshotHash);assert.equal(saved.url,canonical.url);assert.equal(transport.businessSources.find(s=>s.sourceId===row.hash).id,stableVsiCitationId(canonical));}
- const measured={originalContextChars:originalChars,packedContextChars:packedChars,serializedRequestChars,serializedRequestBytes};
+ const measured={originalContextChars:originalChars,originalRequestChars,packedContextChars:packedChars,serializedRequestChars,serializedRequestBytes};
  for(const mode of ['unknown-citation','unsupported-cause']){answerMode=mode;await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.outcomeFailure==='citation_validation');}answerMode='valid';
  for(const kind of ['revoked','foreign']){providerCalls=0;answerCalls=0;revoked=kind==='revoked';foreign=kind==='foreign';await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.inputTokens===0);assert.equal(providerCalls,0);assert.equal(answerCalls,0);}revoked=false;foreign=false;
  providerCalls=0;answerCalls=0;revokeAfterPlanner=true;await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.providerCalls===1&&e.usage.outcomeFailure==='evidence_unavailable');assert.equal(providerCalls,1);assert.equal(answerCalls,0);revokeAfterPlanner=false;revoked=false;

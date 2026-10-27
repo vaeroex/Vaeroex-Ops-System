@@ -24,8 +24,9 @@ const sparse=sourcesFor('unsupported-cause');const sparseText=positive(usefulSha
 // Whole retained Evaluation04 legacy response cannot bypass the new contract.
 denied({content:'The retained synthetic brief.',citationIds:['B1','B2'],interpretations:[]});
 const retained={...sharedReply(payload),hypotheses:[{premises:good.observations,text:'The Google Sheets orders on payment hold and the Xero outstanding invoice balance may each merit follow-up.'}],missing_information:[{premises:good.observations,text:'Whether the partial supplied observations have sufficient coverage to assess the status of the Google Sheets orders on payment hold and the Xero outstanding invoice balance.'}],next_checks:[{premises:good.observations,text:'Review the source records for the Google Sheets orders on payment hold and the Xero outstanding invoice balance, including their scope and coverage.'}]};
-const retainedText=positive(retained);assert(retainedText.content.includes('Hypothesis (unverified model draft)'));const retainedUseful=false;assert.equal(retainedUseful,false,'Generic review remains a failed manual assessment; mechanical pass is not quality.');
-for(const question of ['Which invoice, if any, is linked to each payment-held order?','How could the observations be compared without assuming a causal link?','What information would establish whether these observations concern matched records?','Does the source explain why an order is held?'])positive({...good,missing_information:[{premises:good.observations,text:question}]});
+denied(retained,'temporal_assessment_required');
+const retainedText=positive({...retained,missing_information:good.missing_information});assert(retainedText.content.includes('Hypothesis (unverified model draft)'));const retainedUseful=false;assert.equal(retainedUseful,false,'Generic review remains a failed manual assessment; mechanical pass is not quality.');
+for(const question of ['Which invoice, if any, is linked to each payment-held order?','How could the observations be compared without assuming a causal link?','What information would establish whether these observations concern matched records?','Does the source explain why an order is held?'])positive({...good,next_checks:[{premises:good.observations,text:question}]});
 denied({...good,content:'Xero records a fabricated balance.'});
 denied({...good,scopes:{B1:'Invented scope override.'}});
 denied({...good,observations:[{...good.observations[0],quote:'Invented fact.'},good.observations[1]]});
@@ -77,7 +78,7 @@ const hypothesis={premises:good.observations,text:'The payment-held orders and o
 // merely occur in the intermediate contract string.
 const React=require('react'),{renderToStaticMarkup}=require('react-dom/server'),{AnswerContent}=require('../components/vsi/AnswerContent.tsx');
 const draftMarkup=renderToStaticMarkup(React.createElement(AnswerContent,{content:render({...good,hypotheses:[hypothesis]},context).content}));
-for(const label of ['Hypothesis (unverified model draft)','Missing information / limitation (model assessment)','Recommended check (model draft; not performed)','Draft reasoning is not a verified finding, calculation or completed action.'])assert(draftMarkup.includes(label));
+for(const label of ['Hypothesis (unverified model draft)','Selected-date comparison (application-computed from cited premises)','Recommended check (model draft; not performed)','Draft reasoning is not a verified finding, calculation or completed action.'])assert(draftMarkup.includes(label));
 const clarificationMarkup=renderToStaticMarkup(React.createElement(AnswerContent,{content:renderSharedClarification('Which records and period should be checked?')}));assert(clarificationMarkup.includes('Clarification requested (model draft):'));
 denied({...good,hypotheses:[hypothesis]},'hypothesis_disabled',{...context,hypothesesEnabled:false});
 denied({...good,hypotheses:[{...hypothesis,premises:[good.observations[0]]}]},'independent_sources');

@@ -2,8 +2,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {fork,execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
-const candidate='d9d5810f2384cb0d11a7c37df0c8467063e74429';
-const runtimeTrees="040000 tree d348001c9e91078f6c67cd13f93b36119d30cbf5\tapp\n040000 tree ff3ef96576fea64097e348ab9adb4f4737c8c71e\tlib";
+const candidate='5de93eebb8267bfb687ec59e6642dcee569ec57d';
+const runtimeTrees="040000 tree d348001c9e91078f6c67cd13f93b36119d30cbf5\tapp\n040000 tree 7545bcbde0d296deff97491adfde4faab5f92ff6\tlib";
 const endpoint='https://api.openai.com/v1/responses';
 const limits=Object.freeze({questions:2,calls:4,callsPerQuestion:2,usd:1,reservePerCallUsd:.25,maxChars:48000,maxBytes:192000,maxOutputTokens:8000});
 const cases=Object.freeze([
@@ -130,7 +130,7 @@ function mockDispatch({body,caseId='qualified-brief'}){
  })():(()=>{
   const {sharedReply}=require('./vsi-shared-answer-test-support.cjs');
   const answer=sharedReply(payload);
-  answer.missing_information=[{premises:answer.observations,text:'Whether the source observations have adequate coverage for a useful review remains unclear.'}];
+  answer.missing_information=[{kind:'selected_fact_time_comparison',premises:answer.observations}];
   answer.next_checks=[{premises:answer.observations,text:'Review these observations and their scope alongside each other.'}];
   return answer;
  })();return Promise.resolve({httpStatus:200,model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:30},text:JSON.stringify(value)});
