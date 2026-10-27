@@ -21,7 +21,7 @@ let positives=0,negatives=0;
 const pass=(a=answer(),c=context())=>{const result=render(a,c);positives++;return result;};
 const fail=(a,c=context(),rule)=>{assert.throws(()=>render(a,c),error=>!rule||error.rule===rule);negatives++;};
 const original=JSON.stringify([x,g]),result=pass();
-assert.match(result.content,/Selected-date comparison \(application-computed from cited premises\)/);
+assert.match(result.content,/Dates across all selected business observations \(application-computed\)/);
 assert.match(result.content,/selected date labels differ; same-period alignment is not established/);
 assert.match(result.content,/invoice\/bill date 2026-10-13/);
 assert.doesNotMatch(result.content,/invoice\/bill date 2026-10-14|invoice\/bill date 2026-10-15/);
@@ -29,7 +29,8 @@ assert.match(result.content,/balances at import; their exact observation time is
 assert.deepEqual(result.citationIds,['B1','B2']);
 assert.equal((result.content.match(/Application date check:/g)||[]).length,1,'a full comparison must not repeat the identical date block');
 const subset=pass(answer(observed,[pick(x),pick(g)])).content;
-assert.equal((subset.match(/Application date check:/g)||[]).length,2,'a subset comparison must retain dates from other observed facts');
+assert.equal((subset.match(/Application date check:/g)||[]).length,1,'a subset must not create a narrower competing date assessment');
+assert.equal(subset,result.content,'closed subset does not narrow the all-observed date assessment');
 assert.match(subset,/supplied row date 2026-10-15/,'selected facts outside the comparison remain visible');
 // Unselected invoice rows cannot substitute their dates for the selected bill contribution.
 for(const mutate of [s=>{s.facts[2]='Unselected replacement';s.facts[3]='Other unselected replacement';},s=>{s.factTimes[2].date='2026-12-24';s.factTimes[3].date='2026-12-25';},s=>{s.facts.push('Another unselected invoice');s.factTimes.push(time('2026-10-14','invoice_or_bill_date','document_contribution',4));}]){

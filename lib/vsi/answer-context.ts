@@ -1,5 +1,6 @@
 import type { SynthesisSource } from "@/lib/ai/shared-evidence/answer-contract";
 import type { VsiCitation } from "./types";
+import { invoiceSelections } from "@/lib/ai/shared-evidence/invoice-selection";
 import { VSI_MODEL } from "./config";
 import { vsiContextGroups, vsiAnswerCoverageGroups } from "./context-selection";
 
@@ -68,9 +69,12 @@ export function packVsiAnswerContext<T extends AnswerContext>(payload: T, system
   if (!Number.isSafeInteger(maxChars) || maxChars <= 0) throw new RangeError("invalid_vsi_context_budget");
   const measure = (view: AnswerContext) => {
     const requiredSourceGroups = options.selectRelevant ? vsiAnswerCoverageGroups(view.businessSources, view.sharedRelationships || [], payload.question || "") : undefined;
-    const packed = serializeVsiAnswerContext(requiredSourceGroups ? { ...view, answerSourceRequirements: {
+    const invoicePolicy = options.selectRelevant ? invoiceSelections(view.qualitative_sources, payload.question || "") : [];
+    if (requiredSourceGroups?.some(group => group.every(ref => invoicePolicy.some(policy => policy.ref === ref && !policy.eligible.length)))) throw new Error("vsi_sales_invoice_evidence_unavailable");
+    const reviewedView = invoicePolicy.length ? {...view, invoiceReviewOrder: invoicePolicy.filter(policy => policy.eligible.length).map(policy => ({ref:policy.ref, factGroups:policy.reviewFirst}))} : view;
+    const packed = serializeVsiAnswerContext(requiredSourceGroups ? { ...reviewedView, answerSourceRequirements: {
       groups: requiredSourceGroups, rule: "Cite at least one issued observation from each group. Other available originals are optional context, not claims or proof of complete coverage."
-    } } : view);
+    } } : reviewedView);
     const wire = options.requestJSON?.(packed.json) || `${systemPrompt}${packed.json}`;
     const request = options.requestJSON ? JSON.parse(wire) : null;
     const inputChars = request ? JSON.stringify(request.input).length : packed.json.length + systemPrompt.length;

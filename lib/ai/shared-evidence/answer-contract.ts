@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { invoiceSelections, type InvoiceSelection } from "./invoice-selection";
 import { evidenceEngineHash } from "@/lib/ai/evidence-engine/hash";
 import { expandFactTimes, selectedFactTimeLines, type FactTime, type FactTimeGroup } from "./fact-time";
-export type SynthesisSource = Readonly<{ ref: string; binding: string; dependencies: readonly string[]; facts: readonly string[]; factTimes?: readonly FactTimeGroup[]; reported: "file" | "note" | false; environment: "production" | "sandbox" | "supporting"; installation?: string; provider?: string; supportOnly?: boolean }>;
+export type SynthesisSource = Readonly<{ ref: string; binding: string; dependencies: readonly string[]; facts: readonly string[]; factTimes?: readonly FactTimeGroup[]; salesInvoiceFactGroups?: readonly (readonly number[])[]; reported: "file" | "note" | false; environment: "production" | "sandbox" | "supporting"; installation?: string; provider?: string; supportOnly?: boolean }>;
 
 /** Shared business answers have no free-form factual content field. Models
  * select immutable issued facts/results; the application renders their values,
@@ -22,7 +23,7 @@ export type SharedStructuredAnswer = z.infer<typeof sharedAnswerSchema>;
 export type IssuedAnswerResult = Readonly<{ id: string; fact: string; inputSourceIds: readonly string[] }>;
 type FactSelection = z.infer<typeof factSelection>;
 type Draft = z.infer<typeof draft>;
-export const sharedAnswerRules = ["context_reference", "fact_reference", "duplicate_fact", "source_coverage", "result_reference", "result_dependencies", "draft_support", "draft_format", "numeric_draft", "hypothesis_disabled", "independent_sources", "temporal_assessment_required", "environment", "answer_bounds"] as const;
+export const sharedAnswerRules = ["context_reference", "fact_reference", "duplicate_fact", "invoice_selection", "source_coverage", "result_reference", "result_dependencies", "draft_support", "draft_format", "numeric_draft", "hypothesis_disabled", "independent_sources", "temporal_assessment_required", "environment", "answer_bounds"] as const;
 export type SharedAnswerRule = typeof sharedAnswerRules[number];
 export type SharedAnswerCoverageDiagnostic = Readonly<{ availableReferences: number; observedReferences: number; requiredGroups: number; missingGroups: number }>;
 export const factReferenceReasons = ["unknown_ref", "binding_mismatch", "fact_index_out_of_bounds", "source_dependencies_missing"] as const;
@@ -56,19 +57,25 @@ export const sharedAnswerJsonSchema = { type: "object", additionalProperties: fa
  * not calculation authority: rendering still verifies IDs, hashes, observed
  * dependencies and uniqueness independently, including provider violations.
  * Keep the base schema immutable between requests. */
-export function sharedAnswerJsonSchemaForResults(results: readonly { id: string }[], hypothesesEnabled: boolean) {
+export function sharedAnswerJsonSchemaForResults(results: readonly { id: string }[], hypothesesEnabled: boolean, invoicePolicy: readonly InvoiceSelection[] = [], availableRefs: readonly string[] = []) {
   if (!Array.isArray(results)) resultFailure("invalid_issued_id", 0, 0);
   const ids = results.map(result => result?.id);
   if (ids.some(id => typeof id !== "string" || id.length !== 64 || !/^[a-f0-9]{64}$/.test(id))) resultFailure("invalid_issued_id", ids.length, 0);
   if (new Set(ids).size !== ids.length) resultFailure("duplicate_issued_id", ids.length, 0);
+  const otherRefs = availableRefs.filter(ref => !invoicePolicy.some(policy => policy.ref === ref));
+  const selectionVariants = invoicePolicy.filter(policy => policy.eligible.length).map(policy => ({ ...factJson, properties: {
+    ref: { type: "string", enum: [policy.ref] }, binding: { type: "string", enum: [policy.binding] }, factIndex: { type: "integer", enum: [...policy.eligible] }
+  } }));
+  const items = invoicePolicy.length ? { anyOf: [...selectionVariants, ...(otherRefs.length ? [{ ...factJson, properties: { ...factJson.properties, ref: {type: "string", enum: [...otherRefs]} } }] : [])] } : factJson;
   return { ...sharedAnswerJsonSchema, properties: { ...sharedAnswerJsonSchema.properties,
+    observations: { ...sharedAnswerJsonSchema.properties.observations, ...(invoicePolicy.length && !(items as {anyOf: unknown[]}).anyOf.length ? {maxItems: 0, items: factJson} : {items}) },
     results: { ...sharedAnswerJsonSchema.properties.results, maxItems: Math.min(12, ids.length),
       items: { ...sharedAnswerJsonSchema.properties.results.items, ...(ids.length ? { enum: ids } : {}) } },
     hypotheses: { ...sharedAnswerJsonSchema.properties.hypotheses, maxItems: hypothesesEnabled ? 3 : 0 }
   } };
 }
 
-export const SHARED_ANSWER_INSTRUCTIONS = "Use the shared-answer schema, no content/citationIds. Select observations by issued ref, exact bare binding (64 lowercase hex, never sha256: or snapshotHash), and source-local zero-based factIndex. Historical-only refs are invalid. Observe each answerSourceRequirements group; other facts only when relevant. Availability/subsets prove neither totals, trends nor completeness. contextFactSources indexes follow product text or public claims. results use only issued sharedRelationships IDs with all inputs observed; invent no calculation. The app renders factual values, units, dates and attribution. For billing/collections prefer sales-invoice contributions, not purchase-bill invoice zeros; preserve valid zero-value invoices. factTimes indexes bind each fact: document/row dates, balances at import, retrieval times and selection windows differ; even equal dates prove no measurement alignment. For cross-original missing_information use {kind: selected_fact_time_comparison, premises: observed fact selections}, never text/dates/verdicts. The app computes this limitation. Single-original missing_information may use text. Put specific missing linkage/coverage/status questions in next_checks; do not move factual recaps there. hypotheses are optional unverified possibilities requiring two independent originals; never force one. Draft premises must be observed. Drafts have no factual authority: invent no cause, correspondence, completeness, performed action or result; do not contradict the app date check. No URLs, inline citations or numeric literals in prose; refer to observations. No business-word whitelist applies. Use ordinary questions/negation and a concrete check before a decision, not generic review-alongside prose. Valid references do not prove semantic correctness or usefulness; manual review remains required.";
+export const SHARED_ANSWER_INSTRUCTIONS = "Use the shared-answer schema, no content/citationIds. Select observations by issued ref, exact bare binding (64 lowercase hex, never sha256: or snapshotHash), and source-local zero-based factIndex. Historical-only refs are invalid. Observe each answerSourceRequirements group; other facts only when relevant. Availability/subsets prove neither totals, trends nor completeness. contextFactSources indexes follow product text or public claims. results use only issued sharedRelationships IDs with all inputs observed; invent no calculation. The app renders factual values, units, dates and attribution. For invoice-focused questions, invoiceReviewOrder lists typed invoice fact groups to inspect first; select only eligible invoice indexes, including zero-value invoices. Date-label ranking is not temporal alignment or a record join. factTimes indexes bind each fact: document/row dates, balances at import, retrieval times and selection windows differ; even equal dates prove no measurement alignment. For cross-original missing_information use {kind: selected_fact_time_comparison, premises: observed fact selections}, never text/dates/verdicts. The app computes one date assessment across all selected business observations; a subset of premises cannot narrow it. Single-original missing_information may use text. Put specific missing linkage/coverage/status questions in next_checks; do not move factual recaps there. hypotheses are optional unverified possibilities requiring two independent originals; never force one. Draft premises must be observed. Drafts have no factual authority: invent no cause, correspondence, completeness, performed action or result; do not contradict the app date check. No URLs, inline citations or numeric literals in prose; refer to observations. No business-word whitelist applies. Use ordinary questions/negation and a concrete check before a decision, not generic review-alongside prose. Valid references do not prove semantic correctness or usefulness; manual review remains required.";
 
 /** Reuse already-authorized app context and completed public lookup snapshots.
  * No extra retrieval, source text duplication, or historical-business promotion.
@@ -113,6 +120,7 @@ export function renderSharedClarification(value: string): string {
 export function renderSharedAnswer(value: unknown, context: {
   sources: readonly SynthesisSource[]; results: readonly IssuedAnswerResult[]; hypothesesEnabled: boolean; requiredRefs?: readonly string[];
   requiredSourceGroups?: readonly (readonly string[])[];
+  question?: string;
   scopes?: ReadonlyMap<string, Readonly<Record<string, unknown>>>
 }): { content: string; citationIds: string[] } {
   const answer = sharedAnswerSchema.parse(value);
@@ -135,10 +143,14 @@ export function renderSharedAnswer(value: unknown, context: {
     if (!source.dependencies.length) return factFailure("source_dependencies_missing");
     return { source, fact: source.facts[selection.factIndex], time: timesByRef.get(source.ref)?.[selection.factIndex] ?? null };
   };
+  const invoicePolicy = invoiceSelections(context.sources, context.question || "");
   const observed = new Map<string, ReturnType<typeof resolve>>();
   for (const selection of answer.observations) {
     const key = keyOf(selection); if (observed.has(key)) fail("duplicate_fact");
-    observed.set(key, resolve(selection));
+    const resolved = resolve(selection);
+    const policy = invoicePolicy.find(policy => policy.ref === selection.ref);
+    if (policy && (policy.binding !== selection.binding || !policy.eligible.includes(selection.factIndex))) fail("invoice_selection");
+    observed.set(key, resolved);
   }
   const groups = context.requiredSourceGroups
     ? [...context.requiredSourceGroups, ...(context.requiredRefs || []).map(ref => [ref])]
@@ -201,25 +213,21 @@ export function renderSharedAnswer(value: unknown, context: {
     return [`${scope.windowKind === "retrieval_selection" ? "Source retrieval selection window" : "Source reporting window"}: ${value("start")} through ${value("end")}; scope time zone ${value("timeZone")}; scope currency ${value("currency")}; coverage ${value("coverage")}. These fields do not establish cross-source comparability or selected fact dates.${source.provider==='xero'?' Xero metrics are stored record contributions, not account/day totals; zero contributions do not establish absence of account activity.':''} [${source.ref}]`];
   });
   const businessObservations = [...observed].filter(([,item]) => !item.source.supportOnly);
-  const businessKeys = new Set(businessObservations.map(([key]) => key));
-  // Avoid repeating the identical date block when a closed comparison covers
-  // every business observation. Subset comparisons cannot hide other dates.
-  const fullDateComparison = answer.missing_information.some(item => "kind" in item
-    && item.premises.length === businessKeys.size && item.premises.every(selection => businessKeys.has(keyOf(selection))));
-  const dateLines = fullDateComparison ? [] : selectedFactTimeLines(businessObservations.map(([,item]) => ({ref:item.source.ref,time:item.time})));
+  // One application-owned assessment covers all displayed business observations.
+  // Closed model premises still validate below, but cannot narrow this scope.
+  const dateLines = selectedFactTimeLines(businessObservations.map(([,item]) => ({ref:item.source.ref,time:item.time})));
   const results = chosenResults.map(result => `${displayIssuedText(result.fact)} ${context.sources.filter(source => result.inputSourceIds.includes(source.binding)).map(source => `[${source.ref}]`).join(" ")}`);
   const hypotheses = answer.hypotheses.map(item => `Hypothesis (unverified model draft): ${validateDraft(item, true)}`);
   const missing = answer.missing_information.map(item => {
     if (!("kind" in item)) return `Missing information / limitation (unverified model assessment): ${validateDraft(item, false, true)}`;
     const used = validatePremises(item); requireIndependent(used);
     if (used.some(source => source.supportOnly)) fail("draft_support");
-    const rows = item.premises.map(selection => { const { source, time } = resolve(selection); return {ref:source.ref,time}; });
-    return `Selected-date comparison (application-computed from cited premises):\n${selectedFactTimeLines(rows).join("\n")}`;
+    return ""; // The all-observed date assessment above already renders this limitation.
   });
   const checks = answer.next_checks.map(item => `Recommended check (model draft; not performed): ${validateDraft(item, false)}`);
   if (!observations.length && !results.length && !hypotheses.length && !missing.length && !checks.length) fail("source_coverage");
   const content = [observations.length ? `Stored observations (source-reported, not independently verified):\n${observations.join("\n")}` : "",
-    ...scopeLines, ...dateLines,
+    ...scopeLines, ...(dateLines.length ? ["Dates across all selected business observations (application-computed):", ...dateLines] : []),
     results.length ? `Application-issued results / boundaries:\n${results.join("\n")}` : "", ...hypotheses, ...missing, ...checks,
     "Draft reasoning is not a verified finding, calculation or completed action. Source presence does not establish record correspondence, causation, complete coverage or comparable periods."].filter(Boolean).join("\n\n");
   if (content.length > 24_000 || citations.size > 30) fail("answer_bounds");

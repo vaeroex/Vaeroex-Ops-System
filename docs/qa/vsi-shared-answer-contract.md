@@ -2,8 +2,8 @@
 
 The current local date/selection correction is described in
 [Cross-source selection and date comparison](vsi-cross-source-date-contract.md).
-Cross-original `missing_information` now uses a closed, application-computed
-selected-fact date comparison; free text in that field is limited to one
+Cross-original `missing_information` uses a closed, application-computed date
+assessment across all selected business observations; free text in that field is limited to one
 business original. Specific multi-source evidence questions remain proposed
 `next_checks`. The historical qualification receipts below are not receipts for
 this latest local candidate.
@@ -24,6 +24,9 @@ canonical citation. Each requested protected provider/connection/entity scope
 must be represented by at least one selected observation. Multiple rows from
 that same scope are available context, not a requirement to recite every row.
 Other packed originals remain optional unless used by a claim or issued result.
+Explicit invoice-focused questions restrict Xero observations to issued typed
+sales-invoice fact indexes, with valid zero invoices preserved. Advisory invoice
+review order is not period alignment, a record join or completeness proof.
 Ambiguous tied scopes stay distinct requirements; the model cannot substitute
 an unrelated connection simply because its provider name matches. Packing
 dependency joins do not merge coverage requirements across providers/scopes.

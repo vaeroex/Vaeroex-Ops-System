@@ -108,7 +108,7 @@ const hypothesis={premises:good.observations,text:'The payment-held orders and o
 // merely occur in the intermediate contract string.
 const React=require('react'),{renderToStaticMarkup}=require('react-dom/server'),{AnswerContent}=require('../components/vsi/AnswerContent.tsx');
 const draftMarkup=renderToStaticMarkup(React.createElement(AnswerContent,{content:render({...good,hypotheses:[hypothesis]},context).content}));
-for(const label of ['Hypothesis (unverified model draft)','Selected-date comparison (application-computed from cited premises)','Recommended check (model draft; not performed)','Draft reasoning is not a verified finding, calculation or completed action.'])assert(draftMarkup.includes(label));
+for(const label of ['Hypothesis (unverified model draft)','Dates across all selected business observations (application-computed)','Recommended check (model draft; not performed)','Draft reasoning is not a verified finding, calculation or completed action.'])assert(draftMarkup.includes(label));
 const clarificationMarkup=renderToStaticMarkup(React.createElement(AnswerContent,{content:renderSharedClarification('Which records and period should be checked?')}));assert(clarificationMarkup.includes('Clarification requested (model draft):'));
 denied({...good,hypotheses:[hypothesis]},'hypothesis_disabled',{...context,hypothesesEnabled:false});
 denied({...good,hypotheses:[{...hypothesis,premises:[good.observations[0]]}]},'independent_sources');

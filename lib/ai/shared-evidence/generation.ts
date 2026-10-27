@@ -19,7 +19,7 @@ export async function sharedRpc(reader:SharedClient,name:string,args:Record<stri
 const identity=z.record(z.unknown()),hash=z.string().regex(/^[a-f0-9]{64}$/);
 const resolved=z.object({identity,hash,data:z.record(z.unknown())});
 const root=z.object({table:z.string().regex(/^[a-z][a-z0-9_]*$/),id:z.string().uuid()});
-export type SharedRow={identity:Record<string,unknown>;hash:string;provider:string;facts:string[];factTimes?:FactTimeGroup[];scope:Record<string,unknown>;reported:boolean;data:Record<string,unknown>;roots:z.infer<typeof root>[]};
+export type SharedRow={identity:Record<string,unknown>;hash:string;provider:string;facts:string[];factTimes?:FactTimeGroup[];salesInvoiceFactGroups?:number[][];scope:Record<string,unknown>;reported:boolean;data:Record<string,unknown>;roots:z.infer<typeof root>[]};
 export type SharedPrepared={workspaceId:string;start:string;end:string;rows:SharedRow[];fingerprint:string;limitations:string[];relationships:SharedRelationship[]};
 const issued=new WeakMap<SharedPrepared,string>();
 const num=(v:unknown)=>decimalSchema.parse(v);
@@ -42,7 +42,7 @@ function xeroContribution(metrics: readonly {key:string;value:string;currency?:s
 export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
  const r=resolved.parse(raw),d=r.data;if(d.workspace_id!==workspaceId) throw new Error("shared_workspace_mismatch");
  const provider=z.enum([...pluginProviders,"file","business_note"]).parse(d.provider);
- let facts:string[]=[];const factTimes:FactTime[]=[];const reported=provider==='file'||provider==='business_note';
+ let facts:string[]=[];const factTimes:FactTime[]=[];const salesInvoiceFactGroups:number[][]=[];const reported=provider==='file'||provider==='business_note';
  if(reported) facts=[`${provider==='file'?'The reviewed file reports':'The business reports'}: ${validateSharedMemoryProjection(d,workspaceId).text}. This reported context is not independently measured and does not establish causation.`];
  else if(provider==='google_sheets') facts=z.array(z.object({metric:z.string(),value:decimalSchema,unit:z.string()})).max(100).parse(d.metrics)
   .map(m=>{const date=daySchema.parse(d.date);factTimes.push({date,basis:'sheet_row_date',valueTiming:'row_value'});
@@ -66,7 +66,9 @@ export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
    if(record.metrics||snapshot) {
     const metrics=z.array(z.object({key:z.string(),value:decimalSchema,currency:z.string().optional()})).parse(snapshot?.metrics??record.metrics);
     const contribution=provider==='xero'&&!snapshot?xeroContribution(metrics):null;
+    const invoiceGroup:number[]=[];
     for(const metric of metrics) {
+     if(contribution==='sales-invoice contribution'&&['invoices','billed','outstanding'].includes(metric.key)) invoiceGroup.push(facts.length);
      const semantics=reportingMetricSemantics(provider,metric,snapshot?'snapshot':'history');
      const unit=semantics.currency??semantics.unit;
      const partition=semantics.unit==='count'&&semantics.partition?` (currency partition: ${semantics.partition})`:'';
@@ -82,6 +84,7 @@ export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
       facts.push(`${label(metric.key)}: ${metric.value} ${unit}${partition}; ${dated}${timing}.`);
      } else facts.push(`${label(provider)} ${label(metric.key)}: ${metric.value} ${unit}${partition}; ${dateLabel}. Scope: ${label(d.scope)}.`);
     }
+    if(invoiceGroup.length) salesInvoiceFactGroups.push(invoiceGroup);
    } else if(provider==='wix-orders') facts.push(`Wix order amount: ${num(record.total_amount)} ${z.string().regex(/^[A-Z]{3}$/).parse(record.currency_code)}, created ${z.string().parse(record.created_at)}; order value is not a settlement or accounting revenue.`);
    else if(provider==='zoho-books') {
     if(record.counted!==true||record.currency!=='USD') continue;
@@ -104,9 +107,9 @@ export function sharedRow(raw:unknown,workspaceId:string):SharedRow {
   currency:d.currency??null,coverage:typeof d.coverage==='string'?d.coverage:'unknown',additive:false,
   ...(['xero','harvest','clockify','loyverse','zoho-books','wix-orders'].includes(provider)?{windowKind:'retrieval_selection'}:{})};
  if(factTimes.length&&factTimes.length!==facts.length) throw new Error('shared_fact_time_alignment');
- return {...r,provider,facts,...(factTimes.length?{factTimes:groupFactTimes(factTimes)}:{}),scope,reported,roots:z.array(root).parse(d.read_sources??[])};
+ return {...r,provider,facts,...(factTimes.length?{factTimes:groupFactTimes(factTimes)}:{}),...(provider==='xero'?{salesInvoiceFactGroups}:{}),scope,reported,roots:z.array(root).parse(d.read_sources??[])};
 }
-const fingerprint=(rows:SharedRow[])=>evidenceEngineHash({contract:"shared_generation_v2",rows:rows.map(r=>({identity:r.identity,hash:r.hash,facts:r.facts,...(r.factTimes?{factTimes:r.factTimes}:{}),scope:r.scope})),relationships:sharedFinancialBoundaries(rows)});
+const fingerprint=(rows:SharedRow[])=>evidenceEngineHash({contract:"shared_generation_v2",rows:rows.map(r=>({identity:r.identity,hash:r.hash,facts:r.facts,...(r.factTimes?{factTimes:r.factTimes}:{}),...(r.salesInvoiceFactGroups?{salesInvoiceFactGroups:r.salesInvoiceFactGroups}:{}),scope:r.scope})),relationships:sharedFinancialBoundaries(rows)});
 export async function prepareSharedGeneration(reader:SupabaseClient<Database>,workspaceId:string,start:string,end:string):Promise<SharedPrepared> {
  daySchema.parse(start);daySchema.parse(end);z.string().uuid().parse(workspaceId);
  const rpc=reader as unknown as SharedClient;
