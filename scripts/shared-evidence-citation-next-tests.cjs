@@ -7,7 +7,8 @@ const { createHash } = require('node:crypto');
 const ts = require('typescript');
 const root = path.resolve(__dirname, '..');
 const selfCheck = process.argv.includes('--self-check');
-assert(process.argv.slice(2).every(value => value === '--self-check'));
+const streamingLifecycle = process.argv.includes('--streaming-lifecycle');
+assert(process.argv.slice(2).every(value => value === '--self-check' || value === '--streaming-lifecycle'));
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'vaeroex-citation-next-'));
 const pageFile = 'app/app/sources/evidence/[kind]/[id]/page.tsx';
 const gateFile = 'lib/ai/shared-evidence/runtime-gate.ts';
@@ -17,6 +18,7 @@ const id = value => `00000000-0000-4000-8000-${String(value).padStart(12, '0')}`
 const workspace = id(1), actor = id(2), artifact = id(4), revision = 'a'.repeat(64);
 const publicKey = 'invented-loopback-public-key';
 const plans = new Map(), refreshPlans = new Map(), children = new Set();
+const activeStreams = new Set();
 let phase = 'setup', handlerFailed = false, stopping = false, startupCategory = 'process_failure', nextPlan = 0, cases = 0;
 let parentHooks;
 const sha = value => createHash('sha256').update(value).digest('hex');
@@ -112,6 +114,7 @@ const backend = http.createServer(async (request, response) => {
     const args = await readBody(request);
     assert.deepEqual(args, { p_workspace_id: p.workspace, p_artifact_kind: 'vsi_exchange', p_artifact_id: artifact });
     p.counts.rpc++;
+    p.rpcReceivedAt = performance.now();
     const packet = bundle(p.workspace);
     // Modeled protected-RPC decisions, not SQL/RLS execution. All six manifest originals are considered;
     // the last Sheets original is intentionally absent from the three cited hashes.
@@ -123,9 +126,18 @@ const backend = http.createServer(async (request, response) => {
       assert(!citedHashes.includes(p.checkedHashes.at(-1)));
       json(response, 409, { code: '40001', message: 'shared_evidence_source_changed', details: 'PRIVATE_CHANGED_UNCITED_SOURCE' }); return;
     }
+    if (p.mode === 'hold_response') {
+      p.pending.add(response);
+      response.once('close', () => { p.pending.delete(response); p.upstreamClosedAt = performance.now(); if (!response.writableEnded) p.counts.rpcClosed++; });
+      p.release = () => {
+        assert(!p.releasedAt && !response.destroyed && !response.writableEnded);
+        p.releasedAt = performance.now(); json(response, 200, packet);
+      };
+      return;
+    }
     if (p.mode === 'stall_headers' || p.mode === 'stall_body') {
       p.pending.add(response);
-      response.once('close', () => { p.pending.delete(response); if (!response.writableEnded) p.counts.rpcClosed++; });
+      response.once('close', () => { p.pending.delete(response); p.upstreamClosedAt = performance.now(); if (!response.writableEnded) p.counts.rpcClosed++; });
       if (p.mode === 'stall_body') { response.writeHead(200, { 'Content-Type': 'application/json' }); response.write('{"stage":'); p.counts.headersSent++; }
       return;
     }
@@ -143,6 +155,48 @@ function request(origin, route, cookieValue, options = {}) {
     });
     req.setTimeout(30000, () => req.destroy(new Error('loopback_deadline'))); req.on('error', reject); req.end(options.body);
   });
+}
+// Observe actual HTTP chunks. Never treat serialized Flight text or a final hidden segment as
+// proof of hydrated browser visibility. The caller must see the loading paragraph before release.
+function streamedRequest(origin, route, cookieValue) {
+  const state = { startedAt: performance.now(), headersAt: null, fallbackAt: null, disconnectAt: null, closedAt: null, endedAt: null, body: '' };
+  let response, intentionalClose = false, resolveFinished, rejectFinished;
+  const finished = new Promise((resolve, reject) => { resolveFinished = resolve; rejectFinished = reject; });
+  void finished.catch(() => {}); // The caller also observes early failures while waiting for the first chunk.
+  const url = new URL(route, origin); url.hash = '';
+  const req = http.request(url, { headers: cookieValue ? { cookie: cookieValue } : {} }, res => {
+    response = res; state.headersAt = performance.now(); res.setEncoding('utf8');
+    const result = () => ({ status: res.statusCode, headers: res.headers, body: state.body });
+    res.on('data', chunk => {
+      state.body += chunk;
+      if (state.body.length > 2000000) { req.destroy(new Error('response_budget')); return; }
+      // Remove incomplete script blocks too: a split Flight script must not satisfy this condition.
+      const markup = state.body.replace(/<script\b[^>]*>[\s\S]*?(?:<\/script>|$)/gi, '');
+      if (state.fallbackAt === null && /<p\b[^>]*>Loading Vaeroex module<\/p>/.test(markup)) state.fallbackAt = performance.now();
+    });
+    res.once('end', () => { state.endedAt = performance.now(); resolveFinished(result()); });
+    res.on('error', error => { if (!intentionalClose) rejectFinished(error); });
+    res.once('close', () => {
+      state.closedAt = performance.now();
+      if (intentionalClose) resolveFinished(result());
+      else if (state.endedAt === null) rejectFinished(new Error('unexpected_stream_close'));
+    });
+  });
+  activeStreams.add(req); req.once('close', () => activeStreams.delete(req));
+  req.on('error', error => { if (!intentionalClose) rejectFinished(error); });
+  req.setTimeout(30000, () => req.destroy(new Error('stream_deadline'))); req.end();
+  return { state, finished, disconnect() {
+    assert(response && state.endedAt === null && !intentionalClose);
+    intentionalClose = true; state.disconnectAt = performance.now(); req.destroy(); response.destroy();
+  } };
+}
+async function observeUntil(condition, limitMs) {
+  const deadline = performance.now() + limitMs;
+  while (!condition()) { if (stopping || performance.now() >= deadline) throw new Error('observation_deadline'); await pause(10); }
+}
+function elapsedAt(value, startedAt) {
+  assert(Number.isFinite(value) && value >= startedAt && value - startedAt < 60000);
+  return Math.round(value - startedAt);
 }
 async function freePort() { const server = http.createServer(); server.listen(0, '127.0.0.1'); await once(server, 'listening');
   const port = server.address().port; await new Promise(resolve => server.close(resolve)); return port; }
@@ -169,7 +223,9 @@ function sourceClosure() {
     }
     walk(ast);
   }
-  visit(pageFile); visit('middleware.ts'); return sources;
+  visit(pageFile); visit('middleware.ts');
+  if (streamingLifecycle) { visit('app/app/loading.tsx'); visit('app/app/sources/loading.tsx'); }
+  return sources;
 }
 function offlinePreload(ports, audit, diagnostics, directory) {
   // A blocked attempt is durably counted even if application/SDK code catches the error.
@@ -411,6 +467,107 @@ async function fullHttpChecks(sources, fixtures) {
   await stopChild(child); for (const fixture of fixtures) verifyCopies(sources, fixture);
   assert.equal(handlerFailed, false); diagnostics(on);
 }
+async function streamingMechanicsSelfCheck(fixture, backendOrigin) {
+  phase = 'self_check_streaming_mechanics';
+  const held = plan('hold_response'), disconnected = plan('stall_headers');
+  const routes = new Map([['/release', held], ['/disconnect', disconnected]]), upstreamRequests = new Set();
+  // This tiny relay tests only our chunk observer and explicit client-close mechanics. Its close
+  // handler is test code, not a model of Next's cancellation policy or the runtime 10s deadline.
+  const relay = http.createServer((incoming, outgoing) => {
+    const p = routes.get(incoming.url);
+    if (!p) { handlerFailed = true; outgoing.writeHead(404); outgoing.end(); return; }
+    outgoing.writeHead(200, { 'Content-Type': 'text/html' }); outgoing.write('<p>Loading Vaeroex module</p>');
+    const upstream = http.request(backendOrigin + '/rest/v1/rpc/reopen_shared_evidence_target_v1', { method: 'POST', headers: {
+      apikey: publicKey, authorization: `Bearer ${p.fresh.access_token}`, 'Content-Type': 'application/json' } }, response => {
+      response.resume(); response.on('error', () => { if (!outgoing.destroyed) outgoing.destroy(); });
+      response.once('end', () => outgoing.end('<p>Fixture relay complete</p>'));
+    });
+    upstreamRequests.add(upstream); upstream.once('close', () => upstreamRequests.delete(upstream));
+    upstream.on('error', () => { if (!outgoing.destroyed) outgoing.destroy(); });
+    outgoing.once('close', () => { if (!outgoing.writableEnded) upstream.destroy(); });
+    upstream.end(JSON.stringify({ p_workspace_id: p.workspace, p_artifact_kind: 'vsi_exchange', p_artifact_id: artifact }));
+  });
+  try {
+    relay.listen(fixture.port, '127.0.0.1'); await once(relay, 'listening');
+    const released = streamedRequest(fixture.origin, '/release');
+    await observeUntil(() => released.state.fallbackAt !== null && held.counts.rpc === 1, 3000);
+    assert.equal(released.state.endedAt, null); assert.equal(held.pending.size, 1); held.release();
+    assert((await released.finished).body.includes('Fixture relay complete'));
+    assert(released.state.fallbackAt <= held.releasedAt && released.state.endedAt >= held.releasedAt);
+    const closed = streamedRequest(fixture.origin, '/disconnect');
+    await observeUntil(() => closed.state.fallbackAt !== null && disconnected.counts.rpc === 1, 3000);
+    closed.disconnect(); await closed.finished;
+    await observeUntil(() => disconnected.counts.rpcClosed === 1, 3000);
+    assert.equal(closed.state.endedAt, null); assert(closed.state.closedAt >= closed.state.disconnectAt);
+    assert.equal(disconnected.pending.size, 0); assert.equal(handlerFailed, false);
+    return { syntheticStreamingMechanicsCases: 2, nextStreamingExecuted: false };
+  } finally {
+    relay.closeAllConnections(); for (const upstream of upstreamRequests) upstream.destroy();
+    await new Promise(resolve => relay.close(resolve));
+  }
+}
+async function streamingHttpChecks(sources, fixtures) {
+  const on = fixtures[1], timings = [];
+  const child = await startNext(on);
+  phase = 'streamed_loading_then_release';
+  const held = plan('hold_response'), released = streamedRequest(on.origin, target(), cookie(held));
+  await observeUntil(() => released.state.fallbackAt !== null && held.counts.rpc === 1, 5000);
+  assert.equal(released.state.endedAt, null); assert.equal(held.pending.size, 1);
+  assert(!/Saved evidence|Synthetic dispatches|synthetic-bill/.test(released.state.body));
+  held.release(); rendered(await released.finished);
+  assert.equal(held.counts.rpc, 1); assert.equal(held.counts.rpcClosed, 0);
+  assert(released.state.fallbackAt <= held.releasedAt && released.state.endedAt >= held.releasedAt);
+  assert(diagnostics(on).some(entry => entry.tag === '[shared-citation-transport]' && entry.data.outcome === 'completed'));
+  timings.push({ stage: 'released_stream', rpcReceiptMs: elapsedAt(held.rpcReceivedAt, released.state.startedAt),
+    fallbackMs: elapsedAt(released.state.fallbackAt, released.state.startedAt), releaseMs: elapsedAt(held.releasedAt, released.state.startedAt),
+    responseEndMs: elapsedAt(released.state.endedAt, released.state.startedAt) }); cases++;
+
+  phase = 'streamed_loading_then_client_disconnect';
+  const pending = plan('stall_headers'), before = diagnostics(on).length;
+  const closed = streamedRequest(on.origin, target(), cookie(pending));
+  await observeUntil(() => closed.state.fallbackAt !== null && pending.counts.rpc === 1, 5000);
+  assert.equal(pending.counts.headersSent, 0); assert.equal(pending.pending.size, 1); assert.equal(closed.state.endedAt, null);
+  closed.disconnect(); await closed.finished;
+  assert.equal(closed.state.endedAt, null); assert(closed.state.closedAt >= closed.state.disconnectAt);
+  // The copied runtime has its own AbortController and unchanged 10s deadline. An incoming close
+  // is not proof of immediate upstream cancellation; observe the actual result within deadline+slack.
+  await observeUntil(() => pending.counts.rpcClosed === 1 && diagnostics(on).length >= before + 2, 15000);
+  const emitted = diagnostics(on).slice(before);
+  assert.equal(emitted.length, 2);
+  const trace = emitted.find(entry => entry.tag === '[shared-citation-transport]').data;
+  const failure = emitted.find(entry => entry.tag === '[shared-citation]').data;
+  assert.equal(pending.counts.rpc, 1); assert.equal(pending.pending.size, 0);
+  assert(pending.upstreamClosedAt - pending.rpcReceivedAt < 15000);
+  assert.equal(trace.rpcStatus, 'not_observed'); assert.equal(failure.stage, 'rpc_read');
+  assert.equal(failure.sqlCode, null); assert(failure.httpStatus === null || failure.httpStatus === 0);
+  assert(trace.elapsedMs <= 15000);
+  if (trace.outcome === 'deadline') {
+    assert.equal(failure.reason, 'read_deadline_exceeded'); assert(trace.elapsedMs >= 9500);
+  } else {
+    assert.equal(trace.outcome, 'failed'); assert.equal(failure.reason, 'request_failed');
+  }
+  timings.push({ stage: 'disconnected_stream', rpcReceiptMs: elapsedAt(pending.rpcReceivedAt, closed.state.startedAt),
+    fallbackMs: elapsedAt(closed.state.fallbackAt, closed.state.startedAt), disconnectMs: elapsedAt(closed.state.disconnectAt, closed.state.startedAt),
+    clientCloseMs: elapsedAt(closed.state.closedAt, closed.state.startedAt), upstreamCloseMs: elapsedAt(pending.upstreamClosedAt, closed.state.startedAt),
+    traceOutcome: trace.outcome, tracePhase: trace.phase, traceElapsedMs: trace.elapsedMs }); cases++;
+  const frozen = JSON.stringify(emitted); await pause(100); assert.equal(JSON.stringify(diagnostics(on).slice(before)), frozen);
+
+  phase = 'streaming_independent_recovery';
+  const recovery = plan(); rendered(await request(on.origin, target(), cookie(recovery)));
+  assert.equal(recovery.counts.rpc, 1); assert.equal(pending.counts.rpcClosed, 1); cases++;
+  phase = 'streaming_rpc_denial';
+  const refusal = plan('rpc_denied'); denied(await request(on.origin, target(), cookie(refusal)), { unavailable: true });
+  assert.equal(refusal.counts.rpc, 1); cases++;
+  phase = 'streaming_workspace_denial';
+  const foreign = plan('ok', { workspace: id(501), actor: id(502) });
+  const rejected = await request(on.origin, target(), cookie(foreign)); denied(rejected);
+  // Once the fallback is sent, Next may encode notFound in the stream rather than change HTTP status.
+  assert([200, 404].includes(rejected.status));
+  assert.match(html(rejected), /<h1\b[^>]*>Fixture not found<\/h1>/);
+  assert.equal(foreign.counts.rpc, 0); cases++;
+  await stopChild(child); for (const fixture of fixtures) verifyCopies(sources, fixture);
+  assert.equal(handlerFailed, false); return timings;
+}
 async function main() {
   backend.listen(0, '127.0.0.1'); await once(backend, 'listening');
   const backendPort = backend.address().port, sources = sourceClosure();
@@ -424,9 +581,16 @@ async function main() {
   require(path.join(temporary, 'parent-offline.cjs'));
   if (selfCheck) {
     const checks = await compilerIndependentChecks(sources, fixtures, `http://127.0.0.1:${backendPort}`);
+    const streamingChecks = streamingLifecycle ? await streamingMechanicsSelfCheck(fixtures[1], `http://127.0.0.1:${backendPort}`) : {};
     assert.equal(fs.readFileSync(parentAudit, 'utf8'), '');
-    console.log(JSON.stringify({ passed: true, mode: 'compiler-independent-self-check', ...checks, externalCalls: 0,
+    console.log(JSON.stringify({ passed: true, mode: streamingLifecycle ? 'compiler-independent-streaming-self-check' : 'compiler-independent-self-check', ...checks, ...streamingChecks, externalCalls: 0,
       fullHttpExecuted: false, limitation: 'No Next compiler or protected-route HTTP execution; this validates fixture construction and synthetic transport only.' }));
+  } else if (streamingLifecycle) {
+    const timings = await streamingHttpChecks(sources, fixtures);
+    assert.equal(fs.readFileSync(parentAudit, 'utf8'), '');
+    console.log(JSON.stringify({ passed: true, mode: 'production-Next-streaming-lifecycle', cases, sourceFiles: sources.size, timings,
+      externalAttempts: 0, externalCalls: 0, productionData: false, enabledGate: 'temporary copied sharedEvidenceRuntimeEnabled only',
+      limitation: 'Actual loading boundaries and HTTP streams with synthetic Auth/RPC; no browser hydration, full app shell, actual SQL/RLS, or hosted root-cause proof.' }));
   } else {
     await fullHttpChecks(sources, fixtures);
     assert.equal(fs.readFileSync(parentAudit, 'utf8'), '');
@@ -443,6 +607,7 @@ Promise.race([main(), deadline]).catch(error => {
     location: location ? `shared-evidence-citation-next-tests.cjs:${location}` : null })); process.exitCode = 1;
 }).finally(async () => {
   stopping = true; clearTimeout(watchdog);
+  for (const request of activeStreams) request.destroy();
   for (const child of [...children]) await stopChild(child).catch(() => { process.exitCode = 1; });
   backend.closeAllConnections(); await new Promise(resolve => backend.close(resolve));
   if (parentHooks) { require('node:net').Socket.prototype.connect = parentHooks.connect; globalThis.fetch = parentHooks.fetch;
