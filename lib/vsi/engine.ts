@@ -1,3 +1,4 @@
+import { invoiceSelections, InvoiceSelectionMetadataError } from "@/lib/ai/shared-evidence/invoice-selection";
 import { validateSharedVsiRelationships } from "@/lib/ai/shared-evidence/vsi-validation";
 import type { SynthesisSource } from "@/lib/ai/shared-evidence/answer-contract";
 import { sharedAnswerSchema, sharedAnswerJsonSchemaForResults, SharedAnswerContractError, renderSharedAnswer, renderSharedClarification, sharedDraftTextPattern, issueAnswerResults, issueContextFactSources, SHARED_ANSWER_INSTRUCTIONS } from "@/lib/ai/shared-evidence/answer-contract";
@@ -311,15 +312,18 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const issuePremises = (payload: ReturnType<typeof makePayload>) => {
   payload.qualitative_sources=payload.businessSources.flatMap(source=>{
     const row=sharedPrepared?.rows.find(row=>row.hash===source.sourceId);
-    return row?[{ref:source.id,binding:row.hash,provider:row.provider,dependencies:[row.hash],facts:row.facts,...(row.factTimes?{factTimes:row.factTimes}:{}),reported:row.reported?row.provider==='file'?'file' as const:'note' as const:false as const,
+    return row?[{ref:source.id,binding:row.hash,provider:row.provider,dependencies:[row.hash],facts:row.facts,...(row.salesInvoiceFactGroups?{salesInvoiceFactGroups:row.salesInvoiceFactGroups}:{}),...(row.factTimes?{factTimes:row.factTimes}:{}),reported:row.reported?row.provider==='file'?'file' as const:'note' as const:false as const,
       environment:row.reported?'supporting' as const:row.scope.environment==='sandbox'?'sandbox' as const:'production' as const}]:[];
   });
   };
-  const answerRequest = (json: string, tier: VsiResearchTier, shared = false) => ({ input: [{ role: "system", content: shared ? sharedSystemPrompt : systemPrompt }, { role: "user", content: json }],
+  const answerRequest = (json: string, tier: VsiResearchTier, shared = false) => {
+    const view = shared ? JSON.parse(json) : null;
+    return ({ input: [{ role: "system", content: shared ? sharedSystemPrompt : systemPrompt }, { role: "user", content: json }],
     reasoning: { effort: tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, tier === "deep" ? 6000 : 4000),
     // Derive from this exact packed JSON, not the larger canonical payload.
     // The same factory participates in every packing measurement and transport.
-    text: { format: { type: "json_schema", name: shared ? "vsi_shared_answer_v2" : "vsi_answer_v1", strict: true, schema: shared ? sharedAnswerJsonSchemaForResults(JSON.parse(json).sharedRelationships, qualitativeSynthesisEnabled()) : answerJsonSchema } } });
+    text: { format: { type: "json_schema", name: shared ? "vsi_shared_answer_v2" : "vsi_answer_v1", strict: true, schema: shared ? sharedAnswerJsonSchemaForResults(view.sharedRelationships, qualitativeSynthesisEnabled(), invoiceSelections(view.qualitative_sources,view.question), [...view.qualitative_sources,...view.contextFactSources].map((source: {ref:string})=>source.ref)) : answerJsonSchema } } });
+  };
   const packAnswer = (payload: ReturnType<typeof makePayload>, tier: VsiResearchTier, shared: boolean, phase: "preflight" | "answer") => {
     try {
       if (shared) payload.contextFactSources = issueContextFactSources(payload.productSources,payload.livePublicLookup).map(source => ({ref:source.ref,binding:source.binding,factCount:source.facts.length}));
@@ -330,6 +334,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
       return packed;
     }
     catch (error) {
+      if (error instanceof InvoiceSelectionMetadataError) throw new VsiEngineError("Workspace invoice selection metadata could not be verified before generation.", usage, false, "evidence_unavailable");
       if (error instanceof SharedAnswerContractError) {
         const diagnostic = vsiValidationDiagnostic("answer_request_contract", error);
         usage.validationFailure = diagnostic;
@@ -342,6 +347,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
         throw new VsiEngineError(shared ? "The required whole source scopes and workspace context do not fit within this answer's limit. No canonical evidence was shortened and no answer was generated. Please narrow the source scope or period."
           : "This question and its sources are too large for one answer. Please narrow the question.", usage, false, "context_block");
       }
+      if (error instanceof Error && error.message === "vsi_sales_invoice_evidence_unavailable") throw new VsiEngineError("The requested Xero scope has no contributions with verified sales-invoice type markers. Purchase-bill or untyped values cannot substitute; no answer was generated.",usage,false,"evidence_unavailable");
       if (error instanceof Error && error.message === "vsi_requested_source_unavailable") throw new VsiEngineError("A requested source is not available among the authorized evidence for this period. No answer was generated.",usage,false,"evidence_unavailable");
       throw error;
     }
@@ -503,7 +509,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const decodedAnswer = validateAt("answer_json", () => JSON.parse(outputText(reply)));
   const structuredAnswer = sharedAnswer ? validateAt("answer_schema", () => sharedAnswerSchema.parse(decodedAnswer)) : validateAt("answer_schema", () => answerSchema.parse(decodedAnswer));
   const composed = sharedAnswer
-    ? validateAt("shared_answer_contract", () => renderSharedAnswer(structuredAnswer,{sources:[...selectedPremises,...issueContextFactSources(payload.productSources,payload.livePublicLookup)],requiredSourceGroups:packedContext.requiredSourceGroups,results:selectedRelationships,hypothesesEnabled:qualitativeSynthesisEnabled(),scopes:new Map(selectedPremises.map(source=>[source.ref,sharedPrepared!.rows.find(row=>row.hash===source.binding)!.scope]))}))
+    ? validateAt("shared_answer_contract", () => renderSharedAnswer(structuredAnswer,{question:input.question,sources:[...selectedPremises,...issueContextFactSources(payload.productSources,payload.livePublicLookup)],requiredSourceGroups:packedContext.requiredSourceGroups,results:selectedRelationships,hypothesesEnabled:qualitativeSynthesisEnabled(),scopes:new Map(selectedPremises.map(source=>[source.ref,sharedPrepared!.rows.find(row=>row.hash===source.binding)!.scope]))}))
     : validateAt("shared_relationships", () => {
       const legacy = answerSchema.parse(structuredAnswer);
       if (legacy.interpretations.length) throw new Error("Interpretations require current admitted source composition before citation validation.");

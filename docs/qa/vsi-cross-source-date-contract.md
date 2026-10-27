@@ -24,6 +24,15 @@ preserves whole originals and fact order; it cannot selectively remove later
 facts from an admitted original. The failing sentence is reproduced with a
 sanitized structurally equivalent fixture, not an invented recovered response.
 
+The later hosted result-reference test succeeded mechanically: its answer was
+saved/reopened and accounting completed once. Its selection was still weak:
+purchase-bill and untyped zero contributions appeared in an explicitly
+sales-invoice question. A scoped current-source audit contains relevant typed
+invoices on October 13 and 14 that the answer did not select. That audit is not
+an immutable replay of the entire historical request. The supported contract
+defect is narrower: family labels were only advice; every Xero fact index was
+selectable. Whole-original packing did not individually discard later invoices.
+
 ## Correction
 
 Xero facts identify sales-invoice versus purchase-bill contributions only from
@@ -34,11 +43,33 @@ source context and application attribution instead of repeated in each fact;
 values, units, dates, order, original hashes and canonical data are unchanged.
 New fact presentation changes future preparation/snapshot hashes as intended.
 
+For an explicitly sales/customer-invoice, receivables or billing/collections
+question, the prepared source now issues index groups for its unambiguous sales
+invoices. The request schema and independent renderer both restrict Xero
+observations to those groups. Neutral and purchase/mixed questions retain
+ordinary selection. Eligibility comes from count/currency markers, never from
+positive amounts: a genuine zero invoice remains eligible. Unknown record
+families cannot substitute for required typed invoice evidence. If the required
+scope has no eligible facts, the engine stops before planning/provider use with
+known evidence-unavailable accounting. Malformed issued metadata also fails
+closed. Existing negative-value parsing is unchanged.
+
+The model receives at most three advisory invoice groups, prioritizing supplied
+Sheets row-date labels and then newer invoice dates. Older eligible invoices
+remain selectable. This does not establish shared entities, matching records,
+balance observation times, comparable periods, completeness or causal links.
+The original facts, fact indexes, canonical source text and bindings stay intact;
+the preparation fingerprint binds the new eligibility metadata. Full request
+measurement includes the dynamic selection schema and review-order metadata.
+
 Cross-original `missing_information` accepts the closed item
 `{kind: "selected_fact_time_comparison", premises: [...]}`. Each premise must be
 an exact observed ref/binding/fact-index tuple, with independent business roots
 and compatible access environments. Model text, verdicts or dates in that item
-are rejected. The application compares only those selected facts' typed dates.
+are rejected. The application renders one explicitly labeled date assessment
+across all selected business observations. A model-supplied premise subset may
+not narrow or duplicate that assessment, including answers with more than the
+24-premise item limit. All premise authorization and independence checks remain.
 Unselected matching dates cannot change the result. Unknown timing stays
 unknown; equal labels do not establish equal measurement periods. An outstanding
 balance at import is not measured on its document date.
@@ -72,3 +103,13 @@ budgets. The closed item rejects injected causal or alignment verdicts; other
 unverified prose still needs honest semantic review. No test here proves model
 accuracy, invoice/order reconciliation, general multi-provider performance or
 working hosted citation navigation. No paid evaluation or release is included.
+
+The invoice regression uses 27 records/135 facts with the retained family/date
+shape but invented identifiers and positive amounts. It covers typed zero
+invoices, irrelevant bill zeros, ambiguous markers/currencies, strict bindings,
+canonical packing, insufficient budgets, a single date assessment across 34
+observations and the actual engine's full transmitted schema/request size.
+Both existing isolated cases remain unchanged. These tests prove enforceable
+selection boundaries, not that a model will choose every useful invoice or
+produce good synthesis. Nonnumeric misleading draft claims can still pass
+structural checks; manual usefulness and semantic review remain necessary.

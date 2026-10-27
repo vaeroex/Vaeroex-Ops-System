@@ -111,7 +111,7 @@ const retainedFalse='The Xero records contain invoice and outstanding-balance ob
 const misleading=structuredClone(answer);misleading.missing_information=[{premises:observations,text:retainedFalse}];
 assert.throws(()=>renderSharedAnswer(misleading,context),error=>error.rule==='temporal_assessment_required');negatives++;
 assert.doesNotMatch(rendered.content,/for those dates/);
-assert.match(rendered.content,/Selected-date comparison \(application-computed from cited premises\)/);
+assert.match(rendered.content,/Dates across all selected business observations \(application-computed\)/);
 const residual={...answer,missing_information:[],next_checks:[{premises:observations,text:retainedFalse}]};
 assert.match(renderSharedAnswer(residual,context).content,/Recommended check \(model draft; not performed\)/);
 assert.match(renderSharedAnswer(residual,context).content,/for those dates/,'free proposed-check prose is still not semantic proof');
