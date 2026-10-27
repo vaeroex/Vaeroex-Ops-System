@@ -45,7 +45,7 @@ async function rejectedReply(change){
  await assert.rejects(evaluation.runNext(),/review_or_stop_required/);negativeCases++;return{evaluation,result,calls};
 }
 (async()=>{
- assert.equal(candidate,'0492e6d495899c2d56aaa8f958d326bc823e30ff');assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
+ assert.equal(candidate,'cdf32a792657a4cd5c62cea638c4c654f5d4370b');assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
  checkFixtures();
  const first=createEvaluation({outputDir:output(),dispatch});const result=await first.runNext();
  assert.equal(dispatches,2);

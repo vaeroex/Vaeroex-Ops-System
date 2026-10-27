@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { SharedAnswerContractError, sharedAnswerRules, factReferenceReasons, type FactReferenceDiagnostic, type SharedAnswerRule, type SharedAnswerCoverageDiagnostic } from "@/lib/ai/shared-evidence/answer-contract";
+import { SharedAnswerContractError, sharedAnswerRules, factReferenceReasons, resultReferenceReasons, type ResultReferenceDiagnostic, type FactReferenceDiagnostic, type SharedAnswerRule, type SharedAnswerCoverageDiagnostic } from "@/lib/ai/shared-evidence/answer-contract";
 
 export type VsiValidationStage = "answer_json" | "answer_schema" | "shared_relationships"
-  | "qualitative_interpretation" | "shared_answer_contract" | "planner_clarification" | "citation_resolution" | "public_source_coverage";
+  | "qualitative_interpretation" | "shared_answer_contract" | "answer_request_contract" | "planner_clarification" | "citation_resolution" | "public_source_coverage";
 
 const reasons = [
   "shared_relationship_dependency_missing", "shared_relationship_citation_missing", "shared_relationship_claim_changed",
@@ -19,6 +19,7 @@ export type VsiValidationDiagnostic = Readonly<{
   contractRule?: SharedAnswerRule;
   coverage?: SharedAnswerCoverageDiagnostic;
   factReference?: FactReferenceDiagnostic;
+  resultReference?: ResultReferenceDiagnostic;
 }>;
 
 const schemaCodes = new Set(["invalid_type", "invalid_value", "invalid_string", "invalid_format", "too_big", "too_small", "unrecognized_keys", "invalid_union", "custom"]);
@@ -36,7 +37,7 @@ const messages = new Map<string, Reason>([
  * keys, received values, quotes, source identities, URLs or provider output. */
 export function vsiValidationDiagnostic(stage: VsiValidationStage, error: unknown): VsiValidationDiagnostic {
   const category = stage === "answer_json" || stage === "answer_schema" || stage === "planner_clarification" ? "output_validation" : "citation_validation";
-  if ((stage === "shared_answer_contract" || stage === "planner_clarification") && error instanceof SharedAnswerContractError) return { stage, category, reason: "shared_answer_contract_denied",
+  if ((stage === "shared_answer_contract" || stage === "answer_request_contract" || stage === "planner_clarification") && error instanceof SharedAnswerContractError) return { stage, category, reason: "shared_answer_contract_denied",
     ...(sharedAnswerRules.some(rule => rule === error.rule) ? { contractRule: error.rule } : {}),
     ...(error.rule === "source_coverage" && error.coverage ? { coverage: {
       availableReferences: boundedCount(error.coverage.availableReferences), observedReferences: boundedCount(error.coverage.observedReferences),
@@ -45,7 +46,9 @@ export function vsiValidationDiagnostic(stage: VsiValidationStage, error: unknow
     ...(error.rule === "fact_reference" && error.factReference && factReferenceReasons.some(reason => reason === error.factReference?.reason)
       ? { factReference: { reason: error.factReference.reason,
         ...(error.factReference.reason === "binding_mismatch" && typeof error.factReference.bindingMatchesOtherSource === "boolean"
-          ? { bindingMatchesOtherSource: error.factReference.bindingMatchesOtherSource } : {}) } } : {}) };
+          ? { bindingMatchesOtherSource: error.factReference.bindingMatchesOtherSource } : {}) } } : {}),
+    ...(error.rule === "result_reference" && error.resultReference && resultReferenceReasons.some(reason => reason === error.resultReference?.reason)
+      ? { resultReference: { reason: error.resultReference.reason, issuedCount: boundedCount(error.resultReference.issuedCount), selectedCount: boundedCount(error.resultReference.selectedCount) } } : {}) };
   if (error instanceof z.ZodError) {
     const issues = error.issues.slice(0, 32);
     return { stage, category, reason: "schema_invalid", schemaIssueCount: Math.min(error.issues.length, 999),

@@ -40,4 +40,17 @@ for(const reason of ['unknown_ref','binding_mismatch','fact_index_out_of_bounds'
 const malformedFactDiagnostic=new SharedAnswerContractError('fact_reference',undefined,{reason:'binding_mismatch',bindingMatchesOtherSource:secret});
 assert.deepEqual(diagnose('shared_answer_contract',malformedFactDiagnostic).factReference,{reason:'binding_mismatch'});
 malformedFactDiagnostic.rule='source_coverage';assert.equal(diagnose('shared_answer_contract',malformedFactDiagnostic).factReference,undefined);
+for(const reason of ['invalid_issued_id','duplicate_issued_id','duplicate_selected_id','unknown_selected_id']){
+ const error=new SharedAnswerContractError('result_reference',undefined,undefined,{reason,issuedCount:0,selectedCount:1,id:secret,answer:secret});
+ for(const stage of ['answer_request_contract','shared_answer_contract']){
+  const result=diagnose(stage,error);assert.deepEqual(result.resultReference,{reason,issuedCount:0,selectedCount:1});
+  assert(!JSON.stringify(result).includes(secret));assert.equal(result.contractRule,'result_reference');
+ }
+ assert.equal(diagnose('citation_resolution',error).resultReference,undefined);
+ error.resultReference.reason=secret;assert.equal(diagnose('shared_answer_contract',error).resultReference,undefined);
+}
+const invalidResultCounts=new SharedAnswerContractError('result_reference',undefined,undefined,{reason:'unknown_selected_id',issuedCount:Infinity,selectedCount:10000,received:secret});
+assert.deepEqual(diagnose('shared_answer_contract',invalidResultCounts).resultReference,{reason:'unknown_selected_id',issuedCount:0,selectedCount:999});
+invalidResultCounts.rule='fact_reference';assert.equal(diagnose('shared_answer_contract',invalidResultCounts).resultReference,undefined);
+assert.deepEqual(diagnose('answer_request_contract',Object.assign(new Error(secret),{rule:'result_reference',resultReference:{reason:'unknown_selected_id',id:secret}})),{stage:'answer_request_contract',category:'citation_validation',reason:'unclassified'});
 console.log(JSON.stringify({safeStageCategories:true,unknownMessagesAndFieldsWithheld:true,zodValuesAndMessagesWithheld:true,contractMetadataClosedEnumsOnly:true,externalCalls:0}));
