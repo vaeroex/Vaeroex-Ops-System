@@ -53,6 +53,15 @@ The opt-in run has five cases: release after fallback, explicit client disconnec
 independent recovery, RPC denial, and workspace denial. The default twenty-case
 suite is still the separate baseline, not replaced by these cases.
 
+The workspace-denial check requires either the actual fixture not-found heading
+or an exact structured `NEXT_HTTP_ERROR_FALLBACK;404` Flight error record. Next
+15.5.24 can finish a loading stream with that error for its client boundary to
+render; it need not include the final heading in server HTML. The harness decodes
+only JSON type-1 inline Flight payloads without evaluating scripts. Plain digest
+text, a serialized heading, `noindex` alone, malformed/conflicting records and an
+empty 200 response are insufficient. Complete response, private/no-store policy,
+raw protected-content exclusions and zero citation RPCs remain required.
+
 Only invented sessions and source records are used. Diagnostics retain phase,
 duration and counters, never request/response content or credentials. This is
 HTTP streaming evidence, not browser hydration or visible fallback replacement.
@@ -75,8 +84,15 @@ checks. Its source fingerprint is
 `d551d3ca63cb50a63f787f873eac1223a22cd2a903cf692e9c8eaa17709ff1d6`.
 The baseline still copies 56 files with its original fingerprint
 `843f70e82fa7064027291e470cd13d8ff5ab0607d11d29fbff24405723fa6fe3`.
-Neither self-check executes Next streaming. The five new full HTTP cases have not
-run, and no application defect has been demonstrated.
+Neither self-check executes Next streaming. The first Linux run, `40432265091`
+at public head `f0cbb6e5`, passed the original twenty cases. The first four streaming
+cases reached completion; the final workspace case failed its server-heading-only
+assertion. The other three jobs succeeded. No raw failed response was retained,
+so its exact streamed marker has not been observed. The corrected structured-denial
+assertion and its positive/negative self-check controls await Linux requalification;
+this is not a five-case pass or evidence of an application defect. Failure output
+now adds bounded status/marker booleans, RPC count category and denial outcome,
+never HTML, Flight content, identities or credentials.
 
 If this test passes, it narrows the omitted streaming/cancellation behavior. It
 does not identify the hosted root cause, prove real SQL permissions, or repair

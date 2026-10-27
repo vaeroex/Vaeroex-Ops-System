@@ -21,6 +21,7 @@ const plans = new Map(), refreshPlans = new Map(), children = new Set();
 const activeStreams = new Set();
 let phase = 'setup', handlerFailed = false, stopping = false, startupCategory = 'process_failure', nextPlan = 0, cases = 0;
 let parentHooks;
+let boundaryOutcome;
 const sha = value => createHash('sha256').update(value).digest('hex');
 const encode = value => `base64-${Buffer.from(JSON.stringify(value)).toString('base64url')}`;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -294,6 +295,80 @@ async function startNext(fixture) {
   throw new Error('next_not_ready');
 }
 function html(result) { return result.body.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ''); }
+function notFoundOutcome(result, rpcCount) {
+  const digest404 = 'NEXT_HTTP_ERROR_FALLBACK;404', chunks = [], errorIds = new Set();
+  let malformedFlight = false, conflictingFlight = false, flight404 = false;
+  for (const match of result.body.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
+    const script = match[1].trim();
+    if (!script.startsWith('self.__next_f.push(')) continue;
+    const call = /^self\.__next_f\.push\(([\s\S]+)\);?$/.exec(script);
+    try {
+      if (!call) throw new Error('invalid_fixture_flight');
+      const tuple = JSON.parse(call[1]);
+      if (!Array.isArray(tuple) || tuple.length !== 2 || tuple[0] !== 1 || typeof tuple[1] !== 'string') throw new Error('invalid_fixture_flight');
+      chunks.push(tuple[1]);
+    } catch { malformedFlight = true; }
+  }
+  // Installed Next emits type-1 text chunks; React production emits hex-ID E rows containing
+  // exactly {digest}. Skip length-framed text/binary rows so text resembling an E row is not proof.
+  const flight = Buffer.from(chunks.join(''), 'utf8');
+  for (let offset = 0; offset < flight.length;) {
+    const colon = flight.indexOf(58, offset), idText = colon < 0 ? '' : flight.subarray(offset, colon).toString('ascii');
+    if (!/^[0-9a-f]+$/.test(idText)) { malformedFlight = true; break; }
+    const tag = String.fromCharCode(flight[colon + 1]);
+    if ('TAOoUSsLlGgMmV'.includes(tag)) {
+      const comma = flight.indexOf(44, colon + 2), lengthText = comma < 0 ? '' : flight.subarray(colon + 2, comma).toString('ascii');
+      const length = parseInt(lengthText, 16);
+      if (!/^[0-9a-f]+$/.test(lengthText) || !Number.isSafeInteger(length) || comma + 1 + length > flight.length) { malformedFlight = true; break; }
+      offset = comma + 1 + length; continue;
+    }
+    const end = flight.indexOf(10, colon + 1);
+    if (end < 0) { malformedFlight = true; break; }
+    if (tag === 'E') {
+      const raw = flight.subarray(colon + 2, end).toString('utf8');
+      try {
+        const record = JSON.parse(raw);
+        // Exact production shape also rejects duplicate JSON keys, extra fields and ambiguity.
+        if (!record || Array.isArray(record) || Object.keys(record).join(',') !== 'digest' ||
+            typeof record.digest !== 'string' || JSON.stringify(record) !== raw || errorIds.has(idText)) throw new Error('invalid_fixture_error_row');
+        errorIds.add(idText);
+        if (record.digest === digest404) flight404 = true; else conflictingFlight = true;
+      } catch { malformedFlight = true; }
+    }
+    offset = end + 1;
+  }
+  const markup = html(result), heading = /<h1\b[^>]*>Fixture not found<\/h1>/.test(markup);
+  const noindex = /<meta\b[^>]*name="robots"[^>]*content="noindex"[^>]*>/.test(markup);
+  const statusAllowed = result.status === 200 || result.status === 404;
+  const accepted = statusAllowed && rpcCount === 0 && !malformedFlight && !conflictingFlight && (heading || flight404);
+  return { httpStatus: statusAllowed ? result.status : 'other', heading, flight404, noindex, malformedFlight, conflictingFlight,
+    rpcCount: rpcCount === 0 || rpcCount === 1 ? rpcCount : 'multiple',
+    outcome: accepted ? heading ? 'server_not_found' : 'streamed_not_found' : 'unproven' };
+}
+function notFoundParserSelfCheck() {
+  const row = (digest, id = 'a') => `${id}:E${JSON.stringify({ digest })}\n`;
+  const inline = text => `<script>self.__next_f.push(${JSON.stringify([1, text])})</script>`;
+  const good = row('NEXT_HTTP_ERROR_FALLBACK;404');
+  const evaluate = (body, status = 200, rpcCount = 0) => notFoundOutcome({ body, status }, rpcCount).outcome !== 'unproven';
+  const forgedText = `plain text\n${good}`, framedText = `0:T${Buffer.byteLength(forgedText).toString(16)},${forgedText}`;
+  const checks = [
+    [true, inline(good)], [true, inline(good.slice(0, 17)) + inline(good.slice(17))],
+    [true, '<h1>Fixture not found</h1>', 404],
+    ...['401', '403', '500'].map(code => [false, inline(row(`NEXT_HTTP_ERROR_FALLBACK;${code}`))]),
+    [false, ''], [false, '<p>Loading Vaeroex module</p>'], [false, '<meta name="robots" content="noindex"/>'],
+    [false, good], [false, '<p>NEXT_HTTP_ERROR_FALLBACK;404</p>'],
+    [false, inline('0:["$","h1",null,{"children":"Fixture not found"}]\n')],
+    [false, inline(framedText)], [false, inline('a:E{\n')], [false, inline(good.trimEnd())],
+    [false, inline('a:E{"digest":"NEXT_HTTP_ERROR_FALLBACK;403","digest":"NEXT_HTTP_ERROR_FALLBACK;404"}\n')],
+    [false, inline(good + row('NEXT_HTTP_ERROR_FALLBACK;403', 'b'))], [false, inline(good + good)],
+    [false, inline(good), 500], [false, inline(good), 200, 1],
+    [false, '<script>self.__next_f.push([1,"broken)</script>'],
+    [false, '<script>self.__next_f.push([1,"text", "extra"])</script>'],
+    [false, inline('a:E{"digest":"NEXT_HTTP_ERROR_FALLBACK;404","extra":true}\n')]
+  ];
+  for (const [expected, body, status, rpcCount] of checks) assert.equal(evaluate(body, status, rpcCount), expected);
+  return { notFoundParserCases: checks.length };
+}
 function privateResponse(result) {
   assert.match(result.headers['cache-control'], /no-store/); assert.match(result.headers['cache-control'], /private/);
   assert.equal(result.headers.authorization, undefined);
@@ -469,6 +544,7 @@ async function fullHttpChecks(sources, fixtures) {
 }
 async function streamingMechanicsSelfCheck(fixture, backendOrigin) {
   phase = 'self_check_streaming_mechanics';
+  const parserChecks = notFoundParserSelfCheck();
   const held = plan('hold_response'), disconnected = plan('stall_headers');
   const routes = new Map([['/release', held], ['/disconnect', disconnected]]), upstreamRequests = new Set();
   // This tiny relay tests only our chunk observer and explicit client-close mechanics. Its close
@@ -500,7 +576,7 @@ async function streamingMechanicsSelfCheck(fixture, backendOrigin) {
     await observeUntil(() => disconnected.counts.rpcClosed === 1, 3000);
     assert.equal(closed.state.endedAt, null); assert(closed.state.closedAt >= closed.state.disconnectAt);
     assert.equal(disconnected.pending.size, 0); assert.equal(handlerFailed, false);
-    return { syntheticStreamingMechanicsCases: 2, nextStreamingExecuted: false };
+    return { syntheticStreamingMechanicsCases: 2, ...parserChecks, nextStreamingExecuted: false };
   } finally {
     relay.closeAllConnections(); for (const upstream of upstreamRequests) upstream.destroy();
     await new Promise(resolve => relay.close(resolve));
@@ -560,11 +636,13 @@ async function streamingHttpChecks(sources, fixtures) {
   assert.equal(refusal.counts.rpc, 1); cases++;
   phase = 'streaming_workspace_denial';
   const foreign = plan('ok', { workspace: id(501), actor: id(502) });
-  const rejected = await request(on.origin, target(), cookie(foreign)); denied(rejected);
+  const rejected = await request(on.origin, target(), cookie(foreign));
+  boundaryOutcome = notFoundOutcome(rejected, foreign.counts.rpc); denied(rejected);
   // Once the fallback is sent, Next may encode notFound in the stream rather than change HTTP status.
   assert([200, 404].includes(rejected.status));
-  assert.match(html(rejected), /<h1\b[^>]*>Fixture not found<\/h1>/);
+  assert.notEqual(boundaryOutcome.outcome, 'unproven');
   assert.equal(foreign.counts.rpc, 0); cases++;
+  timings.push({ stage: 'workspace_denial', ...boundaryOutcome });
   await stopChild(child); for (const fixture of fixtures) verifyCopies(sources, fixture);
   assert.equal(handlerFailed, false); return timings;
 }
@@ -604,7 +682,7 @@ const deadline = new Promise((_, reject) => { watchdog = setTimeout(() => { stop
 Promise.race([main(), deadline]).catch(error => {
   const location = /shared-evidence-citation-next-tests\.cjs:(\d+):\d+/.exec(String(error.stack))?.[1];
   console.error(JSON.stringify({ failed: true, phase, category: phase.includes('production_build') ? startupCategory : error.code === 'ERR_ASSERTION' ? 'assertion' : 'harness',
-    location: location ? `shared-evidence-citation-next-tests.cjs:${location}` : null })); process.exitCode = 1;
+    location: location ? `shared-evidence-citation-next-tests.cjs:${location}` : null, ...(boundaryOutcome ? { boundaryOutcome } : {}) })); process.exitCode = 1;
 }).finally(async () => {
   stopping = true; clearTimeout(watchdog);
   for (const request of activeStreams) request.destroy();
