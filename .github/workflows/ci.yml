@@ -381,6 +381,14 @@ jobs:
         timeout-minutes: 5
         run: pnpm test:session-refresh
 
+      - name: Protected citation rendering (synthetic loopback only)
+        timeout-minutes: 5
+        run: pnpm test:protected-citation-http
+
+      - name: Protected citation streaming lifecycle (synthetic loopback only)
+        timeout-minutes: 5
+        run: pnpm test:protected-citation-streaming
+
       - name: Security regression check
         run: pnpm security:check
 
