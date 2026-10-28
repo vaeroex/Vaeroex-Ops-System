@@ -34,10 +34,17 @@ function analysisInputFixtures() {
   // code-owned versions, timestamps or counts; no source text/arrays are sent.
   const strict = value => new Proxy(value,{get(target,key){if(key in target)return target[key];throw new Error(`unqualified_analysis_input_field:${String(key)}`);}});
   const authoritySource=ts.transpileModule(fs.readFileSync(path.join(root,"lib/integrations/google-sheets/read-authority.ts"),"utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+  const diagnosticSource=ts.transpileModule(fs.readFileSync(path.join(root,"lib/ai/shared-evidence/preparation-diagnostics.ts"),"utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+  const diagnostics={};
+  new Function("require","exports",diagnosticSource)(name=>{
+    if(name==="zod")return require("zod");
+    throw new Error(`unqualified_preparation_diagnostic_dependency:${name}`);
+  },diagnostics);
   const authority={};
   new Function("require","exports",authoritySource)(name=>{
     if(name==="server-only")return {};
     if(name==="zod")return require("zod");
+    if(name==="@/lib/ai/shared-evidence/preparation-diagnostics")return diagnostics;
     throw new Error(`unqualified_read_authority_dependency:${name}`);
   },authority);
   const opened=strict({readTicketId:"99999999-9999-4999-8999-999999999991"});

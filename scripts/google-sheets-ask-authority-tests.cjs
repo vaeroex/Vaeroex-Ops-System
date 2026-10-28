@@ -17,7 +17,9 @@ function load(file, dependencies = {}) {
   return loaded.exports;
 }
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'synthetic-ask-authority-test-key';
-const authority = load('lib/integrations/google-sheets/read-authority.ts', { zod: { z } });
+const preparationDiagnostics = load('lib/ai/shared-evidence/preparation-diagnostics.ts', { zod: { z } });
+const authority = load('lib/integrations/google-sheets/read-authority.ts', { zod: { z },
+  '@/lib/ai/shared-evidence/preparation-diagnostics': preparationDiagnostics });
 const session = load('lib/search/ask-session.ts');
 const tokens = load('lib/search/ask-session-token.ts', { crypto, '@/lib/search/ask-session': session });
 const workspaceId = '11111111-1111-4111-8111-111111111111';
