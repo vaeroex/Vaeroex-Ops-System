@@ -31,7 +31,8 @@
       "codex/workspace-audit-workflows": false,
       "codex/all12-qualified-release": false,
       "codex/vsi-exact-fact-bindings": false,
-      "codex/vsi-context-overhead": false
+      "codex/vsi-context-overhead": false,
+      "codex/vsi-overhead-hosted-acceptance": false
     }
   },
   "crons": [

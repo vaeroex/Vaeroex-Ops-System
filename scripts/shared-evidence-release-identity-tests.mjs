@@ -7,7 +7,10 @@ import { createRequire } from 'node:module';
 import { PGlite } from '@electric-sql/pglite';
 
 const require = createRequire(import.meta.url);
-const { assemble, sources, identityConflictUpgrade: upgrade, verifyIdentityConflictTail } = require('./shared-evidence-release-package.cjs');
+const { sources, identityConflictUpgrade: upgrade, verifyIdentityConflictTail } = require('./shared-evidence-release-package.cjs');
+// Preserve the unchanged OFF installation-package guard while this temporary
+// application's three gate files are ON. All SQL and negative mutations remain.
+const { assembleInactivePackage: assemble } = require('./vsi-temporary-activation-test-support.cjs');
 const read = file => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
 const rename = 'alter function private.shared_evidence_original_v1(uuid,jsonb,uuid) rename to shared_evidence_before_memory_receipts_v1;';
 const marker = `-- SOURCE: ${upgrade.path}\n`;
