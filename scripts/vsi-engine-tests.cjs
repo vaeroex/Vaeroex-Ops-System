@@ -18,6 +18,9 @@ let retrievalCalls = 0, permitted = true, productAvailable = true;
 const source = { id:'B1', title:'Repair turnaround', url:'/app/kpis?q=Repair', sourceType:'kpi', sourceId:'metric-1',
   evidenceDate:'2026-09-01', retrievedAt:'2026-10-08T12:00:00Z', excerpt:'Turnaround rose from 2 to 4 days; cause not established.', text:'Turnaround rose from 2 to 4 days; cause not established.', treatment:'record' };
 const mock=(file,exports)=>{const filename=path.join(root,file);require.cache[filename]={id:filename,filename,loaded:true,exports};};
+// Preserve legacy/off branch coverage; shared engine suites exercise enabled admission.
+mock('lib/ai/shared-evidence/runtime-gate.ts', { sharedEvidenceRuntimeEnabled: () => false });
+mock('lib/ai/shared-evidence/qualitative-policy.ts', { qualitativeSynthesisEnabled: () => false });
 mock('lib/integrations/google-sheets/read-authority.ts', { bindGoogleSheetsRead: async () => ({ ticketId: 'synthetic-ticket' }) });
 mock('lib/ai/providers/google-data-policy.ts', { googleSheetsOpenAIHeaders: async () => ({}) });
 mock('lib/vsi/retrieval.ts',{
