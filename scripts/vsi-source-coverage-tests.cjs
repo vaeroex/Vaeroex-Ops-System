@@ -51,7 +51,7 @@ global.fetch=async(url,init)=>{
  answerCalls++;captured=payload;capturedSchema=body.text.format.schema;assert.equal(payload.businessSources.length,expectedPacked,JSON.stringify(budgets.at(-1)));assert.equal(payload.qualitative_sources.length,expectedPacked);assert.equal(payload.productSources.length,6);assert.equal(payload.answerSourceRequirements.groups.length,2);
  assert.equal(init.body.length,budgets.at(-1).final.requestChars,'full engine prompt and source-specific schema are counted before transport');
  assert.equal(Buffer.byteLength(init.body,'utf8'),budgets.at(-1).final.requestBytes);
- assert.match(body.input[0].content,/Historical conversation and source snapshots provide dialogue context only/);
+ assert.match(body.input[0].content,/Historical dialogue\/snapshots are context only: select historical references only when/);
  assert.match(body.input[0].content,/currently issued in qualitative_sources or contextFactSources/);
  assert.doesNotMatch(body.input[0].content,/You may explain prior research using the attached historical web source snapshots/);
  const sources=payload.qualitative_sources,sourceFor=hash=>sources.find(s=>s.binding===hash);

@@ -10,7 +10,8 @@ const scenario=padding=>[
 ];
 // Keep the positive case below the complete wire limit after prompt/schema changes.
 // Payload volume uses valid repeated stored records, not invented metric keys.
-// The former two-copy positive shape now exceeds the complete request budget and must be denied below.
+// The larger original shape is retained below to verify the overhead reduction
+// admits its complete evidence, while an oversized question still fails closed.
 const raw=scenario(0);
 const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
  events.push(name);
@@ -84,7 +85,7 @@ global.fetch=async(url,init)=>{
   for(const source of expanded.businessSources){const record=JSON.parse(source.text);assert(record.observationsRef,'fixture must exercise compaction');const issued=payload.qualitative_sources.find(s=>s.ref===record.observationsRef);delete record.observationsRef;record.observations=issued.facts;source.text=JSON.stringify(record);}
   originalChars=JSON.stringify(expanded).length+body.input[0].content.length;
   originalRequestChars=JSON.stringify({...body,input:[body.input[0],{...body.input[1],content:JSON.stringify(expanded)}]}).length;
-  assert(originalRequestChars>32000,'the duplicated full request including prompt/schema/envelope exceeds the unchanged limit');
+  assert(originalRequestChars>serializedRequestChars+3000,'lossless observation deduplication still removes substantial complete-wire overhead with the shorter prompt');
   const {sharedReply,observationsFor}=require('./vsi-shared-answer-test-support.cjs');
   output=sharedReply(payload);
   output.hypotheses=[{premises:observationsFor(payload),text:'The invoice balance and dispatch observations may merit a closer look; this is not an established cause.'}];
@@ -104,6 +105,10 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  providerCalls=0;answerCalls=0;revokeAfterPlanner=true;await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.providerCalls===1&&e.usage.outcomeFailure==='evidence_unavailable');assert.equal(providerCalls,1);assert.equal(answerCalls,0);revokeAfterPlanner=false;revoked=false;
  providerCalls=0;answerCalls=0;await assert.rejects(runVsiAnswer({...input,recentMessages:[{role:'user',content:'Historical conversation context. '.repeat(250)},{role:'assistant',content:'Prior explanation with no business citations. '.repeat(180)}]}),e=>e instanceof VsiEngineError&&e.usage.outcomeFailure==='context_block'&&/No canonical evidence was shortened/.test(e.message));assert.equal(providerCalls,0);assert.equal(answerCalls,0);
  raw.splice(0,raw.length,...scenario(2));providerCalls=0;answerCalls=0;
- await assert.rejects(runVsiAnswer(input),e=>e instanceof VsiEngineError&&e.usage.outcomeFailure==='context_block'&&/No canonical evidence was shortened/.test(e.message));assert.equal(providerCalls,0);assert.equal(answerCalls,0);
- console.log(JSON.stringify({passed:true,fixture:'synthetic two-plugin full engine packing',...measured,sourceGroupsRetained:2,purePackerGroupsRetained:17,canonicalCitationsPreserved:true,revocationAndWrongWorkspaceDeniedBeforeProvider:true,unknownCitationAndCausalClaimDenied:true,revocationAfterPlanningStopsAnswer:true,unfitContextStopsBeforeAnswerCall:true,originalOversizedFixtureDeniedBeforeProvider:true,mockedRuntime:true,paidCalls:0}));
+ const largerAnswer=await runVsiAnswer(input);assert.equal(providerCalls,2);assert.equal(answerCalls,1);assert.equal(largerAnswer.citations.length,2);
+ for(const original of raw){const row=sharedRow(original,workspace);assert.deepEqual(transport.qualitative_sources.find(source=>source.binding===row.hash).facts,row.facts,'larger fixture retains every original fact');}
+ const largerFixtureRequestChars=serializedRequestChars;providerCalls=0;answerCalls=0;
+ const longQuestion=(input.question+' Preserve the reported dates, source scope and coverage limitations.'.repeat(150)).slice(0,8000);assert.equal(longQuestion.length,8000);
+ await assert.rejects(runVsiAnswer({...input,question:longQuestion}),e=>e instanceof VsiEngineError&&e.usage.outcomeFailure==='context_block'&&/No canonical evidence was shortened/.test(e.message));assert.equal(providerCalls,0);assert.equal(answerCalls,0);
+ console.log(JSON.stringify({passed:true,fixture:'synthetic two-plugin full engine packing',...measured,sourceGroupsRetained:2,purePackerGroupsRetained:17,canonicalCitationsPreserved:true,revocationAndWrongWorkspaceDeniedBeforeProvider:true,unknownCitationAndCausalClaimDenied:true,revocationAfterPlanningStopsAnswer:true,unfitContextStopsBeforeAnswerCall:true,originalLargerFixtureFitsWithoutFactLoss:true,largerFixtureRequestChars,longQuestionDeniedBeforeProvider:true,mockedRuntime:true,paidCalls:0}));
 })().catch(e=>{console.error(e);process.exitCode=1;});

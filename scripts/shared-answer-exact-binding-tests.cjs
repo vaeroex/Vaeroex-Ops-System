@@ -194,8 +194,11 @@ const assertSchemaReferences = schema => visit(schema, value => {
   }
 });
 const excludedInvoice = { ...invoice, salesInvoiceFactGroups: [] };
+const extraSupport = issueContextFactSources(Array.from({ length: 5 }, (_, i) => ({
+  id: `P${i + 2}`, text: `Synthetic supporting context ${i + 2}.`, snapshotHash
+})), null);
 let emptyInvoiceContexts = 0, invoiceFieldDenials = 0;
-for (const remaining of [[], [support], [operations]]) {
+for (const remaining of [[], [support], [operations], [support, ...extraSupport], [operations, support, ...extraSupport]]) {
   const input = [excludedInvoice, ...remaining], schema = invoiceSchema(input), wire = ajv.compile(schema);
   assertSchemaReferences(schema);
   const base = empty(remaining.map(s => pick(s)));

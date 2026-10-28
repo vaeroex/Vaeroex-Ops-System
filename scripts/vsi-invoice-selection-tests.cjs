@@ -148,7 +148,7 @@ async function actualEngineChecks() {
  const actor = id(500), request = id(502), manifest = id(503);
  let engineRaw = originals, mode = 'valid', calls = 0, answerCalls = 0, mockFailure;
  const measured = [], packingFailures = [], validated = [], sealed = [], renderRecords = [];
- let wireBindingRejections = 0, nearLimitPacking, oversizedRequiredContext;
+ let wireBindingRejections = 0, completePacking, nearLimitPacking, oversizedRequiredContext;
  engineReader = { auth: {
   getUser: async () => ({ data: { user: { id: actor } }, error: null }),
   getClaims: async () => ({ data: { claims: { sub: actor, session_id: id(504) } }, error: null })
@@ -197,7 +197,10 @@ async function actualEngineChecks() {
    if (body.text.format.name === 'vsi_research_plan_v1') output = { mode: 'answer', businessEvidence: true, tier: 'simple', clarification: '', publicTargets: [], objectives: [] };
    else {
     answerCalls++; assert.equal(body.text.format.name, 'vsi_shared_answer_v2');
-    assert.equal(view.productSources.length, 6); assert.equal(view.businessSources.length, 3);
+    assert.equal(view.productSources.length, 6);
+    if (mode === 'optional_neighbors') assert.equal(view.businessSources.length, 5);
+    else if (mode === 'near_limit') assert(view.businessSources.length >= 3 && view.businessSources.length < 5);
+    else assert.equal(view.businessSources.length, 3);
     const x = view.qualitative_sources.find(s => s.provider === 'xero'), m = measured.at(-1);
     assert.equal(x.facts.length, 135); assert.deepEqual(x.facts, rows[0].facts); assert.deepEqual(x.salesInvoiceFactGroups, rows[0].salesInvoiceFactGroups);
     assert.equal(init.body.length, m.metrics.requestChars); assert.equal(Buffer.byteLength(init.body, 'utf8'), m.metrics.requestBytes);
@@ -239,23 +242,41 @@ async function actualEngineChecks() {
   mode = 'provider_bad_binding'; await assert.rejects(() => runVsiAnswer(engineInput), e => e.usage.validationFailure?.factReference?.reason === 'binding_mismatch'); assert.equal(calls,6,'schema violations still fail closed without retry');
   // Five available originals reuse the complete 27-record invoice and both
   // intended Sheets rows. Optional neighbors must not displace requested facts.
-  // The compact exact schema must retain all required facts and honest omission
-  // metadata within the same 48k limit, not trim evidence to make room.
+  // The smaller prompt now admits all five sources. Preserve that improvement
+  // while retaining the exact required facts and their renderer context.
   mode = 'optional_neighbors';
   engineRaw = [...originals, ...[2,3].map(n => { const optional = sheet(n, '2026-10-15', 0, 0); optional.data.entity_id = id(900+n); optional.data.connection_id = id(910+n); optional.data.metrics = [{ metric: 'Synthetic unrelated warehouse bin observation', value: 0, unit: 'count' }]; return optional; })];
   const beforeOptionalCalls = calls;
-  const optionalResult = await runVsiAnswer(engineInput), near = measured.at(-1), nearWire = JSON.parse(near.json), nearContext = renderRecords.at(-1);
-  assert.equal(calls-beforeOptionalCalls,2); assert.equal(optionalResult.citations.length,3);
-  assert.equal(near.initialMetrics.sourceGroups,5); assert(near.initialMetrics.requestChars>48000); assert.equal(near.metrics.selectedSourceGroups,3); assert.equal(near.metrics.omittedSourceGroups,2);
+  const optionalResult = await runVsiAnswer(engineInput), complete = measured.at(-1), completeWire = JSON.parse(complete.json), completeContext = renderRecords.at(-1);
+  const assertRequiredUnchanged = (wire, rendered) => {
+   for (const source of baselineWire.qualitative_sources) assert.deepEqual(wire.qualitative_sources.find(candidate => candidate.ref === source.ref),source,'all135 invoice facts, both intended Sheets originals and their exact issued bindings remain unchanged');
+   for (const source of baselineContext.sources) assert.deepEqual(rendered.sources.find(candidate => candidate.ref === source.ref),source,'required and supporting renderer facts remain unchanged');
+   assert.deepEqual(wire.answerSourceRequirements,baselineWire.answerSourceRequirements,'optional neighbors cannot replace required source groups');
+  };
+  assert.equal(calls-beforeOptionalCalls,2); assert.equal(optionalResult.citations.length,5);
+  assert.equal(complete.initialMetrics.sourceGroups,5); assert(complete.initialMetrics.requestChars<=48000); assert.equal(complete.metrics.selectedSourceGroups,5); assert.equal(complete.metrics.omittedSourceGroups,0);
+  assert(complete.metrics.requestChars<=48000); assert(complete.metrics.requestBytes<=192000); assert.equal(completeWire.contextCoverage,undefined,'complete packing must not claim omissions');
+  assertRequiredUnchanged(completeWire,completeContext);
+  assert.deepEqual(completeWire.qualitative_sources,complete.canonical.qualitative_sources,'every admitted original retains all facts and metadata');
+  completePacking = { available: complete.initialMetrics.sourceGroups, selected: complete.metrics.selectedSourceGroups, requestChars: complete.metrics.requestChars, requestBytes: complete.metrics.requestBytes, stoppedBeforePlanner: false };
+  // Added neutral question context independently exercises whole-group packing
+  // near the unchanged cap. No source fact is shortened to construct this case.
+  mode = 'near_limit';
+  const nearInput = { ...engineInput, question: `${question}${' Synthetic test context.'.repeat(100)}` };
+  assert(nearInput.question.length<=8000);
+  const beforeNearCalls = calls;
+  const nearResult = await runVsiAnswer(nearInput), near = measured.at(-1), nearWire = JSON.parse(near.json), nearContext = renderRecords.at(-1);
+  assert.equal(calls-beforeNearCalls,2); assert.equal(nearResult.citations.length,near.metrics.selectedSourceGroups);
+  assert.equal(near.initialMetrics.sourceGroups,5); assert(near.initialMetrics.requestChars>48000); assert(near.metrics.selectedSourceGroups>=3&&near.metrics.selectedSourceGroups<5); assert.equal(near.metrics.omittedSourceGroups,5-near.metrics.selectedSourceGroups);
   assert(near.metrics.requestChars<=48000); assert(near.metrics.requestBytes<=192000); assert.equal(nearWire.productSources.length,6);
-  assert.deepEqual(nearWire.qualitative_sources,baselineWire.qualitative_sources,'all135 invoice facts, both intended Sheets originals and their exact issued bindings remain unchanged');
-  assert.deepEqual(nearContext.sources,baselineContext.sources,'five-source packing preserves the exact renderer context');
-  assert.equal(nearWire.contextCoverage.omittedSourceGroups,2); assert.equal(nearWire.contextCoverage.complete,false);
+  assertRequiredUnchanged(nearWire,nearContext);
+  for(const source of nearWire.qualitative_sources) assert.deepEqual(source,near.canonical.qualitative_sources.find(candidate=>candidate.ref===source.ref),'packing retains complete selected originals');
+  assert.equal(nearWire.contextCoverage.omittedSourceGroups,near.metrics.omittedSourceGroups); assert.equal(nearWire.contextCoverage.complete,false);
   nearLimitPacking = { available: near.initialMetrics.sourceGroups, selected: near.metrics.selectedSourceGroups, requestChars: near.metrics.requestChars, requestBytes: near.metrics.requestBytes, stoppedBeforePlanner: false };
   // Real excess context still stops before planning. This neutral synthetic
   // padding stays below the question limit and adds no provider or business fact.
-  const oversizedInput = { ...engineInput, question: `${question}${' Synthetic test context.'.repeat(100)}` };
-  assert(oversizedInput.question.length<=8000); mode='oversized_required';
+  const oversizedInput = { ...engineInput, question: `${question}${' Synthetic test context.'.repeat(400)}`.slice(0,8000) };
+  assert.equal(oversizedInput.question.length,8000); mode='oversized_required';
   const beforeOversizedCalls = calls, beforePackingFailures = packingFailures.length;
   await assert.rejects(() => runVsiAnswer(oversizedInput), error => {
    if (mockFailure) throw mockFailure;
@@ -274,7 +295,7 @@ async function actualEngineChecks() {
   assert.equal(JSON.stringify(originals),originalJSON); assert.equal(networkAttempts,0); assert(sealed.includes(5)); assert(sealed.every(n=>n===3||n===5));
   assert.doesNotMatch(JSON.stringify(validated),/synthetic-invoice-selection-no-access|[a-f0-9]{64}/);
   const wire=baselineMeasurement.metrics;
-  return {actualEngineFull27RecordPrompt:true,actualWireSchemaBudgetMeasured:true,fullRequestChars:wire.requestChars,fullRequestBytes:wire.requestBytes,wireBindingRejections,actualWireRendererTuplesAligned:true,nearLimitPacking,oversizedRequiredContext,preflightMissingAndMalformedDeny:true,malformedProviderResponseRejected:true,mockedProviderCalls:calls};
+  return {actualEngineFull27RecordPrompt:true,actualWireSchemaBudgetMeasured:true,fullRequestChars:wire.requestChars,fullRequestBytes:wire.requestBytes,wireBindingRejections,actualWireRendererTuplesAligned:true,completePacking,nearLimitPacking,oversizedRequiredContext,preflightMissingAndMalformedDeny:true,malformedProviderResponseRejected:true,mockedProviderCalls:calls};
  } catch (e) { throw mockFailure||e; }
  finally { global.Date=ActualDate; packingModule.packVsiAnswerContext=realPack; contractModule.renderSharedAnswer=realRender; global.fetch=deny; console.info=oldInfo; console.error=oldError; }
 }

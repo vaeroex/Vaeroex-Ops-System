@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Credential-free wire-schema/rendering regressions. */
 const assert = require('node:assert/strict'), path = require('node:path');
 require('./qbo-customer-test-support.cjs').installLoader({ 'server-only': {} });
+let externalCalls = 0;
+const denyNetwork = () => { externalCalls++; throw new Error('limitation_schema_test_network_denied'); };
+global.fetch = denyNetwork;
+require('node:net').Socket.prototype.connect = denyNetwork;
 const Ajv = require(require.resolve('ajv', { paths: [path.dirname(require.resolve('eslint'))] }));
 const ajv = new Ajv({ allErrors: true });
 const { sharedAnswerJsonSchema, sharedAnswerJsonSchemaForResults, renderSharedAnswer, issueAnswerResults } = require('../lib/ai/shared-evidence/answer-contract.ts');
@@ -122,5 +126,55 @@ const wire = serializeVsiProviderRequest({ input: [{ role: 'system', content: 'S
 assert(wire.length < 48_000, `serializedRequestChars=${wire.length}`); assert(Buffer.byteLength(wire) < 192_000);
 assert.equal(JSON.stringify(all), allBefore); assert.equal(JSON.stringify(sharedAnswerJsonSchema), baseBefore);
 assert.equal(ajv.compile(schema)({ ...empty(all.map(s => selection(s))), missing_information: [{ premises: [selection(many[0]), selection(many[23])], text: 'What is the coverage?' }] }), false);
+// Six product sources plus up to twenty-four public sources can accompany the
+// bounded business sources. Use maximum-length refs and independently assert
+// the permitted source combinations instead of testing only schema shape.
+const longRef = (prefix, i) => `${prefix}${i}`.padEnd(80, 'x');
+const largeOriginals = many.map((s, i) => ({ ...s, ref: longRef('B', i) }));
+const largeSupporting = Array.from({ length: 30 }, (_, i) => ({ ...support, ref: longRef('P', i), binding: (i + 100).toString(16).padStart(64, '0') }));
+const largeSources = [...largeOriginals, ...largeSupporting], largeBefore = JSON.stringify(largeSources);
+const largeSchema = schemaFor(largeSources), largeValidate = ajv.compile(largeSchema);
+const sixSupportingChars = JSON.stringify(schemaFor([...largeOriginals, ...largeSupporting.slice(0, 6)])).length;
+const thirtySupportingChars = JSON.stringify(largeSchema).length;
+assert(thirtySupportingChars - sixSupportingChars < 10_000, 'supporting-source growth must not repeat the full union for every original');
+let supportCombinationChecks = 0;
+for (const first of largeSources) for (const second of largeSources) {
+  const premises = [selection(first), selection(second)];
+  const prose = { ...empty([]), missing_information: [{ premises, text: 'Which evidence should be checked?' }] };
+  const distinctOriginals = new Set([first, second].filter(s => !s.supportOnly).map(s => s.binding)).size;
+  assert.equal(largeValidate(prose), distinctOriginals <= 1, 'prose can mix support with one original, never two originals');
+  const typed = { ...empty([]), missing_information: [comparison(premises)] };
+  // Independent runtime validation still establishes actual independence and
+  // observed premises; the wire comparison must exclude all supporting refs.
+  assert.equal(largeValidate(typed), !first.supportOnly && !second.supportOnly);
+  supportCombinationChecks += 2;
+}
+for (const issued of largeSources) {
+  const wrong = { ...selection(issued), binding: 'f'.repeat(64) };
+  for (const field of ['observations', 'hypotheses', 'next_checks', 'missing_information']) {
+    const answer = empty([]);
+    answer[field] = field === 'observations' ? [wrong] : [{ premises: [wrong], text: 'Which evidence should be checked?' }];
+    assert.equal(largeValidate(answer), false, 'fact binding remains exact in every fact-selection field');
+    supportCombinationChecks++;
+  }
+}
+// Alias refs with the same binding remain one original. Empty/sole support
+// contexts and empty source contexts retain the established contract.
+for (const originalsCount of [0, 1, 3]) for (const supportCount of [0, 1, 2, 6]) {
+  const input = [...largeOriginals.slice(0, originalsCount), ...largeSupporting.slice(0, supportCount)];
+  const before = JSON.stringify(input), generated = schemaFor(input), validate = ajv.compile(generated);
+  const premises = [...input.filter(s => !s.supportOnly).slice(0, 1), ...input.filter(s => s.supportOnly)].map(s => selection(s));
+  assert(validate({ ...empty([]), missing_information: [{ premises, text: 'Which evidence should be supplied?' }] }));
+  assert.equal(JSON.stringify(input), before);
+  supportCombinationChecks++;
+}
+const aliased = [...largeOriginals.slice(0, 2), { ...largeOriginals[0], ref: longRef('alias', 0) }, ...largeSupporting];
+const aliasValidate = ajv.compile(schemaFor(aliased));
+assert(aliasValidate({ ...empty([]), missing_information: [{ premises: [selection(aliased[0]), selection(aliased[2]), selection(aliased[3])], text: 'Which evidence should be checked?' }] }));
+assert.equal(aliasValidate({ ...empty([]), missing_information: [{ premises: [selection(aliased[0]), selection(aliased[1]), selection(aliased[3])], text: 'Which evidence should be checked?' }] }), false);
+assert.equal(JSON.stringify(largeSources), largeBefore);
+assert.equal(JSON.stringify(sharedAnswerJsonSchema), baseBefore);
+assert.equal(externalCalls, 0);
 console.log(JSON.stringify({ passed: true, positives, negatives, sourceGroups: 24, supportingSources: 6, serializedRequestChars: wire.length,
+  supportCombinationChecks, boundedBusinessSources: 24, boundedSupportingSources: 30, sixSupportingChars, thirtySupportingChars,
   retainedFailureShapeReproduced: true, runtimeUnchanged: true, missingModelAssessmentCannotSuppressAppDates: true, manualSemanticReviewRequired: true, modelCalls: 0 }));

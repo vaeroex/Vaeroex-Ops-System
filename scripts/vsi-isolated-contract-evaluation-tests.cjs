@@ -45,7 +45,7 @@ async function rejectedReply(change){
  await assert.rejects(evaluation.runNext(),/review_or_stop_required/);negativeCases++;return{evaluation,result,calls};
 }
 (async()=>{
- assert.equal(candidate,'64573de49742ab83d041e64e3ec09f2fec86b1fb');assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
+ assert.equal(candidate,"53effaec9a76b608338a5c9fc5c09cec7331e0cd");assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
  checkFixtures();
  const first=createEvaluation({outputDir:output(),dispatch});const result=await first.runNext();
  assert.equal(dispatches,2);
@@ -58,7 +58,9 @@ async function rejectedReply(change){
  assert.equal(first.snapshot().state,'stopped');await assert.rejects(first.runNext());negativeCases++;
  const all=files(first.directory);for(const file of all)assert.equal(fs.statSync(path.join(first.directory,file.name)).mode&0o777,0o600);
  const request=JSON.parse(all.find(f=>f.name==='qualified-brief-call-2-request.json').value);
- assert(request.body.input[0].content.length>10000,'actual full engine prompt, not a tiny test substitute');
+ // Bind the complete prompt to this pinned runtime; length alone stopped being
+ // a useful identity check when redundant instructions were removed.
+ assert.equal(require('node:crypto').createHash('sha256').update(request.body.input[0].content).digest('hex'),'9f443afa52ef755cfa67ed92cba927ef0e1228f11ee37afc8f8d206265f1eab2','actual complete candidate prompt, not a test substitute');
  assert.match(request.body.input[0].content,/No business-word whitelist applies/);
  const wireSchema=request.body.text.format.schema;
  const definition=part=>{if(!part.$ref)return part;assert.match(part.$ref,/^#\/\$defs\/[a-z][a-z0-9_]*$/);return wireSchema.$defs[part.$ref.slice('#/$defs/'.length)];};
