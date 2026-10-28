@@ -18,15 +18,32 @@ Specific multi-source questions belong in `next_checks`; the application never
 moves or rewrites a rejected draft to make it pass.
 
 These alternatives are regenerated from the exact packed request and share local
-`$defs` for unchanged fact-selection and draft syntax to avoid needless schema overhead. Definitions
+`$defs` for each issued reference/binding pair and shared draft syntax to avoid needless schema overhead. Definitions
 and references are supported by the [OpenAI Structured Outputs contract](https://developers.openai.com/api/docs/guides/structured-outputs#definitions-are-supported).
-Grouping uses the refs that uniquely resolve to protected bindings. Exact binding
-values, source-local index bounds and observed-premise membership remain runtime
-checks; a schema-valid reference is not authorization. All schema bytes remain
+Every observation, hypothesis, next-check, limitation and date-comparison premise
+uses those same exact pairs. Existing invoice eligibility is also reused across
+these fields, since a premise must already be an eligible observed fact. Sources
+without eligible invoice facts cannot become selectable through another field.
+General source-local index bounds and observed-premise membership remain runtime
+checks, alongside independent exact binding validation; a schema-valid reference
+is not authorization. All schema bytes remain
 inside the existing full-request packing measurement.
 The static parser remains a structural superset: rendering still checks current
 bindings, selected facts, independent roots, environments, revocation and other
 cross-field constraints. Free prose still needs manual semantic review.
+
+The hosted rejection `fact_reference / binding_mismatch` established that a
+well-formed binding did not match its selected current source or another current
+source. The rejected answer was not retained: its provider, selected fact, hash
+origin and model-versus-packaging cause remain unknown. This correction closes
+the demonstrated wire-schema gap; it does not establish the historical cause.
+Packing/renderer tuple regressions preserve refs, hashes and source-local order.
+A synthetic five-group request retains three requested groups and all 135 invoice
+facts at 47,841 characters under the unchanged 48,000-character full-request cap.
+An oversized required context still stops before planning. Exact schema overhead
+can reduce optional context or prevent a larger request; limits are not raised.
+The four retained Evaluation 12 answers remain compatibility fixtures, not new
+model calls. Their smaller unpruned contexts did not expose this schema gap.
 
 Evaluation 09 exposed a concrete schema/runtime gap: its date assessment was
 present, but its additional multi-source prose limitation was structurally valid

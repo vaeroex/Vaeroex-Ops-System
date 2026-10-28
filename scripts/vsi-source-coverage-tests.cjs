@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Synthetic-only hosted-shape regression; no external transport or database. */
-const assert=require('node:assert/strict');
+const assert=require('node:assert/strict'),path=require('node:path');
+const Ajv=require(require.resolve('ajv',{paths:[path.dirname(require.resolve('eslint'))]}));
+const ajv=new Ajv({allErrors:true});
+let networkAttempts=0;
+require('node:net').Socket.prototype.connect=()=>{networkAttempts++;throw Error('external_network_forbidden');};
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const workspace=id(1),actor=id(2),session=id(3),request=id(4),manifest=id(6);
 const sheet=(n,kind)=>({provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(100+n),version_id:id(200+n)},hash:(n+20).toString(16).padStart(64,'0'),data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(kind==='wanted'?30:90),connection_id:id(kind==='wanted'?31:kind==='large'?91:300+n),date:n%2?'2026-10-14':'2026-10-15',time_zone:'UTC',metrics:kind==='wanted'?[{metric:'Explicitly synthetic dispatch/backlog operations canary dispatches',value:'6',unit:'count'},{metric:'Explicitly synthetic end-of-day backlog',value:'4',unit:'count'}]:kind==='large'?Array.from({length:6},(_,m)=>({metric:`Unrelated archived worksheet ${m} ${'synthetic warehouse context '.repeat(4)}`,value:String(m+1),unit:'count'})):[{metric:'Unrelated optional worksheet observation',value:'2',unit:'count'}],read_sources:[]}});
@@ -40,11 +44,13 @@ const {vsiAnswerCoverageGroups}=require('../lib/vsi/context-selection.ts');
 const ActualDate=Date;global.Date=class extends ActualDate{constructor(...args){super(...(args.length?args:['2026-10-24T00:00:00Z']));}static now(){return new ActualDate('2026-10-24T00:00:00Z').getTime();}};
 process.env.VAEROEX_VSI_MAX_INPUT_CHARS='48000';process.env.VAEROEX_VSI_MAX_OUTPUT_TOKENS='6000';
 const budgets=[],diagnostics=[];console.info=(tag,value)=>{if(tag==='[vsi-context-budget]')budgets.push(value);};console.error=(tag,value)=>{if(tag==='[vsi-validation]')diagnostics.push(value);};
-let captured,fullReply,selectedSources,expectedPacked=7;
+let captured,capturedSchema,fullReply,selectedSources,expectedPacked=7;
 global.fetch=async(url,init)=>{
  calls++;assert.equal(url,'https://api.openai.com/v1/responses');const body=JSON.parse(init.body),payload=JSON.parse(body.input[1].content);assert.equal(body.store,false);assert.equal(body.model,'gpt-6-luna');assert.equal(body.tools,undefined);assert(init.body.length<=48000);assert(Buffer.byteLength(init.body,'utf8')<=192000);
  if(body.text.format.name==='vsi_research_plan_v1'){if(revokeAfterPlanner)revoked=true;return new Response(JSON.stringify({model:body.model,status:'completed',usage:{input_tokens:10,output_tokens:10},output_text:JSON.stringify({mode:'answer',businessEvidence:true,tier:'simple',clarification:'',publicTargets:[],objectives:[]})}),{status:200});}
- answerCalls++;captured=payload;assert.equal(payload.businessSources.length,expectedPacked,JSON.stringify(budgets.at(-1)));assert.equal(payload.qualitative_sources.length,expectedPacked);assert.equal(payload.productSources.length,6);assert.equal(payload.answerSourceRequirements.groups.length,2);
+ answerCalls++;captured=payload;capturedSchema=body.text.format.schema;assert.equal(payload.businessSources.length,expectedPacked,JSON.stringify(budgets.at(-1)));assert.equal(payload.qualitative_sources.length,expectedPacked);assert.equal(payload.productSources.length,6);assert.equal(payload.answerSourceRequirements.groups.length,2);
+ assert.equal(init.body.length,budgets.at(-1).final.requestChars,'full engine prompt and source-specific schema are counted before transport');
+ assert.equal(Buffer.byteLength(init.body,'utf8'),budgets.at(-1).final.requestBytes);
  assert.match(body.input[0].content,/Historical conversation and source snapshots provide dialogue context only/);
  assert.match(body.input[0].content,/currently issued in qualitative_sources or contextFactSources/);
  assert.doesNotMatch(body.input[0].content,/You may explain prior research using the attached historical web source snapshots/);
@@ -57,6 +63,7 @@ global.fetch=async(url,init)=>{
  const observations=mode==='missing_xero'?[sheetA]:mode==='wrong_sheet'?[xero,other]:mode==='second_date'?[xero,sheetB]:mode==='all'?sources.map(s=>pick(s,/.*/)):[xero,sheetA];
  const answer={observations,results:[],hypotheses:[],missing_information:observations.length<2?[]:[{kind:'selected_fact_time_comparison',premises:observations}],next_checks:[{premises:observations,text:'Check a common observation window, population coverage and existing invoice/order references before making a comparison.'}]};
  fullReply=structuredClone(answer);selectedSources=structuredClone(sources);
+ const wireAccepts=ajv.compile(capturedSchema);assert(wireAccepts(fullReply),'valid selections satisfy the actual transmitted schema');
  if(mode==='bad_binding')answer.observations[0].binding='f'.repeat(64);
  if(mode==='wrong_binding')answer.observations[0].binding=answer.observations[1].binding;
  if(mode==='snapshot_binding')answer.observations[0].binding=payload.businessSources.find(s=>s.id===answer.observations[0].ref).snapshotHash;
@@ -66,6 +73,9 @@ global.fetch=async(url,init)=>{
  if(mode==='omitted_ref'){const omitted=packRecords.at(-1).canonical.qualitative_sources.find(s=>!sources.some(selected=>selected.ref===s.ref));assert(omitted);answer.observations.push({ref:omitted.ref,binding:omitted.binding,factIndex:0});}
  if(mode==='historical_ref'){const historical=payload.historicalSources.find(s=>s.sourceType==='web');assert(historical);assert(!payload.contextFactSources.some(s=>s.ref===historical.id));answer.observations.push({ref:historical.id,binding:'a'.repeat(64),factIndex:0});}
  if(mode==='unobserved_premise')answer.next_checks[0].premises=[other];
+ if(['bad_binding','wrong_binding','snapshot_binding','prefixed_binding','unknown_ref','omitted_ref','historical_ref'].includes(mode))assert.equal(wireAccepts(answer),false,'exact wire schema rejects the deliberately noncompliant provider response');
+ // Deliberately return invalid responses anyway: provider-side constraints do
+ // not replace the independently enforced runtime reference checks below.
  return new Response(JSON.stringify({model:body.model,status:'completed',usage:{input_tokens:100,output_tokens:30},output_text:JSON.stringify(answer)}),{status:200});
 };
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:id(5)},question:'Use stored Xero and explicitly synthetic Google Sheets dispatch/backlog operations canary observations for a hypothetical executive brief. No web research.',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}};
@@ -86,8 +96,10 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  assert.deepEqual(trace.canonical.contextFactSources,captured.contextFactSources);
  const key=selection=>JSON.stringify([selection.ref,selection.binding,selection.factIndex]);
  const probeAnswer=selection=>({observations:[...baselineObservations.filter(s=>key(s)!==key(selection)),selection],results:[],hypotheses:[],missing_information:[],next_checks:[]});
- let businessFactsProbed=0,productFactsProbed=0,referenceRejections=0;
+ const wireAccepts=ajv.compile(capturedSchema);
+ let businessFactsProbed=0,productFactsProbed=0,referenceRejections=0,wireReferenceRejections=0;
  const rejectSelection=(selection,reason,bindingMatchesOtherSource)=>{
+  if(reason!=='fact_index_out_of_bounds'){assert.equal(wireAccepts(probeAnswer(selection)),false,'wire schema cannot select a ref/binding absent from this packed renderer context');wireReferenceRejections++;}
   assert.throws(()=>renderSharedAnswer(probeAnswer(selection),renderContext),error=>{
    assert.equal(error.rule,'fact_reference');assert.deepEqual(error.factReference,{reason,...(reason==='binding_mismatch'?{bindingMatchesOtherSource}:{})});return true;
   });referenceRejections++;
@@ -103,14 +115,14 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
   for(const field of ['id','sourceId','snapshotHash','url'])assert.equal(transportCitation[field],canonicalCitation[field]);
   const record=JSON.parse(transportCitation.text);if(record.observationsRef)assert.equal(record.observationsRef,source.ref);else assert.deepEqual(record.observations,source.facts);
   for(let factIndex=0;factIndex<source.facts.length;factIndex++){
-   const selection={ref:source.ref,binding:source.binding,factIndex};assert(renderSharedAnswer(probeAnswer(selection),renderContext).citationIds.includes(source.ref));businessFactsProbed++;
+   const selection={ref:source.ref,binding:source.binding,factIndex};assert(wireAccepts(probeAnswer(selection)));assert(renderSharedAnswer(probeAnswer(selection),renderContext).citationIds.includes(source.ref));businessFactsProbed++;
   }
  }
  assert.equal(captured.contextFactSources.length,6);
  for(const issued of captured.contextFactSources){
   const product=captured.productSources.find(s=>s.id===issued.ref),renderSource=renderContext.sources.find(s=>s.ref===issued.ref);assert(product&&renderSource);
   assert.equal(issued.factCount,1);assert.equal(renderSource.binding,issued.binding);assert.deepEqual(renderSource.facts,[product.text]);assert.equal(renderSource.supportOnly,true);
-  assert(renderSharedAnswer(probeAnswer({ref:issued.ref,binding:issued.binding,factIndex:0}),renderContext).citationIds.includes(issued.ref));productFactsProbed++;
+  const probe=probeAnswer({ref:issued.ref,binding:issued.binding,factIndex:0});assert(wireAccepts(probe));assert(renderSharedAnswer(probe,renderContext).citationIds.includes(issued.ref));productFactsProbed++;
  }
  const omitted=trace.canonical.qualitative_sources.filter(s=>!captured.qualitative_sources.some(selected=>selected.ref===s.ref));assert.equal(omitted.length,8);
  for(const source of omitted)rejectSelection({ref:source.ref,binding:source.binding,factIndex:0},'unknown_ref');
@@ -118,6 +130,9 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
   const citation=[...captured.businessSources,...captured.productSources].find(s=>s.id===source.ref),other=renderContext.sources.find(s=>s.binding!==source.binding);assert(citation&&other);assert.match(citation.snapshotHash,/^[a-f0-9]{64}$/);assert.notEqual(citation.snapshotHash,source.binding);
   rejectSelection({ref:source.ref,binding:citation.snapshotHash,factIndex:0},'binding_mismatch',renderContext.sources.some(s=>s!==source&&s.binding===citation.snapshotHash));
   rejectSelection({ref:source.ref,binding:other.binding,factIndex:0},'binding_mismatch',true);
+  rejectSelection({ref:source.ref,binding:'f'.repeat(64),factIndex:0},'binding_mismatch',false);
+  rejectSelection({ref:source.ref,binding:omitted[0].binding,factIndex:0},'binding_mismatch',false);
+  rejectSelection({ref:'B_NOT_ISSUED',binding:source.binding,factIndex:0},'unknown_ref');
   rejectSelection({ref:source.ref,binding:source.binding,factIndex:source.facts.length},'fact_index_out_of_bounds');
  }
  // Reproduce the old contract with exactly the same valid, selectively cited answer.
@@ -157,5 +172,6 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  expectedPacked=activeRaw.length;mode='subset';const allAvailable=await runVsiAnswer(allFitInput);assert.equal(allAvailable.citations.length,2);assert.equal(captured.contextCoverage,undefined);assert.match(allAvailable.content,/^Coverage: This is a partial review/);
  const allFitOriginals=activeRaw.length,allFitWireChars=budgets.at(-1).final.requestChars;assert(allFitWireChars<=48000);activeRaw=raw;
  for(const condition of ['foreign','revoked','revoked_after_plan']){mode='subset';foreign=condition==='foreign';revoked=condition==='revoked';revokeAfterPlanner=condition==='revoked_after_plan';calls=0;await assert.rejects(runVsiAnswer(input));assert.equal(calls,condition==='revoked_after_plan'?1:0);}foreign=false;revoked=false;revokeAfterPlanner=false;
- console.log(JSON.stringify({passed:true,canonicalOriginals:15,packedOriginals:7,intendedCoverageGroups:2,sheetsRowsInRequiredScope:2,subsetCitations:2,businessFactsProbed,productFactsProbed,referenceRejections,engineReferenceCases,prefixedBindingsRejectedAtSchema:true,canonicalTransportRendererMappingPreserved:true,historicalOnlyReferenceDenied:true,oldRuleFailureReproduced:true,secondRowAndOptionalSourcesNeedNotBecomeClaims:true,wrongConnectionCannotSatisfyIntent:true,missingProviderAndFabricatedBindingDenied:true,unobservedPremiseAndMissingCalculationInputDenied:true,tiesAndDependencyJoinsPreserveRequirements:true,allAvailableButSubsetAnswerStillPartial:true,allFitOriginals,allFitWireChars,unchangedMaxChars:48000,authorityAndRevocationPreserved:true,fullWireChars:measurement.final.requestChars,externalCalls:0,semanticUsefulnessProved:false}));
+ assert.equal(networkAttempts,0);
+ console.log(JSON.stringify({passed:true,canonicalOriginals:15,packedOriginals:7,intendedCoverageGroups:2,sheetsRowsInRequiredScope:2,subsetCitations:2,businessFactsProbed,productFactsProbed,referenceRejections,wireReferenceRejections,engineReferenceCases,prefixedBindingsRejectedAtSchema:true,canonicalTransportRendererMappingPreserved:true,actualWireRejectsWrongSnapshotOmittedAndSwappedBindings:true,providerSchemaViolationStillFailsRuntime:true,historicalOnlyReferenceDenied:true,oldRuleFailureReproduced:true,secondRowAndOptionalSourcesNeedNotBecomeClaims:true,wrongConnectionCannotSatisfyIntent:true,missingProviderAndFabricatedBindingDenied:true,unobservedPremiseAndMissingCalculationInputDenied:true,tiesAndDependencyJoinsPreserveRequirements:true,allAvailableButSubsetAnswerStillPartial:true,allFitOriginals,allFitWireChars,unchangedMaxChars:48000,authorityAndRevocationPreserved:true,fullWireChars:measurement.final.requestChars,externalCalls:networkAttempts,semanticUsefulnessProved:false}));
 })().catch(error=>{process.stderr.write(String(error.stack||error)+'\n');process.exitCode=1;});

@@ -45,7 +45,7 @@ async function rejectedReply(change){
  await assert.rejects(evaluation.runNext(),/review_or_stop_required/);negativeCases++;return{evaluation,result,calls};
 }
 (async()=>{
- assert.equal(candidate,'28d149191d6be403fbc7bbe1fdc5ccf39dda20af');assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
+ assert.equal(candidate,'64573de49742ab83d041e64e3ec09f2fec86b1fb');assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
  checkFixtures();
  const first=createEvaluation({outputDir:output(),dispatch});const result=await first.runNext();
  assert.equal(dispatches,2);
@@ -61,10 +61,14 @@ async function rejectedReply(change){
  assert(request.body.input[0].content.length>10000,'actual full engine prompt, not a tiny test substitute');
  assert.match(request.body.input[0].content,/No business-word whitelist applies/);
  const wireSchema=request.body.text.format.schema;
- const definition=part=>{if(!part.$ref)return part;assert.match(part.$ref,/^#\/\$defs\/[a-z_]+$/);return wireSchema.$defs[part.$ref.slice('#/$defs/'.length)];};
- assert.equal(wireSchema.properties.content,undefined);assert.equal(definition(definition(wireSchema.properties.observations.items).properties.factIndex).type,'integer');
+ const definition=part=>{if(!part.$ref)return part;assert.match(part.$ref,/^#\/\$defs\/[a-z][a-z0-9_]*$/);return wireSchema.$defs[part.$ref.slice('#/$defs/'.length)];};
+ const alternatives=part=>{const item=definition(part);return item.anyOf?item.anyOf.flatMap(alternatives):[item];};
+ const selections=alternatives(wireSchema.properties.observations.items);
+ assert.equal(wireSchema.properties.content,undefined);assert(selections.every(item=>definition(item.properties.factIndex).type==='integer'));
  assert.equal(request.body.store,false);assert.equal(request.body.stream,false);assert(request.chars<=48000&&request.bytes<=192000);
  const payload=JSON.parse(request.body.input[1].content);assert.equal(payload.productSources.length,6);
+ const issuedPairs=[...payload.qualitative_sources,...payload.contextFactSources].map(s=>[s.ref,s.binding]).sort();
+ assert.deepEqual(selections.map(item=>[item.properties.ref.enum[0],item.properties.binding.enum[0]]).sort(),issuedPairs,'all real wire selections bind the exact packed source, including product context');
  assert.equal(payload.businessSources.length,2);assert.equal(payload.qualitative_sources.length,2);
  assert.deepEqual(new Set(payload.businessSources.map(s=>s.sourceType)),new Set(['shared_xero','shared_google_sheets']));
  assert(payload.businessSources.every(s=>JSON.parse(s.text).scope.entityId.startsWith('00000000-')));

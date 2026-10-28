@@ -29,7 +29,8 @@
       "codex/workspace-audit-security": false,
       "codex/workspace-audit-evidence": false,
       "codex/workspace-audit-workflows": false,
-      "codex/all12-qualified-release": false
+      "codex/all12-qualified-release": false,
+      "codex/vsi-exact-fact-bindings": false
     }
   },
   "crons": [

@@ -2,6 +2,7 @@
 const assert=require('node:assert/strict');
 require('./shared-answer-accounting-scope-tests.cjs');
 require('./shared-answer-limitation-schema-tests.cjs');
+require('./shared-answer-exact-binding-tests.cjs');
 require('./qbo-customer-test-support.cjs').installLoader({'server-only':{}});
 const {sharedAnswerSchema,sharedAnswerJsonSchema,sharedAnswerJsonSchemaForResults,renderSharedAnswer:render,renderSharedClarification,issueAnswerResults,issueContextFactSources,SharedAnswerContractError}=require('../lib/ai/shared-evidence/answer-contract.ts');
 const {vsiValidationDiagnostic:diagnose}=require('../lib/vsi/validation-diagnostics.ts');

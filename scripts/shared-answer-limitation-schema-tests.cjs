@@ -75,13 +75,13 @@ runtimeDenied({ ...empty(mixedObserved), missing_information: [{ premises: [obse
 schemaDenied({ ...empty(mixedObserved), missing_information: [comparison([observed[0], selection(support)])] }, mixed);
 for (const forged of [{ ...selection(support), binding: originals[1].binding }, { ...observed[0], binding: support.binding }]) {
   const answer = { ...empty(mixedObserved), missing_information: [{ premises: [forged], text: 'Which source coverage should be checked?' }] };
-  assert(ajv.compile(schemaFor(mixed))(answer), 'schema grouping never substitutes for exact runtime binding validation');
+  schemaDenied(answer, mixed); // Wire constraints now agree with exact runtime bindings.
   runtimeDenied(answer, 'draft_support', mixed);
 }
 for (const replacement of [{ ...observed[0], binding: originals[1].binding }, { ...observed[0], ref: 'UNKNOWN' }, { ...observed[0], factIndex: originals[0].facts.length }]) {
   const altered = { ...empty(observed), missing_information: [{ premises: [replacement], text: 'What is the source coverage?' }] };
-  if (replacement.ref === 'UNKNOWN') schemaDenied(altered);
-  else assert(ajv.compile(schemaFor(originals))(altered), 'exact binding/index values remain an independent runtime guard');
+  if (replacement.ref === 'UNKNOWN' || replacement.binding !== observed[0].binding) schemaDenied(altered);
+  else assert(ajv.compile(schemaFor(originals))(altered), 'source-local index bounds remain an independent runtime guard');
   runtimeDenied(altered, 'draft_support');
 }
 // Still-current runtime boundaries: a schema-valid issued fact must also have
