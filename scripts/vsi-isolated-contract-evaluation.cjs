@@ -2,8 +2,9 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {fork,execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
-const candidate='64573de49742ab83d041e64e3ec09f2fec86b1fb';
-const runtimeTrees="040000 tree d348001c9e91078f6c67cd13f93b36119d30cbf5\tapp\n040000 tree d6b47c397fc3023eb4e3ff4faac8cffefd02cc0c\tlib";
+// Temporary runtime identity is its exact app/lib tree; this names the reviewed OFF baseline.
+const candidate='temporary-activation-from-326ee953af263b68464a1d2864c68792335b6908';
+const runtimeTrees="040000 tree d348001c9e91078f6c67cd13f93b36119d30cbf5\tapp\n040000 tree d8a0f146c307e32882ccc048eb459a3c0109b88c\tlib";
 const endpoint='https://api.openai.com/v1/responses';
 const limits=Object.freeze({questions:2,calls:4,callsPerQuestion:2,usd:1,reservePerCallUsd:.25,maxChars:48000,maxBytes:192000,maxOutputTokens:8000});
 const cases=Object.freeze([

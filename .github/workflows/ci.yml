@@ -34,6 +34,12 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Qualify QBO Linux amd64 credential-free build and network-isolated smoke
+        # Run before dependency installs and other builds consume runner disk.
+        # Public-repository standard runner; no image push or artifact storage.
+        timeout-minutes: 20
+        run: node scripts/qbo-worker-image-qualification.cjs
+
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
@@ -359,11 +365,6 @@ jobs:
 
       - name: Build external integrations QBO Production runtime
         run: pnpm build:external-integrations-qbo
-
-      - name: Qualify QBO Linux amd64 credential-free build and network-isolated smoke
-        # Public-repository standard runner; no image push or artifact storage.
-        timeout-minutes: 20
-        run: node scripts/qbo-worker-image-qualification.cjs
 
       - name: TypeScript check
         run: pnpm typecheck
