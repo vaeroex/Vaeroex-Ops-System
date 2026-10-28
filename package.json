@@ -200,7 +200,7 @@
     "test:vsi-database": "node scripts/vsi-database-tests.cjs",
     "test:shared-evidence-mapping": "node scripts/shared-evidence-all12-projection-tests.cjs && node scripts/shared-evidence-selection-tests.cjs && node scripts/shared-evidence-preparation-tests.cjs && node scripts/shared-evidence-mapping-upgrade.cjs --check && node scripts/shared-evidence-consumer-tests.cjs",
     "test:shared-evidence-mapping:sql": "node --test scripts/shared-evidence-loyverse-currency-sql-tests.mjs scripts/shared-evidence-discovery-sql-tests.mjs scripts/shared-evidence-all-provider-path-tests.mjs scripts/shared-evidence-mapping-upgrade-tests.mjs",
-    "test:vsi-qualified-answer": "node scripts/shared-answer-accounting-scope-tests.cjs && node scripts/shared-answer-limitation-schema-tests.cjs && node scripts/vsi-all12-review-alignment-tests.cjs && node scripts/vsi-qualified-release-guard-tests.cjs && node scripts/shared-evidence-identity-conflict-caller-tests.cjs && node scripts/shared-evidence-identity-conflict-upgrade.cjs --check && node scripts/shared-evidence-release-package.cjs --check && node --test scripts/shared-evidence-release-identity-tests.mjs"
+    "test:vsi-qualified-answer": "node scripts/shared-answer-accounting-scope-tests.cjs && node scripts/shared-answer-limitation-schema-tests.cjs && node scripts/vsi-all12-review-alignment-tests.cjs && node scripts/vsi-qualified-release-guard-tests.cjs && node scripts/shared-evidence-identity-conflict-caller-tests.cjs && node scripts/shared-evidence-identity-conflict-upgrade.cjs --check && node scripts/vsi-temporary-activation-test-support.cjs --check-inactive-package && node --test scripts/shared-evidence-release-identity-tests.mjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "1.1.1",
