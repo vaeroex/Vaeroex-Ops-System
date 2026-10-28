@@ -127,6 +127,22 @@ export function sharedAnswerJsonSchemaForResults(results: readonly { id: string 
   } }));
   const items = !issued && invoicePolicy.length ? { anyOf: [...selectionVariants, ...(otherRefs.length
     ? [{ ...factJson, properties: { ...factJson.properties, ref: { type: "string", enum: [...otherRefs] } } }] : [])] } : undefined;
+  const limitations = limitationJsonForSources(selectable, exactSelections);
+  const supporting = selectable?.filter(source => source.supportOnly) || [];
+  const supportingDefinition = exactSelections(supporting);
+  // Every prose group allows the same supporting context alongside one
+  // original. Share that union instead of repeating it per original. Keep
+  // anyOf around whole premise arrays so two originals cannot be mixed.
+  const compactLimitations = supporting.length > 1 ? limitationJsonForSources(selectable, group => {
+    if (!group.some(source => source.supportOnly)) return exactSelections(group);
+    const originals = group.filter(source => !source.supportOnly);
+    const support = { $ref: "#/$defs/u" };
+    return originals.length ? { anyOf: [exactSelections(originals), support] } : support;
+  }) : limitations;
+  // Include the definition member and comma in the comparison. Small source
+  // sets retain the original representation when sharing would enlarge it.
+  const reuseSupporting = JSON.stringify(compactLimitations).length + JSON.stringify({ u: supportingDefinition }).length - 1
+    < JSON.stringify(limitations).length;
   // Actual engine requests always supply the exact packed sources. Keep the
   // source-free syntax factory for non-transport callers, never as authority.
   // Hashes occur once per source definition, reused by every premise field.
@@ -136,6 +152,7 @@ export function sharedAnswerJsonSchemaForResults(results: readonly { id: string 
   return { ...sharedAnswerJsonSchema, $defs: { t: draftJson.properties.text,
     ...(!issued ? { b: factJson.properties.binding } : {}), i: factJson.properties.factIndex,
     ...sourceDefinitions,
+    ...(reuseSupporting ? { u: supportingDefinition } : {}),
     s: selectable ? exactSelections(selectable) : { ...factJson, properties: { ...factJson.properties,
       binding: { $ref: "#/$defs/b" }, factIndex: { $ref: "#/$defs/i" } } },
     d: { ...draftJson, properties: { ...draftJson.properties,
@@ -144,7 +161,7 @@ export function sharedAnswerJsonSchemaForResults(results: readonly { id: string 
     observations: { ...sharedAnswerJsonSchema.properties.observations, ...(selectable?.length === 0 || (items && !items.anyOf.length) ? { maxItems: 0, items: selection } : { items: items ?? selection }) },
     results: { ...sharedAnswerJsonSchema.properties.results, maxItems: Math.min(12, ids.length),
       items: { ...sharedAnswerJsonSchema.properties.results.items, ...(ids.length ? { enum: ids } : {}) } },
-    missing_information: limitationJsonForSources(selectable, exactSelections),
+    missing_information: reuseSupporting ? compactLimitations : limitations,
     hypotheses: { ...sharedAnswerJsonSchema.properties.hypotheses, items: { $ref: "#/$defs/d" }, maxItems: hypothesesEnabled ? 3 : 0 },
     next_checks: { ...sharedAnswerJsonSchema.properties.next_checks, items: { $ref: "#/$defs/d" } }
   } };

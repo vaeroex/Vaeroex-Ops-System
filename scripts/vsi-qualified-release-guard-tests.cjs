@@ -5,7 +5,7 @@ const path = require('node:path');
 require('./qbo-customer-test-support.cjs').installLoader({ 'server-only': {} });
 const root = path.resolve(__dirname, '..');
 const deployment = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
-const deploymentHolds = ['main', 'codex/all12-qualified-release', 'codex/vsi-exact-fact-bindings'];
+const deploymentHolds = ['main', 'codex/all12-qualified-release', 'codex/vsi-exact-fact-bindings', 'codex/vsi-context-overhead'];
 for (const branch of deploymentHolds) {
   assert.equal(deployment.git.deploymentEnabled[branch], false, 'automatic deployment must remain disabled');
 }

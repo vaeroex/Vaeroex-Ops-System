@@ -8,7 +8,7 @@ const ActualDate=Date;global.Date=class extends ActualDate{constructor(...args){
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const workspace=id(1),actor=id(2),session=id(3),request=id(4),ticket=id(5),manifest=id(6);
 let revoked=false,foreign=false,revokeAfterPlanner=false,providerCalls=0,answerCalls=0;
-const successMaxChars=36000;
+const successMaxChars=32000;
 const events=[];
 const sheets=(n,wanted)=>({provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(100+n),version_id:id(200+n),authority_hash:(n+20).toString(16).padStart(64,'0')},hash:(n+20).toString(16).padStart(64,'0'),data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(wanted?30:90),connection_id:id(wanted?31:91),date:n%2?'2026-10-14':'2026-10-15',metrics:wanted?[{metric:'Synthetic scenario dispatches - hypothetical operations canary',value:'6',unit:'count'},{metric:'Synthetic scenario end-of-day backlog - hypothetical operations canary',value:'4',unit:'count'}]:Array.from({length:4},(_,m)=>({metric:`Legacy warehouse review metric ${m} - prior worksheet operational checklist verification`,value:String(m+1),unit:'count'})),read_sources:[]}});
 const raw=[sheets(0,true),{provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'stored invoice observations',records:Array.from({length:8},(_,n)=>({day:'2026-10-14',metrics:[{key:'outstanding',value:String(n+1),currency:'USD'}]})),read_sources:[]}},sheets(1,true),...Array.from({length:12},(_,n)=>sheets(n+2,false))];
@@ -110,11 +110,14 @@ global.fetch=async(url,init)=>{
 const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question:'Using only stored Xero evidence and synthetic Google Sheets dispatch and backlog operations canary observations, give a hypothetical executive brief. Do not search the web.',recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}};
 (async()=>{
  const originalRaw=JSON.stringify(raw);
- // Preserve the old artificial cap as a negative: exact per-source schema bytes
- // belong in the request budget and cannot be ignored to recover this fixture.
- await assert.rejects(runVsiAnswer(input),error=>error.usage.outcomeFailure==='context_block'&&error.accountingUncertain===false);
+ // The unchanged source fixture now fits the stricter 32k cap after overhead
+ // reduction. A maximum-length question still proves zero-dispatch rejection;
+ // do not shrink source facts or raise the cap to keep either case passing.
+ const longQuestion=(input.question+' Preserve the reported dates, source scope and coverage limitations.'.repeat(150)).slice(0,8000);
+ assert.equal(longQuestion.length,8000);
+ await assert.rejects(runVsiAnswer({...input,question:longQuestion}),error=>error.usage.outcomeFailure==='context_block'&&error.accountingUncertain===false);
  assert.equal(providerCalls,0,'32000-character required context fails before the paid planner');assert.equal(answerCalls,0);assert.equal(JSON.stringify(raw),originalRaw,'failed preflight cannot change the original synthetic records');
- const tightBudget=budgetEvents.at(-1);assert.equal(tightBudget.reason,'required_context_unfit');assert.equal(tightBudget.maxChars,32000);assert(tightBudget.requestChars>32000);assert(tightBudget.requestChars<=successMaxChars);assert.equal(tightBudget.sourceGroups,15);assert.equal(tightBudget.selectedSourceGroups,3);
+ const tightBudget=budgetEvents.at(-1);assert.equal(tightBudget.reason,'required_context_unfit');assert.equal(tightBudget.maxChars,32000);assert(tightBudget.requestChars>32000);assert(tightBudget.requestChars<=48000);assert.equal(tightBudget.sourceGroups,15);assert.equal(tightBudget.selectedSourceGroups,3);
  budgetEvents.length=0;process.env.VAEROEX_VSI_MAX_INPUT_CHARS=String(successMaxChars);
  assert(successMaxChars<=48000,'test-only success cap never exceeds production');
  const result=await runVsiAnswer(input);assert.equal(result.citations.length,3);assert.equal(providerCalls,2);assert.equal(answerCalls,1);
