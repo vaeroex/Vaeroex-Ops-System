@@ -4,14 +4,15 @@ const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const workspace=id(1),actor=id(2),session=id(3),request=id(4),manifest=id(6);
 const sheet=(n,kind)=>({provider:'google_sheets',identity:{kind:'sheets_ticket_source',source_id:id(100+n),version_id:id(200+n)},hash:(n+20).toString(16).padStart(64,'0'),data:{provider:'google_sheets',workspace_id:workspace,entity_id:id(kind==='wanted'?30:90),connection_id:id(kind==='wanted'?31:kind==='large'?91:300+n),date:n%2?'2026-10-14':'2026-10-15',time_zone:'UTC',metrics:kind==='wanted'?[{metric:'Explicitly synthetic dispatch/backlog operations canary dispatches',value:'6',unit:'count'},{metric:'Explicitly synthetic end-of-day backlog',value:'4',unit:'count'}]:kind==='large'?Array.from({length:6},(_,m)=>({metric:`Unrelated archived worksheet ${m} ${'synthetic warehouse context '.repeat(4)}`,value:String(m+1),unit:'count'})):[{metric:'Unrelated optional worksheet observation',value:'2',unit:'count'}],read_sources:[]}});
 const raw=[sheet(0,'wanted'),{provider:'xero',identity:{kind:'legacy_binding',binding_id:id(32),start:'2026-10-01',end:'2026-10-30'},hash:'b'.repeat(64),data:{provider:'xero',workspace_id:workspace,entity_id:id(30),connection_id:id(33),scope:'Synthetic stored invoice observations',records:[{day:'2026-10-14',metrics:[{key:'invoices',value:'1',currency:'USD'},{key:'billed',value:'234',currency:'USD'},{key:'outstanding',value:'50',currency:'USD'},{key:'bills',value:'0',currency:'USD'},{key:'purchases',value:'0',currency:'USD'}]}],read_sources:[]}},sheet(1,'wanted'),...Array.from({length:4},(_,n)=>sheet(n+2,'optional')),...Array.from({length:8},(_,n)=>sheet(n+6,'large'))];
+let activeRaw=raw;
 let mode='subset',revoked=false,foreign=false,revokeAfterPlanner=false,calls=0,answerCalls=0;
 const reader={auth:{getUser:async()=>({data:{user:{id:actor}},error:null}),getClaims:async()=>({data:{claims:{sub:actor,session_id:session}},error:null})},rpc:async(name,args)=>{
  assert.equal(args.p_workspace_id,workspace);
- if(name==='discover_shared_evidence_v2')return{data:require('./shared-discovery-test-support.cjs').completeCatalog(raw.map(s=>({provider:s.provider,identity:s.identity}))),error:null};
- if(name==='read_shared_typed_evidence_v1'||name==='preview_shared_legacy_evidence_v1'){const source=structuredClone(name==='read_shared_typed_evidence_v1'?raw.find(s=>s.identity.source_id===args.p_identity.source_id):raw[1]);if(foreign)source.data.workspace_id=id(999);return{data:{stage:'unadmitted',resolved:source},error:null};}
+ if(name==='discover_shared_evidence_v2')return{data:require('./shared-discovery-test-support.cjs').completeCatalog(activeRaw.map(s=>({provider:s.provider,identity:s.identity}))),error:null};
+ if(name==='read_shared_typed_evidence_v1'||name==='preview_shared_legacy_evidence_v1'){const source=structuredClone(name==='read_shared_typed_evidence_v1'?activeRaw.find(s=>s.identity.source_id===args.p_identity.source_id):activeRaw.find(s=>s.provider==='xero'));if(foreign)source.data.workspace_id=id(999);return{data:{stage:'unadmitted',resolved:source},error:null};}
  if(name==='capture_legacy_evidence_v1')return{data:{reference_id:id(70),source_hash:raw[1].hash},error:null};
  if(name==='shared_evidence_dependencies_v1')return{data:{manifestIds:[],readSources:[]},error:null};
- if(name==='seal_shared_evidence_manifest_v1'){assert.equal(args.p_target_id,request);assert.equal(args.p_sources.length,15);return{data:{stage:'database_bound',manifest_id:manifest,provider_policy_required:true},error:null};}
+ if(name==='seal_shared_evidence_manifest_v1'){assert.equal(args.p_target_id,request);assert.equal(args.p_sources.length,activeRaw.length);return{data:{stage:'database_bound',manifest_id:manifest,provider_policy_required:true},error:null};}
  if(name==='validate_shared_evidence_manifest_v1')return{data:!revoked,error:null};
  throw Error('unexpected_mock_rpc');
 }};
@@ -146,16 +147,15 @@ const input={supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:
  assert.throws(()=>renderSharedAnswer({observations:observations.slice(0,1),results:[issued.id],hypotheses:[],missing_information:[],next_checks:[]},{sources:exact,results:[issued],hypothesesEnabled:true,requiredSourceGroups:[[exact[0].ref]]}),e=>e.rule==='result_dependencies');
  // An answer is still partial when every available original fits in the input,
  // but only the relevant observations are actually selected for the answer.
- // Compact only this final all-fit fixture; keep all 15 identities, authorization and coverage assertions.
- raw[1].data.scope='Synthetic';
- // Explicit supported-window disclosure adds context. Keep this final all-fit
- // case compact without reducing its source count, values, dates or bindings.
- for(const source of [raw[0],raw[2]]){source.data.metrics[0].metric='dispatches';source.data.metrics[1].metric='backlog';source.hash=require('node:crypto').createHash('sha256').update(JSON.stringify({identity:source.identity,data:source.data})).digest('hex');}
- for(const source of raw.slice(3)){source.data.metrics=[{metric:'X',value:'1',unit:'count'}];source.hash=require('node:crypto').createHash('sha256').update(JSON.stringify({identity:source.identity,data:source.data})).digest('hex');}
- // Leave headroom for the real full prompt/schema while retaining the same
- // Xero + synthetic Sheets scope intent and all 15 canonical originals.
+ // Use a separate seven-original all-fit fixture within the unchanged 48k
+ // maximum. The fifteen-original canonical fixture above still proves seven
+ // packed/eight omitted, coverage, exact references and whole-source retention.
+ // Source-dependent schema bytes mean fifteen originals need not all fit;
+ // this arm isolates selective-answer semantics, not a source-capacity promise.
+ activeRaw=raw.slice(0,7);
  const allFitInput={...input,question:'Stored Xero Google Sheets dispatches'};
- expectedPacked=15;mode='subset';const allAvailable=await runVsiAnswer(allFitInput);assert.equal(allAvailable.citations.length,2);assert.equal(captured.contextCoverage,undefined);assert.match(allAvailable.content,/^Coverage: This is a partial review/);
+ expectedPacked=activeRaw.length;mode='subset';const allAvailable=await runVsiAnswer(allFitInput);assert.equal(allAvailable.citations.length,2);assert.equal(captured.contextCoverage,undefined);assert.match(allAvailable.content,/^Coverage: This is a partial review/);
+ const allFitOriginals=activeRaw.length,allFitWireChars=budgets.at(-1).final.requestChars;assert(allFitWireChars<=48000);activeRaw=raw;
  for(const condition of ['foreign','revoked','revoked_after_plan']){mode='subset';foreign=condition==='foreign';revoked=condition==='revoked';revokeAfterPlanner=condition==='revoked_after_plan';calls=0;await assert.rejects(runVsiAnswer(input));assert.equal(calls,condition==='revoked_after_plan'?1:0);}foreign=false;revoked=false;revokeAfterPlanner=false;
- console.log(JSON.stringify({passed:true,canonicalOriginals:15,packedOriginals:7,intendedCoverageGroups:2,sheetsRowsInRequiredScope:2,subsetCitations:2,businessFactsProbed,productFactsProbed,referenceRejections,engineReferenceCases,prefixedBindingsRejectedAtSchema:true,canonicalTransportRendererMappingPreserved:true,historicalOnlyReferenceDenied:true,oldRuleFailureReproduced:true,secondRowAndOptionalSourcesNeedNotBecomeClaims:true,wrongConnectionCannotSatisfyIntent:true,missingProviderAndFabricatedBindingDenied:true,unobservedPremiseAndMissingCalculationInputDenied:true,tiesAndDependencyJoinsPreserveRequirements:true,allAvailableButSubsetAnswerStillPartial:true,authorityAndRevocationPreserved:true,fullWireChars:measurement.final.requestChars,externalCalls:0,semanticUsefulnessProved:false}));
+ console.log(JSON.stringify({passed:true,canonicalOriginals:15,packedOriginals:7,intendedCoverageGroups:2,sheetsRowsInRequiredScope:2,subsetCitations:2,businessFactsProbed,productFactsProbed,referenceRejections,engineReferenceCases,prefixedBindingsRejectedAtSchema:true,canonicalTransportRendererMappingPreserved:true,historicalOnlyReferenceDenied:true,oldRuleFailureReproduced:true,secondRowAndOptionalSourcesNeedNotBecomeClaims:true,wrongConnectionCannotSatisfyIntent:true,missingProviderAndFabricatedBindingDenied:true,unobservedPremiseAndMissingCalculationInputDenied:true,tiesAndDependencyJoinsPreserveRequirements:true,allAvailableButSubsetAnswerStillPartial:true,allFitOriginals,allFitWireChars,unchangedMaxChars:48000,authorityAndRevocationPreserved:true,fullWireChars:measurement.final.requestChars,externalCalls:0,semanticUsefulnessProved:false}));
 })().catch(error=>{process.stderr.write(String(error.stack||error)+'\n');process.exitCode=1;});

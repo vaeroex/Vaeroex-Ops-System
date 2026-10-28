@@ -321,11 +321,18 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   };
   const answerRequest = (json: string, tier: VsiResearchTier, shared = false) => {
     const view = shared ? JSON.parse(json) : null;
+    const schemaSources = shared ? [
+      ...view.qualitative_sources.map((source: SynthesisSource) => ({ ref: source.ref, binding: source.binding, supportOnly: source.supportOnly === true })),
+      ...view.contextFactSources.map((source: {ref:string;binding:string}) => ({ ref: source.ref, binding: source.binding, supportOnly: true }))
+    ] : [];
     return ({ input: [{ role: "system", content: shared ? sharedSystemPrompt : systemPrompt }, { role: "user", content: json }],
-    reasoning: { effort: tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, tier === "deep" ? 6000 : 4000),
+    // Shared answers serialize issued bindings again in supporting premises.
+    // Their output budget includes reasoning and formatting, not only prose.
+    // Use the existing configured ceiling; keep legacy free-form tier caps.
+    reasoning: { effort: tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, shared || tier === "deep" ? 6000 : 4000),
     // Derive from this exact packed JSON, not the larger canonical payload.
     // The same factory participates in every packing measurement and transport.
-    text: { format: { type: "json_schema", name: shared ? "vsi_shared_answer_v2" : "vsi_answer_v1", strict: true, schema: shared ? sharedAnswerJsonSchemaForResults(view.sharedRelationships, qualitativeSynthesisEnabled(), invoiceSelections(view.qualitative_sources,view.question), [...view.qualitative_sources,...view.contextFactSources].map((source: {ref:string})=>source.ref)) : answerJsonSchema } } });
+    text: { format: { type: "json_schema", name: shared ? "vsi_shared_answer_v2" : "vsi_answer_v1", strict: true, schema: shared ? sharedAnswerJsonSchemaForResults(view.sharedRelationships, qualitativeSynthesisEnabled(), invoiceSelections(view.qualitative_sources,view.question), schemaSources.map(source=>source.ref), schemaSources) : answerJsonSchema } } });
   };
   const packAnswer = (payload: ReturnType<typeof makePayload>, tier: VsiResearchTier, shared: boolean, phase: "preflight" | "answer") => {
     try {

@@ -45,7 +45,7 @@ async function rejectedReply(change){
  await assert.rejects(evaluation.runNext(),/review_or_stop_required/);negativeCases++;return{evaluation,result,calls};
 }
 (async()=>{
- assert.equal(candidate,'eafef0f51a05be22d7445822966dae2f5971a9e2');assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
+ assert.equal(candidate,'28d149191d6be403fbc7bbe1fdc5ccf39dda20af');assert.equal(cases.length,2);assert.equal(limits.calls,4);assert.equal(limits.usd,1);
  checkFixtures();
  const first=createEvaluation({outputDir:output(),dispatch});const result=await first.runNext();
  assert.equal(dispatches,2);
@@ -60,7 +60,9 @@ async function rejectedReply(change){
  const request=JSON.parse(all.find(f=>f.name==='qualified-brief-call-2-request.json').value);
  assert(request.body.input[0].content.length>10000,'actual full engine prompt, not a tiny test substitute');
  assert.match(request.body.input[0].content,/No business-word whitelist applies/);
- assert.equal(request.body.text.format.schema.properties.content,undefined);assert.equal(request.body.text.format.schema.properties.observations.items.properties.factIndex.type,'integer');
+ const wireSchema=request.body.text.format.schema;
+ const definition=part=>{if(!part.$ref)return part;assert.match(part.$ref,/^#\/\$defs\/[a-z_]+$/);return wireSchema.$defs[part.$ref.slice('#/$defs/'.length)];};
+ assert.equal(wireSchema.properties.content,undefined);assert.equal(definition(definition(wireSchema.properties.observations.items).properties.factIndex).type,'integer');
  assert.equal(request.body.store,false);assert.equal(request.body.stream,false);assert(request.chars<=48000&&request.bytes<=192000);
  const payload=JSON.parse(request.body.input[1].content);assert.equal(payload.productSources.length,6);
  assert.equal(payload.businessSources.length,2);assert.equal(payload.qualitative_sources.length,2);
