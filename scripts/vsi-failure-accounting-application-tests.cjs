@@ -24,6 +24,18 @@ function reset(){state={calls:[],statusReads:0,status:{data:{status:'pending',at
  assert(!JSON.stringify(state.calls).includes('synthetic-do-not-persist'));
  reset();state.status.data.status='failed';state.result.data.state='already_failed';assert.equal(await settleFailedVsi(access,input),undefined);
  reset();await settleFailedVsi(access,{...input,usage:{estimatedCostUsd:0}});assert.equal(state.calls[0].args.p_provider_calls,null);assert.equal(state.calls[0].args.p_cost_estimated,false);
+ for(const [name,usage,expectedCalls,expectedUncertain] of [
+  ['known pre-dispatch zero',{estimatedCostUsd:0,providerCalls:0,costEstimated:false},0,false],
+  ['absent uncertain call count',{estimatedCostUsd:0.25,costEstimated:true},null,true],
+  ['explicit unknown call count',{estimatedCostUsd:0.25,providerCalls:null,costEstimated:true},null,true],
+  ['zero calls does not erase explicit cost uncertainty',{estimatedCostUsd:0.25,providerCalls:0,costEstimated:true},0,true],
+  ['one dispatched call remains accounted',{estimatedCostUsd:0.012,providerCalls:1,costEstimated:false},1,false]
+ ]){
+  reset();await settleFailedVsi(access,{...input,usage});
+  assert.equal(state.calls.length,1,name);assert.equal(state.calls[0].args.p_provider_calls,expectedCalls,name);
+  assert.equal(state.calls[0].args.p_cost_usd,usage.estimatedCostUsd,name);
+  assert.equal(state.calls[0].args.p_cost_estimated,expectedUncertain,name);
+ }
  for(const change of [s=>s.status.error={code:'42501'},s=>s.status.data=null,s=>s.status.data.status='completed',s=>s.status.data.attempt=3,s=>s.status.data.conversation_id=null,s=>s.status.data.conversation_id=id(99)]){
   reset();change(state);await assert.rejects(settleFailedVsi(access,input),e=>e.code==='failure_accounting_unavailable');assert.equal(state.calls.length,0);
  }

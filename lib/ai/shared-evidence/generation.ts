@@ -12,10 +12,13 @@ import { validateSharedMemoryProjection } from "./memory-eligibility";
 import { reportingMetricSemantics } from "./adapters";
 import { groupFactTimes, type FactTime, type FactTimeGroup } from "./fact-time";
 import { decodeSharedDiscoveryCatalog, prioritizeSharedCandidates, prioritizeSharedRows, requestedSharedProviders } from "./generation-selection";
+import { sharedRpcFailure, withSharedPreparationPhase as preparationPhase } from "./preparation-diagnostics";
 
 export type SharedClient = { rpc(name:string,args:Record<string,unknown>):PromiseLike<{data:unknown;error:unknown}> };
 export async function sharedRpc(reader:SharedClient,name:string,args:Record<string,unknown>) {
- const result=await reader.rpc(name,args); if(result.error) throw new Error("shared_evidence_authority_unavailable");return result.data;
+ let result;
+ try { result=await reader.rpc(name,args); } catch(error) { throw sharedRpcFailure(name,error); }
+ if(result.error) throw sharedRpcFailure(name,result.error);return result.data;
 }
 const identity=z.record(z.unknown()),hash=z.string().regex(/^[a-f0-9]{64}$/);
 const resolved=z.object({identity,hash,data:z.record(z.unknown())});
@@ -188,19 +191,20 @@ export async function prepareSharedGeneration(reader:SupabaseClient<Database>,wo
  const rpc=reader as unknown as SharedClient,requestedProviders=requestedSharedProviders(question);
  // v2 is an explicit SQL dependency: never silently fall back to discovery that
  // truncated requested providers before relevance was considered.
- const catalog=decodeSharedDiscoveryCatalog(await sharedRpc(rpc,'discover_shared_evidence_v2',{
-  p_workspace_id:workspaceId,p_start:start,p_end:end,p_preferred_providers:requestedProviders}));
+ const catalog=await preparationPhase('discovery',async()=>decodeSharedDiscoveryCatalog(await sharedRpc(rpc,'discover_shared_evidence_v2',{
+  p_workspace_id:workspaceId,p_start:start,p_end:end,p_preferred_providers:requestedProviders})));
  const providers:SharedProviderCoverage[]=catalog.providerCounts.map(count=>({provider:count.provider,catalog:count.total,discovered:count.returned,
   prepared:0,empty:0,unsupported:0,factBudgetOmitted:0,rowBudgetOmitted:0}));
  const coverageFor=(provider:string)=>providers.find(row=>row.provider===provider)!;
  const available:SharedRow[]=[];
  for(const candidate of prioritizeSharedCandidates(catalog.candidates,requestedProviders)) {
   const i=candidate.identity;
-  const raw=await sharedRpc(rpc,i.kind==='legacy_binding'?'preview_shared_legacy_evidence_v1':'read_shared_typed_evidence_v1',i.kind==='legacy_binding'
-   ?{p_workspace_id:workspaceId,p_binding_id:i.binding_id,p_start:i.start,p_end:i.end}:{p_workspace_id:workspaceId,p_identity:i});
-  const preview=z.object({stage:z.literal('unadmitted'),resolved}).parse(raw);
-  if(preview.resolved.data.provider!==candidate.provider)throw new Error('shared_provider_mismatch');
-  try { available.push(sharedRow(preview.resolved,workspaceId)); }
+  const preview=await preparationPhase('source_read',async()=>z.object({stage:z.literal('unadmitted'),resolved}).parse(await sharedRpc(rpc,i.kind==='legacy_binding'?'preview_shared_legacy_evidence_v1':'read_shared_typed_evidence_v1',i.kind==='legacy_binding'
+   ?{p_workspace_id:workspaceId,p_binding_id:i.binding_id,p_start:i.start,p_end:i.end}:{p_workspace_id:workspaceId,p_identity:i})));
+  try { available.push(await preparationPhase('source_projection',()=>{
+   if(preview.resolved.data.provider!==candidate.provider)throw new Error('shared_provider_mismatch');
+   return sharedRow(preview.resolved,workspaceId);
+  })); }
   catch(error) {
    // Only an explicitly recognized, authorized empty/unsupported shape can be
    // omitted. RPC errors, invalid values, foreign workspaces and stale bindings
@@ -237,26 +241,33 @@ export function sharedTargetHref(workspaceId:string,kind:'vsi_exchange'|'briefin
  return `/app/sources/evidence/${kind}/${id}?workspace=${workspaceId}${sourceHash?`#source-${sourceHash}`:""}`;
 }
 export async function sealSharedGeneration(reader:SupabaseClient<Database>,p:SharedPrepared,target:{kind:'vsi_request'|'briefing_run';id:string;attempt:number;ticketId:string}):Promise<string> {
- assertSharedPrepared(p);
- const {data:{user},error}=await reader.auth.getUser();const claims=await reader.auth.getClaims();
- const session=z.string().uuid().safeParse(claims.data?.claims.session_id);
- if(error||!user||claims.error||claims.data?.claims.sub!==user.id||!session.success) throw new Error('shared_actor_unavailable');
+ await preparationPhase('prepared_validation',()=>assertSharedPrepared(p));
+ const {user,session}=await preparationPhase('actor_validation',async()=>{
+  const {data:{user},error}=await reader.auth.getUser();const claims=await reader.auth.getClaims();
+  const session=z.string().uuid().safeParse(claims.data?.claims.session_id);
+  if(error||!user||claims.error||claims.data?.claims.sub!==user.id||!session.success) throw new Error('shared_actor_unavailable');
+  return {user,session};
+ });
  const rpc=reader as unknown as SharedClient;const sources:Record<string,unknown>[]=[];
  for(const row of p.rows) {
   if(row.reported) {
+   await preparationPhase('memory_certification',async()=>{
    validateSharedMemoryProjection(row.data,p.workspaceId);
    const admin=createSupabaseAdminClient();if(!admin) throw new Error('shared_semantic_certification_unavailable');
    if(await sharedRpc(admin as unknown as SharedClient,'certify_shared_memory_semantics_v1',{p_workspace_id:p.workspaceId,p_actor_id:user.id,p_session_id:session.data,p_identity:row.identity})!==true) throw new Error('shared_semantic_certification_failed');
+   });
   }
   if(row.identity.kind==='legacy_binding') {
+   await preparationPhase('legacy_capture',async()=>{
    const captured=z.object({reference_id:z.string().uuid(),source_hash:hash}).parse(await sharedRpc(rpc,'capture_legacy_evidence_v1',{p_workspace_id:p.workspaceId,p_binding_id:row.identity.binding_id,p_start:row.identity.start,p_end:row.identity.end}));
    if(captured.source_hash!==row.hash) throw new Error('shared_source_changed');sources.push({kind:'legacy_reference',reference_id:captured.reference_id});
+   });
   } else sources.push(row.identity);
  }
- await bindGoogleSheetsRead(reader,target.ticketId,p.rows.flatMap(r=>r.roots));
- const deps=z.object({manifestIds:z.array(z.string().uuid()),readSources:z.array(root)}).parse(await sharedRpc(rpc,'shared_evidence_dependencies_v1',{p_workspace_id:p.workspaceId,p_ticket_id:target.ticketId}));
- await bindGoogleSheetsRead(reader,target.ticketId,deps.readSources);
- const sealed=z.object({stage:z.literal('database_bound'),manifest_id:z.string().uuid(),provider_policy_required:z.literal(true)}).parse(await sharedRpc(rpc,'seal_shared_evidence_manifest_v1',{
-  p_workspace_id:p.workspaceId,p_target_kind:target.kind,p_target_id:target.id,p_attempt:target.attempt,p_read_ticket_id:target.ticketId,p_sources:sources,p_inherited_manifest_ids:deps.manifestIds}));
+ await preparationPhase('source_roots',()=>bindGoogleSheetsRead(reader,target.ticketId,p.rows.flatMap(r=>r.roots)));
+ const deps=await preparationPhase('dependency_read',async()=>z.object({manifestIds:z.array(z.string().uuid()),readSources:z.array(root)}).parse(await sharedRpc(rpc,'shared_evidence_dependencies_v1',{p_workspace_id:p.workspaceId,p_ticket_id:target.ticketId})));
+ await preparationPhase('dependency_roots',()=>bindGoogleSheetsRead(reader,target.ticketId,deps.readSources));
+ const sealed=await preparationPhase('manifest_seal',async()=>z.object({stage:z.literal('database_bound'),manifest_id:z.string().uuid(),provider_policy_required:z.literal(true)}).parse(await sharedRpc(rpc,'seal_shared_evidence_manifest_v1',{
+  p_workspace_id:p.workspaceId,p_target_kind:target.kind,p_target_id:target.id,p_attempt:target.attempt,p_read_ticket_id:target.ticketId,p_sources:sources,p_inherited_manifest_ids:deps.manifestIds})));
  return sealed.manifest_id;
 }

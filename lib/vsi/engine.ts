@@ -5,6 +5,7 @@ import { sharedAnswerSchema, sharedAnswerJsonSchemaForResults, SharedAnswerContr
 import { qualitativeSynthesisEnabled } from "@/lib/ai/shared-evidence/qualitative-policy";
 import { sharedEvidenceRuntimeEnabled } from "@/lib/ai/shared-evidence/runtime-gate";
 import { prepareSharedGeneration, sealSharedGeneration, sharedTargetHref, sharedRpc, type SharedClient, type SharedPrepared } from "@/lib/ai/shared-evidence/generation";
+import { sharedPreparationDiagnostic, type SharedPreparationPhase } from "@/lib/ai/shared-evidence/preparation-diagnostics";
 import { googleSheetsOpenAIHeaders } from "@/lib/ai/providers/google-data-policy";
 import { bindGoogleSheetsRead } from "@/lib/integrations/google-sheets/read-authority";
 import { AIProviderPolicyError } from "@/lib/ai/providers/types";
@@ -94,7 +95,7 @@ export class VsiEngineError extends Error {
   }
 }
 export function emptyVsiUsage(): VsiUsage {
-  return { model: VSI_MODEL, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, reasoningTokens: 0, webSearchCalls: 0, retries: 0, estimatedCostUsd: 0, latencyMs: 0, telemetryVersion: 1, evidenceLimitations: false, noteProposal: false, providerFailures: 0, outputValidationFailures: 0, citationValidationFailures: 0 };
+  return { model: VSI_MODEL, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, reasoningTokens: 0, webSearchCalls: 0, retries: 0, estimatedCostUsd: 0, latencyMs: 0, telemetryVersion: 1, evidenceLimitations: false, noteProposal: false, providerCalls: 0, providerFailures: 0, outputValidationFailures: 0, citationValidationFailures: 0 };
 }
 function outputText(payload: ProviderPayload) {
   return payload.output_text || (payload.output || []).flatMap(item => (item.content || []).filter(part => part.type === "output_text").map(part => part.text || "")).join("\n");
@@ -246,16 +247,24 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   let sharedPrepared:SharedPrepared|undefined;
   let sharedWindowLimitation: string | undefined;
   if(sharedEvidenceRuntimeEnabled()) {
+    let preparationPhase: SharedPreparationPhase = "request_binding";
     try {
       if(!input.reservedRequest) throw new Error("shared_request_binding_missing");
+      preparationPhase = "window_selection";
       const window = vsiEvidenceWindowSelection(input.question);
       const { start, end } = window;
       sharedWindowLimitation = window.limitation;
+      preparationPhase = "preparation";
       sharedPrepared=await prepareSharedGeneration(input.supabase,input.workspaceId,start,end,input.question);
       // Product context binds connection roots; finalize those before sealing.
+      preparationPhase = "product_context";
       product=await loadVsiProductContext(access,input.readTicket);
+      preparationPhase = "sealing";
       sharedManifestId=await sealSharedGeneration(input.supabase,sharedPrepared,{kind:"vsi_request",...input.reservedRequest,ticketId:input.readTicket.ticketId});
-    } catch { throw new VsiEngineError("Workspace source access could not be verified before generation.",usage,false,"evidence_unavailable"); }
+    } catch (error) {
+      console.error("[vsi-preparation]", sharedPreparationDiagnostic(preparationPhase,error));
+      throw new VsiEngineError("Workspace source access could not be verified before generation.",usage,false,"evidence_unavailable");
+    }
   }
   const finish = (answer: Omit<VsiAnswer, "usage">): VsiAnswer => {
     usage.latencyMs = Date.now() - startedAt;
