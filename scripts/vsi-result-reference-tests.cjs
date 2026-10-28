@@ -67,9 +67,12 @@ packing.packVsiAnswerContext = (payload, ...args) => {
   assert.equal(JSON.stringify(payload), before, 'packing must preserve the full canonical input');
   measurements.push({ canonical: structuredClone(payload), ...result }); return result;
 };
-// A synthetic 45k budget exercises five admitted originals with only the three
-// relevant originals fitting the full request, including its source-specific
-// schema. This is not a reconstruction of the hosted request's contents.
+// The stricter source-specific schema cannot fit this fixture at 45k; that
+// deliberately smaller budget must reject before transport. The
+// 47k test budget retains all three required originals and their facts while
+// omitting both optional groups (four groups measure 47,549 characters). It
+// remains below the unchanged production 48k limit.
+// This is not a reconstruction of the hosted request's contents.
 process.env.VAEROEX_VSI_MAX_INPUT_CHARS = '45000';
 process.env.VAEROEX_VSI_MAX_OUTPUT_TOKENS = '6000';
 process.env.VAEROEX_VSI_WORKSPACE_MONTHLY_BUDGET_USD = '50';
@@ -102,7 +105,7 @@ global.fetch = async (url, init) => {
     const m = measurements.at(-1);
     assert.equal(init.body.length, m.metrics.requestChars, 'actual serialized request includes final result-specific schema');
     assert.equal(Buffer.byteLength(init.body, 'utf8'), m.metrics.requestBytes);
-    assert(init.body.length <= 45000); assert(m.metrics.requestBytes <= 192000);
+    assert(init.body.length <= 47000); assert(m.metrics.requestBytes <= 192000);
     assert.equal(m.canonical.businessSources.length, 5); assert.equal(m.canonical.qualitative_sources.length, 5);
     assert.equal(payload.productSources.length, 6, 'exercise real product-context producer');
     for (const source of payload.qualitative_sources) {
@@ -181,6 +184,10 @@ function packedRelationshipChecks() {
   const prepared = await generation.prepareSharedGeneration(reader, workspace, '2026-09-28', '2026-10-27');
   assert.equal(prepared.rows.length, 5); assert.deepEqual(prepared.relationships, []);
   assert.deepEqual(prepared.rows.map(r => r.facts), expectedRows.map(r => r.facts));
+  await assert.rejects(() => runVsiAnswer(input), e => e.usage.outcomeFailure === 'context_block' && !e.accountingUncertain);
+  assert.equal(providerCalls, 0, 'insufficient 45k budget fails before any provider call');
+  assert.equal(answerCalls, 0); assert.equal(JSON.stringify(raw), originalRaw);
+  process.env.VAEROEX_VSI_MAX_INPUT_CHARS = '47000';
   const result = await runVsiAnswer(input);
   assert.equal(providerCalls, 2); assert.equal(answerCalls, 1); assert.equal(result.citations.length, 3);
   assert.match(result.content, /^Coverage: This is a partial review/);
@@ -215,5 +222,5 @@ function packedRelationshipChecks() {
   assert.equal(JSON.stringify(contract.sharedAnswerJsonSchema), baseSchema); assert.equal(networkAttempts, 0);
   assert.doesNotMatch(JSON.stringify(diagnostics), /synthetic-result-reference-no-access|120\.50|DO_NOT_LOG|[a-f0-9]{64}/, 'diagnostics contain no credentials, facts or result/source IDs');
   console.info = info; console.error = error;
-  console.log(JSON.stringify({ passed: true, actualEngineAdmitted: 5, modelViewSelected: 3, omitted: 2, bothRelevantSheetsOriginalsSelected: true, fullXeroRecords: 27, fullXeroFacts: 135, emptyResultSchema: true, actualRequestSchemaValidated: true, syntheticMaxChars: 45000, malformedMockStillFailsClosed: true, exactSerializedBudget: true, canonicalRetention: true, wrongWorkspaceAndRevocationDenied: true, nonemptyRelationshipGroups: relationships, providerCallsMocked: providerCalls, externalCalls: networkAttempts, liveModelQualityProved: false }));
+  console.log(JSON.stringify({ passed: true, actualEngineAdmitted: 5, modelViewSelected: 3, omitted: 2, bothRelevantSheetsOriginalsSelected: true, fullXeroRecords: 27, fullXeroFacts: 135, emptyResultSchema: true, actualRequestSchemaValidated: true, insufficient45000BudgetDeniedBeforeTransport: true, syntheticMaxChars: 47000, requestChars: measurements.at(-1).metrics.requestChars, requestBytes: measurements.at(-1).metrics.requestBytes, malformedMockStillFailsClosed: true, exactSerializedBudget: true, canonicalRetention: true, wrongWorkspaceAndRevocationDenied: true, nonemptyRelationshipGroups: relationships, providerCallsMocked: providerCalls, externalCalls: networkAttempts, liveModelQualityProved: false }));
 })().catch(e => { console.info = info; console.error = error; console.error((mockFailure || e).stack); process.exitCode = 1; });

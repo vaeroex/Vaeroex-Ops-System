@@ -2,8 +2,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {fork,execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
-const candidate='28d149191d6be403fbc7bbe1fdc5ccf39dda20af';
-const runtimeTrees="040000 tree d348001c9e91078f6c67cd13f93b36119d30cbf5\tapp\n040000 tree 2a5b780ad0829197b9e6a5005e3627be7c91ec04\tlib";
+const candidate='64573de49742ab83d041e64e3ec09f2fec86b1fb';
+const runtimeTrees="040000 tree d348001c9e91078f6c67cd13f93b36119d30cbf5\tapp\n040000 tree d6b47c397fc3023eb4e3ff4faac8cffefd02cc0c\tlib";
 const endpoint='https://api.openai.com/v1/responses';
 const limits=Object.freeze({questions:2,calls:4,callsPerQuestion:2,usd:1,reservePerCallUsd:.25,maxChars:48000,maxBytes:192000,maxOutputTokens:8000});
 const cases=Object.freeze([

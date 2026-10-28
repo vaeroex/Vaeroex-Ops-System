@@ -49,6 +49,7 @@ const rows = originals.map(value => sharedRow(value, workspace));
 const sourceFor = (row, n) => ({ ref: `B${n + 1}`, binding: row.hash, dependencies: [row.hash], facts: row.facts, factTimes: row.factTimes,
  ...(row.salesInvoiceFactGroups ? { salesInvoiceFactGroups: row.salesInvoiceFactGroups } : {}), reported: false, provider: row.provider, environment: 'production' });
 const sources = rows.map(sourceFor), question = 'Using stored Xero sales-invoice contributions for billing/collections and Google Sheets dispatch/backlog observations, give a hypothetical executive brief.';
+const descriptors = values => values.map(source => ({ ref: source.ref, binding: source.binding, supportOnly: source.supportOnly === true }));
 const policies = invoiceSelections(sources, question), policy = policies[0];
 assert.equal(rows[0].facts.length, 135); assert.equal(rows[0].salesInvoiceFactGroups.length, 10);
 assert.deepEqual(policy.eligible, shape.flatMap(([, invoices], n) => invoices ? [n * 5, n * 5 + 1, n * 5 + 2] : []));
@@ -82,7 +83,7 @@ for (const neutral of ['Review stored Xero and Google Sheets observations.', 'Co
 assert(policy.eligible.includes(6), 'older eligible invoice remains selectable');
 const differentEntitySheet = { ...sources[1], factTimes: sources[1].factTimes };
 assert.deepEqual(invoiceSelections([sources[0], differentEntitySheet], question)[0].reviewFirst[0], [85,86,87]);
-const baseSchema = JSON.stringify(sharedAnswerJsonSchema), schema = sharedAnswerJsonSchemaForResults([], true, policies, sources.map(s => s.ref));
+const baseSchema = JSON.stringify(sharedAnswerJsonSchema), schema = sharedAnswerJsonSchemaForResults([], true, policies, sources.map(s => s.ref), descriptors(sources));
 const accepts = ajv.compile(schema);
 const pick = (source, factIndex) => ({ ref: source.ref, binding: source.binding, factIndex });
 const observed = [pick(sources[0], 86), pick(sources[0], 87), pick(sources[1], 0), pick(sources[2], 0)];
@@ -124,7 +125,7 @@ const businessSources = rows.map((row, i) => withVsiSourceSnapshot({ id: sources
 const payload = { question, businessSources, qualitative_sources: sources, sharedRelationships: [], evidenceLimitations: [] }, before = JSON.stringify(payload);
 const requestJSON = json => {
  const view = JSON.parse(json), selectedPolicies = invoiceSelections(view.qualitative_sources, view.question);
- return serializeVsiProviderRequest({ input: [{ role: 'system', content: 'Synthetic invoice selection regression.' }, { role: 'user', content: json }], text: { format: { name: 'vsi_shared_answer_v2', type: 'json_schema', strict: true, schema: sharedAnswerJsonSchemaForResults(view.sharedRelationships, true, selectedPolicies, view.qualitative_sources.map(s => s.ref)) } } }, 4000);
+ return serializeVsiProviderRequest({ input: [{ role: 'system', content: 'Synthetic invoice selection regression.' }, { role: 'user', content: json }], text: { format: { name: 'vsi_shared_answer_v2', type: 'json_schema', strict: true, schema: sharedAnswerJsonSchemaForResults(view.sharedRelationships, true, selectedPolicies, view.qualitative_sources.map(s => s.ref), descriptors(view.qualitative_sources)) } } }, 4000);
 };
 const packed = packVsiAnswerContext(payload, 'Synthetic invoice selection regression.', 48000, { selectRelevant: true, maxBytes: 192000, requestJSON });
 const view = JSON.parse(packed.json), body = JSON.parse(requestJSON(packed.json));
@@ -142,9 +143,12 @@ assert.equal(JSON.stringify(payload), before); assert.equal(JSON.stringify(origi
 assert.equal(networkAttempts, 0);
 
 async function actualEngineChecks() {
+ const ActualDate = Date;
+ global.Date = class extends ActualDate { constructor(...args) { super(...(args.length ? args : ['2026-10-27T00:00:00Z'])); } static now() { return new ActualDate('2026-10-27T00:00:00Z').getTime(); } };
  const actor = id(500), request = id(502), manifest = id(503);
  let engineRaw = originals, mode = 'valid', calls = 0, answerCalls = 0, mockFailure;
- const measured = [], validated = [], sealed = [];
+ const measured = [], packingFailures = [], validated = [], sealed = [], renderRecords = [];
+ let wireBindingRejections = 0, nearLimitPacking, oversizedRequiredContext;
  engineReader = { auth: {
   getUser: async () => ({ data: { user: { id: actor } }, error: null }),
   getClaims: async () => ({ data: { claims: { sub: actor, session_id: id(504) } }, error: null })
@@ -154,19 +158,28 @@ async function actualEngineChecks() {
   if (name === 'preview_shared_legacy_evidence_v1' || name === 'read_shared_typed_evidence_v1') return { data: { stage: 'unadmitted', resolved: structuredClone(name === 'preview_shared_legacy_evidence_v1' ? engineRaw[0] : engineRaw.find(r => r.identity.source_id === args.p_identity.source_id)) }, error: null };
   if (name === 'capture_legacy_evidence_v1') return { data: { reference_id: id(505), source_hash: engineRaw[0].hash }, error: null };
   if (name === 'shared_evidence_dependencies_v1') return { data: { manifestIds: [], readSources: [] }, error: null };
-  if (name === 'seal_shared_evidence_manifest_v1') { sealed.push(args.p_sources.length); assert.equal(args.p_sources.length, 3); return { data: { stage: 'database_bound', manifest_id: manifest, provider_policy_required: true }, error: null }; }
+  if (name === 'seal_shared_evidence_manifest_v1') { sealed.push(args.p_sources.length); assert.equal(args.p_sources.length, engineRaw.length); return { data: { stage: 'database_bound', manifest_id: manifest, provider_policy_required: true }, error: null }; }
   if (name === 'validate_shared_evidence_manifest_v1') return { data: true, error: null };
   throw Error('unexpected_synthetic_rpc');
  } };
  const packingModule = require('../lib/vsi/answer-context.ts'), realPack = packingModule.packVsiAnswerContext;
+ const contractModule = require('../lib/ai/shared-evidence/answer-contract.ts'), realRender = contractModule.renderSharedAnswer;
+ contractModule.renderSharedAnswer = (value, context) => { renderRecords.push(structuredClone(context)); return realRender(value, context); };
  packingModule.packVsiAnswerContext = (payload, ...args) => {
   // Deliberately corrupt only the issued context in this fault-injection case,
   // not the authority fixture or canonical preparation. The engine must stop
   // before the first provider request and classify it as unavailable evidence.
   const input = mode === 'bad_metadata' ? { ...payload, qualitative_sources: payload.qualitative_sources.map(s => s.provider === 'xero' ? { ...s, salesInvoiceFactGroups: [[9999]] } : s) } : payload;
-  const canonical = JSON.stringify(payload), result = realPack(input, ...args);
-  assert.equal(JSON.stringify(payload), canonical);
-  measured.push({ ...result, canonical: structuredClone(payload) }); return result;
+  const canonical = JSON.stringify(payload);
+  try {
+   const result = realPack(input, ...args);
+   assert.equal(JSON.stringify(payload), canonical);
+   measured.push({ ...result, canonical: structuredClone(payload) }); return result;
+  } catch (error) {
+   assert.equal(JSON.stringify(payload), canonical,'failed packing cannot shorten canonical evidence');
+   if (error instanceof packingModule.VsiAnswerContextLimit) packingFailures.push(error.metrics);
+   throw error;
+  }
  };
  process.env.VAEROEX_VSI_MAX_INPUT_CHARS = '48000'; process.env.VAEROEX_VSI_MAX_OUTPUT_TOKENS = '6000';
  process.env.VAEROEX_VSI_WORKSPACE_MONTHLY_BUDGET_USD = '50'; process.env.VAEROEX_VSI_REQUEST_RESERVE_USD = '0.25';
@@ -194,7 +207,22 @@ async function actualEngineChecks() {
     const observations = [pick(x,81),pick(x,82),pick(x,86),pick(x,87),...view.qualitative_sources.filter(s => s.provider !== 'xero').map(s => pick(s,0))];
     output = { observations, results: [], hypotheses: [], missing_information: [{ kind: 'selected_fact_time_comparison', premises: observations }], next_checks: [] };
     const providerAccepts = ajv.compile(body.text.format.schema); assert(providerAccepts(output));
+    const issuedSources = [...view.qualitative_sources, ...view.contextFactSources], sourcePolicy = invoiceSelections(view.qualitative_sources, question);
+    for (const issued of issuedSources) {
+     const factIndex = sourcePolicy.find(policy => policy.ref === issued.ref)?.eligible[0] ?? 0;
+     const valid = pick(issued, factIndex), canonicalSource = [...m.canonical.qualitative_sources, ...m.canonical.contextFactSources].find(source => source.ref === issued.ref);
+     assert(canonicalSource); assert.equal(issued.binding, canonicalSource.binding);
+     const withSelection = selection => ({ observations: [...observations.filter(item => JSON.stringify(item) !== JSON.stringify(valid)), selection], results: [], hypotheses: [], missing_information: [], next_checks: [] });
+     assert(providerAccepts(withSelection(valid)), 'every current packed original and supporting context has a usable wire selection');
+     const citation = [...view.businessSources, ...view.productSources].find(source => source.id === issued.ref);
+     const other = issuedSources.find(source => source.binding !== issued.binding);
+     assert(citation && other); assert.notEqual(citation.snapshotHash, issued.binding);
+     for (const forged of [{ ...valid, binding: 'f'.repeat(64) }, { ...valid, binding: citation.snapshotHash }, { ...valid, binding: other.binding }, { ...valid, ref: 'B_NOT_ISSUED' }]) {
+      assert.equal(providerAccepts(withSelection(forged)), false, 'all wire refs reject invented, snapshot and swapped bindings'); wireBindingRejections++;
+     }
+    }
     if (mode === 'provider_bad_selection') { output.observations[0] = pick(x,31); assert.equal(providerAccepts(output),false); }
+    if (mode === 'provider_bad_binding') { output.observations[4].binding = 'f'.repeat(64); assert.equal(providerAccepts(output),false); }
    }
    return new Response(JSON.stringify({ model: body.model, status: 'completed', usage: { input_tokens: 100, output_tokens: 20 }, output_text: JSON.stringify(output) }), { status: 200 });
   } catch (e) { mockFailure = e; throw e; }
@@ -202,20 +230,52 @@ async function actualEngineChecks() {
  const engineInput = { supabase: engineReader, workspaceId: workspace, actorUserId: actor, readTicket: { ticketId: id(501) }, question, recentMessages: [], requestId: id(506), reservedRequest: { id: request, attempt: 1 } };
  try {
   const result = await runVsiAnswer(engineInput); assert.equal(calls,2); assert.equal(answerCalls,1); assert.equal(result.citations.length,3);
+  const baselineContext = renderRecords.at(-1), baselineMeasurement = measured.at(-1), baselineWire = JSON.parse(baselineMeasurement.json);
+  for (const source of baselineWire.qualitative_sources) assert.deepEqual(baselineContext.sources.find(candidate => candidate.ref === source.ref), source, 'actual renderer receives the unchanged issued facts and bindings');
+  for (const source of baselineWire.contextFactSources) { const renderedSource = baselineContext.sources.find(candidate => candidate.ref === source.ref); assert(renderedSource); assert.equal(renderedSource.binding, source.binding); assert.equal(renderedSource.facts.length, source.factCount); }
   assert.match(result.content,/billed: 170 USD; sales-invoice contribution dated 2026-10-15/); assert.match(result.content,/billed: 180 USD; sales-invoice contribution dated 2026-10-14/);
   for (const citation of result.citations) { const issued = measured.at(-1).canonical.businessSources.find(s => s.sourceId === citation.sourceId); assert(issued); assert.equal(citation.snapshotHash,issued.snapshotHash); assert.equal(citation.url,issued.url); }
   mode = 'provider_bad_selection'; await assert.rejects(() => runVsiAnswer(engineInput), e => e.usage.validationFailure?.contractRule === 'invoice_selection'); assert.equal(calls,4,'no provider retry');
+  mode = 'provider_bad_binding'; await assert.rejects(() => runVsiAnswer(engineInput), e => e.usage.validationFailure?.factReference?.reason === 'binding_mismatch'); assert.equal(calls,6,'schema violations still fail closed without retry');
+  // Five available originals reuse the complete 27-record invoice and both
+  // intended Sheets rows. Optional neighbors must not displace requested facts.
+  // The compact exact schema must retain all required facts and honest omission
+  // metadata within the same 48k limit, not trim evidence to make room.
+  mode = 'optional_neighbors';
+  engineRaw = [...originals, ...[2,3].map(n => { const optional = sheet(n, '2026-10-15', 0, 0); optional.data.entity_id = id(900+n); optional.data.connection_id = id(910+n); optional.data.metrics = [{ metric: 'Synthetic unrelated warehouse bin observation', value: 0, unit: 'count' }]; return optional; })];
+  const beforeOptionalCalls = calls;
+  const optionalResult = await runVsiAnswer(engineInput), near = measured.at(-1), nearWire = JSON.parse(near.json), nearContext = renderRecords.at(-1);
+  assert.equal(calls-beforeOptionalCalls,2); assert.equal(optionalResult.citations.length,3);
+  assert.equal(near.initialMetrics.sourceGroups,5); assert(near.initialMetrics.requestChars>48000); assert.equal(near.metrics.selectedSourceGroups,3); assert.equal(near.metrics.omittedSourceGroups,2);
+  assert(near.metrics.requestChars<=48000); assert(near.metrics.requestBytes<=192000); assert.equal(nearWire.productSources.length,6);
+  assert.deepEqual(nearWire.qualitative_sources,baselineWire.qualitative_sources,'all135 invoice facts, both intended Sheets originals and their exact issued bindings remain unchanged');
+  assert.deepEqual(nearContext.sources,baselineContext.sources,'five-source packing preserves the exact renderer context');
+  assert.equal(nearWire.contextCoverage.omittedSourceGroups,2); assert.equal(nearWire.contextCoverage.complete,false);
+  nearLimitPacking = { available: near.initialMetrics.sourceGroups, selected: near.metrics.selectedSourceGroups, requestChars: near.metrics.requestChars, requestBytes: near.metrics.requestBytes, stoppedBeforePlanner: false };
+  // Real excess context still stops before planning. This neutral synthetic
+  // padding stays below the question limit and adds no provider or business fact.
+  const oversizedInput = { ...engineInput, question: `${question}${' Synthetic test context.'.repeat(100)}` };
+  assert(oversizedInput.question.length<=8000); mode='oversized_required';
+  const beforeOversizedCalls = calls, beforePackingFailures = packingFailures.length;
+  await assert.rejects(() => runVsiAnswer(oversizedInput), error => {
+   if (mockFailure) throw mockFailure;
+   assert.equal(error.usage?.outcomeFailure,'context_block'); assert.equal(error.accountingUncertain,false); assert.equal(calls,beforeOversizedCalls,'required context does not fit: zero planning or answer calls');
+   assert.equal(packingFailures.length,beforePackingFailures+1);
+   const oversized = packingFailures.at(-1); assert(oversized); assert.equal(oversized.sourceGroups,5); assert.equal(oversized.selectedSourceGroups,3); assert(oversized.requestChars>48000);
+   oversizedRequiredContext = { available: oversized.sourceGroups, selected: oversized.selectedSourceGroups, requestChars: oversized.requestChars, requestBytes: oversized.requestBytes, stoppedBeforePlanner: true, reason: 'required_context_unfit' };
+   return true;
+  });
   for (const variant of ['no_eligible','bad_metadata']) {
    mode=variant; engineRaw=variant==='no_eligible'?[rawFor([record(90,'2026-10-14',[0,0,0,1,25])]),...originals.slice(1)]:originals;
    const beforeCalls=calls;
    await assert.rejects(() => runVsiAnswer(engineInput), e => e.usage.outcomeFailure==='evidence_unavailable' && e.accountingUncertain===false);
    assert.equal(calls,beforeCalls,'missing typed invoice evidence and malformed selection metadata stop before paid planning');
   }
-  assert.equal(JSON.stringify(originals),originalJSON); assert.equal(networkAttempts,0); assert(sealed.every(n=>n===3));
+  assert.equal(JSON.stringify(originals),originalJSON); assert.equal(networkAttempts,0); assert(sealed.includes(5)); assert(sealed.every(n=>n===3||n===5));
   assert.doesNotMatch(JSON.stringify(validated),/synthetic-invoice-selection-no-access|[a-f0-9]{64}/);
-  const wire=measured.find(m=>JSON.parse(m.json).invoiceReviewOrder)?.metrics;
-  return {actualEngineFull27RecordPrompt:true,actualWireSchemaBudgetMeasured:true,fullRequestChars:wire.requestChars,fullRequestBytes:wire.requestBytes,preflightMissingAndMalformedDeny:true,malformedProviderResponseRejected:true,mockedProviderCalls:calls};
+  const wire=baselineMeasurement.metrics;
+  return {actualEngineFull27RecordPrompt:true,actualWireSchemaBudgetMeasured:true,fullRequestChars:wire.requestChars,fullRequestBytes:wire.requestBytes,wireBindingRejections,actualWireRendererTuplesAligned:true,nearLimitPacking,oversizedRequiredContext,preflightMissingAndMalformedDeny:true,malformedProviderResponseRejected:true,mockedProviderCalls:calls};
  } catch (e) { throw mockFailure||e; }
- finally { packingModule.packVsiAnswerContext=realPack; global.fetch=deny; console.info=oldInfo; console.error=oldError; }
+ finally { global.Date=ActualDate; packingModule.packVsiAnswerContext=realPack; contractModule.renderSharedAnswer=realRender; global.fetch=deny; console.info=oldInfo; console.error=oldError; }
 }
 actualEngineChecks().then(engine => console.log(JSON.stringify({ passed: true, retainedShapeRecords: 27, syntheticValuesAndIds: true, canonicalFacts: 135, eligibleInvoiceGroups: 10, regressionCases: cases, genuineZeroPreservedNegativeInvalidAmountsRejected: true, typedSelectionSchemaAndRenderer: true, wholeSourcePackingAndFailClosed: true, oneDateAssessmentAcross34Observations: true, dateRankingAdvisoryOnly: true, exactCitations: true, nonnumericDraftSemanticsRequireReview: true, ...engine, liveModelQualityProved: false, externalCalls: networkAttempts }))).catch(e=>{console.error(e.stack);process.exitCode=1;});

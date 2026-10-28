@@ -63,17 +63,14 @@ const answerSchemaSource = z.object({ ref: factSelection.shape.ref, binding: fac
  * by binding, just like validateDraft; reported files/notes are still originals.
  * Supporting context may accompany one original but never establishes another.
  * This does not move prose, prove entailment, or replace rendering validation. */
-function limitationJsonForSources(sources?: readonly AnswerSchemaSource[]) {
+function limitationJsonForSources(sources: readonly AnswerSchemaSource[] | undefined,
+  selections: (group: readonly AnswerSchemaSource[]) => Record<string, unknown>) {
   if (sources === undefined) return { ...sharedAnswerJsonSchema.properties.missing_information,
     items: { anyOf: [timeComparisonJson] } }; // No source context: do not offer unbounded prose.
   const parsed = z.array(answerSchemaSource).safeParse(sources);
   if (!parsed.success || new Set(parsed.data.map(source => source.ref)).size !== parsed.data.length) return fail("context_reference");
-  // A ref uniquely resolves to its protected binding. Constrain groups by ref;
-  // keep the existing binding/index syntax and independent exact runtime checks.
-  // Enumerating every hash/index here would unnecessarily displace evidence.
-  const selections = (group: readonly AnswerSchemaSource[]) => ({ ...factJson,
-    properties: { ref: { type: "string", enum: group.map(source => source.ref) },
-      binding: { $ref: "#/$defs/b" }, factIndex: { $ref: "#/$defs/i" } } });
+  // Reuse the same exact ref/binding definitions as observations and other
+  // premises. Grouping refs alone would still permit a wrong well-formed hash.
   const originals = parsed.data.filter(source => !source.supportOnly), supporting = parsed.data.filter(source => source.supportOnly);
   const bindings = [...new Set(originals.map(source => source.binding))];
   const proseGroups = bindings.map(binding => [...originals.filter(source => source.binding === binding), ...supporting]);
@@ -100,26 +97,54 @@ export function sharedAnswerJsonSchemaForResults(results: readonly { id: string 
   const ids = results.map(result => result?.id);
   if (ids.some(id => typeof id !== "string" || id.length !== 64 || !/^[a-f0-9]{64}$/.test(id))) resultFailure("invalid_issued_id", ids.length, 0);
   if (new Set(ids).size !== ids.length) resultFailure("duplicate_issued_id", ids.length, 0);
+  const parsed = sources === undefined ? undefined : z.array(answerSchemaSource).safeParse(sources);
+  if (parsed && (!parsed.success || new Set(parsed.data.map(source => source.ref)).size !== parsed.data.length)) return fail("context_reference");
+  const issued = parsed?.success ? parsed.data : undefined;
+  if (issued && invoicePolicy.some(policy => !issued.some(source => source.ref === policy.ref && source.binding === policy.binding))) return fail("context_reference");
+  const selectable = issued?.filter(source => !invoicePolicy.some(policy => policy.ref === source.ref && !policy.eligible.length));
+  const sourceDefinitions: Record<string, unknown> = {};
+  const definitionByRef = new Map<string, string>();
+  for (const [index, source] of (selectable || []).entries()) {
+    const name = `f${index}`;
+    const invoice = invoicePolicy.find(policy => policy.ref === source.ref);
+    definitionByRef.set(source.ref, name);
+    sourceDefinitions[name] = { ...factJson, properties: {
+      ref: { type: "string", enum: [source.ref] }, binding: { type: "string", enum: [source.binding] },
+      // Draft premises must already be observations, so the same existing
+      // invoice eligibility applies without duplicating this source's hash.
+      factIndex: invoice ? { type: "integer", enum: [...invoice.eligible] } : { $ref: "#/$defs/i" }
+    } };
+  }
+  const exactSelections = (group: readonly AnswerSchemaSource[]): Record<string, unknown> => {
+    const refs = group.map(source => ({ $ref: `#/$defs/${definitionByRef.get(source.ref)}` }));
+    // Empty arrays are separately constrained to maxItems:0. Never generate
+    // invalid anyOf:[] or an empty enum for that unreachable item schema.
+    return refs.length === 1 ? refs[0] : refs.length ? { anyOf: refs } : factJson;
+  };
   const otherRefs = availableRefs.filter(ref => !invoicePolicy.some(policy => policy.ref === ref));
   const selectionVariants = invoicePolicy.filter(policy => policy.eligible.length).map(policy => ({ ...factJson, properties: {
     ref: { type: "string", enum: [policy.ref] }, binding: { type: "string", enum: [policy.binding] }, factIndex: { type: "integer", enum: [...policy.eligible] }
   } }));
-  const items = invoicePolicy.length ? { anyOf: [...selectionVariants, ...(otherRefs.length ? [{ ...factJson, properties: { ...factJson.properties, ref: {type: "string", enum: [...otherRefs]} } }] : [])] } : factJson;
-  // Local definitions share only unchanged syntax. Their bytes remain inside
-  // packing measurements; no remote references or weaker runtime checks exist.
-  // Compact local definition keys avoid duplicating unchanged syntax on the wire.
+  const items = !issued && invoicePolicy.length ? { anyOf: [...selectionVariants, ...(otherRefs.length
+    ? [{ ...factJson, properties: { ...factJson.properties, ref: { type: "string", enum: [...otherRefs] } } }] : [])] } : undefined;
+  // Actual engine requests always supply the exact packed sources. Keep the
+  // source-free syntax factory for non-transport callers, never as authority.
+  // Hashes occur once per source definition, reused by every premise field.
+  // All bytes participate in packing; runtime still checks exact bindings,
+  // source-local indexes, observed premises and independent-source authority.
   const selection = { $ref: "#/$defs/s" };
   return { ...sharedAnswerJsonSchema, $defs: { t: draftJson.properties.text,
-    b: factJson.properties.binding, i: factJson.properties.factIndex,
-    s: { ...factJson, properties: { ...factJson.properties,
+    ...(!issued ? { b: factJson.properties.binding } : {}), i: factJson.properties.factIndex,
+    ...sourceDefinitions,
+    s: selectable ? exactSelections(selectable) : { ...factJson, properties: { ...factJson.properties,
       binding: { $ref: "#/$defs/b" }, factIndex: { $ref: "#/$defs/i" } } },
     d: { ...draftJson, properties: { ...draftJson.properties,
-      premises: { ...draftJson.properties.premises, items: selection }, text: { $ref: "#/$defs/t" } } }
+      premises: { ...draftJson.properties.premises, ...(selectable?.length === 0 ? { maxItems: 0 } : {}), items: selection }, text: { $ref: "#/$defs/t" } } }
   }, properties: { ...sharedAnswerJsonSchema.properties,
-    observations: { ...sharedAnswerJsonSchema.properties.observations, ...(invoicePolicy.length && !(items as {anyOf: unknown[]}).anyOf.length ? {maxItems: 0, items: selection} : {items: invoicePolicy.length ? items : selection}) },
+    observations: { ...sharedAnswerJsonSchema.properties.observations, ...(selectable?.length === 0 || (items && !items.anyOf.length) ? { maxItems: 0, items: selection } : { items: items ?? selection }) },
     results: { ...sharedAnswerJsonSchema.properties.results, maxItems: Math.min(12, ids.length),
       items: { ...sharedAnswerJsonSchema.properties.results.items, ...(ids.length ? { enum: ids } : {}) } },
-    missing_information: limitationJsonForSources(sources),
+    missing_information: limitationJsonForSources(selectable, exactSelections),
     hypotheses: { ...sharedAnswerJsonSchema.properties.hypotheses, items: { $ref: "#/$defs/d" }, maxItems: hypothesesEnabled ? 3 : 0 },
     next_checks: { ...sharedAnswerJsonSchema.properties.next_checks, items: { $ref: "#/$defs/d" } }
   } };
