@@ -67,8 +67,9 @@ packing.packVsiAnswerContext = (payload, ...args) => {
   assert.equal(JSON.stringify(payload), before, 'packing must preserve the full canonical input');
   measurements.push({ canonical: structuredClone(payload), ...result }); return result;
 };
-// A synthetic 45k budget deterministically exercises the same five-to-four
-// boundary; this is not a reconstruction of the hosted request's contents.
+// A synthetic 45k budget exercises five admitted originals with only the three
+// relevant originals fitting the full request, including its source-specific
+// schema. This is not a reconstruction of the hosted request's contents.
 process.env.VAEROEX_VSI_MAX_INPUT_CHARS = '45000';
 process.env.VAEROEX_VSI_MAX_OUTPUT_TOKENS = '6000';
 process.env.VAEROEX_VSI_WORKSPACE_MONTHLY_BUDGET_USD = '50';
@@ -93,8 +94,9 @@ global.fetch = async (url, init) => {
   } else {
     answerCalls++; lastAnswerRequest = structuredClone(body);
     assert.equal(body.text.format.name, 'vsi_shared_answer_v2');
-    assert.equal(payload.businessSources.length, 4, `hosted-shaped fixture packs five admitted originals into four model originals: ${measurements.at(-1).metrics.requestChars}`);
-    assert.equal(payload.contextCoverage.omittedSourceGroups, 1);
+    assert.equal(payload.businessSources.length, 3, `hosted-shaped fixture packs five admitted originals into three model originals: ${measurements.at(-1).metrics.requestChars}`);
+    assert.equal(payload.contextCoverage.omittedSourceGroups, 2);
+    assert.deepEqual(new Set(payload.qualitative_sources.map(source => source.binding)), new Set(raw.slice(0, 3).map(source => source.hash)), 'full Xero and both relevant dispatch/backlog originals remain selected');
     assert.deepEqual(payload.sharedRelationships, []);
     assert.equal(body.text.format.schema.properties.results.maxItems, 0, 'no application result can be selected when none was issued');
     const m = measurements.at(-1);
@@ -180,7 +182,7 @@ function packedRelationshipChecks() {
   assert.equal(prepared.rows.length, 5); assert.deepEqual(prepared.relationships, []);
   assert.deepEqual(prepared.rows.map(r => r.facts), expectedRows.map(r => r.facts));
   const result = await runVsiAnswer(input);
-  assert.equal(providerCalls, 2); assert.equal(answerCalls, 1); assert.equal(result.citations.length, 4);
+  assert.equal(providerCalls, 2); assert.equal(answerCalls, 1); assert.equal(result.citations.length, 3);
   assert.match(result.content, /^Coverage: This is a partial review/);
   for (const citation of result.citations) {
     const canonical = measurements.at(-1).canonical.businessSources.find(s => s.sourceId === citation.sourceId);
@@ -213,5 +215,5 @@ function packedRelationshipChecks() {
   assert.equal(JSON.stringify(contract.sharedAnswerJsonSchema), baseSchema); assert.equal(networkAttempts, 0);
   assert.doesNotMatch(JSON.stringify(diagnostics), /synthetic-result-reference-no-access|120\.50|DO_NOT_LOG|[a-f0-9]{64}/, 'diagnostics contain no credentials, facts or result/source IDs');
   console.info = info; console.error = error;
-  console.log(JSON.stringify({ passed: true, actualEngineAdmitted: 5, modelViewSelected: 4, omitted: 1, fullXeroRecords: 27, fullXeroFacts: 135, emptyResultSchema: true, actualRequestSchemaValidated: true, syntheticMaxChars: 45000, malformedMockStillFailsClosed: true, exactSerializedBudget: true, canonicalRetention: true, wrongWorkspaceAndRevocationDenied: true, nonemptyRelationshipGroups: relationships, providerCallsMocked: providerCalls, externalCalls: networkAttempts, liveModelQualityProved: false }));
+  console.log(JSON.stringify({ passed: true, actualEngineAdmitted: 5, modelViewSelected: 3, omitted: 2, bothRelevantSheetsOriginalsSelected: true, fullXeroRecords: 27, fullXeroFacts: 135, emptyResultSchema: true, actualRequestSchemaValidated: true, syntheticMaxChars: 45000, malformedMockStillFailsClosed: true, exactSerializedBudget: true, canonicalRetention: true, wrongWorkspaceAndRevocationDenied: true, nonemptyRelationshipGroups: relationships, providerCallsMocked: providerCalls, externalCalls: networkAttempts, liveModelQualityProved: false }));
 })().catch(e => { console.info = info; console.error = error; console.error((mockFailure || e).stack); process.exitCode = 1; });

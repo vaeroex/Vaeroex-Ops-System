@@ -5,6 +5,15 @@
   "qualifiedBaseTree": "e62e49fae283e682c929223738eb29faf79c3a2c",
   "bootstrapOnly": true,
   "existingDeploymentUpgrade": "docs/security-drafts/mapping-upgrade/forward.sql",
+  "identityConflictUpgrade": {
+    "path": "docs/security-drafts/identity-conflict-upgrade/forward.sql",
+    "forwardSha256": "249e8ff836f384680c954cf1197dbe076db6d2256871c6670dc6721efbeeb20b",
+    "finalBodySha256": "460322cb8730ac1ff72438027771b14b42a8533b0a152836f5ba0443205e82a3",
+    "function": "private.shared_evidence_before_memory_receipts_v1(uuid,jsonb,uuid)",
+    "finalSource": true,
+    "alreadyAppliedProductionMigration": "20261027181014",
+    "automaticApplication": false
+  },
   "excluded": [
     "04-pause-new-readers.sql"
   ],
@@ -64,9 +73,13 @@
     {
       "path": "docs/security-drafts/13-vsi-failure-accounting.sql",
       "sha256": "5329a30f98aae20fb423ba838d2a569e26acb755be925f02c39699df0b65760c"
+    },
+    {
+      "path": "docs/security-drafts/identity-conflict-upgrade/forward.sql",
+      "sha256": "249e8ff836f384680c954cf1197dbe076db6d2256871c6670dc6721efbeeb20b"
     }
   ],
-  "forwardSha256": "571b17978567f97b06fec17ef2ad0a492eac7185665b0b0162a0aca395bf7ddb",
+  "forwardSha256": "7ceebc67399a92cd968ffa46dcf245665aecc28b9f6b822406842e4b96bab264",
   "pauseSourceSha256": "02b32ffdf9b65acbe22687eb484a88218e0189c7a66e51e0329821a497d6ea00",
   "pauseSha256": "dda9829e74575e5ed14dca79e2370ee3bb169ca236c0843c1d1d4d7438bbd33f",
   "runtimeEnabled": false

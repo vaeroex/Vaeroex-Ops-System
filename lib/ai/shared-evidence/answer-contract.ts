@@ -53,11 +53,49 @@ export const sharedAnswerJsonSchema = { type: "object", additionalProperties: fa
   }
 } as const;
 
+export type AnswerSchemaSource = Readonly<{ ref: string; binding: string; supportOnly?: boolean }>;
+const answerSchemaSource = z.object({ ref: factSelection.shape.ref, binding: factSelection.shape.binding,
+  supportOnly: z.boolean().optional() }).strict();
+
+/** The general parser describes syntax, not source-dependent authority. Generate
+ * prose limitation alternatives from the exact packed originals so the wire
+ * schema cannot invite the cross-original draft that rendering rejects. Group
+ * by binding, just like validateDraft; reported files/notes are still originals.
+ * Supporting context may accompany one original but never establishes another.
+ * This does not move prose, prove entailment, or replace rendering validation. */
+function limitationJsonForSources(sources?: readonly AnswerSchemaSource[]) {
+  if (sources === undefined) return { ...sharedAnswerJsonSchema.properties.missing_information,
+    items: { anyOf: [timeComparisonJson] } }; // No source context: do not offer unbounded prose.
+  const parsed = z.array(answerSchemaSource).safeParse(sources);
+  if (!parsed.success || new Set(parsed.data.map(source => source.ref)).size !== parsed.data.length) return fail("context_reference");
+  // A ref uniquely resolves to its protected binding. Constrain groups by ref;
+  // keep the existing binding/index syntax and independent exact runtime checks.
+  // Enumerating every hash/index here would unnecessarily displace evidence.
+  const selections = (group: readonly AnswerSchemaSource[]) => ({ ...factJson,
+    properties: { ref: { type: "string", enum: group.map(source => source.ref) },
+      binding: { $ref: "#/$defs/b" }, factIndex: { $ref: "#/$defs/i" } } });
+  const originals = parsed.data.filter(source => !source.supportOnly), supporting = parsed.data.filter(source => source.supportOnly);
+  const bindings = [...new Set(originals.map(source => source.binding))];
+  const proseGroups = bindings.map(binding => [...originals.filter(source => source.binding === binding), ...supporting]);
+  if (supporting.length || !parsed.data.length) proseGroups.push(supporting);
+  // Keep anyOf around complete arrays: choosing per item would mix originals.
+  const prose = [{ ...draftJson, properties: { ...draftJson.properties,
+    premises: parsed.data.length ? { type: "array", minItems: 1, maxItems: 24,
+      anyOf: proseGroups.map(group => ({ type: "array", items: selections(group) })) }
+      : { type: "array", minItems: 0, maxItems: 0, items: { $ref: "#/$defs/s" } },
+    text: { $ref: "#/$defs/t" }
+  } }];
+  const comparisons = bindings.length >= 2 ? [{ ...timeComparisonJson, properties: { ...timeComparisonJson.properties,
+    premises: { ...timeComparisonJson.properties.premises, items: selections(originals) }
+  } }] : [];
+  return { ...sharedAnswerJsonSchema.properties.missing_information, items: { anyOf: [...prose, ...comparisons] } };
+}
+
 /** Constrain generation to the exact results in this packed request. This is
  * not calculation authority: rendering still verifies IDs, hashes, observed
  * dependencies and uniqueness independently, including provider violations.
  * Keep the base schema immutable between requests. */
-export function sharedAnswerJsonSchemaForResults(results: readonly { id: string }[], hypothesesEnabled: boolean, invoicePolicy: readonly InvoiceSelection[] = [], availableRefs: readonly string[] = []) {
+export function sharedAnswerJsonSchemaForResults(results: readonly { id: string }[], hypothesesEnabled: boolean, invoicePolicy: readonly InvoiceSelection[] = [], availableRefs: readonly string[] = [], sources?: readonly AnswerSchemaSource[]) {
   if (!Array.isArray(results)) resultFailure("invalid_issued_id", 0, 0);
   const ids = results.map(result => result?.id);
   if (ids.some(id => typeof id !== "string" || id.length !== 64 || !/^[a-f0-9]{64}$/.test(id))) resultFailure("invalid_issued_id", ids.length, 0);
@@ -67,15 +105,27 @@ export function sharedAnswerJsonSchemaForResults(results: readonly { id: string 
     ref: { type: "string", enum: [policy.ref] }, binding: { type: "string", enum: [policy.binding] }, factIndex: { type: "integer", enum: [...policy.eligible] }
   } }));
   const items = invoicePolicy.length ? { anyOf: [...selectionVariants, ...(otherRefs.length ? [{ ...factJson, properties: { ...factJson.properties, ref: {type: "string", enum: [...otherRefs]} } }] : [])] } : factJson;
-  return { ...sharedAnswerJsonSchema, properties: { ...sharedAnswerJsonSchema.properties,
-    observations: { ...sharedAnswerJsonSchema.properties.observations, ...(invoicePolicy.length && !(items as {anyOf: unknown[]}).anyOf.length ? {maxItems: 0, items: factJson} : {items}) },
+  // Local definitions share only unchanged syntax. Their bytes remain inside
+  // packing measurements; no remote references or weaker runtime checks exist.
+  // Compact local definition keys avoid duplicating unchanged syntax on the wire.
+  const selection = { $ref: "#/$defs/s" };
+  return { ...sharedAnswerJsonSchema, $defs: { t: draftJson.properties.text,
+    b: factJson.properties.binding, i: factJson.properties.factIndex,
+    s: { ...factJson, properties: { ...factJson.properties,
+      binding: { $ref: "#/$defs/b" }, factIndex: { $ref: "#/$defs/i" } } },
+    d: { ...draftJson, properties: { ...draftJson.properties,
+      premises: { ...draftJson.properties.premises, items: selection }, text: { $ref: "#/$defs/t" } } }
+  }, properties: { ...sharedAnswerJsonSchema.properties,
+    observations: { ...sharedAnswerJsonSchema.properties.observations, ...(invoicePolicy.length && !(items as {anyOf: unknown[]}).anyOf.length ? {maxItems: 0, items: selection} : {items: invoicePolicy.length ? items : selection}) },
     results: { ...sharedAnswerJsonSchema.properties.results, maxItems: Math.min(12, ids.length),
       items: { ...sharedAnswerJsonSchema.properties.results.items, ...(ids.length ? { enum: ids } : {}) } },
-    hypotheses: { ...sharedAnswerJsonSchema.properties.hypotheses, maxItems: hypothesesEnabled ? 3 : 0 }
+    missing_information: limitationJsonForSources(sources),
+    hypotheses: { ...sharedAnswerJsonSchema.properties.hypotheses, items: { $ref: "#/$defs/d" }, maxItems: hypothesesEnabled ? 3 : 0 },
+    next_checks: { ...sharedAnswerJsonSchema.properties.next_checks, items: { $ref: "#/$defs/d" } }
   } };
 }
 
-export const SHARED_ANSWER_INSTRUCTIONS = "Use the shared-answer schema, no content/citationIds. Select observations by issued ref, exact bare binding (64 lowercase hex, never sha256: or snapshotHash), and source-local zero-based factIndex. Historical-only refs are invalid. Observe each answerSourceRequirements group; other facts only when relevant. Availability/subsets prove neither totals, trends nor completeness. contextFactSources indexes follow product text or public claims. results use only issued sharedRelationships IDs with all inputs observed; invent no calculation. The app renders factual values, units, dates and attribution. For invoice-focused questions, invoiceReviewOrder lists typed invoice fact groups to inspect first; select only eligible invoice indexes, including zero-value invoices. Date-label ranking is not temporal alignment or a record join. factTimes indexes bind each fact: document/row dates, balances at import, retrieval times and selection windows differ; even equal dates prove no measurement alignment. For cross-original missing_information use {kind: selected_fact_time_comparison, premises: observed fact selections}, never text/dates/verdicts. The app computes one date assessment across all selected business observations; a subset of premises cannot narrow it. Single-original missing_information may use text. Put specific missing linkage/coverage/status questions in next_checks; do not move factual recaps there. hypotheses are optional unverified possibilities requiring two independent originals; never force one. Draft premises must be observed. Drafts have no factual authority: invent no cause, correspondence, completeness, performed action or result; do not contradict the app date check. No URLs, inline citations or numeric literals in prose; refer to observations. No business-word whitelist applies. Use ordinary questions/negation and a concrete check before a decision, not generic review-alongside prose. Valid references do not prove semantic correctness or usefulness; manual review remains required.";
+export const SHARED_ANSWER_INSTRUCTIONS = "Use compact shared-answer JSON, no content/citationIds. Select observations by issued ref, exact bare binding (64 lowercase hex, never sha256: or snapshotHash), and source-local zero-based factIndex. Historical-only refs are invalid. Observe each answerSourceRequirements group; other facts only when relevant. Use needed premises; avoid repeated checks. Keep needed zeros, statuses and timing. Availability/subsets prove neither totals, trends nor completeness. contextFactSources indexes follow product text or public claims. results use only issued sharedRelationships IDs with all inputs observed; invent no calculation. The app renders factual values, units, dates and attribution. For invoice questions, inspect typed invoiceReviewOrder groups first; select only eligible invoice indexes, including zero-value invoices. Date-label ranking is not temporal alignment or a record join. factTimes indexes bind each fact: document/row dates, balances at import, retrieval times and selection windows differ; even equal dates prove no measurement alignment. For cross-original missing_information use {kind: selected_fact_time_comparison, premises: observed fact selections}, never text/dates/verdicts. The app's date assessment covers all selected business observations; premise subsets cannot narrow it. missing_information prose uses one original plus support; date checks never allow cross-original prose here. next_checks holds specific missing linkage/coverage/status questions, never factual recaps. hypotheses are optional, unverified and require two independent originals. Draft premises must be observed. Drafts have no factual authority: invent no cause, correspondence, completeness, performed action or result; do not contradict the app date check. No URLs, inline citations or numeric literals in prose; refer to observations. No business-word whitelist applies. Use ordinary questions/negation and a concrete check before a decision, not generic review-alongside prose. Valid references do not prove semantic correctness or usefulness; manual review remains required.";
 
 /** Reuse already-authorized app context and completed public lookup snapshots.
  * No extra retrieval, source text duplication, or historical-business promotion.
@@ -113,6 +163,35 @@ function validateDraftText(text: string) {
 export function renderSharedClarification(value: string): string {
   const text = z.string().trim().min(1).max(1600).parse(value);validateDraftText(text);
   return `Clarification requested (model draft): ${escape(text)}`;
+}
+
+/** Selected accounting records can describe the same business population in
+ * different systems. Only protected, distinct entities exclude that pair; a
+ * retrieval window, document date or coverage label is not a deduplication or
+ * disjoint-population certificate. This renders a limitation, not a calculation
+ * or a claim that duplication exists, and does not prohibit separate comparisons.
+ * Scopes come from protected admission, never from model-authored prose. */
+function accountingScopeQualification(sources: readonly SynthesisSource[], scopes?: ReadonlyMap<string, Readonly<Record<string, unknown>>>): string {
+  const labels: Readonly<Record<string, string>> = { quickbooks_online: "QuickBooks Online", xero: "Xero", "zoho-books": "Zoho Books" };
+  const accounting = sources.filter(source => source.provider && Object.hasOwn(labels, source.provider)
+    && source.reported === false && !source.supportOnly && source.environment !== "supporting");
+  const entity = (source: SynthesisSource) => {
+    const scope = scopes?.get(source.ref);
+    const parsed = z.string().uuid().safeParse(scope?.entityId);
+    return scope?.entityBinding === "protected" && parsed.success ? parsed.data.toLowerCase() : null;
+  };
+  const implicated = new Set<string>();
+  for (let i = 0; i < accounting.length; i++) for (let j = i + 1; j < accounting.length; j++) {
+    const left = accounting[i], right = accounting[j];
+    if (left.provider === right.provider) continue;
+    const leftEntity = entity(left), rightEntity = entity(right);
+    if (leftEntity && rightEntity && leftEntity !== rightEntity) continue;
+    implicated.add(left.ref);implicated.add(right.ref);
+  }
+  const selected = accounting.filter(source => implicated.has(source.ref));
+  if (!selected.length) return "";
+  const providers = [...new Set(selected.map(source => labels[source.provider!]))].join(", ");
+  return `Accounting scope check (application-owned): Selected ${providers} observations include cross-system pairs with shared or unestablished entity scope. Their records may overlap or differ in coverage and accounting basis; duplication is not established. These excerpts do not establish a combined revenue or receivables total. Reconcile entity and record correspondence, non-overlapping coverage, dates, currency and accounting basis before adding amounts across those sources. Individual observations can still be compared separately with their stated limits. ${selected.map(source => `[${source.ref}]`).join(" ")}`;
 }
 
 /** All contexts here are supplied by the application after protected admission,
@@ -228,6 +307,7 @@ export function renderSharedAnswer(value: unknown, context: {
   if (!observations.length && !results.length && !hypotheses.length && !missing.length && !checks.length) fail("source_coverage");
   const content = [observations.length ? `Stored observations (source-reported, not independently verified):\n${observations.join("\n")}` : "",
     ...scopeLines, ...(dateLines.length ? ["Dates across all selected business observations (application-computed):", ...dateLines] : []),
+    accountingScopeQualification(observedSources, context.scopes),
     results.length ? `Application-issued results / boundaries:\n${results.join("\n")}` : "", ...hypotheses, ...missing, ...checks,
     "Draft reasoning is not a verified finding, calculation or completed action. Source presence does not establish record correspondence, causation, complete coverage or comparable periods."].filter(Boolean).join("\n\n");
   if (content.length > 24_000 || citations.size > 30) fail("answer_bounds");

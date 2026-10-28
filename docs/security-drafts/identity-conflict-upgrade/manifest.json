@@ -1,0 +1,25 @@
+{
+  "status": "local_review_only_not_applied",
+  "function": "private.shared_evidence_before_memory_receipts_v1(uuid,jsonb,uuid)",
+  "source": "docs/security-drafts/06-typed-source-admission.sql",
+  "sourceSha256": "cc9ad3bb5598b15cb757e8e9261cde5905f8ece050f6e0eef740de78a734b44e",
+  "installedNameEstablishedBy": "docs/security-drafts/10-memory-semantic-receipts.sql:33",
+  "baselineBodySha256": "525df2decebd8c4dce1bdbc2aef1593acbea6470572b58260b1047fee242c576",
+  "patchedBodySha256": "460322cb8730ac1ff72438027771b14b42a8533b0a152836f5ba0443205e82a3",
+  "forwardSha256": "249e8ff836f384680c954cf1197dbe076db6d2256871c6670dc6721efbeeb20b",
+  "rollbackSha256": "33c0506c3dec10feb0e4c15315e480fd6b23c9d35d648e971fefe4400cb46afc",
+  "oldCode": "40001",
+  "newCode": "PT409",
+  "message": "shared_typed_identity_changed",
+  "owner": "postgres",
+  "executeACL": [
+    "postgres=X/postgres"
+  ],
+  "sourceAndSavedDataChanges": false,
+  "permissionChanges": false,
+  "loopCleanupIncluded": false,
+  "other40001BranchesChanged": false,
+  "actualPostgrest14ExecutionProved": false,
+  "requiresSeparateHostedApproval": true,
+  "rollbackRisk": "Restores the vulnerable retryable code; separate decision required. Does not clear already in-flight retries."
+}

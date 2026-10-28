@@ -8,6 +8,33 @@ business original. Specific multi-source evidence questions remain proposed
 `next_checks`. The historical qualification receipts below are not receipts for
 this latest local candidate.
 
+The request-specific wire schema now constrains each free-text
+`missing_information` item to one exact business binding, with optional supporting
+product/public context. Multiple facts or reference aliases for that same binding
+remain usable; a reported file or note still counts as a business original.
+Closed cross-original time comparisons remain available. An additional valid
+date assessment does not make a second cross-original prose limitation valid.
+Specific multi-source questions belong in `next_checks`; the application never
+moves or rewrites a rejected draft to make it pass.
+
+These alternatives are regenerated from the exact packed request and share local
+`$defs` for unchanged fact-selection and draft syntax to avoid needless schema overhead. Definitions
+and references are supported by the [OpenAI Structured Outputs contract](https://developers.openai.com/api/docs/guides/structured-outputs#definitions-are-supported).
+Grouping uses the refs that uniquely resolve to protected bindings. Exact binding
+values, source-local index bounds and observed-premise membership remain runtime
+checks; a schema-valid reference is not authorization. All schema bytes remain
+inside the existing full-request packing measurement.
+The static parser remains a structural superset: rendering still checks current
+bindings, selected facts, independent roots, environments, revocation and other
+cross-field constraints. Free prose still needs manual semantic review.
+
+Evaluation 09 exposed a concrete schema/runtime gap: its date assessment was
+present, but its additional multi-source prose limitation was structurally valid
+and runtime-forbidden. The original response remains rejected. Separate offline
+allowed-shape examples are not repaired model answers or real-model quality passes.
+The application always computes dates from all selected business observations,
+even if the model returns no date-assessment item.
+
 This candidate is inactive. It does not authorize publication, deployment,
 credentials, inference, SQL changes or activation. Existing three gates remain
 false. The general/public answer contract remains available when no stored
@@ -35,6 +62,19 @@ quoted records get an explicit original-citation marker; their immutable source
 text remains intact and they are not promoted to verified external answer links.
 Results select exact application-issued result IDs with all current input
 bindings. This adds no arithmetic recipe or labor/inventory authority.
+
+The application also renders an accounting-scope qualification when selected
+observations from different QBO, Xero or Zoho Books sources have a shared or
+unestablished protected entity scope. Only implicated, selected sources are cited.
+The qualification states that records may overlap or differ in coverage/basis,
+not that duplication exists, and that a combined revenue or receivables total is
+not established without reconciliation. Separate descriptions and comparisons
+remain available with their existing limits. Distinct protected entity UUIDs
+exclude a pair from this particular warning; document dates, retrieval windows
+and text coverage labels are not cross-system disjoint-population certificates.
+This creates neither a new calculation nor a semantic guarantee about draft prose.
+The isolated synthetic evaluator separately owns its fictional-data label; the
+production renderer has no synthetic flag and never labels real records synthetic.
 
 The transport includes application-owned `answerSourceRequirements.groups` of
 valid source references. The renderer enforces the same groups independently of
