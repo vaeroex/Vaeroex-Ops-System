@@ -15,7 +15,9 @@ function load(file, deps) {
   }, loaded);
   return loaded.exports;
 }
-const authority = load('lib/integrations/google-sheets/read-authority.ts', { zod: { z } });
+const preparationDiagnostics = load('lib/ai/shared-evidence/preparation-diagnostics.ts', { zod: { z } });
+const authority = load('lib/integrations/google-sheets/read-authority.ts', { zod: { z },
+  '@/lib/ai/shared-evidence/preparation-diagnostics': preparationDiagnostics });
 const workspaceId = '11111111-1111-4111-8111-111111111111';
 const actorId = '22222222-2222-4222-8222-222222222222';
 const conversationId = '33333333-3333-4333-8333-333333333333';
