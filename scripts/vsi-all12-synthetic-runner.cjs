@@ -186,7 +186,7 @@ async function runCase(caseId, variant = 'present', { responseAdapter } = {}) {
     // never reach a network socket. The dedicated provider policy stub is used.
     process.env.OPENAI_API_KEY = 'offline-noncredential-marker';
     process.env.VAEROEX_VSI_MAX_INPUT_CHARS = '48000'; process.env.VAEROEX_VSI_MAX_OUTPUT_TOKENS = '6000';
-    const { runVsiAnswer, VSI_SYSTEM_PROMPT } = require('../lib/vsi/engine.ts');
+    const { runVsiAnswer, VSI_SHARED_SYSTEM_PROMPT } = require('../lib/vsi/engine.ts');
     const { renderSharedAnswer, SHARED_ANSWER_INSTRUCTIONS } = require('../lib/ai/shared-evidence/answer-contract.ts');
     let mockFailure;
     const mockFetch = async (url, init) => {
@@ -204,7 +204,10 @@ async function runCase(caseId, variant = 'present', { responseAdapter } = {}) {
         assert.equal(body.text.format.name, 'vsi_shared_answer_v2');
         assert.equal(body.max_output_tokens, 6000, 'structured references share the existing output ceiling with reasoning');
         assert.equal(body.reasoning.effort, 'medium', 'output sizing must not silently reduce reasoning effort');
-        assert(body.input[0].content.length > VSI_SYSTEM_PROMPT.length && body.input[0].content.endsWith(SHARED_ANSWER_INSTRUCTIONS));
+        // The shared prompt is intentionally shorter than the legacy prompt.
+        // Verify the exact production instructions, not their relative length.
+        assert.equal(body.input[0].content, VSI_SHARED_SYSTEM_PROMPT, 'reviewed_shared_prompt_required');
+        assert(body.input[0].content.endsWith(`\n\n${SHARED_ANSWER_INSTRUCTIONS}`), 'complete_shared_answer_contract_required');
         assert.deepEqual([...new Set(payload.qualitative_sources.map(s => s.provider))].sort(), [...providers].sort());
         for (const source of payload.qualitative_sources) assert(prepared.rows.some(row => row.hash === source.binding && JSON.stringify(row.facts) === JSON.stringify(source.facts)));
         assert.equal(metrics.at(-1).requestChars, init.body.length); assert.equal(metrics.at(-1).requestBytes, Buffer.byteLength(init.body));

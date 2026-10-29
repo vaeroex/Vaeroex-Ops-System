@@ -32,7 +32,8 @@
       "codex/all12-qualified-release": false,
       "codex/vsi-exact-fact-bindings": false,
       "codex/vsi-context-overhead": false,
-      "codex/vsi-preparation-diagnostics": false
+      "codex/vsi-preparation-diagnostics": false,
+      "codex/vsi-all12-harness-qualification": false
     }
   },
   "crons": [
