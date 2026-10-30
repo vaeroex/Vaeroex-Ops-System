@@ -168,6 +168,7 @@
     "test:production-migration-history": "node scripts/production-migration-history-regression-tests.js",
     "test:billing-policy": "node scripts/billing-policy-regression-tests.js",
     "test:legal-readiness": "node scripts/legal-readiness-regression-tests.js",
+    "test:legal-acceptance-action": "node scripts/legal-acceptance-action-tests.cjs",
     "test:pre-checkout-legal": "node scripts/pre-checkout-legal-acceptance-regression-tests.js",
     "test:customer-1-billing": "node scripts/customer-1-billing-remediation-regression-tests.js",
     "test:admin-company-management": "node scripts/admin-company-management-regression-tests.js && node --test scripts/admin-account-action-tests.js",
