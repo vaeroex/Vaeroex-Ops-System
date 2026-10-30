@@ -376,7 +376,12 @@ jobs:
         run: pnpm test:public-clarity
 
       - name: Legal consent and protected acceptance regressions
-        run: pnpm test:legal-acceptance-action
+        run: |
+          pnpm test:legal-acceptance-action
+          pnpm test:legal-readiness
+          pnpm test:pre-checkout-legal
+          node scripts/pre-checkout-legal-current-policy-tests.cjs
+          node scripts/vsi-evaluator-runtime-guard-tests.cjs
 
       - name: Production build
         run: pnpm build

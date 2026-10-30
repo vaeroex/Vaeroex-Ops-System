@@ -21,8 +21,15 @@ The default mocked answer deliberately remains generic so an honest review rejec
 
 ## Credential-free checks
 
+The current offline evaluator pins snapshot
+`62adf118466394eda92ed1459d83af1d23c9e237`, incorporating the reviewed legal action
+and its TypeScript RPC declaration. The exact application-tree and dirty-worktree
+guards remain mandatory. This snapshot update is synthetic regression evidence
+only; prior real-model results retain their original provenance.
+
 ```sh
 node scripts/vsi-isolated-contract-evaluation-tests.cjs
+node scripts/vsi-evaluator-runtime-guard-tests.cjs
 node scripts/qualitative-evidence-assessment-tests.cjs
 ```
 

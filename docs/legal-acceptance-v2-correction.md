@@ -31,10 +31,32 @@ The 69 actual-handler cases use synthetic server dependencies and verify consent
 actor/session checks, viewer and account-level success, workspace rejection, forged
 form fields, exact RPC arguments, safe failures, and absence of alternate writes.
 
-Local TypeScript and full lint passed. Two broader legal-content suites also fail
-on the untouched base: `test:legal-readiness` expects an obsolete Trust Center
-sentence, and `test:pre-checkout-legal` expects an obsolete acceptance-set version.
-Their assertions and production policy content remain unchanged.
+Local TypeScript and full lint passed. Two broader legal-content suites initially
+failed on the untouched base. Their expectations now match the approved October 17
+Trust Center wording and October 12 Sheets acceptance-set version. The checks still
+require explicit upload-scanning limitations, prohibited-data boundaries, affirmative
+consent, immutable proof, and fail-closed checkout gating. A behavioral suite uses
+the actual acceptance reader with a synthetic ledger to reject other users/sets,
+obsolete versions, changed content in each of the nine policies, and read failures.
+No production policy text or version was changed. CI runs both suites and the
+behavioral checks alongside the legal action tests.
+
+## Synthetic evaluator compatibility
+
+The first draft CI run passed the legal handler tests, typecheck, lint, build and
+database job, but stopped at the synthetic evaluator's exact runtime-tree guard.
+Its earlier `app`/`lib` pins matched main before this correction. The only changes
+inside those trees are the reviewed legal action and its TypeScript RPC declaration.
+The evaluator now identifies reviewed snapshot
+`62adf118466394eda92ed1459d83af1d23c9e237` and pins its exact trees. It still rejects
+any dirty or different `app`/`lib` tree; no path exceptions or dynamic acceptance
+were added. A disposable local Git fixture verifies rejection of modified, staged,
+committed, and untracked files in both roots before artifacts or dispatch.
+
+The evaluator's prompt hash, fixtures, validators, manual-review gates, budgets,
+no-live-CLI restriction and synthetic-only qualification remain unchanged. This
+updates the snapshot for offline regression testing; it does not reclassify or
+rerun historical real-model evidence.
 
 A separate local disposable-database check used retained public function DDL and
 ACL metadata. It verified the direct-write denial, protected wrapper shape, and

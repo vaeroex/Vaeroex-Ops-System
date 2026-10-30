@@ -62,7 +62,8 @@ for (const policyId of [
   assert.match(preCheckout, new RegExp(`"${policyId}"`), `${policyId} must be represented in the pre-checkout acceptance set`);
 }
 
-assert.match(preCheckout, /PRE_CHECKOUT_ACCEPTANCE_SET_VERSION = "2026-08-20\.2"/, "the required policy set must have its own version");
+// 09c3dacb advanced the policy set for the approved Sheets disclosures.
+assert.match(preCheckout, /PRE_CHECKOUT_ACCEPTANCE_SET_VERSION = "2026-10-12\.sheets1"/, "the required policy set must retain the reviewed Sheets disclosure version");
 assert.match(preCheckout, /contentHash: sha256\(canonicalDocument\)/, "each policy must expose a stable content hash");
 assert.match(preCheckout, /requiredPolicyHash: sha256\(policySet\)/, "the complete required policy set must expose a stable hash");
 assert.match(preCheckout, /eq\("acceptance_set_version", PRE_CHECKOUT_ACCEPTANCE_SET_VERSION\)/, "stale acceptance-set versions must fail closed");
