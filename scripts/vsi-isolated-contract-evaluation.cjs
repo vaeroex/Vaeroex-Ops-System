@@ -2,11 +2,11 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {fork,execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
-// Reviewed legal-acceptance snapshot. Relative to the preceding pin, only the
-// legal action and its TypeScript RPC declaration changed in app/lib. Keep exact
-// tree identity and dirty-source rejection; this is not a real-model qualification.
-const candidate="62adf118466394eda92ed1459d83af1d23c9e237";
-const runtimeTrees="040000 tree cfb0570e6c6fb866d6e30c37f31b54b266afe75c\tapp\n040000 tree a098be2a599485e3aa6f50c98f5b09bd2a7103ad\tlib";
+// Reviewed inactive qualification snapshot. Exact app/lib tree identity and
+// dirty-source rejection remain mandatory; this is offline contract testing,
+// not evidence that the hosted model campaign has run.
+const candidate="2d0bceb9f6a45f78fb7b1f3d7532da397b605229";
+const runtimeTrees="040000 tree 02f07ebdf4e313a5001e7c9b2354f91280c1e293\tapp\n040000 tree 9ee3c979daadbacfc5c18f9abb9c20de54d67e61\tlib";
 const endpoint='https://api.openai.com/v1/responses';
 const limits=Object.freeze({questions:2,calls:4,callsPerQuestion:2,usd:1,reservePerCallUsd:.25,maxChars:48000,maxBytes:192000,maxOutputTokens:8000});
 const cases=Object.freeze([
