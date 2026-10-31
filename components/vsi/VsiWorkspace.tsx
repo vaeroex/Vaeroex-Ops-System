@@ -7,7 +7,7 @@ import { Exchange } from "@/components/vsi/Exchange";
 import { displayDate, usagePercent, monthlyResetAt, type VsiChat, type VsiExchange, type VsiUsageView } from "@/components/vsi/contracts";
 import { suggestedPromptDraft, VSI_SUGGESTED_PROMPTS } from "@/lib/vsi/suggested-prompts";
 
-type Props = { workspaceId: string; workspaceName: string; userId: string; timeZone?: string; initialConversationId?: string; initialPrompt?: string };
+type Props = { workspaceId: string; workspaceName: string; userId: string; hideSourceCitations?: boolean; timeZone?: string; initialConversationId?: string; initialPrompt?: string };
 type ChatResponse = { workspaceId: string; conversation: VsiChat; exchanges?: VsiExchange[]; exchange?: VsiExchange; canEditBusinessNotes?: boolean };
 type FailedQuestion = { conversationId: string; message: string; requestId: string };
 const button = "min-h-11 sm:min-h-8 rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vaeroex-blue disabled:cursor-not-allowed disabled:opacity-50";
@@ -15,7 +15,7 @@ class RequestError extends Error {
   constructor(message: string, readonly accessLost = false, readonly code = "") { super(message); }
 }
 
-export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: workspaceTimeZone, initialConversationId = "", initialPrompt = "" }: Props) {
+export function VsiWorkspace({ workspaceId, workspaceName, userId, hideSourceCitations = false, timeZone: workspaceTimeZone, initialConversationId = "", initialPrompt = "" }: Props) {
   const [timeZone, setTimeZone] = useState(workspaceTimeZone || "UTC");
   useEffect(() => { setTimeZone(workspaceTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone); }, [workspaceTimeZone]);
   const [chats, setChats] = useState<VsiChat[]>([]), [chat, setChat] = useState<VsiChat | null>(null);
@@ -317,7 +317,7 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
         <div className="relative min-h-0 flex-1">
         <div ref={transcript} id="vsi-transcript" role="region" aria-label="Conversation transcript" tabIndex={0} onScroll={trackTranscriptPosition} className="h-full space-y-5 overflow-y-auto overscroll-contain p-3 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-vaeroex-blue sm:p-4">
           {!exchanges.length && !failedQuestion ? <div className="py-6 text-center sm:py-10"><h3 className="text-lg font-semibold text-slate-900">What would you like to explore?</h3><p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-slate-600">Write, plan, work through an idea, understand something new, or ask about your business.</p><p className="mx-auto mt-3 max-w-lg text-xs leading-6 text-slate-500">For current information, Vaeroex can check a live source. For business questions, it uses evidence you can access in this workspace.</p></div> : null}
-          {exchanges.map((entry) => <Exchange key={entry.id} exchange={entry} canEditNotes={canEditNotes} saving={pending === `remember:${entry.id}`} disabled={disabled} workspaceName={workspaceName} timeZone={timeZone} onRemember={saveNote} />)}
+          {exchanges.map((entry) => <Exchange key={entry.id} exchange={entry} hideSourceCitations={hideSourceCitations} canEditNotes={canEditNotes} saving={pending === `remember:${entry.id}`} disabled={disabled} workspaceName={workspaceName} timeZone={timeZone} onRemember={saveNote} />)}
           {failedQuestion ? <div className="space-y-3"><div className="ml-auto max-w-[92%] rounded-2xl bg-slate-100 p-4 text-sm leading-7 text-slate-900"><p className="text-xs font-semibold text-slate-500">You</p><p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{failedQuestion.message}</p></div>{pending !== "answer" ? <button type="button" onClick={() => send(failedQuestion)} disabled={disabled} className={button}>Retry this question</button> : null}</div> : null}
           {pending === "answer" ? <p role="status" className="text-sm leading-6 text-slate-600">Vaeroex is preparing your answer…{slowAnswer ? <span className="mt-1 block text-xs">Some questions take about three minutes. You can keep reading while Vaeroex finishes.</span> : null}</p> : null}
         </div>

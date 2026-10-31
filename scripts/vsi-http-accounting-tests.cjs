@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
 const { z } = require('zod');
+require('./qbo-customer-test-support.cjs').installLoader({ 'server-only': {} });
+const qualification = require('../lib/vsi/qualification.ts');
 const workspaceId = '11111111-1111-4111-8111-111111111111';
 const conversationId = '22222222-2222-4222-8222-222222222222';
 const requestId = '33333333-3333-4333-8333-333333333333';
@@ -15,6 +17,7 @@ class VsiHttpError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
 }
 const mocks = {
+  '@/lib/vsi/qualification': qualification,
   'server-only': {},
   '@/lib/integrations/google-sheets/read-authority': { beginGoogleSheetsRead: async () => ({ ticketId: requestId }), bindGoogleSheetsRead: async () => ({ ticketId: requestId }), googleSheetsReadSources: (table, rows) => rows.map(({ id }) => ({ table, id })) },
   'next/server': { NextResponse: { json: (body, options) => Response.json(body, options) } },
