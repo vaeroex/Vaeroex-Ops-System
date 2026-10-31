@@ -43,6 +43,7 @@ class VsiHttpError extends Error { constructor(status, code, message) { super(me
 class VsiEngineError extends Error {}
 let staleDuringProvider = false, providerTicket;
 const deps = {
+  '@/lib/vsi/qualification': load('lib/vsi/qualification.ts', { zod: { z }, 'node:crypto': require('node:crypto') }),
   'next/server': { NextResponse: { json: (value, init) => Response.json(value, init) } }, zod: { z },
   '@/lib/integrations/google-sheets/read-authority': authority,
   '@/lib/security/rate-limit': { enforceRateLimit: async () => ({ allowed: true }) },
