@@ -2,8 +2,11 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {fork,execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
-const candidate="bf923a719562a50bb26977508904564d3abad95b";
-const runtimeTrees="040000 tree d348001c9e91078f6c67cd13f93b36119d30cbf5\tapp\n040000 tree f672000fd3194151a2cf968b1a59ce3affd258bd\tlib";
+// Reviewed legal-acceptance snapshot. Relative to the preceding pin, only the
+// legal action and its TypeScript RPC declaration changed in app/lib. Keep exact
+// tree identity and dirty-source rejection; this is not a real-model qualification.
+const candidate="62adf118466394eda92ed1459d83af1d23c9e237";
+const runtimeTrees="040000 tree cfb0570e6c6fb866d6e30c37f31b54b266afe75c\tapp\n040000 tree a098be2a599485e3aa6f50c98f5b09bd2a7103ad\tlib";
 const endpoint='https://api.openai.com/v1/responses';
 const limits=Object.freeze({questions:2,calls:4,callsPerQuestion:2,usd:1,reservePerCallUsd:.25,maxChars:48000,maxBytes:192000,maxOutputTokens:8000});
 const cases=Object.freeze([

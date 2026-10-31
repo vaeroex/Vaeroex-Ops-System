@@ -57,7 +57,12 @@ assert.match(trustCenterPage, /trustSection\("Infrastructure & Security"\)/, "Tr
 assert.match(legalContent, /cloud infrastructure providers that maintain independent security and compliance programs, including applicable SOC 2 Type II and ISO 27001 certifications and attestations/, "Trust Center must attribute SOC 2 Type II and ISO 27001 to infrastructure providers");
 assert.doesNotMatch([trustCenterPage, legalContent].join("\n"), /does not currently claim HIPAA compliance|GDPR certification|GDPR certified|enterprise compliance certification for Vaeroex itself/i, "Trust Center must not restore the removed negative compliance disclaimer");
 assert.doesNotMatch(trustCenterPage, /Vaeroex is (?:SOC 2|ISO 27001|HIPAA)/, "Trust Center must not claim Vaeroex certification or HIPAA compliance");
-assert.match(trustCenterPage, /does not currently claim malware scanning, DLP scanning, file sandboxing, or regulated-data detection/, "Trust Center must not claim unsupported scanning/DLP capabilities");
+// Public copy was clarified in 366c4ed3; retain its explicit limitations and
+// customer responsibility rather than requiring the superseded sentence.
+assert.match(trustCenterPage, /does not currently claim malware scanning or automatic detection of sensitive data in uploads/, "Trust Center must disclaim unsupported upload scanning and sensitive-data detection");
+assert.match(trustCenterPage, /Check files before sharing them/, "Trust Center must require customer review of uploads");
+assert.match(trustCenterPage, /Do not enter patient data, PHI\/ePHI, medical record numbers, insurance IDs, Social Security numbers, or other prohibited sensitive data/, "Trust Center must retain the explicit prohibited-data boundary");
+assert.doesNotMatch(trustCenterPage, /Vaeroex (?:provides|performs|offers) (?:malware scanning|DLP scanning|file sandboxing|regulated-data detection)/i, "Trust Center must not add unsupported scanning/DLP claims");
 
 assert.match(checkoutLegalPage, /Terms of Service, Privacy Policy, Subscription and Billing Terms/, "pre-checkout UI must identify primary accepted terms");
 assert.match(checkoutLegalPage, /incorporated responsible-use, AI, sensitive-data, data-retention, and human-review policies/, "pre-checkout UI must identify incorporated policies without separate checkboxes");

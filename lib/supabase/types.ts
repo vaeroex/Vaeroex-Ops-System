@@ -67,6 +67,21 @@ type GoogleSheetsFactLinkRow = {
 export type Database = {
   public: {
     Functions: {
+      record_trusted_in_app_legal_acceptance_v2: {
+        Args: {
+          p_user_id: string;
+          p_workspace_id: string | null;
+          p_user_email: string;
+          p_terms_version: string;
+          p_privacy_version: string;
+          p_ai_disclaimer_version: string;
+          p_sensitive_data_policy_version: string;
+          p_user_agent: string | null;
+          p_ip_address: string | null;
+          p_session_id: string;
+        };
+        Returns: string;
+      };
       read_reporting_history: {
         Args: { p_workspace: string; p_provider: string; p_connection: string; p_start_date?: string | null; p_end_date?: string | null };
         Returns: Json;
