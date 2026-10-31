@@ -34,7 +34,8 @@
       "codex/vsi-context-overhead": false,
       "codex/vsi-preparation-diagnostics": false,
       "codex/vsi-all12-harness-qualification": false,
-      "codex/legal-acceptance-v2": false
+      "codex/legal-acceptance-v2": false,
+      "codex/vsi-bounded-qualification": false
     }
   },
   "crons": [
