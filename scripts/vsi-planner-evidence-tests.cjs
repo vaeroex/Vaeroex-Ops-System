@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Real engine, fixed synthetic authority and mocked model responses only. */
+if (require('./vsi-pinned-evaluation-test-fixture.cjs').runInPinnedEvaluationFixture(__filename)) return;
 const assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs'),os=require('node:os');
 const {fork}=require('node:child_process');
 const {cases,mockDispatch,createEvaluation,limits}=require('./vsi-isolated-contract-evaluation.cjs');
