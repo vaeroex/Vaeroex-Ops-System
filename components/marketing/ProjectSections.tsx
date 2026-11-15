@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import { PROJECT_STEPS } from "@/lib/marketing/solutions";
+import { PROJECT_AGREEMENT_NOTICE, PROJECT_STEPS } from "@/lib/marketing/solutions";
 import styles from "./Solutions.module.css";
 
 export function ProjectProcess() {
@@ -33,8 +33,8 @@ export function ProjectPricing({ website = false }: { website?: boolean }) {
           : "Custom Business Systems"}
       </h3>
       <p className={styles.copy}>
-        A one-time development fee with an upfront deposit, followed by a scoped
-        monthly maintenance and support plan.
+        Development and any ongoing maintenance are quoted for the individual
+        project. Fees and the payment schedule are agreed before work begins.
       </p>
       <p className={styles.copy}>
         Quotes depend on scope, complexity, integrations, expected users, usage,
@@ -46,6 +46,7 @@ export function ProjectPricing({ website = false }: { website?: boolean }) {
         substantial scope changes are quoted separately. Custom project
         proposals are separate from the Executive Intelligence subscription.
       </p>
+      <p className={styles.copy}>{PROJECT_AGREEMENT_NOTICE}</p>
       <div className={styles.actions}>
         <Link
           href={

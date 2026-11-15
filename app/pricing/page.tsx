@@ -18,7 +18,7 @@ import styles from "@/components/marketing/IntelligencePages.module.css";
 export const metadata: Metadata = publicPageMetadata({
   title: "Product & Project Pricing | Vaeroex",
   description:
-    "Executive Intelligence at $250/month, plus custom business systems and website projects quoted by scope with monthly maintenance.",
+    "Executive Intelligence at $250/month, plus custom business systems and website projects quoted by scope with agreed maintenance.",
   path: "/pricing",
 });
 
@@ -62,7 +62,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
               <strong>Two ways to get started.</strong>
               <p>
                 The product has a monthly subscription. Custom systems and websites
-                have a separate project proposal and scoped monthly maintenance.
+                have an individual written project agreement and agreed maintenance.
               </p>
             </div>
           </div>
@@ -218,7 +218,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
           </div>
         </div>
       </section>
-      <section className={styles.section} aria-labelledby="project-pricing"><div className={styles.container}><p className={styles.sectionLabel}>Custom projects</p><h2 id="project-pricing">Development and ongoing support.</h2><p className={styles.copy}>Project fees and maintenance are defined in a proposal. The subscription details above describe Executive Intelligence.</p><div className={solutions.two}><ProjectPricing /><ProjectPricing website /></div></div></section>
+      <section className={styles.section} aria-labelledby="project-pricing"><div className={styles.container}><p className={styles.sectionLabel}>Custom projects</p><h2 id="project-pricing">Development and ongoing support.</h2><p className={styles.copy}>Project fees and maintenance are defined in an individual written project agreement before work begins. The subscription details above describe Executive Intelligence.</p><div className={solutions.two}><ProjectPricing /><ProjectPricing website /></div></div></section>
       <PublicFooter />
     </main>
   );

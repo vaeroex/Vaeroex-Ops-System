@@ -94,8 +94,8 @@ export default function ServicePage() {
             </h2>
             <p className={styles.copy}>
               We establish the users, workflows, integrations, and support needs
-              before quoting the work. The proposal sets the development fee,
-              deposit, and monthly maintenance scope.
+              before quoting the work. An individual written project agreement
+              defines the development fee, payment schedule, and maintenance scope.
             </p>
           </div>
           <ProjectPricing />

@@ -467,7 +467,11 @@ async function main() {
   assert.doesNotMatch(lineup, /In Development|href="\/(?:biological|drug-discovery)-intelligence"/);
   for (const route of ["/custom-business-systems", "/website-development"]) {
     const html = htmlByRoute.get(route);
-    assert.match(html, /one-time development fee with an upfront deposit/);
+    assert.match(html, /Development and any ongoing maintenance are quoted/);
+    assert.match(html, /They do not accept project payments/);
+    assert.match(html, /submitting an inquiry does not create a service contract/);
+    assert.match(html, /scope, fees, payment schedule, maintenance, ownership or licensing, delivery, cancellation, and handover/);
+    assert.match(html, /individual written project agreement/);
     assert.match(html, /quoted separately/);
     assert.match(html, /Not sure|Quoted per project/);
     assert.match(html, new RegExp('href="/contact\\?inquiry=' + route.slice(1) + '"'));

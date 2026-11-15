@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { createContactRequestAction } from "@/app/support/actions";
+import { PROJECT_AGREEMENT_NOTICE } from "@/lib/marketing/solutions";
 import {
   INQUIRY_CATEGORIES,
   isProjectInquiry,
@@ -238,6 +239,9 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
                 <p className="text-xs leading-5 text-slate-400 md:col-span-2">
                   Budget ranges help us understand your plans; they are not
                   service prices or quotes.
+                </p>
+                <p className="text-sm leading-6 text-slate-300 md:col-span-2">
+                  {PROJECT_AGREEMENT_NOTICE}
                 </p>
               </>
             ) : null}

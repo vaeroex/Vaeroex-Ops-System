@@ -6,7 +6,7 @@ This change expands the existing public site to Intelligence Systems, Custom Bus
 
 - `/`: company overview, three offerings, actual Executive Intelligence preview and authoritative subscription price, service summaries, project process, existing veteran ownership and NVIDIA Inception membership, project inquiry CTA.
 - `/intelligence-systems`: Executive Intelligence is available; Biological Intelligence and Drug Discovery Intelligence are secondary, Planned entries with no capabilities, release dates, or purchase links. Their existing retired detail routes remain unchanged.
-- `/custom-business-systems` and `/website-development`: dedicated service pages with scoped capabilities, development fee and deposit, monthly maintenance, proposal-defined costs, and category-prefilled contact links.
+- `/custom-business-systems` and `/website-development`: informational service pages with scoped capabilities and category-prefilled contact links. These pages accept no project payments and inquiries create no service contracts. Scope, fees, payment schedule, maintenance, ownership or licensing, delivery, cancellation, and handover are defined in an individual written project agreement before work begins. The same notice appears with custom-project pricing and project inquiry fields.
 - `/executive-intelligence`: actual workspace previews follow the introduction; conceptual animation is removed from this route. Supported integrations and limitations, fictional-data labels, product capabilities, and signup remain intact.
 - `/pricing`, `/about`, navigation, footer, metadata, organization description, and sitemap reflect all three offerings.
 
@@ -41,6 +41,16 @@ The existing legal documents in `lib/legal/content.ts` were preserved. Before se
 - Privacy Policy, Information We Collect and related sections: describes platform and support data. Review coverage of project intake details (business, tools/URL, expected users, budget, timeline) and commissioned-project data handling.
 
 No deposit percentages, project prices, response-time guarantees, unlimited support, ownership/licensing terms, or new contractual policies were invented.
+
+### Informational release boundary and proposed minimal policy clarification
+
+For this release, the new service pages collect inquiries only. They have no project-payment or contract-acceptance flow. Executive Intelligence checkout and its subscription policies are unchanged.
+
+The phrase “All purchases and subscription payments” in Terms, Refund Policy, and Subscription and Billing Terms is still broader than its subscription context. There is no project payment in this release to which a refund rule could attach, but the text should not be relied on to establish future commissioned-project terms.
+
+Proposed clarification for owner review, not applied to versioned legal documents: “These subscription payment and cancellation provisions apply to Executive Intelligence. Project inquiries do not create a purchase or service contract. Scope, fees, payment schedule, maintenance, ownership or licensing, delivery, cancellation, and handover for commissioned work are defined in an individual written project agreement before work begins.” Preserve the separately applicable Workspace Capacity Terms. Review the exact placement and policy-version/acceptance impact before publication; do not rewrite the existing product refund, price-protection, or cancellation commitments.
+
+Remaining policy issue: the existing blanket wording has not been narrowed in the legal documents. Approve the scope clarification or explicitly defer it for this inquiry-only release before lifting the release hold. Any later project-payment or contracting flow requires its agreed terms first.
 
 ## Validation
 

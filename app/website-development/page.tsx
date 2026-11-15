@@ -13,7 +13,7 @@ import styles from "@/components/marketing/Solutions.module.css";
 export const metadata: Metadata = publicPageMetadata({
   title: "Website Development & Enhancement | Vaeroex",
   description:
-    "Build a new business website or improve an existing one, with mobile usability, contact forms, supported integrations, and scoped monthly maintenance.",
+    "Build a new business website or improve an existing one, with mobile usability, contact forms, supported integrations, and agreed maintenance.",
   path: "/website-development",
 });
 export default function ServicePage() {
@@ -116,9 +116,9 @@ export default function ServicePage() {
               Plan the upkeep.
             </h2>
             <p className={styles.copy}>
-              Project-based development pricing and a scoped monthly maintenance
-              plan. The proposal defines hosting, third-party costs, and
-              additional development.
+              Development and maintenance are scoped for your project. An
+              individual written project agreement defines hosting, third-party
+              costs, and additional development before work begins.
             </p>
           </div>
           <ProjectPricing website />
