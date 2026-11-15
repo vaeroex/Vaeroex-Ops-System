@@ -48,10 +48,10 @@ export default function HomePage() {
             integrations, and AI.
           </p>
           <div className={styles.actions}>
-            <a href="#solutions" className="vx-button vx-button--primary">
+            <Link href="#solutions" className="vx-button vx-button--primary">
               Explore Solutions
               <ArrowUpRight size={17} aria-hidden="true" />
-            </a>
+            </Link>
             <Link href="/contact" className="vx-text-link">
               Discuss a Project
               <ArrowUpRight size={17} aria-hidden="true" />
