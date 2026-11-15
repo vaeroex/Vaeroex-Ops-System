@@ -28,7 +28,13 @@ This isolated checkout does not load `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SU
 
 Deployment must retain the site's existing Supabase configuration and support/rate-limit/audit schema. The URL and server-only service-role key are required for saving requests; the public anon key enables the existing signed-in context. Never expose the service-role key to the client.
 
-Successful inserts and all failure branches were verified with isolated mocks of the existing destination. Browser submissions used synthetic data against the credential-free localhost server only. No production rows or test emails were created.
+Initial local successful-insert and failure-branch tests used isolated mocks of the existing destination. Those checks alone do not establish real persistence. A later deployed Preview check on `d932ff0b` verified actual browser submission, independent database readback, and authenticated staff display for both project categories. No production rows or test emails were created.
+
+Before submitting, the actual Preview endpoint was verified as Supabase project `zfpnhvcmuuvtswttmnjd`, separate from Production `mdiianhfrojmxqpwrflh`, using deployed response origins, server-client endpoint configuration, project inventory, existing isolated-preview provenance, and database metadata. The Preview initially lacked the existing `consume_request_rate_limit_v1` function. Only that canonical function and its service-role-only grants were restored there; Production received no schema or data changes. Both subsequent browser submissions succeeded.
+
+The retained synthetic requests are `0070a63d-9335-492f-a29d-1f8ba329adc0` (Custom Business Systems) and `bd071d59-01f9-4f7c-a532-59c494b82983` (Website Development / Enhancement). Both are open, Medium priority, and anonymous with no workspace association. Saved project context and both audit records were verified. A temporary Preview admin identity used for the real UI test was signed out and disabled afterward.
+
+Platform admins see these entries at **Admin → Support Requests** (`/app/admin/support-requests`), newest first. Expand **Request details and triage**, then **Read support message** for the project fields. `/app/admin` displayed an **Open support** count of 2. These views expose requests when opened or refreshed; the handler has no email transport, and the interface has no incoming-request notification, unread badge, polling, or realtime subscription. Assign a queue reviewer before relying on manual follow-up.
 
 ## Policy language requiring owner review
 

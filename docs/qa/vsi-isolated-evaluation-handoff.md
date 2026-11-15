@@ -27,6 +27,16 @@ and its TypeScript RPC declaration. The exact application-tree and dirty-worktre
 guards remain mandatory. This snapshot update is synthetic regression evidence
 only; prior real-model results retain their original provenance.
 
+The two evaluator-specific test commands below create disposable local checkouts
+of published commit `475e70b84d20c43cac1cb7a33ec7f839cdca1c33`, whose `app` and
+`lib` trees match that pinned snapshot, and run the current tests and evaluator
+there. This keeps unrelated application changes from invalidating the test's
+accepted fixture. The evaluator itself is not repinned or bypassed; its exact
+tree and modified, staged, committed, and untracked runtime rejection checks
+remain active. These tests require the reviewed commit in local Git history
+(CI checks out full history). They do not qualify the current application for
+a real-model evaluation.
+
 ```sh
 node scripts/vsi-isolated-contract-evaluation-tests.cjs
 node scripts/vsi-evaluator-runtime-guard-tests.cjs
