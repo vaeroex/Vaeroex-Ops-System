@@ -33,12 +33,21 @@ function walk(node, predicate, matches=[]) {
   if(predicate(node))matches.push(node);
   walk(node.props?.children,predicate,matches);return matches;
 }
-function fixture({reduced=false,compact=false,saveData=false}={}) {
+const milestones = [
+  ['home-opening',0],['solutions',.14],['featured-product',.30],
+  ['home-custom',.50],['home-websites',.70],['project-process-title',.84],['home-finish',1],
+];
+// Unequal section heights ensure progress follows the actual content, not an
+// assumed fraction of total page length or a uniform chapter spacing.
+const documentTops = [500,1230,2160,3100,4200,5050,6200];
+function fixture({reduced=false,compact=false,saveData=false,missing=[]}={}) {
   const slots=[],pending=[],rafs=new Map(),intersections=[],resizes=[];
   let cursor=0,dirty=false,tree,frameId=0,scroll=0;
-  const window=events(),document={...events(),visibilityState:'visible',getElementById(id){
-    const index=['solutions','featured-product','home-custom','home-websites','home-finish'].indexOf(id);
-    return id==='home-connected-journey'?{}:{getBoundingClientRect:()=>({top:400+index*600-scroll})};
+  const window={...events(),innerHeight:1000,innerWidth:compact?390:1440},document={...events(),visibilityState:'visible',getElementById(id){
+    if(id==='home-connected-journey')return {};
+    const index=milestones.findIndex(([anchor])=>anchor===id);
+    if(index<0 || missing.includes(id))return null;
+    return {getBoundingClientRect:()=>({top:documentTops[index]-scroll})};
   }};
   const motion={...events(),matches:reduced},small={...events(),matches:compact};
   const node={getBoundingClientRect:()=>({bottom:300})};
@@ -67,6 +76,39 @@ function fixture({reduced=false,compact=false,saveData=false}={}) {
     scrollTo(value){scroll=value;window.emit('scroll');},
     unmount(){slots.forEach(slot=>slot.cleanup?.());assert.equal(window.count(),0);assert.equal(document.count(),0);assert.equal(motion.count(),0);assert.equal(small.count(),0);assert.equal(rafs.size,0);assert.ok(intersections.every(o=>!o.connected));assert.ok(resizes.every(o=>!o.connected));},
   };
+}
+
+for(const compact of [false,true]) {
+  const h=fixture({compact});h.intersect(true);h.flush();
+  const sampled=[];
+  for(let index=0;index<milestones.length;index++) {
+    h.scrollTo(documentTops[index]-h.window.innerHeight*.5);h.flush();
+    assert.equal(h.scene().props.progress,milestones[index][1],`${milestones[index][0]} corresponds exactly to its camera milestone`);
+    sampled.push(h.scene().props.progress);
+    if(index<milestones.length-1) {
+      const midpoint=(documentTops[index]+documentTops[index+1])/2-h.window.innerHeight*.5;
+      h.scrollTo(midpoint);h.flush();
+      const expected=(milestones[index][1]+milestones[index+1][1])/2;
+      assert.ok(Math.abs(h.scene().props.progress-expected)<1e-10,'Mid-section progress interpolates over measured content spacing');
+    }
+  }
+  for(let index=milestones.length-1;index>=0;index--) {
+    h.scrollTo(documentTops[index]-h.window.innerHeight*.5);h.flush();
+    assert.equal(h.scene().props.progress,sampled[index],'Reverse scrolling restores the exact milestone');
+  }
+  h.scrollTo(-1000);h.flush();assert.equal(h.scene().props.progress,0,'Before opening remains at the initial pose');
+  h.scrollTo(9000);h.flush();assert.equal(h.scene().props.progress,1,'After final CTA remains fully resolved');
+  h.window.innerHeight=600;h.scrollTo(documentTops[3]-300);h.window.emit('resize');h.flush();
+  assert.equal(h.scene().props.progress,.5,'Viewport resize changes focus without changing the milestone');
+  h.unmount();
+}
+for(const missing of [['home-custom'],['home-finish'],milestones.map(([id])=>id)]) {
+  const h=fixture({missing});h.intersect(true);h.flush();
+  for(const position of [0,1500,3500,7000]) {
+    h.scrollTo(position);h.flush();const p=h.scene().props.progress;
+    assert.ok(Number.isFinite(p) && p>=0 && p<=1,'Absent anchors cannot yield an invalid camera progress');
+  }
+  h.unmount();
 }
 
 for(const options of [{reduced:true},{saveData:true}]) {
@@ -135,4 +177,4 @@ for(const cancelAfterFirst of [false,true]) {
   assert.equal(frames.size,1);cleanup();assert.equal(frames.size,0,'Probe cleanup cancels either pending frame');
   assert.equal(renders,0);assert.equal(callbacks,0,'Unmounted probe cannot call the owner');
 }
-console.log('Homepage journey mocked lifecycle: deferred mount, reduced motion/data-saving, scroll progress, offscreen/hidden pause, responsive quality, static toggle, context-loss and driver-exception fallback, HTML links, and listener/observer/frame cleanup passed. No browser or WebGL rendering is claimed.');
+console.log('Homepage journey mocked lifecycle: seven exact content milestones, interpolation/reversal, viewport resize, missing anchors, deferred mount, reduced motion/data-saving, offscreen/hidden pause, responsive quality, static toggle, context-loss and driver-exception fallback, HTML links, and listener/observer/frame cleanup passed. No browser or WebGL rendering is claimed.');

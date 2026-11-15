@@ -1,17 +1,23 @@
+.root {
+  position: relative;
+  isolation: isolate;
+}
+/* An absolute parent supplies the full page boundary. The scene and controls
+   stick independently inside it, leaving document flow and scroll untouched. */
 .journey {
-  position: sticky;
-  top: 85px;
-  z-index: 5;
-  height: clamp(220px, 34svh, 340px);
+  position: absolute;
+  inset: 0;
   margin: 0;
-  background: #080d16;
-  border-block: 1px solid #92abef40;
-  contain: layout paint;
+  pointer-events: none;
 }
 .visual {
-  position: absolute;
-  inset: 0 0 48px;
-  pointer-events: none;
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  z-index: 0;
+  overflow: hidden;
+  background: #080d16;
+  contain: layout paint;
 }
 .poster, .canvas, .vignette {
   position: absolute;
@@ -20,59 +26,41 @@
 .poster svg {
   width: 100%;
   height: 100%;
-  opacity: .65;
+  opacity: .75;
 }
-.canvas {
-  opacity: 0;
-  transition: opacity .35s;
-}
-.ready {
-  opacity: 1;
-}
-.hidden {
-  visibility: hidden;
-}
+.canvas { opacity: 0; transition: opacity .35s; }
+.ready { opacity: 1; }
+.hidden { visibility: hidden; }
 .vignette {
-  background: linear-gradient(90deg,#080d1670,transparent 25%,transparent 75%,#080d1670);
+  background: linear-gradient(90deg,#03070cb0, #03070c28 50%,transparent 80%), linear-gradient(0deg,#03070c70,transparent 22%,transparent 80%,#03070c55);
 }
 .caption {
-  position: absolute;
-  bottom: 0;
+  position: sticky;
+  top: calc(100svh - 66px);
+  z-index: 4;
+  width: fit-content;
+  max-width: calc(100% - 40px);
   height: 48px;
-  width: 100%;
-  padding: 0 max(22px,calc((100% - 1216px)/2));
+  margin: -100svh 24px 0 auto;
+  padding: 0 12px 0 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  background: #0b111b;
-  border-top: 1px solid #9bbaff24;
-  color: #d8e0f2;
-  font-size: 12px;
-}
-.label {
-  font-size: 11px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-.label small {
-  color: #a8b3c8;
-  margin-left: 12px;
-  font-size: 9px;
-}
-.offerings {
-  display: flex;
   gap: 24px;
+  color: #d8e0f2;
+  background: #0b111bf5;
+  border: 1px solid #9bbaff40;
+  border-radius: 6px;
+  box-shadow: 0 8px 32px #0006;
+  font-size: 12px;
+  pointer-events: auto;
 }
-.offerings a:first-child {
-  color: #a8bdff;
-}
-.offerings a:nth-child(2) {
-  color: #9cddcd;
-}
-.offerings a:last-child {
-  color: #d4bdef;
-}
+.label { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.label small { display: block; color: #a8b3c8; margin-top: 3px; font-size: 8px; }
+.offerings { display: flex; gap: 18px; }
+.offerings a:first-child { color: #a8bdff; }
+.offerings a:nth-child(2) { color: #9cddcd; }
+.offerings a:last-child { color: #d4bdef; }
 .caption button {
   min-height: 36px;
   padding: 6px 12px;
@@ -82,68 +70,104 @@
   background: #101b2b;
   cursor: pointer;
 }
-.caption a {
-  padding-block: 12px;
+.caption a { padding-block: 12px; }
+.caption a:focus-visible,.caption button:focus-visible { outline: 2px solid #d2dfff; outline-offset: 3px; }
+.static { color: #b9c4d8; }
+.root > :not(.journey) { position: relative; z-index: 1; }
+.root :is(section[id],h2[id],div[id]) { scroll-margin-top: 130px; }
+.root :is(a,button) { scroll-margin-block: 120px 90px; }
+.root .hero {
+  min-height: calc(100svh - 85px);
+  display: flex;
+  align-items: center;
+  padding-block: 90px 120px;
+  border: 0;
+  background: linear-gradient(90deg,#050a12de,#050a129c 48%,transparent 76%);
 }
-.caption a:focus-visible,.caption button:focus-visible {
-  outline: 2px solid #d2dfff;
-  outline-offset: 3px;
+.hero > div { width: 100%; }
+.root .hero h1 { max-width: 760px; font-size: clamp(44px,5.2vw,74px); }
+.root .hero p { max-width: 590px; }
+.root .hero p:not(:first-child) { color: #d3dbe9; text-shadow: 0 2px 12px #000; }
+.root .overview {
+  min-height: 90svh;
+  padding-block: 100px 130px;
+  border: 0;
+  background: linear-gradient(0deg,transparent,#060a12a0 25%,#060a12a0 75%,transparent);
 }
-.static {
-  color: #b9c4d8;
+.overview h2, .overview > div > p { text-shadow: 0 2px 12px #000; }
+.root .chapter {
+  min-height: 105svh;
+  padding: 100px 0 140px;
+  display: flex;
+  align-items: center;
+  border: 0;
 }
-.root {
-  position: relative;
+.root .chapter > div {
+  width: min(640px,52%);
+  margin: 0 auto 0 max(40px,calc((100% - 1216px)/2));
+  padding: 34px;
+  display: block;
+  background: #070d17e8;
+  border: 1px solid #9cb5ff30;
+  border-radius: 8px;
+  box-shadow: 0 20px 70px #0003;
 }
-.root :is(section[id],h2[id],div[id]) {
-  scroll-margin-top: calc(min(34svh,340px) + 140px);
+.chapter > div > :nth-child(2) { margin-top: 30px; }
+.root .chapter h2 { font-size: clamp(30px,3vw,43px); }
+.process { padding: 80px 0 100px; }
+.process > section { border: 0; padding: 0; }
+.process > section > div {
+  max-width: 1216px;
+  width: calc(100% - 80px);
+  padding: 34px;
+  background: #070d17e8;
+  border: 1px solid #9cb5ff30;
+  border-radius: 8px;
+}
+.root .credentials {
+  max-width: 1216px;
+  width: calc(100% - 80px);
+  padding-inline: 34px;
+  margin-block: 60px;
+  background: #070d17ec;
+  border: 1px solid #9cb5ff30;
+  border-radius: 8px;
+}
+.finish { min-height: 95svh; display: flex; align-items: center; padding-bottom: 120px; }
+.finish > section { width: 100%; background: transparent; }
+.finish > section > div {
+  width: min(640px,52%);
+  margin: 0 auto 0 max(40px,calc((100% - 1216px)/2));
+  padding: 34px;
+  background: #070d17e8;
+  border: 1px solid #9cb5ff30;
+  border-radius: 8px;
+}
+@media(max-width:1000px) {
+  .root .hero h1 { max-width: 650px; }
+  .root .chapter > div,.finish > section > div { width: 62%; margin-left: 30px; padding: 28px; }
+  .caption { gap: 16px; }
 }
 @media(max-width:760px) {
-  .journey {
-    top: 69px;
-    height: 218px;
-  }
-  .visual {
-    bottom: 70px;
-  }
-  .caption {
-    height: 70px;
-    padding: 7px 22px;
-    flex-wrap: wrap;
-    gap: 0 12px;
-  }
-  .label {
-    width: 100%;
-    font-size: 9px;
-  }
-  .label small {
-    font-size: 8px;
-  }
-  .offerings {
-    gap: 18px;
-    font-size: 11px;
-  }
-  .caption button {
-    font-size: 10px;
-    min-height: 32px;
-    padding: 4px 8px;
-  }
-  .root :is(section[id],h2[id],div[id]) {
-    scroll-margin-top: 335px;
-  }
+  .vignette { background: linear-gradient(90deg,#03070c60,#03070c20),linear-gradient(0deg,#03070c50,transparent 40%); }
+  .root .hero { padding-block: 80px 110px; min-height: calc(100svh - 69px); }
+  .root .hero h1 { font-size: clamp(38px,9vw,58px); text-shadow: 0 2px 20px #000; }
+  .hero > div { background: linear-gradient(90deg,#060b14cf,#060b1480); padding-block: 22px; }
+  .root .overview { padding-block: 60px 100px; }
+  .root .chapter { min-height: 0; padding-block: 100px 130px; }
+  .root .chapter > div,.finish > section > div { width: calc(100% - 36px); margin-inline: 18px; padding: 24px; background: #070d17d4; }
+  .root .chapter h2 { font-size: 32px; }
+  .process { padding-block: 80px; }
+  .process > section > div,.root .credentials { width: calc(100% - 36px); padding-inline: 24px; background: #070d17db; }
+  .finish { min-height: 90svh; padding-bottom: 110px; }
+  .caption { top: calc(100svh - 60px); margin-right: 12px; max-width: calc(100% - 24px); width: calc(100% - 24px); padding-inline: 12px; gap: 10px; font-size: 11px; }
+  .label { display: none; }
+  .offerings { gap: 14px; }
+  .caption button { padding: 5px 8px; font-size: 10px; }
+  .root :is(section[id],h2[id],div[id]) { scroll-margin-top: 100px; }
 }
 @media(max-height:550px) {
-  .journey {
-    position: relative;
-    top: 0;
-    height: 218px;
-  }
-  .root :is(section[id],h2[id],div[id]) {
-    scroll-margin-top: 90px;
-  }
+  .caption { top: calc(100svh - 48px); height: 42px; }
+  .root .hero,.root .chapter,.finish { min-height: 0; }
 }
-@media(prefers-reduced-motion:reduce) {
-  .canvas {
-    transition: none;
-  }
-}
+@media(prefers-reduced-motion:reduce) { .canvas { transition: none; } }

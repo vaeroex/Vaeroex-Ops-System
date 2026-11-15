@@ -33,35 +33,35 @@ export default function HomePage() {
   return (
     <main className={`vaeroex-public-site ${styles.site}`}>
       <PublicSiteHeader />
-      <section className={styles.hero}>
-        <div className={styles.container}>
-          <p className={styles.eyebrow}>
-            Intelligence products · Custom software · Websites
-          </p>
-          <h1>
-            Intelligence and software <span>built around your business.</span>
-          </h1>
-          <p className={styles.lead}>
-            Vaeroex develops intelligence products, custom business software,
-            and websites. Explore our intelligence systems, bring a new idea to life,
-            or enhance the tools you already use with custom features,
-            integrations, and AI.
-          </p>
-          <div className={styles.actions}>
-            <Link href="#solutions" className="vx-button vx-button--primary">
-              Explore Solutions
-              <ArrowUpRight size={17} aria-hidden="true" />
-            </Link>
-            <Link href="/contact" className="vx-text-link">
-              Discuss a Project
-              <ArrowUpRight size={17} aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
-      </section>
       <div id="home-connected-journey" className={journeyStyles.root}>
         <HomeJourney />
-        <section id="solutions" className={styles.section}>
+        <section id="home-opening" className={`${styles.hero} ${journeyStyles.hero}`}>
+          <div className={styles.container}>
+            <p className={styles.eyebrow}>
+              Intelligence products · Custom software · Websites
+            </p>
+            <h1>
+              Intelligence and software <span>built around your business.</span>
+            </h1>
+            <p className={styles.lead}>
+              Vaeroex develops intelligence products, custom business software,
+              and websites. Explore our intelligence systems, bring a new idea to life,
+              or enhance the tools you already use with custom features,
+              integrations, and AI.
+            </p>
+            <div className={styles.actions}>
+              <Link href="#solutions" className="vx-button vx-button--primary">
+                Explore Solutions
+                <ArrowUpRight size={17} aria-hidden="true" />
+              </Link>
+              <Link href="/contact" className="vx-text-link">
+                Discuss a Project
+                <ArrowUpRight size={17} aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
+        </section>
+        <section id="solutions" className={`${styles.section} ${journeyStyles.overview}`}>
           <div className={styles.container}>
             <p className={styles.eyebrow}>Three ways to work with Vaeroex</p>
             <h2>Start with what your business needs.</h2>
@@ -94,7 +94,7 @@ export default function HomePage() {
             </div>
           </div>
         </section>
-        <section className={styles.section} aria-labelledby="featured-product">
+        <section className={`${styles.section} ${journeyStyles.chapter}`} aria-labelledby="featured-product">
           <div className={`${styles.container} ${styles.split}`}>
             <div>
               <span className={styles.badge}>Available now</span>
@@ -133,7 +133,7 @@ export default function HomePage() {
             </div>
           </div>
         </section>
-        <section className={styles.section}>
+        <section className={`${styles.section} ${journeyStyles.chapter}`}>
           <div className={`${styles.container} ${styles.split}`}>
             <div>
               <p className={styles.eyebrow}>Custom Business Systems</p>
@@ -172,7 +172,7 @@ export default function HomePage() {
             </ul>
           </div>
         </section>
-        <section className={styles.section}>
+        <section className={`${styles.section} ${journeyStyles.chapter}`}>
           <div className={`${styles.container} ${styles.split}`}>
             <div>
               <p className={styles.eyebrow}>
@@ -207,9 +207,11 @@ export default function HomePage() {
             </ul>
           </div>
         </section>
-        <ProjectProcess />
+        <div className={journeyStyles.process}>
+          <ProjectProcess />
+        </div>
         <section
-          className={styles.container}
+          className={`${styles.container} ${journeyStyles.credentials}`}
           aria-label="NVIDIA Inception membership and company credentials"
         >
           <div className={styles.credibility}>
@@ -241,7 +243,7 @@ export default function HomePage() {
             </div>
           </div>
         </section>
-        <div id="home-finish">
+        <div id="home-finish" className={journeyStyles.finish}>
           <ProjectCta />
         </div>
       </div>

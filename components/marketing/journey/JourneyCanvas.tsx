@@ -1,14 +1,15 @@
 "use client";
+
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
-import { ACESFilmicToneMapping, BoxGeometry, Object3D, Vector3, type InstancedMesh } from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { ACESFilmicToneMapping, BoxGeometry, Object3D, type InstancedMesh } from "three";
 import { PublicSpatialContextGuard } from "@/components/spatial/PublicSpatialCanvasGuard";
 import { probeRenderedCanvas } from "@/components/spatial/CanvasPixelProbe";
 import { SpatialResizeObserver } from "@/components/spatial/SpatialResizeObserver";
 import { StudioEnvironment } from "../clarity/ClarityEngineWorld";
 import { recordGeometry } from "../assembly/AssemblyGeometry";
-import { journeyCamera, journeyFrame, journeyPanel } from "./journeyMotion";
+import { createJourneyWorld, journeyCamera } from "./journeyMotion";
+
 type Props = {
   progress: number;
   active: boolean;
@@ -16,188 +17,170 @@ type Props = {
   onReady: () => void;
   onFailure: () => void;
 };
-const tones = ["#9cb5ff", "#9ed8cc", "#c7b3eb"];
-function makeGate() {
-  const parts = [
-    new BoxGeometry(.14, 4.7, .24).translate(-3.65, 0, 0),
-    new BoxGeometry(.14, 4.7, .24).translate(3.65, 0, 0),
-    new BoxGeometry(7.4, .14, .24).translate(0, 2.35, 0),
-    new BoxGeometry(7.4, .14, .24).translate(0, -2.35, 0),
-  ];
-  const geometry = mergeGeometries(parts);
-  parts.forEach(part => part.dispose());
-  return geometry;
-}
+
+const tones = ["#91b6ff", "#91d5c3", "#bba5ed"];
+const materials = ["#253748", "#657d94", ...tones];
+
 function World({ progress, active, compact, onReady, onFailure }: Props) {
   const state = useThree();
   const { gl, camera, invalidate, size } = state;
-  const current = useRef(progress), painted = useRef(false), frames = useRef(0);
+  const current = useRef(progress);
+  const painted = useRef(false);
+  const frames = useRef(0);
+  const architecture = useRef<Array<InstancedMesh | null>>([]);
   const panels = useRef<Array<InstancedMesh | null>>([]);
   const traces = useRef<Array<InstancedMesh | null>>([]);
   const rims = useRef<Array<InstancedMesh | null>>([]);
-  const gates = useRef<InstancedMesh>(null), rails = useRef<InstancedMesh>(null), glow = useRef<InstancedMesh>(null);
-  const count = compact ? 18 : 30, rows = count / 3;
-  const resources = useMemo(() => ({ records: [2, 5, 0].map(recordGeometry), gate: makeGate(), beam: new BoxGeometry(1, 1, 1) }), []);
-  const scratch = useMemo(() => ({
-    object: new Object3D(), a: new Vector3(), b: new Vector3(), direction: new Vector3(), up: new Vector3(0, 1, 0), positions: Array.from({ length: 30 }, () => new Vector3())
+  const resources = useMemo(() => ({
+    records: [2, 5, 0].map(recordGeometry),
+    box: new BoxGeometry(1, 1, 1),
   }), []);
+  const world = useMemo(() => {
+    const fixed = createJourneyWorld(compact);
+    return {
+      blocks: materials.map((_, material) => fixed.blocks.filter(block => block.material === material)),
+      panels: tones.map((_, family) => fixed.panels.filter(panel => panel.family === family)),
+    };
+  }, [compact]);
+
+  // Upload the world once when its quality changes. Scroll never rebuilds or moves it.
+  useLayoutEffect(() => {
+    const object = new Object3D();
+    world.blocks.forEach((blocks, family) => {
+      const mesh = architecture.current[family];
+      if (!mesh) return;
+      blocks.forEach((block, index) => {
+        object.position.set(...block.position);
+        object.rotation.set(0, block.rotation, 0);
+        object.scale.set(...block.size);
+        object.updateMatrix();
+        mesh.setMatrixAt(index, object.matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    });
+    world.panels.forEach((records, family) => {
+      const meshes = [panels.current[family], traces.current[family], rims.current[family]];
+      records.forEach((record, index) => {
+        object.position.set(...record.position);
+        object.rotation.set(...record.rotation);
+        object.scale.setScalar(record.scale);
+        object.updateMatrix();
+        meshes.forEach(mesh => mesh?.setMatrixAt(index, object.matrix));
+      });
+      meshes.forEach(mesh => {
+        if (!mesh) return;
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.computeBoundingSphere();
+      });
+    });
+    gl.domElement.dataset.journeyWorld = "static-connected-districts";
+    gl.domElement.dataset.journeyInstances = String(world.blocks.reduce((sum, blocks) => sum + blocks.length, 0));
+    invalidate();
+  }, [world, gl, invalidate]);
+
   useEffect(() => () => {
     resources.records.forEach(record => Object.values(record).forEach(geometry => geometry.dispose()));
-    resources.gate.dispose();
-    resources.beam.dispose();
+    resources.box.dispose();
   }, [resources]);
+
   useEffect(() => {
-    if (active || !painted.current)
-      invalidate();
+    if (active || !painted.current) invalidate();
   }, [progress, active, compact, size.width, size.height, invalidate]);
-  useEffect(() => probeRenderedCanvas(state, result => result === "nonblank" ? onReady() : onFailure()), [state, onReady, onFailure]);
+
+  useEffect(() => probeRenderedCanvas(state, result => {
+    if (result === "nonblank") onReady();
+    else onFailure();
+  }), [state, onReady, onFailure]);
+
   useFrame((_, delta) => {
-    if (!active && painted.current)
-      return;
-    current.current += (progress - current.current) * Math.min(1, Math.max(.016, delta) * 11);
-    if (Math.abs(current.current - progress) < .0001)
-      current.current = progress;
-    const p = current.current, { object: o, a, b, direction, up, positions } = scratch;
-    for (let i = 0; i < count; i++) {
-      const pose = journeyPanel(i, count, p), family = i % 3, row = Math.floor(i / 3);
-      positions[i].set(...pose.position);
-      o.position.copy(positions[i]);
-      o.rotation.set(...pose.rotation);
-      o.scale.setScalar(pose.scale);
-      o.updateMatrix();
-      panels.current[family]?.setMatrixAt(row, o.matrix);
-      traces.current[family]?.setMatrixAt(row, o.matrix);
-      rims.current[family]?.setMatrixAt(row, o.matrix);
-    }
-    [...panels.current, ...traces.current, ...rims.current].forEach(mesh => {
-      if (mesh)
-        mesh.instanceMatrix.needsUpdate = true;
-    });
-    const gathering = Math.min(1, p / .24);
-    for (let i = 0; i < 9; i++) {
-      o.position.set(...journeyFrame(i, p));
-      o.rotation.set(0, 0, 0);
-      o.scale.setScalar(.75 + .25 * gathering);
-      o.updateMatrix();
-      gates.current?.setMatrixAt(i, o.matrix);
-    }
-    if (gates.current)
-      gates.current.instanceMatrix.needsUpdate = true;
-    // Four illuminated rails establish perspective through the central corridor;
-    // each splits toward a branch as the system becomes organized.
-    let edge = 0;
-    const beam = (start: Vector3, end: Vector3, width: number) => {
-      direction.subVectors(end, start);
-      const length = direction.length();
-      o.position.copy(start).add(end).multiplyScalar(.5);
-      o.quaternion.setFromUnitVectors(up, direction.normalize());
-      o.scale.set(width, length, width);
-      o.updateMatrix();
-      rails.current?.setMatrixAt(edge, o.matrix);
-      o.scale.set(width * .24, length, width * .24);
-      o.updateMatrix();
-      glow.current?.setMatrixAt(edge++, o.matrix);
-    };
-    for (let i = 0; i < 8; i++)
-      for (let corner = 0; corner < 4; corner++) {
-        const from = journeyFrame(i, p), to = journeyFrame(i + 1, p), x = corner % 2 ? 3.58 : -3.58, y = corner < 2 ? -2.25 : 2.25;
-        a.set(from[0] + x, from[1] + y, from[2]);
-        b.set(to[0] + x, to[1] + y, to[2]);
-        beam(a, b, .045);
-      }
-    for (let i = 0; i < count; i++) {
-      a.copy(positions[i]);
-      b.copy(positions[(i + 3) % count]);
-      beam(a, b, .018 * gathering);
-    }
-    if (rails.current)
-      rails.current.instanceMatrix.needsUpdate = true;
-    if (glow.current)
-      glow.current.instanceMatrix.needsUpdate = true;
-    const view = journeyCamera(p, compact);
+    if (!active && painted.current) return;
+    // A finite settle tail follows input; no ambient clock or perpetual render loop.
+    current.current += (progress - current.current) * Math.min(1, Math.max(.016, delta) * 10);
+    if (Math.abs(current.current - progress) < .00005) current.current = progress;
+    const view = journeyCamera(current.current, compact);
     camera.position.set(...view.position);
     camera.lookAt(...view.target);
-    camera.updateProjectionMatrix();
     const node = gl.domElement;
     node.dataset.journeyFrames = String(++frames.current);
-    node.dataset.journeyProgress = p.toFixed(4);
+    node.dataset.journeyProgress = current.current.toFixed(5);
     node.dataset.journeyTriangles = String(gl.info.render.triangles);
-    node.dataset.journeyCamera = view.position.map(v => v.toFixed(2)).join(",");
+    node.dataset.journeyCamera = view.position.map(value => value.toFixed(2)).join(",");
+    node.dataset.journeyTarget = view.target.map(value => value.toFixed(2)).join(",");
     node.dataset.journeyQuality = compact ? "compact" : "full";
     painted.current = true;
-    if (active && current.current !== progress)
-      invalidate();
+    if (active && current.current !== progress) invalidate();
   });
+
   return <>
-    <color attach="background" args={["#080d16"]} />
-    <fog attach="fog" args={["#080d16", 22, 66]} />
+    <color attach="background" args={["#080f1b"]} />
+    <fog attach="fog" args={["#080f1b", 48, 180]} />
     <StudioEnvironment />
-    <ambientLight intensity={.5} />
-    <directionalLight position={[4, 8, 12]} intensity={3} color="#dce8ff" />
-    <directionalLight position={[-8, 2, -8]} intensity={2.5} color="#6685ef" />
-    <pointLight position={[0, 1, -16]} intensity={65} color="#a1d9d2" distance={30} />
-    {resources.records.map((record, i) => <group key={i}>
+    <ambientLight intensity={.6} />
+    <directionalLight position={[-30, 45, 25]} intensity={2.6} color="#d7e8ff" />
+    <directionalLight position={[35, 15, -70]} intensity={1.8} color="#718bbd" />
+    <pointLight position={[10, 9, -19]} intensity={210} color={tones[0]} distance={37} />
+    <pointLight position={[-11, 8, -45]} intensity={180} color={tones[1]} distance={30} />
+    <pointLight position={[19, 10, -74]} intensity={210} color={tones[2]} distance={35} />
+
+    {world.blocks.map((blocks, family) => <instancedMesh
+      key={family}
+      ref={mesh => { architecture.current[family] = mesh; }}
+      args={[resources.box, undefined, blocks.length]}
+    >
+      <meshStandardMaterial
+        color={materials[family]}
+        metalness={family < 2 ? .78 : .3}
+        roughness={family < 2 ? .32 : .42}
+        emissive={family >= 2 ? materials[family] : "#000000"}
+        emissiveIntensity={family >= 2 ? 1.1 : 0}
+      />
+    </instancedMesh>)}
+
+    {resources.records.map((record, family) => <group key={family}>
       <instancedMesh
-        ref={mesh => {
-          panels.current[i] = mesh;
-        }}
-        args={[record.body, undefined, rows]}
-        frustumCulled={false}
+        ref={mesh => { panels.current[family] = mesh; }}
+        args={[record.body, undefined, world.panels[family].length]}
       >
-        <meshStandardMaterial color="#253548" metalness={.76} roughness={.3} />
+        <meshStandardMaterial color="#1e3044" metalness={.8} roughness={.3} />
       </instancedMesh>
       <instancedMesh
-        ref={mesh => {
-          traces.current[i] = mesh;
-        }}
-        args={[record.trace, undefined, rows]}
-        frustumCulled={false}
+        ref={mesh => { traces.current[family] = mesh; }}
+        args={[record.trace, undefined, world.panels[family].length]}
       >
         <meshStandardMaterial
-          color={tones[i]}
-          emissive={tones[i]}
-          emissiveIntensity={.7}
-          metalness={.4}
-          roughness={.3}
+          color={tones[family]}
+          emissive={tones[family]}
+          emissiveIntensity={.9}
+          metalness={.25}
+          roughness={.35}
         />
       </instancedMesh>
       <instancedMesh
-        ref={mesh => {
-          rims.current[i] = mesh;
-        }}
-        args={[record.frame, undefined, rows]}
-        frustumCulled={false}
+        ref={mesh => { rims.current[family] = mesh; }}
+        args={[record.frame, undefined, world.panels[family].length]}
       >
-        <meshStandardMaterial color={tones[i]} metalness={.85} roughness={.25} />
+        <meshStandardMaterial color={tones[family]} metalness={.85} roughness={.3} />
       </instancedMesh>
     </group>)}
-    <instancedMesh ref={gates} args={[resources.gate, undefined, 9]} frustumCulled={false}>
-      <meshStandardMaterial color="#657e9d" metalness={.9} roughness={.26} />
-    </instancedMesh>
-    <instancedMesh ref={rails} args={[resources.beam, undefined, 32 + count]} frustumCulled={false}>
-      <meshStandardMaterial color="#6386ab" metalness={.75} roughness={.3} />
-    </instancedMesh>
-    <instancedMesh ref={glow} args={[resources.beam, undefined, 32 + count]} frustumCulled={false}>
-      <meshBasicMaterial color="#98c9e4" />
-    </instancedMesh>
-    <mesh position={[0, -2.55, -13]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[50, 75]} />
-      <meshStandardMaterial color="#070c13" metalness={.05} roughness={.95} />
+
+    <mesh position={[0, -1.85, -40]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[180, 230]} />
+      <meshStandardMaterial color="#09121e" metalness={.15} roughness={.88} />
     </mesh>
   </>;
 }
+
 export default function JourneyCanvas(props: Props) {
   return <Canvas
-    camera={{
-      position: [6, 2.8, 3], fov: 32, near: .08, far: 110
-    }}
+    camera={{ position: [-20, 12, 30], fov: props.compact ? 58 : 48, near: .12, far: 260 }}
     dpr={props.compact ? 1 : [1, 1.5]}
     frameloop="demand"
     resize={{ polyfill: SpatialResizeObserver }}
     gl={{ alpha: false, antialias: !props.compact, powerPreference: "low-power" }}
     onCreated={({ gl }) => {
       gl.toneMapping = ACESFilmicToneMapping;
-      gl.toneMappingExposure = 1.15;
+      gl.toneMappingExposure = 1.05;
     }}
   >
     <PublicSpatialContextGuard onFailure={props.onFailure} />
