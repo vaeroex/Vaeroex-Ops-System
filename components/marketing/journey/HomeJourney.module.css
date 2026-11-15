@@ -1,0 +1,149 @@
+.journey {
+  position: sticky;
+  top: 85px;
+  z-index: 5;
+  height: clamp(220px, 34svh, 340px);
+  margin: 0;
+  background: #080d16;
+  border-block: 1px solid #92abef40;
+  contain: layout paint;
+}
+.visual {
+  position: absolute;
+  inset: 0 0 48px;
+  pointer-events: none;
+}
+.poster, .canvas, .vignette {
+  position: absolute;
+  inset: 0;
+}
+.poster svg {
+  width: 100%;
+  height: 100%;
+  opacity: .65;
+}
+.canvas {
+  opacity: 0;
+  transition: opacity .35s;
+}
+.ready {
+  opacity: 1;
+}
+.hidden {
+  visibility: hidden;
+}
+.vignette {
+  background: linear-gradient(90deg,#080d1670,transparent 25%,transparent 75%,#080d1670);
+}
+.caption {
+  position: absolute;
+  bottom: 0;
+  height: 48px;
+  width: 100%;
+  padding: 0 max(22px,calc((100% - 1216px)/2));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #0b111b;
+  border-top: 1px solid #9bbaff24;
+  color: #d8e0f2;
+  font-size: 12px;
+}
+.label {
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.label small {
+  color: #a8b3c8;
+  margin-left: 12px;
+  font-size: 9px;
+}
+.offerings {
+  display: flex;
+  gap: 24px;
+}
+.offerings a:first-child {
+  color: #a8bdff;
+}
+.offerings a:nth-child(2) {
+  color: #9cddcd;
+}
+.offerings a:last-child {
+  color: #d4bdef;
+}
+.caption button {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid #657696;
+  border-radius: 4px;
+  color: #d8e0f2;
+  background: #101b2b;
+  cursor: pointer;
+}
+.caption a {
+  padding-block: 12px;
+}
+.caption a:focus-visible,.caption button:focus-visible {
+  outline: 2px solid #d2dfff;
+  outline-offset: 3px;
+}
+.static {
+  color: #b9c4d8;
+}
+.root {
+  position: relative;
+}
+.root :is(section[id],h2[id],div[id]) {
+  scroll-margin-top: calc(min(34svh,340px) + 140px);
+}
+@media(max-width:760px) {
+  .journey {
+    top: 69px;
+    height: 218px;
+  }
+  .visual {
+    bottom: 70px;
+  }
+  .caption {
+    height: 70px;
+    padding: 7px 22px;
+    flex-wrap: wrap;
+    gap: 0 12px;
+  }
+  .label {
+    width: 100%;
+    font-size: 9px;
+  }
+  .label small {
+    font-size: 8px;
+  }
+  .offerings {
+    gap: 18px;
+    font-size: 11px;
+  }
+  .caption button {
+    font-size: 10px;
+    min-height: 32px;
+    padding: 4px 8px;
+  }
+  .root :is(section[id],h2[id],div[id]) {
+    scroll-margin-top: 335px;
+  }
+}
+@media(max-height:550px) {
+  .journey {
+    position: relative;
+    top: 0;
+    height: 218px;
+  }
+  .root :is(section[id],h2[id],div[id]) {
+    scroll-margin-top: 90px;
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  .canvas {
+    transition: none;
+  }
+}

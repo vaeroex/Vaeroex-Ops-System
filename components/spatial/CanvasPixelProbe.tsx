@@ -39,8 +39,14 @@ export function probeRenderedCanvas(
   let secondFrame = 0;
   const firstFrame = requestAnimationFrame(() => {
     secondFrame = requestAnimationFrame(() => {
-      gl.render(scene, camera);
-      const result = probeCanvasPixels(gl.domElement);
+      let result: Exclude<CanvasPixelProbeResult, "pending"> = "blank";
+      try {
+        gl.render(scene, camera);
+        result = probeCanvasPixels(gl.domElement);
+      } catch {
+        // Driver/context errors occur outside React's error boundary here.
+        // Report a failed probe so the owning view restores its HTML poster.
+      }
       gl.domElement.dataset.canvasProbe = result;
       gl.domElement.closest("[data-spatial-webgl]")?.setAttribute("data-canvas-pixels", result);
       onResult(result);

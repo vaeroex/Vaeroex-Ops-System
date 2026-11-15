@@ -1,0 +1,38 @@
+.detail {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.flag {
+  display: block;
+  flex: 0 0 57px;
+  width: 57px;
+  height: 30px;
+  box-shadow: 0 0 0 1px #ffffff30;
+}
+
+.words {
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.red {
+  color: #ffb0b8;
+}
+
+.white {
+  color: #f4f6fb;
+}
+
+.blue {
+  color: #a8c8ff;
+}
+
+@media (forced-colors: active) {
+  .words span {
+    color: CanvasText;
+  }
+}

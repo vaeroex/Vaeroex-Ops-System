@@ -457,7 +457,10 @@ async function main() {
   assert.doesNotMatch(home, /data-home-assembly=|data-clarity-chapter=/, "Company overview should foreground the offerings");
   const headline = home.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
   assert.equal(headline, "Intelligence and software built around your business.");
-  assert.match(home, /Veteran owned and operated/);
+  assert.match(home.replace(/<[^>]+>/g, ""), /Veteran owned and operated/);
+  assert.equal((home.match(/data-home-journey=/g) || []).length, 1);
+  assert.match(home, /aria-label="United States flag"/);
+  assert.equal((home.match(/<polygon /g) || []).length, 50, "US flag has fifty stars");
   assert.match(home, /Coastal Kitchen · Fictional business example/);
   assert.ok(executive.indexOf('id="product-experience"') < executive.indexOf('id="business-information"'));
   const lineup = htmlByRoute.get("/intelligence-systems");
