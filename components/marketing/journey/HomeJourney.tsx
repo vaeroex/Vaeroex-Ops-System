@@ -28,89 +28,82 @@ class Boundary extends Component<{
 }
 /** Always present in server HTML, including without JavaScript or WebGL. */
 function Poster() {
-  // A cutaway overview of the same fictional operations-center concept as the
-  // 3D world. The floor connects every zone; front walls are omitted for clarity.
-  const point = (x: number, z: number, height = 0) =>
-    `${600 + (x - z) * 45},${430 + (x + z) * 22 - height * 55}`;
-  const plane = (...vertices: [number, number, number][]) =>
-    vertices.map(([x, z, height]) => point(x, z, height)).join(" ");
-  const block = (x: number, z: number, width: number, depth: number, height: number, tone: string, key: string) => (
-    <g key={key} stroke="#58708b" strokeWidth="1.3" strokeLinejoin="round">
-      <polygon points={plane([x,z,height],[x+width,z,height],[x+width,z+depth,height],[x,z+depth,height])} fill={tone} />
-      <polygon points={plane([x,z+depth,0],[x,z+depth,height],[x+width,z+depth,height],[x+width,z+depth,0])} fill="#172b3c" />
-      <polygon points={plane([x+width,z,0],[x+width,z,height],[x+width,z+depth,height],[x+width,z+depth,0])} fill="#101e2d" />
-    </g>
-  );
-  return <svg viewBox="0 0 1200 800" fill="none" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+  // The same authored V-fold and offset wing as the 3D sculpture, projected
+  // obliquely so the depth, inset material layers, and narrow seam remain legible.
+  type Point = [number, number];
+  const project = ([x, y]: Point, depth: number) =>
+    `${650 + x * 15.3 + depth * 5.1},${420 - y * 16 + depth * 1.76}`;
+  const outline = (a: Point, b: Point, width: number): Point[] => {
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const ux = (b[0] - a[0]) / length, uy = (b[1] - a[1]) / length;
+    const half = width / 2, bevel = .24;
+    const at = (point: Point, along: number, across: number): Point =>
+      [point[0] + ux * along - uy * across, point[1] + uy * along + ux * across];
+    return [at(a,0,half-bevel), at(a,bevel,half), at(b,-bevel,half), at(b,0,half-bevel),
+      at(b,0,-half+bevel), at(b,-bevel,-half), at(a,bevel,-half), at(a,0,-half+bevel)];
+  };
+  const points = (vertices: Point[], depth: number) => vertices.map(point => project(point,depth)).join(" ");
+  const folds: {a: Point; b: Point; width: number}[] = [
+    {a:[-14,18], b:[-1,-9], width:4.5},
+    {a:[-1,-9], b:[5,1], width:4},
+    {a:[5,1], b:[15,-12], width:4.2},
+    {a:[13,3], b:[20,12], width:4},
+  ];
+  const seam = [[-13,16],[-1,-8],[5,1],[14,-10.7]] as Point[];
+  const seamPath = (depth: number) => seam.map((point,index) => `${index ? "L" : "M"}${project(point,depth)}`).join(" ");
+  return <svg viewBox="0 0 1200 800" fill="none" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
     <defs>
-      <radialGradient id="journey-horizon" cx=".6" cy=".45" r=".7">
-        <stop stopColor="#263a50" />
+      <radialGradient id="journey-horizon" cx=".6" cy=".42" r=".7">
+        <stop stopColor="#253446" />
         <stop offset="1" stopColor="#080d16" />
       </radialGradient>
-      <linearGradient id="journey-floor" x2=".3" y2="1">
-        <stop stopColor="#273b4c" />
-        <stop offset="1" stopColor="#101d2c" />
+      <linearGradient id="journey-graphite" x1="390" y1="90" x2="880" y2="680" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#9aa8b5" />
+        <stop offset=".24" stopColor="#394958" />
+        <stop offset=".6" stopColor="#1c2835" />
+        <stop offset="1" stopColor="#526577" />
       </linearGradient>
-      <linearGradient id="journey-screen" x2="1" y2="1">
-        <stop stopColor="#426b91" />
-        <stop offset="1" stopColor="#152639" />
+      <linearGradient id="journey-edge" x1="250" y1="250" x2="950" y2="620" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#182230" />
+        <stop offset=".55" stopColor="#0d1520" />
+        <stop offset="1" stopColor="#324559" />
+      </linearGradient>
+      <linearGradient id="journey-metal" x1="440" y1="100" x2="880" y2="660" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#d1dbe2" />
+        <stop offset=".3" stopColor="#6d8192" />
+        <stop offset=".7" stopColor="#b4c2cc" />
+        <stop offset="1" stopColor="#42566a" />
+      </linearGradient>
+      <linearGradient id="journey-glass" x1="470" y1="180" x2="910" y2="620" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#b6d9df" stopOpacity=".5" />
+        <stop offset=".45" stopColor="#6b97ac" stopOpacity=".12" />
+        <stop offset="1" stopColor="#d0c6e7" stopOpacity=".4" />
       </linearGradient>
     </defs>
     <path fill="url(#journey-horizon)" d="M0 0h1200v800H0z" />
-    <ellipse cx="620" cy="530" rx="495" ry="210" fill="#03070c" opacity=".55" />
-    {/* One continuous floor slab, with visible thickness on the cutaway edges. */}
-    <polygon points={plane([-6,-5,0],[6,-5,0],[6,5,0],[-6,5,0])} fill="url(#journey-floor)" stroke="#8095ac" strokeWidth="2" />
-    <polygon points={plane([-6,5,0],[6,5,0],[6,5,-.25],[-6,5,-.25])} fill="#182534" stroke="#52677e" />
-    <polygon points={plane([6,-5,0],[6,5,0],[6,5,-.25],[6,-5,-.25])} fill="#0d1725" stroke="#52677e" />
-    <g stroke="#6b849a" opacity=".18">
-      {[-4,-2,0,2,4].map(value => <g key={value}>
-        <path d={`M${point(value,-5)}L${point(value,5)}`} />
-        <path d={`M${point(-6,value)}L${point(6,value)}`} />
-      </g>)}
-    </g>
-    {/* Rear and side walls include genuine openings and continuous lintels. */}
-    <g fill="#253849" stroke="#6f869c" strokeWidth="1.5" strokeLinejoin="round">
-      <polygon points={plane([-6,-5,0],[-6,-5,3],[-1,-5,3],[-1,-5,0])} />
-      <polygon points={plane([1,-5,0],[1,-5,3],[6,-5,3],[6,-5,0])} />
-      <polygon points={plane([-1,-5,2.2],[-1,-5,3],[1,-5,3],[1,-5,2.2])} />
-      <polygon points={plane([-6,-5,0],[-6,-5,3],[-6,-1,3],[-6,-1,0])} fill="#1b2c3c" />
-      <polygon points={plane([-6,1,0],[-6,1,3],[-6,5,3],[-6,5,0])} fill="#1b2c3c" />
-      <polygon points={plane([-6,-1,2.2],[-6,-1,3],[-6,1,3],[-6,1,2.2])} fill="#1b2c3c" />
-    </g>
-    <g stroke="#adc8e0" strokeWidth="3" opacity=".75">
-      <path d={`M${point(-6,-5,2.9)}L${point(6,-5,2.9)}`} />
-      <path d={`M${point(-6,-5,2.9)}L${point(-6,5,2.9)}`} />
-    </g>
-    <g strokeWidth="2" strokeLinejoin="round">
-      <path d={`M${point(-5,0,.02)}L${point(-1,0,.02)}L${point(-1,2.3,.02)}L${point(4.8,2.3,.02)}`} stroke="#94b8e8" />
-      <path d={`M${point(-1,0,.02)}L${point(1,0,.02)}L${point(1,-3,.02)}L${point(5,-3,.02)}`} stroke="#9ed8cc" />
-      <path d={`M${point(-1,2.3,.02)}L${point(-1,4.2,.02)}L${point(-4.5,4.2,.02)}`} stroke="#c5b2e4" />
-    </g>
-    {/* Central intelligence core and wall displays: light and structure, no data. */}
-    {block(-3.8,-3.7,2,1.6,.3,"#4e657d","core-base")}
-    {block(-3.5,-3.4,1.4,1.05,2.2,"#6886a6","core")}
-    {[.4,.8,1.2,1.6,2].map(height => <path key={height} d={`M${point(-3.35,-2.34,height)}L${point(-2.25,-2.34,height)}`} stroke="#b6d8ff" strokeWidth="3" />)}
-    {[1.7,3.1,4.5].map(x => <g key={x}>
-      <polygon points={plane([x,-4.96,1.05],[x,-4.96,2.2],[x+1.1,-4.96,2.2],[x+1.1,-4.96,1.05])} fill="#0c1826" stroke="#98b4cc" strokeWidth="2" />
-      <polygon points={plane([x+.08,-4.95,1.15],[x+.08,-4.95,2.1],[x+1.02,-4.95,2.1],[x+1.02,-4.95,1.15])} fill="url(#journey-screen)" />
-    </g>)}
-    {/* Connected workstations with desks, upright monitors, and seats. */}
-    {[[-.2,-1.7],[2.8,-1.7],[.5,.7],[3.5,.7]].map(([x,z],index) => <g key={index}>
-      {block(x,z,1.8,.9,.82,"#5a7388",`desk-${index}`)}
-      <polygon points={plane([x+.22,z+.14,.86],[x+.22,z+.14,1.6],[x+1.58,z+.14,1.6],[x+1.58,z+.14,.86])} fill="url(#journey-screen)" stroke="#a4d2ce" strokeWidth="2" />
-      <path d={`M${point(x+.9,z+.16,.86)}L${point(x+.9,z+.48,.84)}`} stroke="#9bb3c5" strokeWidth="3" />
-      {block(x+.55,z+1.1,.7,.6,.47,"#324e61",`seat-${index}`)}
-    </g>)}
-    {/* Dimensional browser gallery: abstract page composition, never product UI. */}
-    {[-4.5,-2.25,0].map((x,index) => <g key={x}>
-      {block(x-.12,3.15,1.8,.55,.18,"#4b5773",`gallery-base-${index}`)}
-      <polygon points={plane([x,3.3,.2],[x,3.3,2.65],[x+1.55,3.3,2.65],[x+1.55,3.3,.2])} fill="#172338" stroke="#c0aedb" strokeWidth="2" />
-      <polygon points={plane([x+1.55,3.3,.2],[x+1.55,3.3,2.65],[x+1.55,3.08,2.65],[x+1.55,3.08,.2])} fill="#35445f" stroke="#9d96b7" />
-      <polygon points={plane([x,3.3,2.34],[x,3.3,2.65],[x+1.55,3.3,2.65],[x+1.55,3.3,2.34])} fill="#52627b" />
-      {[.16,.31,.46].map(dot => { const [cx,cy]=point(x+dot,3.31,2.5).split(','); return <circle key={dot} cx={cx} cy={cy} r="1.8" fill="#d6c6e7" />; })}
-      <polygon points={plane([x+.12,3.31,1.22],[x+.12,3.31,2.15],[x+1.42,3.31,2.15],[x+1.42,3.31,1.22])} fill="url(#journey-screen)" />
-      {[.55,.8].map(height => <path key={height} d={`M${point(x+.15,3.31,height)}L${point(x+1.25,3.31,height)}`} stroke="#a89fc0" strokeWidth="3" />)}
-    </g>)}
+    <ellipse cx="665" cy="696" rx="350" ry="34" fill="#03070d" opacity=".55" />
+    {/* Deep chamfered blades form one composed sculpture, without a built environment. */}
+    {folds.map(({a,b,width},index) => {
+      const vertices = outline(a,b,width);
+      return <g key={index} strokeLinejoin="round">
+        <polygon points={points(vertices,-33)} fill="#182432" stroke="#4c5d6d" strokeWidth="1" />
+        {vertices.map((vertex,edge) => {
+          const next = vertices[(edge+1)%vertices.length];
+          return <polygon key={edge} points={`${project(vertex,-33)} ${project(next,-33)} ${project(next,1)} ${project(vertex,1)}`}
+            fill="url(#journey-edge)" stroke="#3c4d5e" strokeWidth=".8" />;
+        })}
+        <polygon points={points(vertices,1)} fill="url(#journey-graphite)" stroke="#a1b4c5" strokeWidth="1.2" />
+        <polygon points={points(outline(a,b,width*.53),1.08)} fill="url(#journey-metal)" opacity=".72" />
+        <polygon points={points(outline(a,b,width*.36),1.16)} fill="url(#journey-glass)" stroke="#a9c8d3" strokeOpacity=".45" strokeWidth=".65" />
+      </g>;
+    })}
+    {/* The dark joint and restrained light trace reveal connected inset layers. */}
+    <path d={seamPath(1.22)} stroke="#08111d" strokeWidth="7" strokeLinejoin="bevel" />
+    <path d={seamPath(1.24)} stroke="#658da7" strokeWidth="3.5" strokeLinejoin="bevel" />
+    <path d={seamPath(1.28)} stroke="#cae5ed" strokeWidth="1.15" strokeLinejoin="bevel" />
+    <path d={`M${project([13.5,3.7],1.22)}L${project([19.5,11.3],1.22)}`} stroke="#b7d5e5" strokeWidth="1.3" />
+    <path d={`M${project([-1,-8],1.1)}L${project([-1,-8],-5)}L${project([5,1],-5)}`} stroke="#97bfb8" strokeOpacity=".7" strokeWidth="1.2" />
+    <path d={`M${project([5,1],1.1)}L${project([5,1],-9)}L${project([14,-10.7],-9)}`} stroke="#b5aad0" strokeOpacity=".6" strokeWidth="1.2" />
   </svg>;
 }
 export function HomeJourney() {
@@ -250,9 +243,9 @@ export function HomeJourney() {
       <div className={styles.vignette} />
     </div>
     <figcaption className={styles.caption}>
-      <span className={styles.label}>Connected by design <small>Illustrative environment</small>
+      <span className={styles.label}>Connected by design <small>Illustrative sculpture</small>
       </span>
-      <span id="home-journey-description" className="sr-only">Fictional architectural visualization, not a depiction of actual Vaeroex facilities or product interfaces.</span>
+      <span id="home-journey-description" className="sr-only">An illustrative sculpture inspired by the Vaeroex mark, with folded graphite, metal, glass, and connected inset layers.</span>
       <nav aria-label="Explore Vaeroex offerings" className={styles.offerings}>
         <a href="/intelligence-systems">Intelligence</a>
         <a href="/custom-business-systems">Software</a>

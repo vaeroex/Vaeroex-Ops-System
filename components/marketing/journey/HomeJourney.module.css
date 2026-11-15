@@ -150,9 +150,9 @@
 }
 @media(max-width:760px) {
   .vignette { background: linear-gradient(90deg,#03070c60,#03070c20),linear-gradient(0deg,#03070c50,transparent 40%); }
-  .root .hero { padding-block: 80px 110px; min-height: calc(100svh - 69px); }
+  .root .hero { padding-block: 80px 110px; min-height: calc(100svh - 69px); background: linear-gradient(90deg,#050a1280,#050a1220); }
   .root .hero h1 { font-size: clamp(38px,9vw,58px); text-shadow: 0 2px 20px #000; }
-  .hero > div { background: linear-gradient(90deg,#060b14cf,#060b1480); padding-block: 22px; }
+  .hero > div { background: linear-gradient(90deg,#060b14a0,#060b1440); padding-block: 22px; }
   .root .overview { padding-block: 60px 100px; }
   .root .chapter { min-height: 0; padding-block: 100px 130px; }
   .root .chapter > div,.finish > section > div { width: calc(100% - 36px); margin-inline: 18px; padding: 24px; background: #070d17d4; }
