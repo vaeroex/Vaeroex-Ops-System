@@ -177,23 +177,25 @@ export function createJourneyWorld(compact = false) {
   }
 
   // Intelligence: one contained central equipment core, connected to supported displays.
-  add([12, -.88, -23], [6.5, .8, 6.5], 1, 0, "cylinder");
-  add([12, -.42, -23], [6, .12, 6], 2, 0, "ring");
-  add([12, 2.9, -23], [4.7, 6.7, 4.7], 5, 0, "cylinder");
-  add([12, 2.9, -23], [2.8, 6.7, 2.8], 0, 0, "cylinder");
+  // Position the core within both the wide and portrait camera sightlines.
+  const coreX = 8, coreZ = -28;
+  add([coreX, -.88, coreZ], [6.5, .8, 6.5], 1, 0, "cylinder");
+  add([coreX, -.42, coreZ], [6, .12, 6], 2, 0, "ring");
+  add([coreX, 2.9, coreZ], [4.7, 6.7, 4.7], 5, 0, "cylinder");
+  add([coreX, 2.9, coreZ], [2.8, 6.7, 2.8], 0, 0, "cylinder");
   for (const y of [-.35, 1.8, 4.1, 6.3]) {
-    add([12, y, -23], [4.9, .18, 4.9], 1, 0, "ring");
+    add([coreX, y, coreZ], [4.9, .18, 4.9], 1, 0, "ring");
   }
   for (const angle of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
-    add([12 + Math.cos(angle) * 2.25, 2.9, -23 + Math.sin(angle) * 2.25], [.16, 6.8, .16], 1, 0, "cylinder");
-    add([12 + Math.cos(angle) * 1.42, 2.9, -23 + Math.sin(angle) * 1.42], [.07, 6.3, .07], 2);
+    add([coreX + Math.cos(angle) * 2.25, 2.9, coreZ + Math.sin(angle) * 2.25], [.16, 6.8, .16], 1, 0, "cylinder");
+    add([coreX + Math.cos(angle) * 1.42, 2.9, coreZ + Math.sin(angle) * 1.42], [.07, 6.3, .07], 2);
   }
   for (const [x, z, scale] of [[6, -15, 3.8], [14, -17, 4.3], [22, -25, 3.8]]) {
     panel(0, [x, 3.5, z], scale, -.3);
     add([x, -.95, z - .35], [3.4, .5, 2], 1);
     add([x, .7, z - .4], [.35, 3, .35], 1);
     add([x, 2.1, z - .4], [2.5, .2, .4], 1);
-    segment([x, -1.17, z], [12, -1.17, -23], .055, 2);
+    segment([x, -1.17, z], [coreX, -1.17, coreZ], .055, 2);
   }
   if (!compact) {
     panel(0, [19, 4, -32.65], 2.8);
@@ -251,7 +253,7 @@ export function createJourneyWorld(compact = false) {
     add([x, -.65, z + .95], [7.6, .055, .055], 4);
     segment([9, -1.17, z], [x, -1.17, z], .055, 4);
   }
-  segment([12, -1.17, -27], [-3.5, -1.17, -43], .055, 2);
+  segment([coreX, -1.17, coreZ - 3.5], [-3.5, -1.17, -43], .055, 2);
   segment([1, -1.17, -52], [15, -1.17, -68], .055, 3);
   return { blocks, panels };
 }
