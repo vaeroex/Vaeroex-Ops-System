@@ -5,6 +5,7 @@ export type JourneyBlock = {
   size: JourneyPoint;
   rotation: number;
   material: number;
+  shape?: "box" | "cylinder" | "ring";
 };
 
 export type JourneyPanel = {
@@ -92,111 +93,165 @@ export function journeyCamera(progress: number, compact = false): {
   return { position, target };
 }
 
-/** Fixed architecture: analysis atrium, connected operations, and publication gallery. */
+/** A grounded operations center with three open rooms connected by a lit circulation route. */
 export function createJourneyWorld(compact = false) {
   const blocks: JourneyBlock[] = [];
   const panels: JourneyPanel[] = [];
-  const add = (position: JourneyPoint, size: JourneyPoint, material = 0, rotation = 0) => {
-    blocks.push({ position, size, material, rotation });
+  const add = (position: JourneyPoint, size: JourneyPoint, material = 0, rotation = 0,
+    shape: JourneyBlock["shape"] = "box") => {
+    blocks.push({ position, size, material, rotation, shape });
   };
-  const segment = (a: JourneyPoint, b: JourneyPoint, width: number, material: number, height = .07) => {
+  const segment = (a: JourneyPoint, b: JourneyPoint, width: number, material: number, height = .06) => {
     const dx = b[0] - a[0], dz = b[2] - a[2];
     add([(a[0] + b[0]) / 2, a[1], (a[2] + b[2]) / 2],
       [Math.hypot(dx, dz), height, width], material, Math.atan2(-dz, dx));
   };
-  const portal = (x: number, z: number, width: number, height: number, family: number) => {
-    for (const side of [-1, 1]) {
-      add([x + side * width / 2, height / 2 - 1.3, z], [.32, height, .65], 1);
-      add([x + side * (width / 2 - .18), height / 2 - 1.3, z + .35], [.055, height, .06], family + 2);
-    }
-    add([x, height - 1.3, z], [width + .3, .34, .65], 1);
-    add([x, height - 1.5, z + .35], [width, .045, .06], family + 2);
-    add([x, -1.45, z], [width + 1, .3, 1.8]);
-  };
   const panel = (family: number, position: JourneyPoint, scale: number, rotation = 0) => {
     panels.push({ family, position, scale, rotation: [0, rotation, 0] });
   };
+  const doorway = (x: number, z: number, width: number, height: number, family: number) => {
+    for (const side of [-1, 1]) {
+      add([x + side * width / 2, height / 2 - 1.3, z], [.5, height, .7], 1);
+    }
+    add([x, height - 1.3, z], [width + .5, .45, .8], 7);
+    add([x, height - 1.55, z + .43], [width, .07, .07], family + 2);
+  };
+  const room = (x: number, z: number, width: number, depth: number, family: number) => {
+    const right = x + width / 2, back = z - depth / 2, top = 7.4;
+    add([x, -1.48, z], [width, .45, depth], 6);
+    // Two glazed exterior walls and open circulation sides make the interior legible
+    // while keeping the final aerial view and the authored camera route unobstructed.
+    const backSpans = family === 1 ? [[x - width / 2, -22], [-14, right]] : [[x - width / 2, right]];
+    for (const [start, end] of backSpans) {
+      add([(start + end) / 2, -.55, back], [end - start, 1.4, .45], 7);
+      add([(start + end) / 2, 3.65, back], [end - start - .3, 6.7, .10], 5);
+    }
+    if (family === 1) for (const jamb of [-22, -14]) {
+      add([jamb, 3.1, back], [.22, 8.7, .3], 1);
+    }
+    add([right, -.55, z], [.45, 1.4, depth], 7);
+    add([right, 3.65, z], [.10, 6.7, depth - .6], 5);
+    for (const at of [-.5, 0, .5]) {
+      add([x + width * at, 3.1, back], [.22, 8.7, .3], 1);
+      add([right, 3.1, z + depth * at], [.3, 8.7, .22], 1);
+    }
+    add([x, top, back], [width + .5, .35, 1.4], 7);
+    add([right, top, z], [1.4, .35, depth + .5], 7);
+    add([x, top - .2, back + .65], [width, .06, .10], family + 2);
+    add([right - .65, top - .2, z], [.10, .06, depth], family + 2);
+    for (const side of [-1, 1]) {
+      add([x, -1.22, z + side * (depth / 2 - .45)], [width - .8, .04, .07], 1);
+      add([x + side * (width / 2 - .45), -1.22, z], [.07, .04, depth - .8], 1);
+    }
+    // Floor joints read as a deliberate interior surface; compact mode uses fewer.
+    const joints = compact ? 2 : 4;
+    for (let i = 1; i <= joints; i++) {
+      add([x, -1.245, z - depth / 2 + depth * i / (joints + 1)], [width - .8, .015, .035], 0);
+    }
+  };
 
-  // A continuous ground route is visible from within the city and at the final overlook.
-  const spine: JourneyPoint[] = [[0, -1.18, 18], [0, -1.18, -17], [-15, -1.18, -39],
-    [-15, -1.18, -50], [10, -1.18, -70], [10, -1.18, -89]];
+  add([1, -1.82, -41], [74, .3, 130], 0);
+  room(9, -14, 36, 38, 0);
+  room(-9, -45, 30, 25, 1);
+  room(19, -74, 28, 31, 2);
+  doorway(0, 5, 18, 9, 0);
+  doorway(-17, -34, 15, 8, 1);
+  // Short opaque returns and a glazed entry partition frame actual openings.
+  add([18, 2.5, 5], [18, 7.6, .45], 7);
+  add([-8.8, 2.5, -.5], [.35, 7.6, 9], 5);
+  add([18, 2.5, 5.25], [10, 4.2, .10], 5);
+  add([-3, 2.2, -32.5], [13, 7, .4], 7);
+  add([29.5, 2.2, -58.5], [7, 7, .4], 7);
+
+  const spine: JourneyPoint[] = [[0, -1.19, 17], [0, -1.19, -17], [-17, -1.19, -37],
+    [-17, -1.19, -54], [9, -1.19, -69], [9, -1.19, -89]];
   for (let i = 0; i < spine.length - 1; i++) {
     const a = spine[i], b = spine[i + 1], family = Math.min(2, Math.floor(i / 2));
-    segment([a[0], -1.48, a[2]], [b[0], -1.48, b[2]], 5, 0, .25);
+    segment([a[0], -1.40, a[2]], [b[0], -1.40, b[2]], 5.5, 6, .3);
     const length = Math.hypot(b[0] - a[0], b[2] - a[2]);
     const nx = -(b[2] - a[2]) / length, nz = (b[0] - a[0]) / length;
     for (const side of [-1, 1]) {
-      segment([a[0] + nx * side * 2, a[1], a[2] + nz * side * 2],
-        [b[0] + nx * side * 2, b[1], b[2] + nz * side * 2], .075, family + 2);
+      segment([a[0] + nx * side * 2.35, a[1], a[2] + nz * side * 2.35],
+        [b[0] + nx * side * 2.35, b[1], b[2] + nz * side * 2.35], .055, family + 2);
     }
   }
 
-  // Intelligence: a traversable nave with tall analytical fins and stacked data surfaces.
-  for (const z of [5, -4, -13]) portal(0, z, 18, 11, 0);
-  add([15, -1.55, -22], [24, .5, 25]);
-  for (let i = 0; i < 6; i++) {
-    const x = 9 + (i % 3) * 6, z = -17 - Math.floor(i / 3) * 13;
-    const height = [10, 15, 12, 7, 11, 17][i];
-    add([x, height / 2 - 1.3, z], [1.2, height, 5.5]);
-    add([x - .65, height / 2 - 1.3, z + 2.75], [.09, height, .08], 2);
-    add([x, height - 1.1, z], [1.6, .18, 5.9], 1);
-    if (!compact || i % 2 === 0) {
-      for (let level = 1; level < 4; level++) {
-        add([x + 1.4, level * 2.1, z + 2.8], [2.8, .09, .08], 2);
-      }
+  // Intelligence: one contained central equipment core, connected to supported displays.
+  add([12, -.88, -23], [6.5, .8, 6.5], 1, 0, "cylinder");
+  add([12, -.42, -23], [6, .12, 6], 2, 0, "ring");
+  add([12, 2.9, -23], [4.7, 6.7, 4.7], 5, 0, "cylinder");
+  add([12, 2.9, -23], [2.8, 6.7, 2.8], 0, 0, "cylinder");
+  for (const y of [-.35, 1.8, 4.1, 6.3]) {
+    add([12, y, -23], [4.9, .18, 4.9], 1, 0, "ring");
+  }
+  for (const angle of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
+    add([12 + Math.cos(angle) * 2.25, 2.9, -23 + Math.sin(angle) * 2.25], [.16, 6.8, .16], 1, 0, "cylinder");
+    add([12 + Math.cos(angle) * 1.42, 2.9, -23 + Math.sin(angle) * 1.42], [.07, 6.3, .07], 2);
+  }
+  for (const [x, z, scale] of [[6, -15, 3.8], [14, -17, 4.3], [22, -25, 3.8]]) {
+    panel(0, [x, 3.5, z], scale, -.3);
+    add([x, -.95, z - .35], [3.4, .5, 2], 1);
+    add([x, .7, z - .4], [.35, 3, .35], 1);
+    add([x, 2.1, z - .4], [2.5, .2, .4], 1);
+    segment([x, -1.17, z], [12, -1.17, -23], .055, 2);
+  }
+  if (!compact) {
+    panel(0, [19, 4, -32.65], 2.8);
+    add([19, 4, -32.9], [4.3, 3, .2], 7);
+  }
+
+  // Systems: three complete desk/seat/monitor pods, connected to a compact mechanism bay.
+  // One partial canopy covers the front workstations, tied into the right wall frame
+  // and two columns. The remaining roof area stays open for the final overlook.
+  add([-6, 7.55, -41.5], [24, .3, 10], 7);
+  add([-18, 7.3, -41.5], [.35, .45, 10], 1);
+  for (const z of [-36.5, -46.5]) {
+    add([-18, 3.05, z], [.35, 8.7, .35], 1);
+    add([-6, 7.34, z + (z === -36.5 ? -1.2 : 1.2)], [21.5, .06, .14], 3);
+  }
+  for (const [x, z] of [[-12, -41], [-3.5, -43], [-10, -51]]) {
+    add([x, 1.15, z], [5.4, .28, 2.3], 1);
+    for (const side of [-1, 1]) {
+      add([x + side * 2.1, -.05, z], [.32, 2.2, 1.5], 0);
     }
-    segment([0, -1.15, z], [x, -1.15, z], .06, 2);
-  }
-  panel(0, [8, 3.2, -15], 3.8, -.25);
-  panel(0, [16, 5, -25], 4.5, -.3);
-  panel(0, [22, 3, -33], 3.4, -.25);
-  if (!compact) panel(0, [8, 7.8, -27], 2.7, -.3);
-
-  // Custom systems: distinct connected modules, elevated bridges and routed floor circuitry.
-  add([-8, -1.55, -46], [25, .5, 23]);
-  portal(-17, -35, 16, 10, 1);
-  portal(-17, -43, 16, 10, 1);
-  const modules: JourneyPoint[] = [[-12, 0, -43], [-3, 0, -43], [-12, 0, -53], [-3, 0, -53]];
-  for (let i = 0; i < modules.length; i++) {
-    const [x, , z] = modules[i], height = i % 2 ? 7 : 5;
-    add([x, .1, z], [5.4, 2.5, 5.4]);
-    for (const dx of [-2.5, 2.5]) for (const dz of [-2.5, 2.5]) {
-      add([x + dx, height / 2, z + dz], [.22, height, .22], 1);
+    add([x, .7, z - .75], [4.8, .18, .25], 7);
+    add([x, 1.8, z - .4], [.16, 1.2, .16], 1, 0, "cylinder");
+    panel(1, [x, 2.8, z - .35], 2.6, -.1);
+    add([x + 1.85, 1.55, z + .1], [.65, .5, .7], 7);
+    add([x + 1.85, 1.81, z + .1], [.4, .035, .35], 3);
+    // A recognizable seat, backrest, pedestal and base, all resting on the floor.
+    add([x, .1, z + 2.2], [1.7, .28, 1.65], 0);
+    add([x, 1, z + 2.85], [1.7, 1.75, .25], 7);
+    add([x, -.55, z + 2.2], [.16, 1.1, .16], 1, 0, "cylinder");
+    add([x, -1.13, z + 2.2], [1.7, .12, 1.7], 1, 0, "cylinder");
+    if (!compact) for (const side of [-1, 1]) {
+      add([x + side * .95, .65, z + 2.15], [.12, .16, 1.25], 1);
     }
-    add([x, height, z], [5.6, .25, 5.6], 1);
-    for (const dz of [-2.85, 2.85]) add([x, height + .15, z + dz], [5.7, .06, .06], 3);
-    panel(1, [x, 3.6, z + 2.9], compact ? 2.4 : 2.7, -.1);
-    segment([-17, -1.15, z], [x, -1.15, z], .075, 3);
-    if (i % 2 === 0) {
-      add([x + 4.5, 5.4, z], [4.2, .35, 1.8], 1);
-      add([x + 4.5, 5.65, z + .95], [4.2, .06, .06], 3);
+    segment([-17, -1.17, z], [x, -1.17, z], .055, 3);
+  }
+  add([1, -.95, -52], [7.5, .6, 5.5], 7);
+  for (const x of [-1, 2.5]) {
+    add([x, .7, -52], [2.5, 2.6, 3.5], 0);
+    add([x, 2.3, -52], [2.2, 1.1, 2.2], 1, 0, "cylinder");
+    add([x, 3.3, -52], [.35, 1.1, .35], 1, 0, "cylinder");
+    add([x, 1.2, -50.2], [1.8, 1.7, .1], 5);
+    add([x, 2.6, -50.1], [1.5, .055, .055], 3);
+  }
+  add([.75, 3.9, -52], [6.4, .3, .4], 1);
+  segment([-10, -1.17, -51], [1, -1.17, -52], .055, 3);
+
+  // Websites: three dimensional browser canvases on freestanding physical gallery mounts.
+  for (const [x, z] of [[15, -68], [22, -77], [25, -85]]) {
+    panel(2, [x, 4, z], 7, -.2);
+    add([x, -.95, z - .4], [8.8, .5, 2.6], 7);
+    for (const side of [-1, 1]) {
+      add([x + side * 3.1, .9, z - .5], [.25, 3.5, .3], 1);
     }
+    add([x, 1.3, z - .5], [7, .2, .35], 1);
+    add([x, -.65, z + .95], [7.6, .055, .055], 4);
+    segment([9, -1.17, z], [x, -1.17, z], .055, 4);
   }
-
-  // Website development: layered page frames and a clear, repeating publication silhouette.
-  add([19, -1.55, -73], [22, .5, 30]);
-  for (let i = 0; i < 3; i++) {
-    const x = 17 + i * 2, z = -63 - i * 10, width = 10, height = 10 + i * 2;
-    portal(x, z, width, height, 2);
-    add([x, 5.5, z - .4], [8.8, 10, .3]);
-    add([x, height - 2.3, z + .25], [8.8, .25, .2], 4);
-    panel(2, [x, 4.3, z + .15], 4.3, 0);
-    for (let dot = 0; dot < 3; dot++) add([x - 3.4 + dot * .55, height - 2.3, z + .4], [.18, .18, .15], 1);
-    segment([10, -1.15, z], [x, -1.15, z], .07, 4);
-  }
-
-  // Ground connections unite the districts without animated particles or floating ornaments.
-  segment([8, -1.1, -32], [-3, -1.1, -42], .08, 2);
-  segment([-3, -1.1, -54], [17, -1.1, -63], .08, 3);
-  segment([22, -1.1, -30], [29, -1.1, -30], .06, 2);
-  segment([29, -1.1, -30], [29, -1.1, -83], .06, 4);
-  segment([29, -1.1, -83], [21, -1.1, -83], .06, 4);
-
-  // Sparse peripheral buildings establish near/middle/far depth on the opening view.
-  for (const [x, z, height] of [[-31, 8, 9], [30, 6, 15], [-32, -18, 14], [37, -39, 19],
-    [-31, -65, 13], [34, -97, 12], [-13, -94, 8]]) {
-    add([x, height / 2 - 1.6, z], [3, height, 5]);
-    add([x, height - 1.5, z], [3.2, .1, 5.2], 1);
-  }
+  segment([12, -1.17, -27], [-3.5, -1.17, -43], .055, 2);
+  segment([1, -1.17, -52], [15, -1.17, -68], .055, 3);
   return { blocks, panels };
 }

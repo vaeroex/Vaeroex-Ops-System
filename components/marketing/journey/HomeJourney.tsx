@@ -28,39 +28,88 @@ class Boundary extends Component<{
 }
 /** Always present in server HTML, including without JavaScript or WebGL. */
 function Poster() {
+  // A cutaway overview of the same fictional operations-center concept as the
+  // 3D world. The floor connects every zone; front walls are omitted for clarity.
+  const point = (x: number, z: number, height = 0) =>
+    `${600 + (x - z) * 45},${430 + (x + z) * 22 - height * 55}`;
+  const plane = (...vertices: [number, number, number][]) =>
+    vertices.map(([x, z, height]) => point(x, z, height)).join(" ");
+  const block = (x: number, z: number, width: number, depth: number, height: number, tone: string, key: string) => (
+    <g key={key} stroke="#58708b" strokeWidth="1.3" strokeLinejoin="round">
+      <polygon points={plane([x,z,height],[x+width,z,height],[x+width,z+depth,height],[x,z+depth,height])} fill={tone} />
+      <polygon points={plane([x,z+depth,0],[x,z+depth,height],[x+width,z+depth,height],[x+width,z+depth,0])} fill="#172b3c" />
+      <polygon points={plane([x+width,z,0],[x+width,z,height],[x+width,z+depth,height],[x+width,z+depth,0])} fill="#101e2d" />
+    </g>
+  );
   return <svg viewBox="0 0 1200 800" fill="none" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
     <defs>
-      <linearGradient id="journey-metal" x2="1" y2="1">
-        <stop stopColor="#6e8bb4" />
-        <stop offset=".45" stopColor="#17253b" />
-        <stop offset="1" stopColor="#304466" />
-      </linearGradient>
-      <radialGradient id="journey-horizon">
-        <stop stopColor="#243653" />
+      <radialGradient id="journey-horizon" cx=".6" cy=".45" r=".7">
+        <stop stopColor="#263a50" />
         <stop offset="1" stopColor="#080d16" />
       </radialGradient>
+      <linearGradient id="journey-floor" x2=".3" y2="1">
+        <stop stopColor="#273b4c" />
+        <stop offset="1" stopColor="#101d2c" />
+      </linearGradient>
+      <linearGradient id="journey-screen" x2="1" y2="1">
+        <stop stopColor="#426b91" />
+        <stop offset="1" stopColor="#152639" />
+      </linearGradient>
     </defs>
     <path fill="url(#journey-horizon)" d="M0 0h1200v800H0z" />
-    <g stroke="#475e7e" opacity=".28">
-      {[0,1,2,3,4,5,6,7,8].map(i => <path key={i} d={`M${i*180-200} 800L640 240M0 ${360+i*65}H1200`} />)}
-    </g>
-    <g stroke="#8ba9e1" strokeWidth="2" opacity=".6">
-      <path d="M300 760L610 540L840 430L760 300M360 800L660 570L890 450L800 300" />
-      <path d="M610 540L420 440L560 350M840 430L1060 550L1140 490" />
-    </g>
-    {[
-      {x:650,y:345,s:1.3,tone:'#a8bdff'},
-      {x:350,y:490,s:1.5,tone:'#9cddcd'},
-      {x:970,y:530,s:1.9,tone:'#d4bdef'},
-    ].map(({x,y,s,tone},district) => <g key={x} transform={`translate(${x} ${y}) scale(${s}) skewY(-12)`}>
-      {[0,1,2,3].map(i => <g key={i} transform={`translate(${i*20} ${i*-12})`}>
-        <path d="M-74-106H70V34H-74Z M-65-97V25H61V-97Z" fill="url(#journey-metal)" fillRule="evenodd" stroke="#7188ab" />
-        <path d="M-64 24H61M-64-97H61" stroke={tone} strokeWidth="2" />
+    <ellipse cx="620" cy="530" rx="495" ry="210" fill="#03070c" opacity=".55" />
+    {/* One continuous floor slab, with visible thickness on the cutaway edges. */}
+    <polygon points={plane([-6,-5,0],[6,-5,0],[6,5,0],[-6,5,0])} fill="url(#journey-floor)" stroke="#8095ac" strokeWidth="2" />
+    <polygon points={plane([-6,5,0],[6,5,0],[6,5,-.25],[-6,5,-.25])} fill="#182534" stroke="#52677e" />
+    <polygon points={plane([6,-5,0],[6,5,0],[6,5,-.25],[6,-5,-.25])} fill="#0d1725" stroke="#52677e" />
+    <g stroke="#6b849a" opacity=".18">
+      {[-4,-2,0,2,4].map(value => <g key={value}>
+        <path d={`M${point(value,-5)}L${point(value,5)}`} />
+        <path d={`M${point(-6,value)}L${point(6,value)}`} />
       </g>)}
-      {[0,1,2].map(i => <g key={i} transform={`translate(${i*38-30} ${i*4-60})`}>
-        <path d="M0 0h25v40H0z" fill="#152238" stroke={tone} />
-        <path d={district === 0 ? "M5 30v-8m5 8V15m5 15V8m5 22V4" : district === 1 ? "M5 10h15v20H5zM5 20h15" : "M4 8h17M4 16h17M4 22h10M4 28h14"} stroke={tone} />
-      </g>)}
+    </g>
+    {/* Rear and side walls include genuine openings and continuous lintels. */}
+    <g fill="#253849" stroke="#6f869c" strokeWidth="1.5" strokeLinejoin="round">
+      <polygon points={plane([-6,-5,0],[-6,-5,3],[-1,-5,3],[-1,-5,0])} />
+      <polygon points={plane([1,-5,0],[1,-5,3],[6,-5,3],[6,-5,0])} />
+      <polygon points={plane([-1,-5,2.2],[-1,-5,3],[1,-5,3],[1,-5,2.2])} />
+      <polygon points={plane([-6,-5,0],[-6,-5,3],[-6,-1,3],[-6,-1,0])} fill="#1b2c3c" />
+      <polygon points={plane([-6,1,0],[-6,1,3],[-6,5,3],[-6,5,0])} fill="#1b2c3c" />
+      <polygon points={plane([-6,-1,2.2],[-6,-1,3],[-6,1,3],[-6,1,2.2])} fill="#1b2c3c" />
+    </g>
+    <g stroke="#adc8e0" strokeWidth="3" opacity=".75">
+      <path d={`M${point(-6,-5,2.9)}L${point(6,-5,2.9)}`} />
+      <path d={`M${point(-6,-5,2.9)}L${point(-6,5,2.9)}`} />
+    </g>
+    <g strokeWidth="2" strokeLinejoin="round">
+      <path d={`M${point(-5,0,.02)}L${point(-1,0,.02)}L${point(-1,2.3,.02)}L${point(4.8,2.3,.02)}`} stroke="#94b8e8" />
+      <path d={`M${point(-1,0,.02)}L${point(1,0,.02)}L${point(1,-3,.02)}L${point(5,-3,.02)}`} stroke="#9ed8cc" />
+      <path d={`M${point(-1,2.3,.02)}L${point(-1,4.2,.02)}L${point(-4.5,4.2,.02)}`} stroke="#c5b2e4" />
+    </g>
+    {/* Central intelligence core and wall displays: light and structure, no data. */}
+    {block(-3.8,-3.7,2,1.6,.3,"#4e657d","core-base")}
+    {block(-3.5,-3.4,1.4,1.05,2.2,"#6886a6","core")}
+    {[.4,.8,1.2,1.6,2].map(height => <path key={height} d={`M${point(-3.35,-2.34,height)}L${point(-2.25,-2.34,height)}`} stroke="#b6d8ff" strokeWidth="3" />)}
+    {[1.7,3.1,4.5].map(x => <g key={x}>
+      <polygon points={plane([x,-4.96,1.05],[x,-4.96,2.2],[x+1.1,-4.96,2.2],[x+1.1,-4.96,1.05])} fill="#0c1826" stroke="#98b4cc" strokeWidth="2" />
+      <polygon points={plane([x+.08,-4.95,1.15],[x+.08,-4.95,2.1],[x+1.02,-4.95,2.1],[x+1.02,-4.95,1.15])} fill="url(#journey-screen)" />
+    </g>)}
+    {/* Connected workstations with desks, upright monitors, and seats. */}
+    {[[-.2,-1.7],[2.8,-1.7],[.5,.7],[3.5,.7]].map(([x,z],index) => <g key={index}>
+      {block(x,z,1.8,.9,.82,"#5a7388",`desk-${index}`)}
+      <polygon points={plane([x+.22,z+.14,.86],[x+.22,z+.14,1.6],[x+1.58,z+.14,1.6],[x+1.58,z+.14,.86])} fill="url(#journey-screen)" stroke="#a4d2ce" strokeWidth="2" />
+      <path d={`M${point(x+.9,z+.16,.86)}L${point(x+.9,z+.48,.84)}`} stroke="#9bb3c5" strokeWidth="3" />
+      {block(x+.55,z+1.1,.7,.6,.47,"#324e61",`seat-${index}`)}
+    </g>)}
+    {/* Dimensional browser gallery: abstract page composition, never product UI. */}
+    {[-4.5,-2.25,0].map((x,index) => <g key={x}>
+      {block(x-.12,3.15,1.8,.55,.18,"#4b5773",`gallery-base-${index}`)}
+      <polygon points={plane([x,3.3,.2],[x,3.3,2.65],[x+1.55,3.3,2.65],[x+1.55,3.3,.2])} fill="#172338" stroke="#c0aedb" strokeWidth="2" />
+      <polygon points={plane([x+1.55,3.3,.2],[x+1.55,3.3,2.65],[x+1.55,3.08,2.65],[x+1.55,3.08,.2])} fill="#35445f" stroke="#9d96b7" />
+      <polygon points={plane([x,3.3,2.34],[x,3.3,2.65],[x+1.55,3.3,2.65],[x+1.55,3.3,2.34])} fill="#52627b" />
+      {[.16,.31,.46].map(dot => { const [cx,cy]=point(x+dot,3.31,2.5).split(','); return <circle key={dot} cx={cx} cy={cy} r="1.8" fill="#d6c6e7" />; })}
+      <polygon points={plane([x+.12,3.31,1.22],[x+.12,3.31,2.15],[x+1.42,3.31,2.15],[x+1.42,3.31,1.22])} fill="url(#journey-screen)" />
+      {[.55,.8].map(height => <path key={height} d={`M${point(x+.15,3.31,height)}L${point(x+1.25,3.31,height)}`} stroke="#a89fc0" strokeWidth="3" />)}
     </g>)}
   </svg>;
 }
@@ -175,6 +224,7 @@ export function HomeJourney() {
     ref={ref}
     className={styles.journey}
     data-home-journey
+    aria-describedby="home-journey-description"
     data-journey-layout="environment"
     data-mode={interactive && ready ? "interactive" : "static"}
     data-reason={staticView ? "user-static" : failed ? "rendering-unavailable" : reason}
@@ -200,8 +250,9 @@ export function HomeJourney() {
       <div className={styles.vignette} />
     </div>
     <figcaption className={styles.caption}>
-      <span className={styles.label}>Connected by design <small>Conceptual view</small>
+      <span className={styles.label}>Connected by design <small>Illustrative environment</small>
       </span>
+      <span id="home-journey-description" className="sr-only">Fictional architectural visualization, not a depiction of actual Vaeroex facilities or product interfaces.</span>
       <nav aria-label="Explore Vaeroex offerings" className={styles.offerings}>
         <a href="/intelligence-systems">Intelligence</a>
         <a href="/custom-business-systems">Software</a>

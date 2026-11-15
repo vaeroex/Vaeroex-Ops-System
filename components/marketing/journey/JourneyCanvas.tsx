@@ -2,12 +2,12 @@
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
-import { ACESFilmicToneMapping, BoxGeometry, Object3D, type InstancedMesh } from "three";
+import { ACESFilmicToneMapping, BoxGeometry, CylinderGeometry, Object3D, TorusGeometry, type InstancedMesh } from "three";
 import { PublicSpatialContextGuard } from "@/components/spatial/PublicSpatialCanvasGuard";
 import { probeRenderedCanvas } from "@/components/spatial/CanvasPixelProbe";
 import { SpatialResizeObserver } from "@/components/spatial/SpatialResizeObserver";
 import { StudioEnvironment } from "../clarity/ClarityEngineWorld";
-import { recordGeometry } from "../assembly/AssemblyGeometry";
+import { operationsDisplayGeometry } from "./OperationsGeometry";
 import { createJourneyWorld, journeyCamera } from "./journeyMotion";
 
 type Props = {
@@ -19,7 +19,15 @@ type Props = {
 };
 
 const tones = ["#91b6ff", "#91d5c3", "#bba5ed"];
-const materials = ["#253748", "#657d94", ...tones];
+const materials = [
+  { color: "#253343", metalness: .55, roughness: .4 },
+  { color: "#8a9baa", metalness: .85, roughness: .28 },
+  ...tones.map(color => ({ color, metalness: .3, roughness: .38, emissive: color, emissiveIntensity: .85 })),
+  { color: "#8caebf", metalness: .15, roughness: .12, transparent: true, opacity: .16, depthWrite: false },
+  { color: "#213449", metalness: .18, roughness: .76 },
+  { color: "#43576c", metalness: .4, roughness: .44 },
+];
+const shapes = ["box", "cylinder", "ring"] as const;
 
 function World({ progress, active, compact, onReady, onFailure }: Props) {
   const state = useThree();
@@ -29,16 +37,21 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
   const frames = useRef(0);
   const architecture = useRef<Array<InstancedMesh | null>>([]);
   const panels = useRef<Array<InstancedMesh | null>>([]);
+  const faces = useRef<Array<InstancedMesh | null>>([]);
   const traces = useRef<Array<InstancedMesh | null>>([]);
   const rims = useRef<Array<InstancedMesh | null>>([]);
   const resources = useMemo(() => ({
-    records: [2, 5, 0].map(recordGeometry),
+    records: [0, 1, 2].map(operationsDisplayGeometry),
     box: new BoxGeometry(1, 1, 1),
+    cylinder: new CylinderGeometry(.5, .5, 1, 32),
+    ring: new TorusGeometry(.45, .05, 6, 32).rotateX(Math.PI / 2).scale(1, 10, 1),
   }), []);
   const world = useMemo(() => {
     const fixed = createJourneyWorld(compact);
     return {
-      blocks: materials.map((_, material) => fixed.blocks.filter(block => block.material === material)),
+      batches: materials.flatMap((_, material) => shapes.map(shape => ({
+        material, shape, blocks: fixed.blocks.filter(block => block.material === material && block.shape === shape),
+      }))).filter(batch => batch.blocks.length > 0),
       panels: tones.map((_, family) => fixed.panels.filter(panel => panel.family === family)),
     };
   }, [compact]);
@@ -46,8 +59,8 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
   // Upload the world once when its quality changes. Scroll never rebuilds or moves it.
   useLayoutEffect(() => {
     const object = new Object3D();
-    world.blocks.forEach((blocks, family) => {
-      const mesh = architecture.current[family];
+    world.batches.forEach(({ blocks }, index) => {
+      const mesh = architecture.current[index];
       if (!mesh) return;
       blocks.forEach((block, index) => {
         object.position.set(...block.position);
@@ -60,7 +73,7 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
       mesh.computeBoundingSphere();
     });
     world.panels.forEach((records, family) => {
-      const meshes = [panels.current[family], traces.current[family], rims.current[family]];
+      const meshes = [panels.current[family], faces.current[family], traces.current[family], rims.current[family]];
       records.forEach((record, index) => {
         object.position.set(...record.position);
         object.rotation.set(...record.rotation);
@@ -74,14 +87,16 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
         mesh.computeBoundingSphere();
       });
     });
-    gl.domElement.dataset.journeyWorld = "static-connected-districts";
-    gl.domElement.dataset.journeyInstances = String(world.blocks.reduce((sum, blocks) => sum + blocks.length, 0));
+    gl.domElement.dataset.journeyWorld = "vaeroex-operations-center";
+    gl.domElement.dataset.journeyInstances = String(world.batches.reduce((sum, batch) => sum + batch.blocks.length, 0));
     invalidate();
   }, [world, gl, invalidate]);
 
   useEffect(() => () => {
     resources.records.forEach(record => Object.values(record).forEach(geometry => geometry.dispose()));
     resources.box.dispose();
+    resources.cylinder.dispose();
+    resources.ring.dispose();
   }, [resources]);
 
   useEffect(() => {
@@ -105,6 +120,7 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
     node.dataset.journeyFrames = String(++frames.current);
     node.dataset.journeyProgress = current.current.toFixed(5);
     node.dataset.journeyTriangles = String(gl.info.render.triangles);
+    node.dataset.journeyDrawCalls = String(gl.info.render.calls);
     node.dataset.journeyCamera = view.position.map(value => value.toFixed(2)).join(",");
     node.dataset.journeyTarget = view.target.map(value => value.toFixed(2)).join(",");
     node.dataset.journeyQuality = compact ? "compact" : "full";
@@ -116,25 +132,19 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
     <color attach="background" args={["#080f1b"]} />
     <fog attach="fog" args={["#080f1b", 48, 180]} />
     <StudioEnvironment />
-    <ambientLight intensity={.6} />
-    <directionalLight position={[-30, 45, 25]} intensity={2.6} color="#d7e8ff" />
+    <hemisphereLight args={["#d4e2ef", "#17283c", 1.1]} />
+    <directionalLight position={[-30, 45, 25]} intensity={2.4} color="#e5edff" />
     <directionalLight position={[35, 15, -70]} intensity={1.8} color="#718bbd" />
     <pointLight position={[10, 9, -19]} intensity={210} color={tones[0]} distance={37} />
-    <pointLight position={[-11, 8, -45]} intensity={180} color={tones[1]} distance={30} />
+    <pointLight position={[-9, 6.6, -42]} intensity={180} color={tones[1]} distance={30} />
     <pointLight position={[19, 10, -74]} intensity={210} color={tones[2]} distance={35} />
 
-    {world.blocks.map((blocks, family) => <instancedMesh
-      key={family}
-      ref={mesh => { architecture.current[family] = mesh; }}
-      args={[resources.box, undefined, blocks.length]}
+    {world.batches.map(({ blocks, shape, material }, index) => <instancedMesh
+      key={`${material}-${shape}`}
+      ref={mesh => { architecture.current[index] = mesh; }}
+      args={[resources[shape], undefined, blocks.length]}
     >
-      <meshStandardMaterial
-        color={materials[family]}
-        metalness={family < 2 ? .78 : .3}
-        roughness={family < 2 ? .32 : .42}
-        emissive={family >= 2 ? materials[family] : "#000000"}
-        emissiveIntensity={family >= 2 ? 1.1 : 0}
-      />
+      <meshStandardMaterial {...materials[material]} />
     </instancedMesh>)}
 
     {resources.records.map((record, family) => <group key={family}>
@@ -142,7 +152,13 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
         ref={mesh => { panels.current[family] = mesh; }}
         args={[record.body, undefined, world.panels[family].length]}
       >
-        <meshStandardMaterial color="#1e3044" metalness={.8} roughness={.3} />
+        <meshStandardMaterial color="#667b8e" metalness={.82} roughness={.27} />
+      </instancedMesh>
+      <instancedMesh
+        ref={mesh => { faces.current[family] = mesh; }}
+        args={[record.face, undefined, world.panels[family].length]}
+      >
+        <meshStandardMaterial color="#102438" emissive="#122f49" emissiveIntensity={.35} metalness={.2} roughness={.36} />
       </instancedMesh>
       <instancedMesh
         ref={mesh => { traces.current[family] = mesh; }}
@@ -151,7 +167,7 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
         <meshStandardMaterial
           color={tones[family]}
           emissive={tones[family]}
-          emissiveIntensity={.9}
+          emissiveIntensity={.6}
           metalness={.25}
           roughness={.35}
         />
@@ -160,7 +176,7 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
         ref={mesh => { rims.current[family] = mesh; }}
         args={[record.frame, undefined, world.panels[family].length]}
       >
-        <meshStandardMaterial color={tones[family]} metalness={.85} roughness={.3} />
+        <meshStandardMaterial color="#526c81" metalness={.35} roughness={.4} />
       </instancedMesh>
     </group>)}
 

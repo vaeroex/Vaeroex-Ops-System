@@ -459,8 +459,9 @@ async function main() {
   assert.equal(headline, "Intelligence and software built around your business.");
   assert.match(home.replace(/<[^>]+>/g, ""), /Veteran owned and operated/);
   assert.equal((home.match(/data-home-journey=/g) || []).length, 1);
-  assert.match(home, /aria-label="United States flag"/);
-  assert.equal((home.match(/<polygon /g) || []).length, 50, "US flag has fifty stars");
+  const flag = home.match(/<svg\b[^>]*aria-label="United States flag"[^>]*>[\s\S]*?<\/svg>/)?.[0];
+  assert.ok(flag, "The veteran detail includes an accessible United States flag");
+  assert.equal((flag.match(/<polygon /g) || []).length, 50, "US flag has fifty stars");
   assert.match(home, /Coastal Kitchen · Fictional business example/);
   assert.ok(executive.indexOf('id="product-experience"') < executive.indexOf('id="business-information"'));
   const lineup = htmlByRoute.get("/intelligence-systems");
