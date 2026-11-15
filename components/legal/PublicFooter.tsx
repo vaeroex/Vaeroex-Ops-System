@@ -6,7 +6,9 @@ import { legalLinks } from "@/lib/legal/content";
 
 const platformLinks: Array<[string, Route]> = [
   ["Home", "/"],
-  ["Our approach", "/intelligence-systems"],
+  ["Intelligence Systems", "/intelligence-systems"],
+  ["Custom Business Systems", "/custom-business-systems"],
+  ["Website Development & Enhancement", "/website-development"],
   ["Executive Intelligence", "/executive-intelligence"],
   ["Pricing", "/pricing"],
   ["Trust", "/trust"]
@@ -54,7 +56,7 @@ export function PublicFooter() {
           <Link href="/" className="inline-flex items-center gap-3 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60" aria-label="Vaeroex home">
             <span className="vx-footer-wordmark">VAEROEX</span>
           </Link>
-          <p className="mt-4 max-w-sm text-base leading-7 text-slate-300">Complex information. Clearer perspective. Intelligence shaped around the decisions that matter.</p>
+          <p className="mt-4 max-w-sm text-base leading-7 text-slate-300">Intelligence products, custom business software, and websites built around your business.</p>
           <p className="mt-3 text-xs">{VAEROEX_FOOTER_LOCATION}</p>
           <div className="mt-4 text-xs leading-5">
             <p className="font-semibold text-slate-200">Business Address</p>
@@ -69,7 +71,7 @@ export function PublicFooter() {
         </div>
         <div className="vx-footer-links grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
           <div>
-            <p className="font-semibold text-slate-200">Intelligence</p>
+            <p className="font-semibold text-slate-200">Solutions</p>
             <div className="mt-2 grid gap-1.5">
               {platformLinks.map(([label, href]) => (
                 href === "/executive-intelligence" ? (

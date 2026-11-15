@@ -8,7 +8,7 @@ import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
 import { IntegrationScreenshotTour } from "@/components/marketing/IntegrationScreenshots";
 import { WorkspaceScreenshotTour } from "@/components/marketing/WorkspaceScreenshots";
 import story from "@/components/marketing/ExecutiveStory.module.css";
-import { ClarityJourney } from "@/components/marketing/clarity/ClarityJourney";
+import { VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 import {
   operationsIntelligenceJsonLd,
   publicPageMetadata,
@@ -28,46 +28,6 @@ const capabilities = [
   ["Briefings & Saved Analyses", "Generate eligible Weekly and Monthly Intelligence Briefings on demand. Reopen saved briefings and analyses when you need them."],
 ] as const;
 
-const evidenceJourney = [
-  {
-    label: "Operational activity",
-    title: "Begin with the business in motion.",
-    description:
-      "Sales records, operating costs, reports, and business notes each reveal part of the picture. Bring supported information into one private workspace.",
-    detail:
-      "Conceptual visualization of business information and relationships. No customer data.",
-  },
-  {
-    label: "Financial relationships",
-    title: "Read the relationships.",
-    description:
-      "Revenue can improve while margins weaken. Review related measures together, with the context and targets your business has confirmed.",
-    detail: "Business Health · KPI movement · Confirmed targets",
-  },
-  {
-    label: "Emerging risks",
-    title: "Bring what matters into focus.",
-    description:
-      "Surface supported risks, meaningful changes, and opportunities. A prioritized view helps you decide which questions deserve a closer look.",
-    detail:
-      "Prioritized Intelligence · Supported findings · Visible uncertainty",
-  },
-  {
-    label: "Explain the finding",
-    title: "Follow the evidence.",
-    description:
-      "Examine why a change may matter. Separate the underlying business facts from interpretation, and review the sources and limits behind a conclusion.",
-    detail: "Explain Finding · Evidence · Source freshness and limitations",
-  },
-  {
-    label: "Executive priorities",
-    title: "Set the agenda. Keep the judgment.",
-    description:
-      "Return to useful analyses and generate eligible intelligence briefings on demand. Decide what to investigate, what to prioritize, and what to do next.",
-    detail: "Saved Analyses · Weekly and Monthly Briefings · Human review",
-  },
-];
-
 export default function OperationsIntelligencePage() {
   return (
     <main className={`${styles.site} vaeroex-public-site`}>
@@ -80,6 +40,7 @@ export default function OperationsIntelligencePage() {
           <div className={styles.heroGrid}>
             <div>
               <p className={styles.heroLead}>For restaurants, breweries, retailers, and other businesses. Understand performance, investigate change, and prepare clearer next steps with evidence you can review.</p>
+              <p className={styles.copy}>{VAEROEX_PLAN_PRICE_LABEL} · Monthly subscription</p>
               <div className={styles.actions}>
                 <StartWithVaeroexMenu className={styles.primary} label="Start Executive Intelligence" />
                 <a href="#product-experience" className={styles.textLink}>Explore the workspace<ArrowRight aria-hidden="true" /></a>
@@ -87,19 +48,12 @@ export default function OperationsIntelligencePage() {
             </div>
             <div className={styles.heroSide}>
               <strong>Turn everyday records into useful questions.</strong>
-              <p>Ask questions, explore ideas, and work through challenges with VSI—from understanding your business to researching a topic or creating something new—all through natural conversation.</p>
+              <p>Investigate changes in business performance with VSI. Ask follow-up questions, compare supported information, and examine the evidence and limitations behind an answer.</p>
               <a href="#vsi" className={styles.textLink}>Explore included VSI<ArrowRight aria-hidden="true" /></a>
             </div>
           </div>
         </div>
       </section>
-
-      <ClarityJourney
-        id="executive-control"
-        variant="business"
-        compact
-        stages={evidenceJourney}
-      />
 
       <section id="product-experience" className={styles.sectionTight} aria-labelledby="product-experience-title">
         <div className={styles.container}>
@@ -163,12 +117,12 @@ export default function OperationsIntelligencePage() {
             <p className={styles.sectionLabel}>Vaeroex Super Intelligence / VSI</p>
             <p className={story.included}>Flagship feature included with Executive Intelligence</p>
             <h2 id="vsi-title" className={story.headline}>Ask deeper questions.<br /><em>See the bigger picture.</em></h2>
-            <p className={story.aside}>A text conversation with room to investigate, imagine, and refine.</p>
+            <p className={story.aside}>A business conversation with room to investigate, compare, and refine.</p>
           </div>
           <div className={story.prose}>
-            <p className={story.lead}>Built with advanced artificial intelligence and Vaeroex-developed technology, VSI helps turn questions into insights, ideas into strategies, and complex information into clearer next steps—all through natural conversation.</p>
+            <p className={story.lead}>VSI brings business calculations, evidence, and conversation together. Ask what changed, explore possible explanations, and identify the additional information needed to support a conclusion.</p>
             <p>Explore business performance, investigate the evidence behind an insight, research market trends, develop marketing ideas, and draft plans, SOPs, or meeting agendas. Ask follow-up questions and refine your thinking with relevant business context.</p>
-            <p>Go beyond business, too—from everyday questions and learning to creative writing and brainstorming—all within your Vaeroex workspace.</p>
+            <p>Review supporting evidence, source freshness, and missing context. Treat recommendations as drafts and apply your judgment before acting.</p>
           </div>
         </div>
         <div className={styles.container}><VsiScreenshotTour /></div>
@@ -181,7 +135,7 @@ export default function OperationsIntelligencePage() {
             <h2 id="getting-started-title">Build a clearer picture<br />of your business.</h2>
             <div className={styles.actions}>
               <Link href="/pricing" className={styles.primary}>View pricing<ArrowRight aria-hidden="true" /></Link>
-              <Link href="/contact" className={styles.secondary}>Talk with Vaeroex</Link>
+              <Link href="/contact?inquiry=executive-intelligence" className={styles.secondary}>Talk with Vaeroex</Link>
             </div>
           </div>
           <ol className={story.steps}>

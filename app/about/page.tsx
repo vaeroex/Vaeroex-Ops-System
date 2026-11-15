@@ -10,7 +10,7 @@ import story from "@/components/marketing/ExecutiveStory.module.css";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "About Vaeroex | Isaac Vizcarra, Founder & CEO",
-  description: "Meet Isaac Vizcarra, Founder & CEO of Vaeroex, and learn why Vaeroex helps businesses turn scattered information into clearer operational understanding.",
+  description: "Meet Isaac Vizcarra, Founder & CEO of Vaeroex, and learn about Vaeroex’s intelligence products, custom business software, and website development.",
   path: "/about",
 });
 
@@ -20,9 +20,9 @@ export default function AboutPage() {
       <PublicSiteHeader />
       <PublicPageHero
         eyebrow="About Vaeroex"
-        title={"Information is everywhere. Under\u00adstanding is not."}
-        description="Vaeroex helps business owners turn scattered records and everyday context into a clearer view of their operations—and a better starting point for decisions."
-        actions={<Link href="/executive-intelligence" className={styles.primary}>Explore Executive Intelligence<ArrowRight size={17} aria-hidden="true" /></Link>}
+        title="Practical software. Built around business."
+        description="Vaeroex develops intelligence products, custom business software, and websites. Businesses can subscribe to Executive Intelligence or commission a solution for a specific workflow or online presence."
+        actions={<Link href="/#solutions" className={styles.primary}>Explore Solutions<ArrowRight size={17} aria-hidden="true" /></Link>}
       />
 
       <section className={styles.section} aria-labelledby="founder-title">
@@ -60,12 +60,12 @@ export default function AboutPage() {
 
       <section className={`${styles.section} ${story.vsi}`} aria-labelledby="vsi-foundation">
         <div className={`${styles.container} ${story.vsiLayout}`}>
-          <div><p className={styles.sectionLabel}>Vaeroex Super Intelligence</p><h2 id="vsi-foundation" className={story.headline}>VSI—the intelligence behind Vaeroex.</h2></div>
+          <div><p className={styles.sectionLabel}>Vaeroex Super Intelligence</p><h2 id="vsi-foundation" className={story.headline}>VSI—the intelligence behind Executive Intelligence.</h2></div>
           <div className={story.prose}>
-            <p className={story.lead}>Vaeroex Super Intelligence, or VSI, is the foundation of Vaeroex.</p>
-            <p>It brings business calculations, evidence, and reasoning together to power analysis, explanations, and conversation across the platform.</p>
+            <p className={story.lead}>Vaeroex Super Intelligence, or VSI, powers reasoning and conversation within Executive Intelligence.</p>
+            <p>It brings business calculations, evidence, and reasoning together to power analysis, explanations, and conversation within that product.</p>
             <p>Through Executive Intelligence, VSI helps you look at your business from several perspectives: finances, operations, customers, marketing, technology, and overall direction.</p>
-            <p>You bring the experience and judgment. Vaeroex helps you connect the information.</p>
+            <p>You bring the experience and judgment. Vaeroex helps you connect the information. Custom systems and websites are scoped separately; they do not automatically include VSI.</p>
             <Link href="/about/why-vaeroex" className={styles.textLink}>Explore why Vaeroex<ArrowRight size={17} aria-hidden="true" /></Link>
           </div>
         </div>
@@ -76,6 +76,7 @@ export default function AboutPage() {
           <div><p className={styles.sectionLabel}>Why we build</p><h2 id="purpose-title">Make information<br />useful to the people<br />running the business.</h2></div>
           <div className={story.prose}>
             <p>Restaurant, brewery, and retail teams work across payment records, accounting reports, spreadsheets, and conversations. Vaeroex brings supported information into a workspace where people can investigate performance and explore the context behind a finding.</p>
+            <p>Alongside Executive Intelligence, businesses can commission internal tools, portals, reporting workflows, or a new or improved website. Each project starts with its own scope, practical requirements, and maintenance needs.</p>
             <p>That focus also serves other businesses with complex information to understand. Vaeroex-developed software, data connections, and analysis workflows support the process. Evidence, uncertainty, and human judgment stay part of the decision.</p>
             <Link href="/intelligence-systems" className={styles.textLink}>The Vaeroex approach<ArrowRight size={17} aria-hidden="true" /></Link>
           </div>
@@ -89,7 +90,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <PublicCtaBand title="The advantage of knowing first" description="Explore Executive Intelligence and see how your business information can become a clearer starting point." primaryHref="/executive-intelligence" primaryLabel="Explore Executive Intelligence" />
+      <PublicCtaBand title="What does your business need next?" description="Explore an intelligence product, commission a custom system, or discuss a new or improved website." primaryHref="/contact" primaryLabel="Discuss a Project" />
       <PublicFooter />
     </main>
   );

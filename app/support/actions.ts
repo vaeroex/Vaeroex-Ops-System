@@ -1,6 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { z } from "zod";
+import { INQUIRY_CATEGORIES, isProjectInquiry, type ContactFormState } from "@/lib/contact/inquiries";
 import type { Route } from "next";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
@@ -30,7 +32,7 @@ function redirectBack(formData: FormData, key: "message" | "error", message: str
   redirect(`${safePath}?${key}=${encodeURIComponent(message)}` as Route);
 }
 
-export async function createSupportRequestAction(formData: FormData) {
+async function submitSupportRequest(formData: FormData): Promise<ContactFormState> {
   const supabase = await createSupabaseServerClient();
   const admin = createSupabaseAdminClient();
   let submission: ReturnType<typeof supportRequestSchema.parse>;
@@ -39,9 +41,21 @@ export async function createSupportRequestAction(formData: FormData) {
     submission = supportRequestSchema.parse(
       boundedFormData(formData, SUPPORT_REQUEST_KEYS, SUPPORT_FORM_MAX_BODY_BYTES)
     );
-  } catch {
-    redirectBack(formData, "error", "Check the submitted fields and try again.");
+  } catch (error) {
+    const fieldErrors: Record<string, string> = {};
+    if (error instanceof z.ZodError) {
+      for (const issue of error.issues) {
+        const field = String(issue.path[0]);
+        fieldErrors[field] = field === "email" ? "Enter a valid email address."
+          : issue.code === "too_small" && field === "name" ? "Enter your name."
+          : issue.code === "too_small" && field === "message" ? "Add a brief description."
+          : issue.code === "too_big" ? `Use no more than ${issue.maximum} characters.`
+          : issue.message;
+      }
+    }
+    return { error: "Check the submitted fields and try again.", fieldErrors };
   }
+  if (!admin) return { error: "Contact requests are temporarily unavailable. Please use the direct email links on this page." };
 
   const {
     name,
@@ -57,7 +71,11 @@ export async function createSupportRequestAction(formData: FormData) {
     business_type: businessType,
     team_size: teamSize,
     improvement_goal: improvementGoal,
-    preferred_contact_method: preferredContactMethod
+    preferred_contact_method: preferredContactMethod,
+    existing_tools: existingTools,
+    expected_users: expectedUsers,
+    project_budget: projectBudget,
+    project_timeline: projectTimeline
   } = submission;
 
   let rateLimit;
@@ -74,11 +92,11 @@ export async function createSupportRequestAction(formData: FormData) {
       strict: true
     });
   } catch {
-    redirectBack(formData, "error", "Vaeroex could not verify request limits. Please try again shortly.");
+    return { error: "Vaeroex could not verify request limits. Please try again shortly." };
   }
 
   if (!rateLimit.allowed) {
-    redirectBack(formData, "error", rateLimitMessage(rateLimit));
+    return { error: rateLimitMessage(rateLimit) };
   }
 
   let userId: string | null = null;
@@ -118,13 +136,14 @@ export async function createSupportRequestAction(formData: FormData) {
     teamSize ? `Team size: ${teamSize}` : "",
     improvementGoal ? `Trying to improve: ${improvementGoal}` : "",
     preferredContactMethod ? `Preferred contact method: ${preferredContactMethod}` : "",
+    isProjectInquiry(issueType) && existingTools ? `Existing tools or website: ${existingTools}` : "",
+    issueType === "Custom Business Systems" && expectedUsers ? `Approximate expected users: ${expectedUsers}` : "",
+    isProjectInquiry(issueType) && projectBudget ? `Approximate budget: ${projectBudget}` : "",
+    isProjectInquiry(issueType) && projectTimeline ? `Approximate timeline: ${projectTimeline}` : "",
     workspaceReference && !workspaceId ? `Workspace reference: ${workspaceReference}` : "",
     workspaceInput && !uuidOrNull(workspaceInput) ? `Workspace: ${workspaceInput}` : ""
   ].filter(Boolean);
   const fullMessage = contextLines.length ? `${contextLines.join("\n")}\n\n${message}` : message;
-  if (!admin) {
-    redirectBack(formData, "error", "Support requests are not configured yet.");
-  }
 
   const { data: supportRequest, error } = await admin
     .from("support_requests")
@@ -141,8 +160,8 @@ export async function createSupportRequestAction(formData: FormData) {
     .select("id")
     .maybeSingle();
 
-  if (error) {
-    redirectBack(formData, "error", "The support request could not be submitted. Please try again.");
+  if (error || !supportRequest?.id) {
+    return { error: "The request could not be submitted. Please try again or use the direct email links." };
   }
 
   await logSecurityAuditEvent({
@@ -174,6 +193,9 @@ export async function createSupportRequestAction(formData: FormData) {
           "General Question",
           "General Inquiry",
           "Platform Questions",
+          "Executive Intelligence",
+          "Custom Business Systems",
+          "Website Development / Enhancement",
           "Network Interest",
           "Strategic Partnership",
           "Advisor Interest",
@@ -186,5 +208,25 @@ export async function createSupportRequestAction(formData: FormData) {
         ? "Contact request received. Vaeroex will review it."
         : "Support request received. Vaeroex will review it.";
 
-  redirectBack(formData, "message", successMessage);
+  return { message: successMessage };
+}
+
+// Preserve the redirect contract used by existing support forms.
+export async function createSupportRequestAction(formData: FormData) {
+  const result = await submitSupportRequest(formData);
+  redirectBack(formData, result.error ? "error" : "message", result.error || result.message || "The request could not be submitted.");
+}
+
+// The public form uses the same validation, rate limiting, destination, and audit trail.
+export async function createContactRequestAction(_previous: ContactFormState, formData: FormData): Promise<ContactFormState> {
+  if (!Object.values(INQUIRY_CATEGORIES).some(category => category === formData.get("issue_type"))) {
+    return { error: "Choose an inquiry type.", fieldErrors: { issue_type: "Choose an inquiry type." } };
+  }
+  formData.set("return_path", "/contact");
+  formData.set("page_module", String(formData.get("issue_type")));
+  try {
+    return await submitSupportRequest(formData);
+  } catch {
+    return { error: "We could not confirm receipt. Please use the direct email links before retrying to avoid a duplicate request." };
+  }
 }

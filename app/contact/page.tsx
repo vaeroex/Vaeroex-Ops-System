@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { inquiryCategory } from "@/lib/contact/inquiries";
 import { Clock3, Mail, MapPin } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicRequestForm } from "@/components/legal/PublicRequestForm";
@@ -9,11 +10,10 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Contact Vaeroex",
-  description: "Contact Vaeroex about Executive Intelligence, support, billing, or business relationships.",
+  description: "Contact Vaeroex about Executive Intelligence, a custom business system, website development, support, billing, or partnerships.",
   path: "/contact"
 });
 
-const inquiryCategories = ["Platform Questions", "Strategic Partnership", "Support Request", "Billing or Subscription", "General Inquiry"];
 
 const contactChannels = [
   ["Product and general questions", VAEROEX_CONTACT_EMAILS.general, VAEROEX_MAILTO_LINKS.general],
@@ -23,7 +23,7 @@ const contactChannels = [
 ] as const;
 
 type ContactPageProps = {
-  searchParams?: Promise<{ error?: string; message?: string }>;
+  searchParams?: Promise<{ inquiry?: string }>;
 };
 
 export default async function ContactPage({ searchParams }: ContactPageProps) {
@@ -33,9 +33,9 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
     <main className="vaeroex-public-site min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
       <PublicPageHero
-        eyebrow="Vaeroex Executive Intelligence"
-        title="Tell us what you want to understand."
-        description="Use the form for Executive Intelligence questions, support, billing, or a business conversation. Your request goes to the appropriate Vaeroex contact."
+        eyebrow="Contact Vaeroex"
+        title="Let’s talk about your business."
+        description="Ask about Executive Intelligence, describe a custom system or website project, or contact us for support, billing, and partnerships."
       />
 
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">
@@ -76,14 +76,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
             <p className="mt-5 text-xs leading-5 text-slate-500">Do not submit patient data, Social Security numbers, payment card numbers, government IDs, or regulated sensitive information through this form.</p>
           </div>
 
-          <PublicRequestForm
-            returnPath="/contact"
-            issueType="General Inquiry"
-            issueOptions={inquiryCategories}
-            message={params?.message}
-            error={params?.error}
-            submitLabel="Send contact request"
-          />
+          <PublicRequestForm key={inquiryCategory(params?.inquiry)} issueType={inquiryCategory(params?.inquiry)} />
         </div>
       </section>
       <PublicFooter />
