@@ -340,6 +340,112 @@ const finishA = createSculptureFinish(), finishB = createSculptureFinish();
 assert.equal(finishA.image.data.byteLength, 64 * 64 * 4, 'Material detail remains a small, local procedural texture');
 assert.deepEqual(finishA.image.data, finishB.image.data, 'Material detail is reproducible and needs no external image request');
 finishA.dispose(); finishB.dispose();
+// R3F keeps its default camera mounted across responsive changes. Execute the
+// actual World hooks with that same real Three camera; only scheduling/WebGL is
+// mocked, so a changed Canvas camera prop alone cannot satisfy this regression.
+function rendererLensFixture(source) {
+  const slots = [], effects = [];
+  let cursor = 0, frame, scheduled = false, invalidations = 0, projectionUpdates = 0;
+  const same = (a, b) => a && b && a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
+  const memo = (create, deps) => {
+    const index = cursor++;
+    if (!same(slots[index]?.deps, deps)) slots[index] = { deps, value: create() };
+    return slots[index].value;
+  };
+  const effect = (callback, deps) => {
+    const index = cursor++;
+    if (!same(slots[index]?.deps, deps)) {
+      const previous = slots[index];
+      slots[index] = { deps };
+      effects.push(() => { previous?.cleanup?.(); slots[index].cleanup = callback(); });
+    }
+  };
+  const react = {
+    useRef(initial) { const index = cursor++; return slots[index] ??= { current: initial }; },
+    useMemo: memo, useCallback: (callback, deps) => memo(() => callback, deps),
+    useEffect: effect, useLayoutEffect: effect,
+  };
+  const lens = journeyLens(false), camera = new PerspectiveCamera(lens.fov, 1440 / 900, lens.near, lens.far);
+  const update = camera.updateProjectionMatrix.bind(camera);
+  camera.updateProjectionMatrix = () => { projectionUpdates++; update(); };
+  const state = {
+    camera, size: { width: 1440, height: 900 },
+    gl: { domElement: { dataset: {} }, info: { render: { triangles: 0, calls: 0 } } },
+    invalidate() { scheduled = true; invalidations++; },
+  };
+  const jsx = (type, props) => ({ type, props });
+  const mocks = {
+    react, 'react/jsx-runtime': { jsx, jsxs: jsx }, three: require('three'),
+    '@react-three/fiber': { Canvas: 'fixture-canvas', useThree: () => state, useFrame(callback) { frame = callback; } },
+    '@/components/spatial/PublicSpatialCanvasGuard': { PublicSpatialContextGuard: () => null },
+    '@/components/spatial/CanvasPixelProbe': { probeRenderedCanvas: () => () => {} },
+    '@/components/spatial/SpatialResizeObserver': { SpatialResizeObserver: class {} },
+    '../clarity/ClarityEngineWorld': { StudioEnvironment: () => null },
+    './SculptureGeometry': loadTypeScript('components/marketing/journey/SculptureGeometry.ts'),
+    './journeyMotion': loadTypeScript('components/marketing/journey/journeyMotion.ts'),
+  };
+  const result = { exports: {} };
+  vm.runInNewContext(ts.transpileModule(source, {
+    fileName: 'JourneyCanvas.tsx',
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText, { exports: result.exports, module: result, require(name) {
+    assert.ok(Object.hasOwn(mocks, name), 'Renderer fixture has no unexpected dependency: ' + name);
+    return mocks[name];
+  } });
+  const props = { progress: .5, active: true, compact: false, onReady() {}, onFailure() {} };
+  return {
+    camera, state,
+    get invalidations() { return invalidations; }, get projectionUpdates() { return projectionUpdates; },
+    render(changes = {}, width = state.size.width, height = state.size.height) {
+      Object.assign(props, changes);
+      if (width !== state.size.width || height !== state.size.height) {
+        Object.assign(state.size, { width, height });
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix(); // R3F updates aspect, retaining the old lens until World corrects it.
+      }
+      cursor = 0;
+      const canvas = result.exports.default(props);
+      const world = canvas.props.children.find(child => child?.props?.progress !== undefined);
+      assert.ok(world && typeof world.type === 'function');
+      world.type(world.props);
+      while (effects.length) effects.shift()();
+    },
+    settle() {
+      let count = 0;
+      while (scheduled) {
+        scheduled = false; frame(state, 1 / 60);
+        assert.ok(++count < 150, 'The actual World demand loop must settle');
+      }
+      return count;
+    },
+    unmount() { slots.forEach(slot => slot.cleanup?.()); },
+  };
+}
+const rendererSource = fs.readFileSync('components/marketing/journey/JourneyCanvas.tsx', 'utf8');
+const renderer = rendererLensFixture(rendererSource), mountedCamera = renderer.camera;
+try {
+  for (const { compact, width, height } of [viewports[0], viewports[1], viewports[2]]) {
+    renderer.render({ compact }, width, height);
+    const lens = journeyLens(compact), expected = new PerspectiveCamera(lens.fov, width / height, lens.near, lens.far);
+    assert.equal(renderer.camera, mountedCamera, 'Responsive changes retain the mounted R3F camera');
+    assert.equal(renderer.camera.fov, lens.fov, 'The mounted camera changes full → compact → full lens');
+    assert.deepEqual(renderer.camera.projectionMatrix.elements, expected.projectionMatrix.elements,
+      'The actual mounted camera projection is rebuilt before the next frame');
+    assert.equal(renderer.state.gl.domElement.dataset.journeyFov, String(lens.fov));
+    assert.equal(renderer.settle(), 1, 'A settled quality/size transition requests one coalesced demand frame');
+    const before = { invalidations: renderer.invalidations, projectionUpdates: renderer.projectionUpdates };
+    for (let repeat = 0; repeat < 5; repeat++) renderer.render({ compact });
+    assert.equal(renderer.invalidations, before.invalidations, 'Identical rerenders do not perpetually invalidate');
+    assert.equal(renderer.projectionUpdates, before.projectionUpdates, 'Identical rerenders do not rebuild the projection');
+    assert.equal(renderer.settle(), 0);
+  }
+  const updates = renderer.projectionUpdates;
+  renderer.render({ progress: .6 });
+  assert.ok(renderer.settle() > 1, 'Real progress interpolation schedules a finite series of demand frames');
+  assert.equal(renderer.projectionUpdates, updates, 'Scrolling alone does not rebuild the responsive lens');
+  assert.equal(renderer.settle(), 0, 'No background frame remains after interpolation settles');
+} finally { renderer.unmount(); }
+console.log('Actual World hook fixture: same-camera 47° → 57° → 47° resize, rebuilt projection, coalesced demand frames and no idle invalidation passed. React/R3F scheduling is mocked; no WebGL claim.');
 for (const result of results) {
   console.log('Sculpture ' + result.label + ': ' + result.pathLength.toFixed(1) +
     ' units of camera travel; ' + result.closest.toFixed(3) + ' minimum moving-solid clearance ' +

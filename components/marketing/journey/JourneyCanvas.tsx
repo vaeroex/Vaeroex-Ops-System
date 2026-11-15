@@ -2,7 +2,7 @@
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
-import { ACESFilmicToneMapping, Object3D, type InstancedMesh } from "three";
+import { ACESFilmicToneMapping, Object3D, PerspectiveCamera, type InstancedMesh } from "three";
 import { PublicSpatialContextGuard } from "@/components/spatial/PublicSpatialCanvasGuard";
 import { probeRenderedCanvas } from "@/components/spatial/CanvasPixelProbe";
 import { SpatialResizeObserver } from "@/components/spatial/SpatialResizeObserver";
@@ -62,6 +62,19 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
       mesh.instanceMatrix.needsUpdate = true;
     });
   }, [batches, resources]);
+
+  useLayoutEffect(() => {
+    if (!(camera instanceof PerspectiveCamera)) return;
+    // Canvas camera options initialize its default camera; responsive lens changes
+    // must also update that existing camera before the next demand-rendered frame.
+    const lens = journeyLens(compact);
+    camera.fov = lens.fov;
+    camera.near = lens.near;
+    camera.far = lens.far;
+    camera.updateProjectionMatrix();
+    gl.domElement.dataset.journeyFov = String(camera.fov);
+    invalidate();
+  }, [camera, compact, gl, invalidate]);
 
   useLayoutEffect(() => {
     paint(current.current);
