@@ -13,7 +13,7 @@ import styles from "@/components/marketing/Solutions.module.css";
 export const metadata: Metadata = publicPageMetadata({
   title: "Website Development & Enhancement | Vaeroex",
   description:
-    "Build a new business website or improve an existing one, with mobile usability, contact forms, supported integrations, and agreed maintenance.",
+    "Build a new website or enhance an existing one with custom features, connected business tools, AI-assisted inquiries, knowledge search, and scoped maintenance.",
   path: "/website-development",
 });
 export default function ServicePage() {
@@ -74,33 +74,34 @@ export default function ServicePage() {
         <div className={`${styles.container} ${styles.split}`}>
           <div>
             <p className={styles.eyebrow}>Beyond the page</p>
-            <h2>
-              Help visitors connect.
-              <br />
-              Help your team respond.
-            </h2>
+            <h2>Your website can do more.</h2>
             <p className={styles.copy}>
-              The scope starts with what visitors need to do and how your team
-              handles the next step. Existing platform constraints and
-              integration feasibility are reviewed during discovery.
+              Build on your existing website with custom features, connected
+              business tools, and AI-powered experiences.
+            </p>
+            <p className={styles.copy}>
+              Choose scoped development options around what visitors need to do
+              and how your team handles the next step.
             </p>
           </div>
           <ul className={styles.list}>
             <li>
-              <strong>Contact and lead capture</strong>Approachable contact
-              forms, useful inquiry details, and clear submission feedback.
+              <strong>AI-assisted inquiries &amp; knowledge search</strong>Help
+              visitors ask questions and find relevant information from approved
+              business content.
             </li>
             <li>
-              <strong>Booking integrations</strong>Connect supported booking
-              tools so visitors can find the right next step.
+              <strong>Document upload &amp; information extraction</strong>Let
+              visitors upload documents and bring extracted information into a
+              review workflow.
             </li>
             <li>
-              <strong>Business-tool connections</strong>Connections to supported
-              business tools or custom systems where appropriate.
+              <strong>Voice &amp; transcription</strong>Add voice interactions
+              or turn audio into text where useful to the website experience.
             </li>
             <li>
-              <strong>Maintenance and updates</strong>Agreed upkeep and updates
-              under a scoped monthly plan.
+              <strong>Connected website features</strong>Bring booking, forms,
+              customer portals, and supported business-tool integrations into the site.
             </li>
           </ul>
         </div>

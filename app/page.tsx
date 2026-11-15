@@ -22,7 +22,7 @@ import styles from "@/components/marketing/Solutions.module.css";
 export const metadata: Metadata = publicPageMetadata({
   title: "Vaeroex | Intelligence, Custom Software & Websites",
   description:
-    "Subscribe to Executive Intelligence or commission a custom business system or website. Intelligence and software built around your business.",
+    "Explore intelligence products, build custom software and websites, or enhance existing tools with features, integrations, automation, and AI.",
   path: "/",
 });
 const icons = [ChartNoAxesCombined, Workflow, PanelsTopLeft];
@@ -40,8 +40,9 @@ export default function HomePage() {
           </h1>
           <p className={styles.lead}>
             Vaeroex develops intelligence products, custom business software,
-            and websites. Subscribe to Executive Intelligence, or commission a
-            system or website shaped around the way your business works.
+            and websites. Explore our intelligence systems, bring a new idea to life,
+            or enhance the tools you already use with custom features,
+            integrations, and AI.
           </p>
           <div className={styles.actions}>
             <a href="#solutions" className="vx-button vx-button--primary">
@@ -134,8 +135,9 @@ export default function HomePage() {
             <h2>Software for the work between your tools.</h2>
             <p className={styles.copy}>
               Equipment tracked in a spreadsheet. Requests buried in email.
-              Reports assembled by hand. Commission a system that brings a
-              defined workflow into one place.
+              Reports assembled by hand. Build a new system around your business,
+              or enhance the software you already use with custom features,
+              integrations, automation, and AI.
             </p>
             <div className={styles.actions}>
               <Link href="/custom-business-systems" className="vx-text-link">
@@ -190,8 +192,8 @@ export default function HomePage() {
               landing pages.
             </li>
             <li>
-              <strong>Improve an existing website</strong>Redesigns, mobile
-              usability, navigation, and contact forms.
+              <strong>Improve an existing website</strong>Custom features,
+              AI-assisted inquiries, knowledge search, and connected business tools.
             </li>
             <li>
               <strong>Keep it working</strong>Booking integrations,

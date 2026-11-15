@@ -9,6 +9,11 @@ export function ProjectProcess() {
       <div className={styles.container}>
         <p className={styles.eyebrow}>From a problem to a working solution</p>
         <h2 id="project-process-title">A clear process, together.</h2>
+        <p className={styles.copy}>
+          These are potential project capabilities. Feasibility depends on the
+          existing platform, available APIs, permissions, data, and project
+          requirements. Discovery defines what can be built or enhanced.
+        </p>
         <ol className={styles.process}>
           {PROJECT_STEPS.map(([title, description], index) => (
             <li key={title}>
@@ -33,8 +38,10 @@ export function ProjectPricing({ website = false }: { website?: boolean }) {
           : "Custom Business Systems"}
       </h3>
       <p className={styles.copy}>
-        Development and any ongoing maintenance are quoted for the individual
-        project. Fees and the payment schedule are agreed before work begins.
+        Projects use a one-time development fee with an upfront deposit,
+        followed by scoped monthly maintenance and support. The individual
+        written project agreement defines fees, the payment schedule, and
+        maintenance terms before work begins.
       </p>
       <p className={styles.copy}>
         Quotes depend on scope, complexity, integrations, expected users, usage,

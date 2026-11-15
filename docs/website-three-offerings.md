@@ -5,7 +5,7 @@ This change expands the existing public site to Intelligence Systems, Custom Bus
 ## Routes and content
 
 - `/`: company overview, three offerings, actual Executive Intelligence preview and authoritative subscription price, service summaries, project process, existing veteran ownership and NVIDIA Inception membership, project inquiry CTA.
-- `/intelligence-systems`: Executive Intelligence is available; Biological Intelligence and Drug Discovery Intelligence are secondary, Planned entries with no capabilities, release dates, or purchase links. Their existing retired detail routes remain unchanged.
+- `/intelligence-systems`: Executive Intelligence is available; Biological Intelligence and Drug Discovery Intelligence are secondary, In Development entries describing intended research capabilities. They are not currently available, clinically validated, or established for medical decisions; no release dates or purchase links are offered. Their existing retired detail routes remain unchanged.
 - `/custom-business-systems` and `/website-development`: informational service pages with scoped capabilities and category-prefilled contact links. These pages accept no project payments and inquiries create no service contracts. Scope, fees, payment schedule, maintenance, ownership or licensing, delivery, cancellation, and handover are defined in an individual written project agreement before work begins. The same notice appears with custom-project pricing and project inquiry fields.
 - `/executive-intelligence`: actual workspace previews follow the introduction; conceptual animation is removed from this route. Supported integrations and limitations, fictional-data labels, product capabilities, and signup remain intact.
 - `/pricing`, `/about`, navigation, footer, metadata, organization description, and sitemap reflect all three offerings.
@@ -69,3 +69,11 @@ Remaining policy issue: the existing blanket wording has not been narrowed in th
 - Desktop/mobile navigation, Escape dismissal, service-to-inquiry prefill, conditional fields, pending state, failure feedback, and retained input after failure.
 
 Repository-wide ESLint has existing warnings in unrelated files, which cause its zero-warning command to fail. The modified files pass their targeted checks. See the task's verification report for the final result and deployment status.
+
+## Owner-requested content revision
+
+The homepage now uses the supplied introduction and makes new builds and enhancements equally clear. The custom-systems page pairs new internal tools and portals with extending existing software, then presents eight potential capabilities in two compact lists. Website enhancement options include AI-assisted inquiries/search, document extraction, voice/transcription, and connected forms, booking, portals, and business tools. Feasibility is addressed once near the shared process: platform, APIs, permissions, data, and requirements. No provider-specific technology or completed-client-work claim is added.
+
+The owner explicitly established a one-time development fee with an upfront deposit and scoped monthly maintenance/support. Shared project pricing uses that structure without inventing amounts, timing details, ownership, refund rights, or service guarantees. The written-agreement and inquiry-only notice remains in place. Existing subscription/refund scope ambiguity is still held for owner review.
+
+Project inquiries reuse the existing message and existing_tools fields. Accessible helper text asks whether a new system/website or improvements are needed and requests context about current tools. No new field, server action, database schema, authentication, billing, or integration behavior is introduced by this revision. Earlier real Preview persistence evidence remains historical evidence for the unchanged handler, not a claim of new submissions in this revision.

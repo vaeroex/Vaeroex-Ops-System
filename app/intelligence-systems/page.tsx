@@ -10,7 +10,7 @@ import styles from "@/components/marketing/Solutions.module.css";
 export const metadata: Metadata = publicPageMetadata({
   title: "Intelligence Systems | Vaeroex",
   description:
-    "Explore Executive Intelligence, available now, and Vaeroex’s planned intelligence products. Business information, evidence, and human judgment.",
+    "Explore Executive Intelligence, available now, and Biological Intelligence and Drug Discovery Intelligence, both in development for research.",
   path: "/intelligence-systems",
 });
 export default function IntelligenceSystemsPage() {
@@ -77,25 +77,43 @@ export default function IntelligenceSystemsPage() {
       <section className={styles.section}>
         <div className={styles.container}>
           <p className={styles.eyebrow}>Looking ahead</p>
-          <h2>Planned intelligence products.</h2>
+          <h2>Intelligence products in development.</h2>
           <p className={styles.copy}>
-            These offerings are planned and are not available to purchase.
-            Capabilities and release dates have not been announced.
+            These descriptions outline intended research capabilities of products
+            under development, not currently available products. They do not
+            establish clinical validation, proven discovery results, or suitability
+            for medical decisions. Release dates have not been announced.
           </p>
           <div className={styles.two}>
-            {["Biological Intelligence", "Drug Discovery Intelligence"].map(
-              (name) => (
-                <article className={styles.planned} key={name}>
-                  <span>Planned</span>
-                  <h3>{name}</h3>
-                  <p>
-                    Future offering. Further details will be shared when
-                    available.
-                  </p>
-                </article>
-              ),
-            )}
+            {[
+              [
+                "Biological Intelligence",
+                "In development to help researchers organize biological information, explore relationships, and investigate scientific questions with supporting evidence.",
+              ],
+              [
+                "Drug Discovery Intelligence",
+                "In development to help researchers explore scientific literature, compounds, and biological targets, organize evidence, and identify questions for further investigation.",
+              ],
+            ].map(([name, description]) => (
+              <article className={styles.planned} key={name}>
+                <span>In Development</span>
+                <h3>{name}</h3>
+                <p>{description}</p>
+              </article>
+            ))}
           </div>
+        </div>
+      </section>
+      <section className={styles.section}>
+        <div className={styles.container}>
+          <p className={styles.eyebrow}>The product family</p>
+          <h2>Continuously developed. Built to evolve.</h2>
+          <p className={styles.copy}>
+            Vaeroex intelligence systems are under continuous development, with
+            ongoing work to refine existing products, expand capabilities, and
+            develop specialized systems. New capabilities become available as
+            they are tested and released.
+          </p>
         </div>
       </section>
       <section className={styles.section}>

@@ -13,7 +13,7 @@ import styles from "@/components/marketing/Solutions.module.css";
 export const metadata: Metadata = publicPageMetadata({
   title: "Custom Business Systems | Vaeroex",
   description:
-    "Commission software tailored to your operations, portals, reporting, integrations, and AI-assisted workflows. Scope and pricing are agreed through discovery.",
+    "Build a new business system or enhance existing software with custom features, integrations, automation, and AI. Scope and feasibility are defined through discovery.",
   path: "/custom-business-systems",
 });
 export default function ServicePage() {
@@ -27,9 +27,10 @@ export default function ServicePage() {
             Built for the way <span>your business works.</span>
           </h1>
           <p className={styles.lead}>
-            When spreadsheets, email, and separate tools make a workflow hard to
-            manage, a custom system can give it a clear home. Vaeroex builds
-            software around the people, information, and steps involved.
+            Build a new system around the way your business works, or extend the
+            software you already use with custom features, integrations,
+            automation, and AI. Start with the people, information, and workflow
+            you want to support.
           </p>
           <div className={styles.actions}>
             <Link
@@ -43,44 +44,79 @@ export default function ServicePage() {
         </div>
       </section>
       <section className={styles.section}>
-        <div className={`${styles.container} ${styles.split}`}>
-          <div>
-            <p className={styles.eyebrow}>Start with a specific problem</p>
-            <h2>What does your team keep working around?</h2>
-            <p className={styles.copy}>
-              A shared inbox that loses requests. Equipment with no clear
-              checkout record. Customers asking for updates that live in several
-              places. Start with the workflow you want to improve.
-            </p>
-            <p className={styles.copy}>
-              These are illustrative capabilities, subject to discovery and
-              feasibility. The proposal defines what will be built and which
-              tools can be connected.
-            </p>
+        <div className={styles.container}>
+          <p className={styles.eyebrow}>Two starting points</p>
+          <h2>A new system or a better-connected one.</h2>
+          <div className={styles.two}>
+            <article className={styles.card} data-kind="systems">
+              <span className={styles.eyebrow}>01 / Build new</span>
+              <h3>Build around your business</h3>
+              <p>
+                Create internal tools for equipment checkout, inventory, tasks,
+                and request management. Give customers or employees a portal for
+                documents, status updates, and shared work.
+              </p>
+            </article>
+            <article className={styles.card} data-kind="intelligence">
+              <span className={styles.eyebrow}>02 / Extend what works</span>
+              <h3>Enhance existing software</h3>
+              <p>
+                Add missing features, reporting, integrations, automation, or AI
+                to the tools your team already uses. Keep the useful parts and
+                focus the project on what needs to work better.
+              </p>
+            </article>
           </div>
-          <ul className={styles.list}>
-            <li>
-              <strong>Internal operations</strong>Equipment checkout, inventory
-              tracking, task management, and request tracking.
-            </li>
-            <li>
-              <strong>Customer and employee portals</strong>Documents, requests,
-              status updates, and access permissions appropriate to each role.
-            </li>
-            <li>
-              <strong>Dashboards and reporting</strong>Centralized metrics and
-              automated reports based on agreed data sources.
-            </li>
-            <li>
-              <strong>Integrations and automation</strong>Connect supported
-              tools and reduce repetitive data entry.
-            </li>
-            <li>
-              <strong>AI-powered systems</strong>Company document search,
-              internal assistants, and AI-assisted workflows with review where
-              appropriate.
-            </li>
-          </ul>
+        </div>
+      </section>
+      <section className={styles.section}>
+        <div className={styles.container}>
+          <p className={styles.eyebrow}>Features &amp; connections</p>
+          <h2>Already have a system? Build on it.</h2>
+          <p className={styles.copy}>
+            Extend the software your business already uses with custom features,
+            connected workflows, and AI capabilities tailored to your operations.
+          </p>
+          <div className={styles.two}>
+            <ul className={styles.list}>
+              <li>
+                <strong>AI assistants</strong>Help employees find information,
+                draft content, and complete supported tasks using relevant business context.
+              </li>
+              <li>
+                <strong>Document recognition &amp; extraction</strong>Turn scanned
+                documents, receipts, and images into searchable text and structured
+                information for review.
+              </li>
+              <li>
+                <strong>Company knowledge search</strong>Help teams find answers
+                across approved company documents, with references to supporting
+                material where available.
+              </li>
+              <li>
+                <strong>Speech &amp; transcription</strong>Convert audio into text,
+                summarize conversations, and add voice interactions to supported workflows.
+              </li>
+            </ul>
+            <ul className={styles.list}>
+              <li>
+                <strong>Image &amp; video analysis</strong>Extract useful information
+                from images and video for defined business tasks.
+              </li>
+              <li>
+                <strong>Workflow automation</strong>Connect steps across tools,
+                route requests, and reduce repetitive manual work.
+              </li>
+              <li>
+                <strong>Custom integrations</strong>Connect supported software
+                and APIs so information can move between systems.
+              </li>
+              <li>
+                <strong>Custom features &amp; dashboards</strong>Add reporting,
+                interfaces, and functionality that existing tools are missing.
+              </li>
+            </ul>
+          </div>
         </div>
       </section>
       <ProjectProcess />

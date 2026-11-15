@@ -14,7 +14,7 @@ export const SOLUTIONS = [
     name: "Custom Business Systems",
     route: "/custom-business-systems",
     description:
-      "Commission software for the workflows, people, and tools in your business.",
+      "Build a new business system or enhance existing software with custom features, integrations, and AI.",
     kind: "systems",
     label: "02 / CUSTOM SOFTWARE",
   },

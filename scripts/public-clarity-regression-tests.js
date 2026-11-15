@@ -461,13 +461,22 @@ async function main() {
   assert.match(home, /Coastal Kitchen · Fictional business example/);
   assert.ok(executive.indexOf('id="product-experience"') < executive.indexOf('id="business-information"'));
   const lineup = htmlByRoute.get("/intelligence-systems");
-  assert.equal((lineup.match(/<span>Planned<\/span>/g) || []).length, 2);
+  assert.equal((lineup.match(/<span>In Development<\/span>/g) || []).length, 2);
   assert.match(lineup, /Biological Intelligence/);
   assert.match(lineup, /Drug Discovery Intelligence/);
-  assert.doesNotMatch(lineup, /In Development|href="\/(?:biological|drug-discovery)-intelligence"/);
+  assert.doesNotMatch(lineup, /<span>Planned<\/span>|href="\/(?:biological|drug-discovery)-intelligence"/);
+  assert.match(lineup, /intended research capabilities/);
+  assert.match(lineup, /not currently available products/);
+  assert.match(lineup, /not establish clinical validation, proven discovery results, or suitability for medical decisions/);
+  assert.match(lineup, /Continuously developed. Built to evolve./);
+  for (const card of lineup.matchAll(/<article[^>]*>([\s\S]*?)<\/article>/g)) {
+    assert.match(card[1], /In Development/);
+    assert.doesNotMatch(card[1], /<a|<button|<form/, "Developing research products have no purchase or activation action");
+  }
   for (const route of ["/custom-business-systems", "/website-development"]) {
     const html = htmlByRoute.get(route);
-    assert.match(html, /Development and any ongoing maintenance are quoted/);
+    assert.match(html, /one-time development fee with an upfront deposit/);
+    assert.match(html, /scoped monthly maintenance and support/);
     assert.match(html, /They do not accept project payments/);
     assert.match(html, /submitting an inquiry does not create a service contract/);
     assert.match(html, /scope, fees, payment schedule, maintenance, ownership or licensing, delivery, cancellation, and handover/);

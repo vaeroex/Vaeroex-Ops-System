@@ -41,11 +41,13 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
       maxLength = 200,
       type = "text",
       multiline = false,
+      hint,
     }: {
       required?: boolean;
       maxLength?: number;
       type?: string;
       multiline?: boolean;
+      hint?: string;
     } = {},
   ) {
     const error = state.fieldErrors?.[name];
@@ -59,13 +61,26 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
         event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
       ) => setValues((current) => ({ ...current, [name]: event.target.value })),
       "aria-invalid": Boolean(error),
-      "aria-describedby": error ? `contact-${name}-error` : undefined,
+      "aria-describedby":
+        [hint ? `contact-${name}-hint` : "", error ? `contact-${name}-error` : ""]
+          .filter(Boolean)
+          .join(" ") || undefined,
       className: controlClass,
     };
     return (
-      <label className="block text-sm font-medium" htmlFor={props.id}>
-        {label}
-        {required ? " *" : " (optional)"}
+      <div className="text-sm font-medium">
+        <label className="block" htmlFor={props.id}>
+          {label}
+          {required ? " *" : " (optional)"}
+        </label>
+        {hint ? (
+          <p
+            id={`contact-${name}-hint`}
+            className="mt-2 text-sm font-normal leading-6 text-slate-300"
+          >
+            {hint}
+          </p>
+        ) : null}
         {multiline ? (
           <textarea {...props} rows={5} />
         ) : (
@@ -91,7 +106,7 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
             {error}
           </span>
         ) : null}
-      </label>
+      </div>
     );
   }
   function choice(name: string, label: string, options: string[]) {
@@ -206,14 +221,22 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
                 project
                   ? "Problem to solve or project description"
                   : "How can Vaeroex help?",
-                { required: true, multiline: true, maxLength: 6000 },
+                {
+                  required: true,
+                  multiline: true,
+                  maxLength: 6000,
+                  hint: project
+                    ? `Tell us whether you need a new ${category === "Custom Business Systems" ? "system" : "website"} or improvements to an existing one, and what you want it to do.`
+                    : undefined,
+                },
               )}
             </div>
             {project ? (
               <>
                 <div className="md:col-span-2">
-                  {field("existing_tools", "Existing tools or website URL", {
+                  {field("existing_tools", "Existing software or website", {
                     maxLength: 1000,
+                    hint: "Describe the tools you use today, include a website URL if relevant, and tell us what you want to keep or improve.",
                   })}
                 </div>
                 {category === "Custom Business Systems"

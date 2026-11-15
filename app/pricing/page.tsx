@@ -18,7 +18,7 @@ import styles from "@/components/marketing/IntelligencePages.module.css";
 export const metadata: Metadata = publicPageMetadata({
   title: "Product & Project Pricing | Vaeroex",
   description:
-    "Executive Intelligence at $250/month, plus custom business systems and website projects quoted by scope with agreed maintenance.",
+    "Executive Intelligence at $250/month, plus custom business systems and website projects quoted by scope with a development fee, upfront deposit, and scoped monthly maintenance.",
   path: "/pricing",
 });
 
@@ -62,7 +62,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
               <strong>Two ways to get started.</strong>
               <p>
                 The product has a monthly subscription. Custom systems and websites
-                have an individual written project agreement and agreed maintenance.
+                have an individual written project agreement and scoped monthly maintenance.
               </p>
             </div>
           </div>

@@ -21,7 +21,7 @@ export default function AboutPage() {
       <PublicPageHero
         eyebrow="About Vaeroex"
         title="Practical software. Built around business."
-        description="Vaeroex develops intelligence products, custom business software, and websites. Businesses can subscribe to Executive Intelligence or commission a solution for a specific workflow or online presence."
+        description="Vaeroex develops intelligence products, custom business software, and websites. Businesses can subscribe to Executive Intelligence, build a new system or website, or enhance existing tools with custom features and integrations."
         actions={<Link href="/#solutions" className={styles.primary}>Explore Solutions<ArrowRight size={17} aria-hidden="true" /></Link>}
       />
 
@@ -76,7 +76,7 @@ export default function AboutPage() {
           <div><p className={styles.sectionLabel}>Why we build</p><h2 id="purpose-title">Make information<br />useful to the people<br />running the business.</h2></div>
           <div className={story.prose}>
             <p>Restaurant, brewery, and retail teams work across payment records, accounting reports, spreadsheets, and conversations. Vaeroex brings supported information into a workspace where people can investigate performance and explore the context behind a finding.</p>
-            <p>Alongside Executive Intelligence, businesses can commission internal tools, portals, reporting workflows, or a new or improved website. Each project starts with its own scope, practical requirements, and maintenance needs.</p>
+            <p>Alongside Executive Intelligence, businesses can commission internal tools, portals, reporting workflows, or a new or improved website, and extend existing software with features, integrations, automation, and AI. Each project starts with its own scope, practical requirements, and maintenance needs.</p>
             <p>That focus also serves other businesses with complex information to understand. Vaeroex-developed software, data connections, and analysis workflows support the process. Evidence, uncertainty, and human judgment stay part of the decision.</p>
             <Link href="/intelligence-systems" className={styles.textLink}>The Vaeroex approach<ArrowRight size={17} aria-hidden="true" /></Link>
           </div>
