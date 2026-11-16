@@ -1,0 +1,109 @@
+{
+  "sourceCommit": "67fac4d6476eb5f2373c6fd74bb3c38410f1077d",
+  "snapshot": {
+    "acceptanceSetId": "vaeroex_pre_checkout_terms",
+    "acceptanceSetVersion": "2026-10-12.sheets1",
+    "priceLabel": "$250/month",
+    "billingCadence": "monthly_subscription",
+    "requiredPolicies": [
+      {
+        "id": "terms",
+        "title": "Terms of Service",
+        "href": "/terms",
+        "version": "2026-08-20",
+        "effectiveDate": "2026-08-20",
+        "contentHash": "efd600c6a62a5dd7535c0e64eb2f593cc8e8917e22e5e29d0c234fac7e4813df"
+      },
+      {
+        "id": "privacy",
+        "title": "Privacy Policy",
+        "href": "/privacy",
+        "version": "2026-10-12.sheets1",
+        "effectiveDate": "2026-10-12.sheets1",
+        "contentHash": "27592726aee66944794664be8b07103acf1d51851598be2d7e842f05278d3566"
+      },
+      {
+        "id": "subscription-billing-terms",
+        "title": "Subscription and Billing Terms",
+        "href": "/subscription-billing-terms",
+        "version": "2026-10-12.1",
+        "effectiveDate": "2026-10-12.1",
+        "contentHash": "d311ee031b947b50571cb8fc3265d71d09e87283ee52df6b53d9c1a82c4c43fe"
+      },
+      {
+        "id": "refund-policy",
+        "title": "Refund Policy",
+        "href": "/refund-policy",
+        "version": "2026-08-20",
+        "effectiveDate": "2026-08-20",
+        "contentHash": "67dec75b67c598a4646c7ab9334ee3990120648289dec924bab7ac2d531abb5d"
+      },
+      {
+        "id": "acceptable-use",
+        "title": "Acceptable Use Policy",
+        "href": "/acceptable-use",
+        "version": "2026-08-20",
+        "effectiveDate": "2026-08-20",
+        "contentHash": "28ca4e2056f4fb4a64f199a5921d5969e7b67333a8b9ec8d091733de0e9aef49"
+      },
+      {
+        "id": "ai-disclaimer",
+        "title": "Vaeroex Disclaimer",
+        "href": "/ai-disclaimer",
+        "version": "2026-08-20",
+        "effectiveDate": "2026-08-20",
+        "contentHash": "a632b66933e18333827cdfea8e362259de34cf5e22a3741f07352669cac9d303"
+      },
+      {
+        "id": "sensitive-data-policy",
+        "title": "Sensitive Data Policy",
+        "href": "/sensitive-data-policy",
+        "version": "2026-08-20",
+        "effectiveDate": "2026-08-20",
+        "contentHash": "3001a517ca1eb1f8c458d3b214235496c89a3e113a4d5a9ed75ea2ceb26490a1"
+      },
+      {
+        "id": "data-retention",
+        "title": "Data Retention Notice",
+        "href": "/data-retention",
+        "version": "2026-10-12.sheets1",
+        "effectiveDate": "2026-10-12.sheets1",
+        "contentHash": "0dbe0e50a407861b3d9235deeeffde966cc4d53b92e587fcc0bd6c9a4f9e990d"
+      },
+      {
+        "id": "human-review",
+        "title": "Human Review Notice",
+        "href": "/human-review",
+        "version": "2026-08-20",
+        "effectiveDate": "2026-08-20",
+        "contentHash": "eff3d9c778bec5fc9cec08981220508509b0ad718d344552f6b89677e8ef0fe8"
+      }
+    ],
+    "recordClass": "pre_checkout_legal_acceptance",
+    "requiredPolicyHash": "aa2514ab74cb536f49aec9bffb364753e0476c632c1a72b2fb914e33f1f4d071"
+  },
+  "versions": {
+    "terms": "2026-08-20",
+    "privacy": "2026-10-12.sheets1",
+    "acceptable-use": "2026-08-20",
+    "refund-policy": "2026-08-20",
+    "ai-disclaimer": "2026-08-20",
+    "sensitive-data-policy": "2026-08-20",
+    "subscription-billing-terms": "2026-10-12.1",
+    "data-retention": "2026-10-12.sheets1",
+    "workspace-capacity-terms": "storage-capacity-v1",
+    "human-review": "2026-08-20"
+  },
+  "documentHashes": {
+    "terms": "5628f688be4691e41b34b1cfecd18440418faae5833bc8f6647ac84dd895f3d0",
+    "privacy": "aeb1d03a77269dffc18001c510755f8e311727cdc381fee4f5eeb5945adb08af",
+    "acceptable-use": "ea955a40727d03ac82ee3e38c57dedd6d40731c858058b46533a47aa3d217ab1",
+    "refund-policy": "8001227181ab392fd841166969b1c909410e14bcc0e311f7f302c3132b3449ca",
+    "ai-disclaimer": "499d2d21b7806aba1e0d60c3e7e1419c9b407364af61c5f42ed9d11158c8eb20",
+    "sensitive-data-policy": "e77a0512496800cbc8fbd58e573d0982c4188970356d029f7cd054c5098cd668",
+    "subscription-billing-terms": "d08da1cbcd8fcc9355c7343a1049319e2aef8ad30334030f7b882f2d35cade09",
+    "data-retention": "30b1c6e79412346a42527c2a0af6cf9b2006ada95138f6949a0ad5a638fd6b5c",
+    "workspace-capacity-terms": "40f97919c7a2ac55d0ca93b5d0fb4cfc659b1520978e9a24f5e1f576bfe2fd82",
+    "human-review": "021963388263e1809b39766bdf2fd0238ed7ae765d2d1be80578a1fca4c8abf3"
+  }
+}

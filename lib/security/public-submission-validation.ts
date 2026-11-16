@@ -18,6 +18,9 @@ const supportIssueTypes = [
   "General Question",
   "General Inquiry",
   "Platform Questions",
+  "Executive Intelligence",
+  "Custom Business Systems",
+  "Website Development / Enhancement",
   "Support Request",
   "Network Interest",
   "Strategic Partnership",
@@ -49,7 +52,11 @@ export const supportRequestSchema = z
     business_type: optionalText(120),
     team_size: optionalText(80),
     improvement_goal: optionalText(1000),
-    preferred_contact_method: optionalText(80)
+    preferred_contact_method: optionalText(80),
+    existing_tools: optionalText(1000),
+    expected_users: optionalText(80),
+    project_budget: optionalText(160),
+    project_timeline: optionalText(160)
   })
   .strict();
 

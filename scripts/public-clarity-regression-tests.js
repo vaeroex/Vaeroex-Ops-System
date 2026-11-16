@@ -111,6 +111,8 @@ async function main() {
     "/pricing",
     "/executive-intelligence",
     "/intelligence-systems",
+    "/custom-business-systems",
+    "/website-development",
     "/drug-discovery-intelligence",
     "/biological-intelligence",
   ];
@@ -159,8 +161,6 @@ async function main() {
   // Validate the real server output: chapter text and native links work before
   // hydration, and each page owns one persistent scene instead of stacked canvases.
   for (const [route, variant] of [
-    ["/executive-intelligence", "business"],
-    ["/intelligence-systems", "systems"],
     ["/drug-discovery-intelligence", "drug-discovery"],
     ["/biological-intelligence", "biology"],
   ]) {
@@ -432,7 +432,7 @@ async function main() {
   assert.match(executive, /one authoritative source/);
   assert.match(executive, /not automatically consolidated or deduplicated/);
   assert.match(executive, /Flagship feature included with Executive Intelligence/);
-  assert.match(executive, /VSI helps turn questions into insights/);
+  assert.match(executive, /VSI brings business calculations, evidence, and conversation together/);
   assert.doesNotMatch(executive, /Plans and SOPs are drafts for your review/);
   assert.match(executive, /Refresh payments on request/);
   assert.match(executive, /transaction changes every 15 minutes/);
@@ -448,38 +448,47 @@ async function main() {
   assert.match(pricing, /\$5\/month each for another 10 GB and 500 slots/);
   const retiredPromotion = /Biological Intelligence|Drug Discovery|drug-discovery-intelligence|biological-intelligence/i;
   for (const [route, html] of htmlByRoute) {
-    if (!retiredRoutes.has(route)) assert.doesNotMatch(html, retiredPromotion, `${route} must not promote retired products`);
+    if (!retiredRoutes.has(route) && route !== "/intelligence-systems") assert.doesNotMatch(html, retiredPromotion, `${route} must not promote retired products`);
   }
   assert.doesNotMatch(about, retiredPromotion);
   assert.doesNotMatch(read("components/legal/PublicFooter.tsx") + read("lib/seo/public-seo.ts") + read("app/sitemap.ts"), retiredPromotion);
 
   const home = htmlByRoute.get("/");
-  assert.equal((home.match(/data-home-assembly=/g) || []).length, 1, "Homepage has one persistent scene");
-  assert.doesNotMatch(home, /data-clarity-chapter=/, "Homepage uses real content rather than adding scroll chapters");
-  for (const id of ["home-title", "product-title", "business-context", "trust-title", "closing-title"]) { assert.ok(home.includes(`id="${id}"`) && home.includes(`href="#${id}"`), "Each scene stage has an accessible content anchor"); }
-  assert.equal((home.match(/data-controlled="false"/g) || []).length, 2, "Server-rendered scene and controls remain section-bound before hydration");
-  const assemblyCss = read("components/marketing/assembly/HomepageScene.module.css");
-  assert.match(assemblyCss, /\.scene\s*\{\s*position: absolute;/, "Static poster must scroll with its owning section without JavaScript");
-  assert.match(assemblyCss, /\.scene\[data-controlled="true"\]\s*\{\s*position: fixed;/, "Only the mounted boundary controller may enable persistent positioning");
+  assert.doesNotMatch(home, /data-home-assembly=|data-clarity-chapter=/, "Company overview should foreground the offerings");
   const headline = home.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
-  assert.equal(headline, "The advantage of knowing first");
-  assert.match(home, /Veteran owned and operated/);
-
-  assert.match(
-    home,
-    /data-assembly-poster/,
-    "An image fallback must exist in server HTML before JavaScript or WebGL loads",
-  );
-  assert.match(
-    home,
-    /CONCEPT RENDER/,
-    "A poster must not be labeled as functioning real-time 3D",
-  );
-  assert.doesNotMatch(
-    home,
-    /data-clarity-mode="interactive"/,
-    "The initial server response cannot claim unverified WebGL readiness",
-  );
+  assert.equal(headline, "Intelligence and software built around your business.");
+  assert.match(home.replace(/<[^>]+>/g, ""), /Veteran owned and operated/);
+  assert.equal((home.match(/data-home-journey=/g) || []).length, 1);
+  const flag = home.match(/<svg\b[^>]*aria-label="United States flag"[^>]*>[\s\S]*?<\/svg>/)?.[0];
+  assert.ok(flag, "The veteran detail includes an accessible United States flag");
+  assert.equal((flag.match(/<polygon /g) || []).length, 50, "US flag has fifty stars");
+  assert.match(home, /Coastal Kitchen · Fictional business example/);
+  assert.ok(executive.indexOf('id="product-experience"') < executive.indexOf('id="business-information"'));
+  const lineup = htmlByRoute.get("/intelligence-systems");
+  assert.equal((lineup.match(/<span>In Development<\/span>/g) || []).length, 2);
+  assert.match(lineup, /Biological Intelligence/);
+  assert.match(lineup, /Drug Discovery Intelligence/);
+  assert.doesNotMatch(lineup, /<span>Planned<\/span>|href="\/(?:biological|drug-discovery)-intelligence"/);
+  assert.match(lineup, /intended research capabilities/);
+  assert.match(lineup, /not currently available products/);
+  assert.match(lineup, /not establish clinical validation, proven discovery results, or suitability for medical decisions/);
+  assert.match(lineup, /Continuously developed. Built to evolve./);
+  for (const card of lineup.matchAll(/<article[^>]*>([\s\S]*?)<\/article>/g)) {
+    assert.match(card[1], /In Development/);
+    assert.doesNotMatch(card[1], /<a|<button|<form/, "Developing research products have no purchase or activation action");
+  }
+  for (const route of ["/custom-business-systems", "/website-development"]) {
+    const html = htmlByRoute.get(route);
+    assert.match(html, /one-time development fee with an upfront deposit/);
+    assert.match(html, /scoped monthly maintenance and support/);
+    assert.match(html, /They do not accept project payments/);
+    assert.match(html, /submitting an inquiry does not create a service contract/);
+    assert.match(html, /scope, fees, payment schedule, maintenance, ownership or licensing, delivery, cancellation, and handover/);
+    assert.match(html, /individual written project agreement/);
+    assert.match(html, /quoted separately/);
+    assert.match(html, /Not sure|Quoted per project/);
+    assert.match(html, new RegExp('href="/contact\\?inquiry=' + route.slice(1) + '"'));
+  }
   assert.match(
     home,
     /member of the[^<]*<br\/>|member of the NVIDIA/,
@@ -496,15 +505,10 @@ async function main() {
       navigation.includes(`href="${system.route}"`),
       `Navigation must reach ${system.route}`,
     );
-  const productGroups = [...navigation.matchAll(/<div class="vx-nav-product" role="group" aria-label="Executive Intelligence">([\s\S]*?)<\/div>/g)];
-  assert.equal(productGroups.length, 2, "Desktop and mobile group VSI under its included product");
-  for (const [, group] of productGroups) {
-    assert.match(group, /href="\/executive-intelligence"/);
-    assert.equal((group.match(/<a /g) || []).length, 1, "Product and feature description share one clickable entry");
-    assert.match(group, /<small class="vx-nav-description">Featuring Vaeroex Super Intelligence, our flagship conversational AI feature\.<\/small><\/a>/);
-    assert.doesNotMatch(group, /AVAILABLE|vx-nav-included|#vsi/);
-    assert.doesNotMatch(group, /The Vaeroex approach/, "The approach remains separate from the product group");
+  for (const solution of loadTs("lib/marketing/solutions.ts").SOLUTIONS) {
+    assert.equal((navigation.match(new RegExp(`href="${solution.route}"`, "g")) || []).length, 2, "Desktop and mobile expose the same offerings");
   }
+  assert.match(navigation, /Solutions/);
   assert.doesNotMatch(navigation, retiredPromotion);
   assert.match(navigation, /Open navigation menu/);
   assert.match(navigation, /href="\/login"/);
@@ -565,24 +569,12 @@ async function main() {
   );
 
   const form = read("components/legal/PublicRequestForm.tsx");
-  assert.match(
-    form,
-    /action=\{createSupportRequestAction\}/,
-    "Public contact forms must retain their working server action",
-  );
-  for (const field of [
-    "return_path",
-    "issue_type",
-    "page_module",
-    "name",
-    "email",
-    "company",
-    "message",
-  ])
-    assert.ok(
-      form.includes(`name="${field}"`),
-      `Public form field must remain: ${field}`,
-    );
+  assert.match(form, /createContactRequestAction/, "Contact form must use the shared support infrastructure");
+  assert.match(form, /action=\{action\}/);
+  assert.match(form, /useActionState/);
+  for (const field of ["issue_type", "name", "email", "company", "message", "existing_tools", "expected_users", "project_budget", "project_timeline"])
+    assert.ok(form.includes(`"${field}"`), `Public field must remain: ${field}`);
+  assert.match(read("app/support/actions.ts"), /formData.set\("return_path", "\/contact"\)/);
   assert.match(
     read("app/support/actions.ts"),
     /enforceRateLimit[\s\S]*supportRequestSchema/,

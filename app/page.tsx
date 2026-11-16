@@ -2,315 +2,251 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  ArrowRight,
   ArrowUpRight,
-  FileText,
-  ScanLine,
-  ShieldCheck,
+  ChartNoAxesCombined,
+  Workflow,
+  PanelsTopLeft,
 } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
-import { HomepageWorkspaceTour } from "@/components/marketing/HomepageWorkspaceTour";
-import { HomepageScene } from "@/components/marketing/assembly/HomepageScene";
-import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
+import { WorkspaceCapture } from "@/components/marketing/WorkspaceScreenshots";
+import {
+  ProjectProcess,
+  ProjectCta,
+} from "@/components/marketing/ProjectSections";
+import { SOLUTIONS } from "@/lib/marketing/solutions";
+import { VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
-import styles from "./public-home.module.css";
+import { HomeJourney } from "@/components/marketing/journey/HomeJourney";
+import journeyStyles from "@/components/marketing/journey/HomeJourney.module.css";
+import { VeteranOwned } from "@/components/marketing/VeteranOwned";
+import styles from "@/components/marketing/Solutions.module.css";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Vaeroex | The advantage of knowing first",
+  title: "Vaeroex | Intelligence, Custom Software & Websites",
   description:
-    "Executive Intelligence for restaurants, breweries, retailers, and other businesses. Connect records, upload reports, add business context, and explore what matters with Vaeroex.",
+    "Explore intelligence products, build custom software and websites, or enhance existing tools with features, integrations, automation, and AI.",
   path: "/",
 });
-
+const icons = [ChartNoAxesCombined, Workflow, PanelsTopLeft];
 export default function HomePage() {
   return (
-    <main className={`vaeroex-public-site ${styles.home}`}>
+    <main className={`vaeroex-public-site ${styles.site}`}>
       <PublicSiteHeader />
-      <div id="home-information-journey" className={styles.informationJourney}>
-        <HomepageScene />
-        <section className={styles.assemblyHero} aria-labelledby="home-title">
-          <div className={`${styles.heroCopy} ${styles.journeyHero}`}>
+      <div id="home-connected-journey" className={journeyStyles.root}>
+        <HomeJourney />
+        <section id="home-opening" className={`${styles.hero} ${journeyStyles.hero}`}>
+          <div className={styles.container}>
             <p className={styles.eyebrow}>
-              <span className={styles.signalDot} /> SUPER INTELLIGENCE
+              Intelligence products · Custom software · Websites
             </p>
-            <h1 id="home-title">
-              The advantage <br />
-              <span>of knowing first</span>
+            <h1>
+              Intelligence and software <span>built around your business.</span>
             </h1>
-            <p className={styles.lede}>
-              You wear every hat. Get support for every perspective.
-            </p>
-            <p className={styles.heroDescription}>
-              Vaeroex Executive Intelligence brings a CEO’s strategic
-              perspective, a CFO’s financial lens, a COO’s operational focus,
-              and a CMO’s market perspective into one conversational workspace.
+            <p className={styles.lead}>
+              Vaeroex develops intelligence products, custom business software,
+              and websites. Explore our intelligence systems, bring a new idea to life,
+              or enhance the tools you already use with custom features,
+              integrations, and AI.
             </p>
             <div className={styles.actions}>
-              <Link
-                href="/executive-intelligence"
-                className="vx-button vx-button--primary"
-              >
-                Explore Executive Intelligence
+              <Link href="#solutions" className="vx-button vx-button--primary">
+                Explore Solutions
                 <ArrowUpRight size={17} aria-hidden="true" />
               </Link>
               <Link href="/contact" className="vx-text-link">
-                Talk to us
-                <ArrowRight size={16} aria-hidden="true" />
+                Discuss a Project
+                <ArrowUpRight size={17} aria-hidden="true" />
               </Link>
             </div>
-            <p className={styles.heroDescription}>
-              $250/month · Less time piecing information together. More time for
-              what matters.
-            </p>
           </div>
         </section>
-
-        <section className={styles.problems} aria-labelledby="problems-title">
-          <p className={styles.eyebrow}>THE PROBLEMS WE HELP SOLVE</p>
-          <h2 id="problems-title">Sales are up.<br />Why aren’t profits?</h2>
-          <p className={styles.problemsLead}>
-            A simple question can mean hours comparing reports. An answer you
-            can’t trust adds more work. And even when you find the issue, you
-            still have to decide what to do first.
-          </p>
-          <div className={styles.problemRows}>
+        <section id="solutions" className={`${styles.section} ${journeyStyles.overview}`}>
+          <div className={styles.container}>
+            <p className={styles.eyebrow}>Three ways to work with Vaeroex</p>
+            <h2>Start with what your business needs.</h2>
+            <div className={styles.grid}>
+              {SOLUTIONS.map((solution, index) => {
+                const Icon = icons[index];
+                return (
+                  <article
+                    className={styles.card}
+                    data-kind={solution.kind}
+                    key={solution.route}
+                  >
+                    <span className={styles.eyebrow}>{solution.label}</span>
+                    <div className={styles.icon}>
+                      <Icon size={30} strokeWidth={1.3} aria-hidden="true" />
+                    </div>
+                    <h3>{solution.name}</h3>
+                    <p>{solution.description}</p>
+                    <Link
+                      href={solution.route}
+                      className="vx-text-link"
+                      aria-label={`Explore ${solution.name}`}
+                    >
+                      Explore offering
+                      <ArrowUpRight size={17} aria-hidden="true" />
+                    </Link>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+        <section className={`${styles.section} ${journeyStyles.chapter}`} aria-labelledby="featured-product">
+          <div className={`${styles.container} ${styles.split}`}>
             <div>
-              <h3>Hallucinated answers</h3>
-              <p>VSI helps prevent hallucinated answers by checking the evidence.
-                When information is missing, it tells you what to provide.</p>
-            </div>
-            <div>
-              <h3>Hours of manual comparison</h3>
-              <p>Bring sales, costs, staffing, and business notes together to
-                help explain what’s happening across your business.</p>
-            </div>
-            <div>
-              <h3>Too much to do. What comes first?</h3>
-              <p>Identify priorities, review what changed, and spot what needs
-                attention as your business grows.</p>
-            </div>
-          </div>
-          <Link href="/about/why-vaeroex" className="vx-text-link">
-            See how Vaeroex helps at every step
-            <ArrowUpRight size={18} aria-hidden="true" />
-          </Link>
-        </section>
-
-        <section className={styles.product} aria-labelledby="product-title">
-          <div className={styles.productIntro}>
-            <p className={styles.eyebrow}>02 / EXECUTIVE INTELLIGENCE</p>
-            <h2 id="product-title">
-              Your business is connected.
-              <br />
-              Your intelligence should be, too.
-            </h2>
-            <p className={styles.connectedStory}>
-              A change in sales can affect staffing. Staffing can affect
-              service. Service can affect repeat business. And growth can put
-              pressure on margins.
-            </p>
-            <p>
-              VSI—Vaeroex Super Intelligence—helps you reason across those
-              connections using what you connect, upload, and tell it. More
-              relevant context means a more informed conversation.
-            </p>
-            <p>
-              Built for the people running cafés, restaurants, breweries, retail
-              stores, warehouses, and growing businesses.
-            </p>
-            <p>Plug-ins for Square, QuickBooks Online, Zoho Books, and Loyverse.</p>
-            <Link href="/executive-intelligence" className="vx-text-link">
-              Meet Executive Intelligence
-              <ArrowUpRight size={18} aria-hidden="true" />
-            </Link>
-          </div>
-          <div className={styles.featureRows} id="business-context">
-            {[
-              [
-                "01",
-                "Everyday conversation. Business-depth reasoning.",
-                "VSI",
-                "Ask anything from “What should I eat for breakfast?” to “Why did sales rise while profit fell?” Move from everyday help to complex business analysis in the same workspace.",
-              ],
-              [
-                "02",
-                "Bring the context behind the numbers.",
-                "Business Notes & Uploads",
-                "Connect supported systems, upload reports, and share your goals. Capture meeting takeaways in Business Notes, or upload photos of a presentation so Vaeroex can extract useful information for business context. Review and approve it before it becomes business evidence.",
-              ],
-              [
-                "03",
-                "Short on time? Get a brief.",
-                "Business Health & Executive Analysis",
-                "Get a quick assessment without starting a conversation. Save the analysis for later when you’re between meetings or on the go.",
-              ],
-            ].map(([n, title, label, copy]) => (
-              <div key={n}>
-                <span>{n}</span>
-                <div>
-                  <small>{label}</small>
-                  <h3>{title}</h3>
-                  <p>{copy}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className={styles.material} aria-labelledby="trust-title">
-          <div className={styles.materialCopy}>
-            <p className={styles.eyebrow}>03 / BUILT TO BE INSPECTED</p>
-            <h2 id="trust-title">
-              Clarity you can
-              <br />
-              look into.
-            </h2>
-            <p>
-              <strong>Grounded answers. Not confident guesses.</strong>
-            </p>
-            <p>
-              Source citations and confidence indicators make the evidence
-              behind supported business findings clear and help guard against AI
-              hallucinations. When evidence is insufficient, Vaeroex holds back
-              unsupported conclusions and identifies the additional context
-              needed.
-            </p>
-            <p>
-              Get clear insights, with supporting citations ready whenever you
-              want a closer look.
-            </p>
-            <Link href="/trust" className="vx-text-link">
-              Explore the Trust Center
-              <ArrowUpRight size={18} aria-hidden="true" />
-            </Link>
-          </div>
-          <div className={styles.evidenceVisual}>
-            <HomepageWorkspaceTour />
-          </div>
-        </section>
-        <section
-          className={styles.trustPrinciples}
-          aria-label="Our approach to trust"
-        >
-          {[
-            [
-              FileText,
-              "Connected to evidence",
-              "Important findings remain connected to the business information that supports them.",
-            ],
-            [
-              ScanLine,
-              "Clear about its limits",
-              "Freshness, uncertainty, and missing context remain part of the picture.",
-            ],
-            [
-              ShieldCheck,
-              "Led by your judgment",
-              "Recommendations are drafts for review. You confirm before records are created or changed.",
-            ],
-          ].map(([Icon, title, text]) => (
-            <div key={String(title)}>
-              <Icon size={23} aria-hidden="true" />
-              <h3>{String(title)}</h3>
-              <p>{String(text)}</p>
-            </div>
-          ))}
-        </section>
-
-        <section className={styles.domains} aria-labelledby="domains-title">
-          <div className={styles.sectionLabel}>
-            <span>04 / CONTINUOUS DEVELOPMENT</span>
-            <Link href="/intelligence-systems">
-              Explore our approach
-              <ArrowUpRight size={14} aria-hidden="true" />
-            </Link>
-          </div>
-          <h2 id="domains-title">
-            Continuously developed.
-            <br />
-            <span>Carefully tested.</span>
-          </h2>
-          <div className={styles.domainList}>
-            {PUBLIC_SYSTEMS.map((system, index) => (
-              <Link
-                key={system.id}
-                href={system.route}
-                className={styles.domainRow}
-              >
-                <span className={styles.domainNumber}>0{index + 1}</span>
-                <h3>{system.name}</h3>
-                <span
-                  className={
-                    system.availability === "available"
-                      ? styles.statusAvailable
-                      : styles.status
-                  }
+              <span className={styles.badge}>Available now</span>
+              <p className={styles.eyebrow}>
+                Featured product / Executive Intelligence
+              </p>
+              <h2 id="featured-product">
+                A clearer view of your business information.
+              </h2>
+              <p className={styles.copy}>
+                Bring supported records, reports, and Business Notes into one
+                workspace. Investigate performance, ask follow-up questions with
+                VSI, and review the evidence behind supported findings.
+              </p>
+              <p className={styles.price}>{VAEROEX_PLAN_PRICE_LABEL}</p>
+              <div className={styles.actions}>
+                <Link href="/executive-intelligence" className="vx-text-link">
+                  Explore Executive Intelligence
+                  <ArrowUpRight size={17} aria-hidden="true" />
+                </Link>
+                <Link
+                  href="/checkout/legal"
+                  className="vx-button vx-button--primary"
                 >
-                  {system.statusLabel}
-                </span>
-                <ArrowUpRight aria-hidden="true" size={24} />
-              </Link>
-            ))}
+                  Get Executive Intelligence
+                </Link>
+              </div>
+              <div className={styles.actions}>
+                <Link href="/pricing" className="vx-text-link">
+                  Subscription details
+                </Link>
+              </div>
+            </div>
+            <div className={styles.preview}>
+              <WorkspaceCapture view="intelligence" />
+            </div>
           </div>
-          <p className={styles.domainNote}>
-            We continue to refine Vaeroex’s intelligence tools, test their
-            performance, and expand how businesses can connect and understand
-            their information.
-          </p>
         </section>
-
-        <section className={styles.closing}>
-          <p className={styles.eyebrow}>EXECUTIVE INTELLIGENCE · $250/MONTH</p>
-          <h2 id="closing-title">
-            Executive perspectives.
-            <br />
-            <span>An owner’s budget.</span>
-          </h2>
-          <p className={styles.closingCopy}>
-            For $250 per month, bring conversational intelligence, business
-            analysis, and useful context into one workspace—helping reduce the
-            time and cost of preparing analysis, so you can put more resources
-            toward running and growing your business.
-          </p>
-          <div className={styles.actions}>
-            <Link
-              href="/checkout/legal"
-              className="vx-button vx-button--primary"
-            >
-              Get Executive Intelligence
-              <ArrowUpRight size={18} aria-hidden="true" />
-            </Link>
-            <Link href="/contact" className="vx-text-link">
-              Talk to us
-              <ArrowRight size={18} aria-hidden="true" />
-            </Link>
+        <section className={`${styles.section} ${journeyStyles.chapter}`}>
+          <div className={`${styles.container} ${styles.split}`}>
+            <div>
+              <p className={styles.eyebrow}>Custom Business Systems</p>
+              <h2 id="home-custom">Software for the work between your tools.</h2>
+              <p className={styles.copy}>
+                Equipment tracked in a spreadsheet. Requests buried in email.
+                Reports assembled by hand. Build a new system around your business,
+                or enhance the software you already use with custom features,
+                integrations, automation, and AI.
+              </p>
+              <div className={styles.actions}>
+                <Link href="/custom-business-systems" className="vx-text-link">
+                  Explore Custom Business Systems
+                  <ArrowUpRight size={17} aria-hidden="true" />
+                </Link>
+              </div>
+            </div>
+            <ul className={styles.list}>
+              <li>
+                <strong>Track day-to-day operations</strong>Equipment checkout,
+                inventory, tasks, and requests.
+              </li>
+              <li>
+                <strong>Give people a shared place to work</strong>Customer and
+                employee portals, dashboards, and reporting.
+              </li>
+              <li>
+                <strong>Connect supported tools</strong>Integrations, automation,
+                document search, and AI-assisted workflows with review where
+                appropriate.
+              </li>
+              <li>
+                Illustrative capabilities. Scope and feasibility are established
+                during discovery.
+              </li>
+            </ul>
           </div>
-          <p className={styles.ownership}>Veteran owned and operated</p>
         </section>
+        <section className={`${styles.section} ${journeyStyles.chapter}`}>
+          <div className={`${styles.container} ${styles.split}`}>
+            <div>
+              <p className={styles.eyebrow}>
+                Website Development &amp; Enhancement
+              </p>
+              <h2 id="home-websites">A useful home for your business online.</h2>
+              <p className={styles.copy}>
+                Build a new business website or improve an existing one. Make
+                information easier to find, help visitors get in touch, and
+                connect the site to the tools your team uses.
+              </p>
+              <div className={styles.actions}>
+                <Link href="/website-development" className="vx-text-link">
+                  Explore Website Development &amp; Enhancement
+                  <ArrowUpRight size={17} aria-hidden="true" />
+                </Link>
+              </div>
+            </div>
+            <ul className={styles.list}>
+              <li>
+                <strong>Build a new website</strong>Business websites and focused
+                landing pages.
+              </li>
+              <li>
+                <strong>Improve an existing website</strong>Custom features,
+                AI-assisted inquiries, knowledge search, and connected business tools.
+              </li>
+              <li>
+                <strong>Keep it working</strong>Booking integrations,
+                business-tool connections, and scoped maintenance.
+              </li>
+            </ul>
+          </div>
+        </section>
+        <div className={journeyStyles.process}>
+          <ProjectProcess />
+        </div>
+        <section
+          className={`${styles.container} ${journeyStyles.credentials}`}
+          aria-label="NVIDIA Inception membership and company credentials"
+        >
+          <div className={styles.credibility}>
+            <div>
+              <VeteranOwned />
+              <div className={styles.actions}>
+                <Link href="/about" className="vx-text-link">
+                  Meet Vaeroex
+                </Link>
+                <Link href="/trust" className="vx-text-link">
+                  Trust Center
+                </Link>
+              </div>
+            </div>
+            <div>
+              <p>Vaeroex is a member of the NVIDIA Inception program.</p>
+              <Image
+                src="/brand/nvidia-inception-program-badge.svg"
+                alt="NVIDIA Inception Program badge"
+                width={190}
+                height={82}
+                unoptimized
+              />
+              <small>
+                © 2025 NVIDIA, the NVIDIA logo, and NVIDIA Inception are
+                trademarks and/or registered trademarks of NVIDIA Corporation in
+                the U.S. and other countries.
+              </small>
+            </div>
+          </div>
+        </section>
+        <div id="home-finish" className={journeyStyles.finish}>
+          <ProjectCta />
+        </div>
       </div>
-      <section
-        className={styles.membership}
-        aria-label="NVIDIA Inception membership"
-      >
-        <p>
-          Vaeroex is a member of the
-          <br />
-          <strong>NVIDIA Inception program.</strong>
-        </p>
-        <Image
-          src="/brand/nvidia-inception-program-badge.svg"
-          alt="NVIDIA Inception Program badge"
-          width={190}
-          height={60}
-          unoptimized
-        />
-        <small>
-          © 2025 NVIDIA, the NVIDIA logo, and NVIDIA Inception are trademarks
-          and/or registered trademarks of NVIDIA Corporation in the U.S. and
-          other countries.
-        </small>
-      </section>
       <PublicFooter />
     </main>
   );

@@ -474,7 +474,8 @@ test("permanent deletion is explicitly confirmed before a workspace-bound mutati
   } finally { global.fetch = oldFetch; global.window = oldWindow; }
 });
 
-test("canceling a paid pack requires explicit confirmation and discloses the retained-file downgrade", async () => {
+test("canceling a paid pack requires explicit confirmation and discloses the retained-file downgrade", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-10-12T12:00:00Z") });
   const oldFetch = global.fetch, oldWindow = global.window;
   const calls = [], messages = [];
   let consent = false;

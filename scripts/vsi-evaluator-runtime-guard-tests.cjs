@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Disposable local Git fixtures exercise the actual evaluator guard without dispatch. */
+if (require('./vsi-pinned-evaluation-test-fixture.cjs').runInPinnedEvaluationFixture(__filename)) return;
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
