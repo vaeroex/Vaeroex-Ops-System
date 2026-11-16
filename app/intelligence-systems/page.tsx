@@ -6,6 +6,7 @@ import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { WorkspaceCapture } from "@/components/marketing/WorkspaceScreenshots";
 import { VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
+import { SYSTEM_CATALOG } from "@/lib/systems/catalog";
 import styles from "@/components/marketing/Solutions.module.css";
 export const metadata: Metadata = publicPageMetadata({
   title: "Intelligence Systems | Vaeroex",
@@ -85,16 +86,7 @@ export default function IntelligenceSystemsPage() {
             for medical decisions. Release dates have not been announced.
           </p>
           <div className={styles.two}>
-            {[
-              [
-                "Biological Intelligence",
-                "In development to help researchers organize biological information, explore relationships, and investigate scientific questions with supporting evidence.",
-              ],
-              [
-                "Drug Discovery Intelligence",
-                "In development to help researchers explore scientific literature, compounds, and biological targets, organize evidence, and identify questions for further investigation.",
-              ],
-            ].map(([name, description]) => (
+            {SYSTEM_CATALOG.filter(system => system.status === "development").map(({ name, description }) => (
               <article className={styles.planned} key={name}>
                 <span>In Development</span>
                 <h3>{name}</h3>

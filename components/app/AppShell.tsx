@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOutAction } from "@/lib/auth/actions";
 import { selectWorkspaceAction } from "@/lib/workspaces/actions";
+import { SystemNavigation } from "@/components/systems/SystemNavigation";
+import type { SystemLink } from "@/lib/systems/routing";
 import { AppNavigation } from "@/components/app/AppNavigation";
 import { WorkspacePageTitle } from "@/components/app/WorkspacePageTitle";
 import { WorkspacePresentation, WorkspaceSwitcherDisclosure } from "@/components/app/WorkspacePresentation";
@@ -47,6 +49,7 @@ type AppShellProps = {
   activeWorkspace: Workspace | null;
   membership: WorkspaceMember | null;
   isVaeroexAdmin: boolean;
+  switchableSystems?: readonly SystemLink[];
 };
 
 function workspaceAccessLabel(workspace: Workspace | null) {
@@ -64,7 +67,7 @@ function workspaceStatusTone(label: string) {
   return "border-red-300/30 bg-red-400/15 text-red-100";
 }
 
-export function AppShell({ children, profile, workspaces, activeWorkspace, isVaeroexAdmin }: AppShellProps) {
+export function AppShell({ children, profile, workspaces, activeWorkspace, isVaeroexAdmin, switchableSystems = [] }: AppShellProps) {
   const navSections = isVaeroexAdmin ? [...baseNavSections, adminNavSection] : baseNavSections;
   const accessLabel = workspaceAccessLabel(activeWorkspace);
   const isDemoWorkspace = activeWorkspace?.subscription_status === "demo";
@@ -111,6 +114,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, isVae
           </WorkspaceSwitcherDisclosure>
         </form>
 
+        <SystemNavigation systems={switchableSystems} />
         <AppNavigation sections={navSections} />
 
         <form action={signOutAction} className="mt-3">
@@ -145,6 +149,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, isVae
         </header>
 
         <nav className="workspace-mobile-navigation border-b border-line bg-white px-3 py-2 sm:px-4 lg:hidden">
+          <SystemNavigation systems={switchableSystems} />
           <AppNavigation sections={navSections} mobile />
         </nav>
 

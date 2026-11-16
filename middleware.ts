@@ -7,4 +7,4 @@ export async function middleware(request: NextRequest) {
 
 // Workspace Server Components cannot persist refreshed cookies themselves.
 // APIs, OAuth callbacks and public pages retain their existing handling.
-export const config = { matcher: ["/app/:path*"] };
+export const config = { matcher: ["/app/:path*", "/systems", "/access"] };

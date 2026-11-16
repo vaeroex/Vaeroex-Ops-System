@@ -338,7 +338,7 @@ test("native Back/Forward restores workspace-local filter, page, selection, pane
 
 test("Overview redirect retains query values and ordinary auth defaults preserve deliberate destinations", async () => {
   const {safeAuthRedirectPath}=loadSource("lib/auth/safe-redirect.ts");
-  assert.equal(safeAuthRedirectPath(null),"/app/intelligence");
+  assert.equal(safeAuthRedirectPath(null),"/systems");
   for(const target of ["/app/sources?file=test#review","/app/intelligence?finding=id-7","/onboarding","/checkout/legal","/app?view=Operations%20View"]) assert.equal(safeAuthRedirectPath(target),target);
   let authorized=0;
   const Overview=loadSource("app/app/page.tsx",{"@/lib/workspaces/page-context":{requireWorkspacePage:async()=>{authorized++;}},"next/navigation":{redirect: value=>{throw new Error(value);}}}).default;

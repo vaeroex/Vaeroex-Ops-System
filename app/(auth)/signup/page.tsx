@@ -19,11 +19,11 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
   return (
     <AuthShell
       title="Get Started With Vaeroex"
-      subtitle="Create your Executive Intelligence Workspace and access the product."
+      subtitle="Create a Vaeroex account. Product access and subscriptions are managed separately."
     >
       <form action={signUpAction} className="space-y-4">
         <AuthMessage error={params?.error} message={params?.message} />
-        <input type="hidden" name="next" value={params?.next || "/app/setup"} />
+        <input type="hidden" name="next" value={params?.next || "/systems"} />
         <label className="block text-sm font-medium">
           Full name
           <input
@@ -61,7 +61,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
       </form>
       <p className="mt-5 text-sm text-muted">
         Already have an account?{" "}
-        <Link href={`/login?next=${encodeURIComponent(params?.next || "/app/setup")}`} className="text-vaeroex-blue">
+        <Link href={`/login?next=${encodeURIComponent(params?.next || "/systems")}`} className="text-vaeroex-blue">
           Log in
         </Link>
       </p>
