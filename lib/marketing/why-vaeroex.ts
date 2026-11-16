@@ -1,84 +1,70 @@
-export const businessProblems = [
+export const companyApproach = [
   {
-    id: "hallucinated-answers",
-    order: "First",
-    title: "Hallucinated answers",
-    problem: [
-      "Ever asked AI a question and received an answer you knew was wrong?",
-      "You ask again and get a different answer—sometimes one that has nothing to do with your question.",
-      "Now you still need the answer, and you have another job: checking whether you can trust it."
-    ],
-    solution: [
-      "VSI helps prevent hallucinated answers by checking its business conclusions for support, consistency, and relevance. It challenges its own conclusions before presenting them.",
-      "When there isn’t enough information, it explains what’s missing and what you can provide next."
-    ],
-    takeaway: "An answer should hold up to questions—including its own."
-  },
-  {
-    id: "manual-comparison",
-    order: "Second",
-    title: "Manual comparison",
-    problem: [
-      "Without a reliable explanation, you start investigating yourself.",
-      "Your sales report shows growth. Your bookkeeping shows higher expenses. Staffing records and supplier bills may hold other clues.",
-      "Finding the connection means opening different systems, matching dates, and comparing numbers. You may not have an analyst—or the time to become one."
-    ],
-    solution: [
-      "Vaeroex brings available information from connected tools, uploaded reports, and business notes together to help explain what changed.",
-      "Higher supplier costs, heavier discounts, or a change in what customers buy can each affect margins differently. Vaeroex helps narrow down what the evidence supports and what still needs checking."
-    ],
-    takeaway: "Spend less time assembling the information and more time understanding it."
-  },
-  {
-    id: "unclear-priorities",
-    order: "Third",
-    title: "Unclear priorities",
-    problem: [
-      "Once you understand what changed, you still have to decide what comes first.",
-      "Should you review pricing, investigate supplier costs, or adjust staffing? Which issue needs attention now? Is there something working well that deserves more investment?",
-      "Without clear priorities, finding the answer can lead to another round of uncertainty."
-    ],
-    solution: [
-      "Vaeroex helps you sort findings into practical priorities, explains why they matter, and suggests next steps.",
-      "You can weigh the problems and opportunities, then decide where to focus your time."
+    "id": "software-that-fits",
+    "title": "Software that fits the work",
+    "paragraphs": [
+      "Our software templates and intelligence systems provide starting points for defined needs. Custom development addresses requirements that call for a different approach—from internal tools and portals to reporting and customer-facing features."
     ]
   },
   {
-    id: "unclear-results",
-    order: "Fourth",
-    title: "Unclear results",
-    problem: [
-      "You make a change. Now you need to know whether it helped.",
-      "Did the pricing adjustment improve margins? Did reducing costs affect service? Did one result improve while another slipped?",
-      "Checking the outcome can send you straight back to comparing reports."
-    ],
-    solution: [
-      "Vaeroex helps you review updated numbers alongside the changes you recorded in your business notes.",
-      "You can assess what improved, what still needs attention, and whether another adjustment is worth considering."
+    "id": "build-on-what-works",
+    "title": "Build on what already works",
+    "paragraphs": [
+      "An existing system doesn’t always need replacing. Where the platform allows, we can add missing features, connect tools, and introduce automation or AI around the parts your team already uses."
     ]
   },
   {
-    id: "keeping-up-with-growth",
-    order: "Fifth",
-    title: "Keeping up with growth",
-    problem: [
-      "As the business grows, there’s more to manage: more activity, more information, and more decisions.",
-      "The approach that worked when things were smaller can start taking too much time. Questions pile up, and the same cycle begins again."
-    ],
-    solution: [
-      "Vaeroex helps you maintain a clear view as the business changes—bringing information together, highlighting priorities, and helping you review progress without rebuilding the analysis from scratch each time.",
-      "Whether you’re addressing a problem or exploring an opportunity, you have a place to keep the information and decisions connected."
+    "id": "ai-defined-role",
+    "title": "AI with a defined role",
+    "paragraphs": [
+      "VSI is the AI behind Vaeroex, with capabilities that can be incorporated into focused tools and larger software implementations. We scope information access, interfaces, integrations, and supported actions around the task and its users.",
+      "Projects can include conversational assistance, document extraction, company knowledge search, speech features, and workflow automation, depending on the requirements and available technology."
+    ]
+  },
+  {
+    "id": "answers-you-can-examine",
+    "title": "Answers you can examine",
+    "paragraphs": [
+      "AI can produce convincing answers that are incorrect. Our approach emphasizes relevant information, supporting evidence, and clear limits.",
+      "Depending on the implementation, we use approved sources, calculation checks, source references, access controls, and review steps to help reduce unsupported outputs. Safeguards are defined for the use case, and important results remain subject to human review."
+    ]
+  },
+  {
+    "id": "clear-project",
+    "title": "A clear project and a path forward",
+    "paragraphs": [
+      "Custom work begins with agreed deliverables, costs, responsibilities, and support. New features and substantial changes are scoped separately, giving the system a practical path to evolve as requirements change."
     ]
   }
 ] as const;
 
 export const whyVaeroexFaqs = [
-  ["Is VSI a chatbot?", "VSI is the intelligence behind Vaeroex. Chat is one way to use it. It also powers how Vaeroex analyzes business information, explains findings, and helps you evaluate priorities across the platform."],
-  ["Can I ask everyday questions too?", "Yes. You can ask for breakfast ideas, help planning a trip, or other everyday assistance. When you have a business question, Vaeroex can work with the business information available in your workspace."],
-  ["How does Vaeroex look at my business from different perspectives?", "A decision can affect more than one part of your business. Vaeroex helps you examine the financial, operational, customer, marketing, and technology implications together—the perspectives a leadership team would consider. You remain responsible for the decision."],
-  ["My existing software already has AI. Why would I use Vaeroex?", "Those features can be valuable. Vaeroex helps when your question reaches across several tools and you need to understand how their information fits together. It adds a place to compare available information, include your business context, and investigate the question as a whole."],
-  ["How does VSI help prevent hallucinated answers?", "VSI combines business calculations with checks on the support, consistency, and relevance of its conclusions. It challenges its own interpretation and identifies missing information when it cannot adequately support an answer."],
-  ["What happens if I haven’t provided enough information?", "Vaeroex explains what it can establish, what remains unanswered, and what additional information would help. That could mean a missing report, a different date range, or context about a change in your business."],
-  ["Do I need to connect every system before I can use it?", "You can start with the information you have. The questions Vaeroex can answer depend on the records and context available. Additional information can help it investigate more of the business."],
-  ["Will Vaeroex make changes to my business for me?", "Its findings and suggested actions help you decide what to do. You review recommendations and confirm supported actions before records are created or changed."]
+  [
+    "Do I need a custom build?",
+    "Not always. An available software template or intelligence system may meet your needs. Discovery helps determine whether to use an existing solution, extend your current tools, or build something new."
+  ],
+  [
+    "Can you improve software or a website we already have?",
+    "Yes, where the platform and available access support the proposed changes. We review the existing setup before defining what can be enhanced."
+  ],
+  [
+    "Can VSI be included in our software?",
+    "VSI capabilities can be scoped into custom implementations when desired and technically feasible. Information access, supported actions, integrations, and ongoing costs are defined for the project."
+  ],
+  [
+    "What AI capabilities can you add?",
+    "Options include assistants, document extraction, company knowledge search, speech and transcription, image analysis, and workflow automation. The appropriate capabilities depend on the task, data, and available technology. Speech and transcription are project-scoped development options, rather than generally available product features."
+  ],
+  [
+    "How are development and support priced?",
+    "Custom projects have a one-time development fee with an upfront deposit and a scoped monthly maintenance and support plan. Hosting, third-party usage, deliverables, and additional development are defined in the written proposal and agreement."
+  ],
+  [
+    "Can every platform be integrated?",
+    "Integration depends on available APIs, permissions, platform restrictions, and the project requirements. We check feasibility before committing to the scope."
+  ],
+  [
+    "How do you address AI accuracy?",
+    "We define relevant information sources, checks, and review steps for each implementation. These measures help reduce unsupported outputs but cannot guarantee that every AI response is correct."
+  ]
 ] as const;

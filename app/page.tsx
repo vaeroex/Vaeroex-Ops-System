@@ -23,9 +23,9 @@ import { VeteranOwned } from "@/components/marketing/VeteranOwned";
 import styles from "@/components/marketing/Solutions.module.css";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Vaeroex | Intelligence, Custom Software & Websites",
+  title: "Vaeroex | AI Tools, Intelligence, Software & Websites",
   description:
-    "Explore intelligence products, build custom software and websites, or enhance existing tools with features, integrations, automation, and AI.",
+    "Explore software templates, intelligence systems, AI tools, custom business software, and new or enhanced websites from Vaeroex.",
   path: "/",
 });
 const icons = [ChartNoAxesCombined, Workflow, PanelsTopLeft];
@@ -43,12 +43,7 @@ export default function HomePage() {
             <h1>
               Intelligence and software <span>built around your business.</span>
             </h1>
-            <p className={styles.lead}>
-              Vaeroex develops intelligence products, custom business software,
-              and websites. Explore our intelligence systems, bring a new idea to life,
-              or enhance the tools you already use with custom features,
-              integrations, and AI.
-            </p>
+            <p className={styles.lead}>Vaeroex develops intelligence products, AI tools, custom business software, and websites. Explore our available systems, bring a new idea to life, or enhance the tools you already use with custom features, integrations, and AI.</p>
             <div className={styles.actions}>
               <Link href="#solutions" className="vx-button vx-button--primary">
                 Explore Solutions
@@ -130,6 +125,18 @@ export default function HomePage() {
             </div>
             <div className={styles.preview}>
               <WorkspaceCapture view="intelligence" />
+            </div>
+          </div>
+        </section>
+        <section aria-labelledby="home-vsi" className={`${styles.section} ${journeyStyles.technology}`}>
+          <div className={styles.container}>
+            <p className={styles.eyebrow}>Vaeroex Super Intelligence</p>
+            <h2 id="home-vsi">The AI behind Vaeroex. From focused tools to complex systems.</h2>
+            <p className={styles.copy}>VSI brings intelligent capabilities to our software templates and custom implementations—connecting information, conversation, and automation around what users need to accomplish.</p>
+            <p className={styles.copy}>We combine Vaeroex-developed technology with tools from providers including OpenAI and NVIDIA, selecting the technologies appropriate to each implementation.</p>
+            <div className={styles.actions}>
+              <Link href="/about#vsi" className="vx-text-link">About Our Technology<ArrowUpRight size={17} aria-hidden="true" /></Link>
+              <Link href="/contact?inquiry=custom-business-systems" className="vx-text-link">Discuss Your Project<ArrowUpRight size={17} aria-hidden="true" /></Link>
             </div>
           </div>
         </section>

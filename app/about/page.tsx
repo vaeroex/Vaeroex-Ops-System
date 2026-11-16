@@ -9,8 +9,8 @@ import styles from "@/components/marketing/IntelligencePages.module.css";
 import story from "@/components/marketing/ExecutiveStory.module.css";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "About Vaeroex | Isaac Vizcarra, Founder & CEO",
-  description: "Meet Isaac Vizcarra, Founder & CEO of Vaeroex, and learn about Vaeroex’s intelligence products, custom business software, and website development.",
+  title: "About Vaeroex | AI Tools, Software & Our Founder",
+  description: "Meet Vaeroex and founder Isaac Vizcarra. Explore software templates, intelligence systems, VSI AI tools, custom business software, and websites.",
   path: "/about",
 });
 
@@ -21,7 +21,7 @@ export default function AboutPage() {
       <PublicPageHero
         eyebrow="About Vaeroex"
         title="Practical software. Built around business."
-        description="Vaeroex develops intelligence products, custom business software, and websites. Businesses can subscribe to Executive Intelligence, build a new system or website, or enhance existing tools with custom features and integrations."
+        description="Vaeroex develops software templates, intelligence systems, its own AI tools, custom business software, and websites. Start with an available solution, commission a tailored build, or add new capabilities to the software and website your business already uses."
         actions={<Link href="/#solutions" className={styles.primary}>Explore Solutions<ArrowRight size={17} aria-hidden="true" /></Link>}
       />
 
@@ -33,7 +33,7 @@ export default function AboutPage() {
             <p className={story.founderRole}>Founder &amp; CEO</p>
           </div>
           <div className={story.prose}>
-            <p className={story.lead}>Isaac founded Vaeroex to help businesses turn scattered information into a clearer understanding of their operations. His goal is to reduce the time teams spend gathering and interpreting data, helping them make informed decisions while automating routine analysis wherever practical.</p>
+            <p className={story.lead}>Isaac founded Vaeroex to help businesses make better use of information and build tools around the way they work. That focus spans intelligence systems, AI tools, custom software, and websites—with an emphasis on connecting useful technology to practical business needs.</p>
             <p>His background includes operational leadership in hospital and emergency medical services settings, business operations, and U.S. Air Force service. Those experiences shaped his interest in making complex information easier to understand and act on.</p>
           </div>
         </div>
@@ -52,33 +52,36 @@ export default function AboutPage() {
           </div>
           <div className={story.prose}>
             <p className={story.lead}>A name inspired by truth and executive thinking.</p>
-            <p>We believe business decisions deserve clear explanations, reliable calculations, and evidence you can check.</p>
-            <p>That belief shapes Vaeroex: understand what the information supports, recognize what’s missing, and help people decide what to do next.</p>
+            <p>We believe useful technology should have a clear purpose. Whether it helps someone investigate information, manage a workflow, or connect with customers, it should make the next step easier to understand.</p>
+            <p>That belief shapes how we develop our products and approach commissioned work: understand the need, define the requirements, and build something people can use.</p>
           </div>
         </div>
       </section>
 
-      <section className={`${styles.section} ${story.vsi}`} aria-labelledby="vsi-foundation">
+      <section id="vsi" className={`${styles.section} ${story.vsi} scroll-mt-28`} aria-labelledby="vsi-foundation">
         <div className={`${styles.container} ${story.vsiLayout}`}>
-          <div><p className={styles.sectionLabel}>Vaeroex Super Intelligence</p><h2 id="vsi-foundation" className={story.headline}>VSI—the intelligence behind Executive Intelligence.</h2></div>
+          <div><p className={styles.sectionLabel}>Vaeroex Super Intelligence</p><h2 id="vsi-foundation" className={story.headline}>VSI—the AI behind Vaeroex.</h2></div>
           <div className={story.prose}>
-            <p className={story.lead}>Vaeroex Super Intelligence, or VSI, powers reasoning and conversation within Executive Intelligence.</p>
-            <p>It brings business calculations, evidence, and reasoning together to power analysis, explanations, and conversation within that product.</p>
-            <p>Through Executive Intelligence, VSI helps you look at your business from several perspectives: finances, operations, customers, marketing, technology, and overall direction.</p>
-            <p>You bring the experience and judgment. Vaeroex helps you connect the information. Custom systems and websites are scoped separately; they do not automatically include VSI.</p>
-            <Link href="/about/why-vaeroex" className={styles.textLink}>Explore why Vaeroex<ArrowRight size={17} aria-hidden="true" /></Link>
+            <p>Vaeroex develops AI tools, software templates, and custom systems. VSI—Vaeroex Super Intelligence—connects intelligent capabilities across that work, from focused tools to complex software implementations.</p>
+            <p>Conversation is one way users interact with VSI. Its capabilities can also be integrated into software interfaces, document workflows, knowledge search, and automation, with information access and functionality tailored to each implementation.</p>
+            <p>We combine Vaeroex-developed software and workflows with models, tools, and technologies from providers including OpenAI and NVIDIA. Our software templates offer a starting point, while custom development brings those capabilities into the systems your business needs.</p>
+            <h3 className="text-xl font-medium text-white">Useful intelligence. Clear limits.</h3>
+            <p>Our approach emphasizes relevant context, supporting evidence, and reviewable outputs. Depending on the implementation, this includes grounding answers in approved information, checking calculations, showing sources, and identifying uncertainty to help reduce unsupported conclusions.</p>
+            <p>Speech and transcription are project-scoped development options, rather than generally available product features.</p>
+            <p>AI outputs can still be incorrect. Important results require human review.</p>
+            <Link href="/about/why-vaeroex" className={styles.textLink}>Explore Why Vaeroex<ArrowRight size={17} aria-hidden="true" /></Link>
           </div>
         </div>
       </section>
 
       <section className={styles.section} aria-labelledby="purpose-title">
         <div className={`${styles.container} ${styles.split}`}>
-          <div><p className={styles.sectionLabel}>Why we build</p><h2 id="purpose-title">Make information<br />useful to the people<br />running the business.</h2></div>
+          <div><p className={styles.sectionLabel}>Why we build</p><h2 id="purpose-title">Build around the work that needs doing.</h2></div>
           <div className={story.prose}>
-            <p>Restaurant, brewery, and retail teams work across payment records, accounting reports, spreadsheets, and conversations. Vaeroex brings supported information into a workspace where people can investigate performance and explore the context behind a finding.</p>
-            <p>Alongside Executive Intelligence, businesses can commission internal tools, portals, reporting workflows, or a new or improved website, and extend existing software with features, integrations, automation, and AI. Each project starts with its own scope, practical requirements, and maintenance needs.</p>
-            <p>That focus also serves other businesses with complex information to understand. Vaeroex-developed software, data connections, and analysis workflows support the process. Evidence, uncertainty, and human judgment stay part of the decision.</p>
-            <Link href="/intelligence-systems" className={styles.textLink}>The Vaeroex approach<ArrowRight size={17} aria-hidden="true" /></Link>
+            <p>Some businesses need a ready-to-use solution. Others need a workflow their current software doesn’t support, a better website, or a way to connect tools that operate separately.</p>
+            <p>Vaeroex works across those needs. We develop software templates and intelligence systems, build custom applications and websites, and enhance existing tools with features, integrations, automation, and AI.</p>
+            <p>Each custom project begins with understanding the problem, checking what is technically possible, and agreeing on the scope and ongoing support.</p>
+            <Link href="/#solutions" className={styles.textLink}>Explore Solutions<ArrowRight size={17} aria-hidden="true" /></Link>
           </div>
         </div>
       </section>
@@ -86,11 +89,11 @@ export default function AboutPage() {
       <section className={styles.section} aria-labelledby="development-title">
         <div className={`${styles.container} ${styles.split}`}>
           <div><p className={styles.sectionLabel}>Ongoing development</p><h2 id="development-title">Continuously developed.<br />Carefully tested.</h2></div>
-          <p className={styles.copy}>We continue to refine Vaeroex’s intelligence tools, test their performance, and expand how businesses can connect and understand their information. Executive Intelligence is available today; new capabilities are described as available only when they are ready.</p>
+          <p className={styles.copy}>We continue to develop Vaeroex’s software templates, intelligence systems, and AI tools, refine existing capabilities, and explore new applications. Custom systems and websites can evolve through agreed enhancements and ongoing support. New product capabilities become available as they are tested and released.</p>
         </div>
       </section>
 
-      <PublicCtaBand title="What does your business need next?" description="Explore an intelligence product, commission a custom system, or discuss a new or improved website." primaryHref="/contact" primaryLabel="Discuss a Project" />
+      <PublicCtaBand eyebrow="Build with Vaeroex" title="What does your business need next?" description="Explore our available solutions or tell us what you want to build, connect, or improve." primaryHref="/#solutions" primaryLabel="Explore Solutions" secondaryHref="/contact?inquiry=custom-business-systems" secondaryLabel="Discuss Your Project" />
       <PublicFooter />
     </main>
   );

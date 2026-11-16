@@ -229,9 +229,15 @@ const companySources = [
 ].join("\n");
 assert.doesNotMatch(
   companySources,
-  /NVIDIA|BioNeMo|OpenAI|Anthropic|Vertex AI|Supabase|private orchestration/i,
-  "The membership attribution must not expand into infrastructure or vendor claims",
+  /BioNeMo|Anthropic|Vertex AI|Supabase|private orchestration|endorsed by (?:OpenAI|NVIDIA)|(?:OpenAI|NVIDIA) partnership/i,
+  "Technology references may name implemented providers without inventing partnerships or exposing private infrastructure",
 );
+for (const file of ["app/page.tsx", "app/about/page.tsx"]) {
+  const copy = read(file);
+  assert.match(copy, /providers including OpenAI and NVIDIA/);
+  assert.match(copy, /each implementation/);
+  assert.doesNotMatch(copy, /train(?:s|ing)? (?:our own|foundation) models|guarantee.*(?:accuracy|hallucination)/i);
+}
 const researchSources =
   read("app/drug-discovery-intelligence/_archived-page.tsx") +
   read("app/biological-intelligence/_archived-page.tsx");

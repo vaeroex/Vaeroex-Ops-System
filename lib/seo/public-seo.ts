@@ -49,7 +49,7 @@ export const organizationJsonLd = {
   legalName: "Vaeroex LLC",
   url: PUBLIC_SITE_URL,
   logo: `${PUBLIC_SITE_URL}/brand/vaeroex-logo-white-wordmark.png`,
-  description: "Vaeroex develops intelligence products, custom business software, and websites.",
+  description: "Vaeroex develops software templates, intelligence systems, AI tools, custom business software, and new or enhanced websites.",
   address: {
     "@type": "PostalAddress",
     streetAddress: "5319 University Dr, Unit 762",
