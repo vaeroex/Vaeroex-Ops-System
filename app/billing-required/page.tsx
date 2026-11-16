@@ -1,3 +1,5 @@
+import { utilityRobots } from "@/lib/seo/public-seo";
+export const metadata = { robots: utilityRobots };
 import Link from "next/link";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";

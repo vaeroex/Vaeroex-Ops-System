@@ -7,6 +7,7 @@ import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emai
 import { trustSections } from "@/lib/legal/content";
 
 function trustSection(title: (typeof trustSections)[number][0]) {
+  if (title === "Deterministic Business Intelligence") return [title, "VSI uses calculation checks and supporting information to help reduce unsupported figures. Relevant, up-to-date records matter; missing information and important outputs require review."] as const;
   return trustSections.find(([sectionTitle]) => sectionTitle === title) ?? trustSections[0];
 }
 
@@ -66,6 +67,7 @@ function TrustContent({ inApp }: { inApp: boolean }) {
         </header>
       ) : null}
 
+      <p className={`text-sm leading-7 ${inApp ? "text-muted" : "text-slate-300"}`}>Published workspace controls describe the current hosted product where applicable. Commissioned implementations have controls and responsibilities defined for their own scope. VSI capabilities and safeguards depend on the implementation; important AI outputs require human review.</p>
       <div className="grid gap-3 lg:grid-cols-2">
         {trustGroups.map((group, index) => {
           const Icon = group.icon;
@@ -126,7 +128,7 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
       <PublicPageHero
         eyebrow="Trust at Vaeroex"
         title="Intelligence you can inspect, understand, and control."
-        description="VSI is the intelligence behind Vaeroex. Its safeguards help prevent hallucinated answers and keep findings grounded in business evidence. Learn how to check its findings, protect your information, and stay in control."
+        description="VSI is the intelligence behind Vaeroex. Its safeguards help reduce unsupported outputs and keep findings grounded in relevant evidence. Learn how to check its findings, protect your information, and stay in control."
       />
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-7xl">

@@ -2,28 +2,12 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { ActivityProvider } from "@/components/app/ActivityProvider";
 import { PwaServiceWorker } from "@/components/app/PwaServiceWorker";
-import { organizationJsonLd, PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
+import { organizationJsonLd, PUBLIC_SITE_URL, publicPageMetadata } from "@/lib/seo/public-seo";
 import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || PUBLIC_SITE_URL),
-  title: "Vaeroex | AI Tools, Intelligence, Software & Websites",
-  description: "Vaeroex develops software templates, intelligence systems, AI tools, custom business software, and websites. Explore available products or build and enhance the tools your business needs.",
-  openGraph: {
-    title: "Vaeroex | AI Tools, Intelligence, Software & Websites",
-    description: "Vaeroex develops software templates, intelligence systems, AI tools, custom business software, and websites. Explore available products or build and enhance the tools your business needs.",
-    url: PUBLIC_SITE_URL,
-    siteName: "Vaeroex",
-    type: "website",
-    images: [
-      {
-        url: "/brand/vaeroex-logo-white-wordmark.png",
-        width: 1536,
-        height: 1024,
-        alt: "Vaeroex"
-      }
-    ]
-  },
+  ...publicPageMetadata({title: "Vaeroex | AI Tools, Intelligence, Software & Websites", description: "Vaeroex develops software templates, intelligence systems, AI tools, custom business software, and websites. Explore available products or build and enhance the tools your business needs."}),
   icons: {
     apple: "/apple-touch-icon.png",
     icon: "/favicon.png"

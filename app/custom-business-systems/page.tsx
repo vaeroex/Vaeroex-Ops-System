@@ -61,9 +61,7 @@ export default function ServicePage() {
               <span className={styles.eyebrow}>02 / Extend what works</span>
               <h3>Enhance existing software</h3>
               <p>
-                Add missing features, reporting, integrations, automation, or AI
-                to the tools your team already uses. Keep the useful parts and
-                focus the project on what needs to work better.
+                Keep the useful parts of your current setup. Discovery identifies the gaps and checks which changes the platform can support.
               </p>
             </article>
           </div>
@@ -74,8 +72,7 @@ export default function ServicePage() {
           <p className={styles.eyebrow}>Features &amp; connections</p>
           <h2>Already have a system? Build on it.</h2>
           <p className={styles.copy}>
-            Extend the software your business already uses with custom features,
-            connected workflows, and AI capabilities tailored to your operations.
+            Explore practical capabilities that can be scoped around your existing tools, information, and workflows.
           </p>
           <div className={styles.two}>
             <ul className={styles.list}>

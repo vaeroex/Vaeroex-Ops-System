@@ -26,18 +26,19 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
       type: "website",
       images: [
         {
-          url: `${PUBLIC_SITE_URL}/brand/vaeroex-logo-white-wordmark.png`,
+          url: `${PUBLIC_SITE_URL}/brand/vaeroex-social.jpg`,
           width: 1200,
           height: 630,
           alt: "Vaeroex"
         }
       ]
     },
+    other: { "twitter:url": canonical },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [`${PUBLIC_SITE_URL}/brand/vaeroex-logo-white-wordmark.png`]
+      images: [`${PUBLIC_SITE_URL}/brand/vaeroex-social.jpg`]
     }
   };
 }
@@ -82,3 +83,5 @@ export const operationsIntelligenceJsonLd = {
   },
   description: "Executive Intelligence helps restaurants, breweries, retailers, and other businesses explore performance, inspect business evidence, and ask deeper questions with Vaeroex Super Intelligence."
 };
+
+export const utilityRobots = { index: false, follow: false } as const;

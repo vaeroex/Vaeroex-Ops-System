@@ -187,7 +187,7 @@
     "benchmark:answers": "node scripts/answer-quality-benchmark.js",
     "test:project-inquiries": "node scripts/project-inquiry-tests.cjs",
     "test:homepage-journey": "node scripts/homepage-journey-tests.cjs && node scripts/homepage-journey-lifecycle-tests.cjs",
-    "test:public-clarity": "node scripts/project-inquiry-tests.cjs && node scripts/inquiry-notification-tests.cjs && node scripts/public-clarity-regression-tests.js && node scripts/website-workspace-imagery-tests.cjs && node scripts/public-policy-regression-tests.js && node scripts/clarity-motion-regression-tests.js && node scripts/science-regression-tests.js && node scripts/signature-regression-tests.js && node scripts/homepage-assembly-tests.cjs && pnpm test:homepage-journey",
+    "test:public-clarity": "node scripts/public-audit-seo-tests.cjs && node scripts/project-inquiry-tests.cjs && node scripts/inquiry-notification-tests.cjs && node scripts/public-clarity-regression-tests.js && node scripts/website-workspace-imagery-tests.cjs && node scripts/public-policy-regression-tests.js && node scripts/clarity-motion-regression-tests.js && node scripts/science-regression-tests.js && node scripts/signature-regression-tests.js && node scripts/homepage-assembly-tests.cjs && pnpm test:homepage-journey",
     "test:science": "node scripts/science-regression-tests.js",
     "test:google-sheets": "node scripts/google-sheets-runtime-tests.cjs && node scripts/google-sheets-data-tests.cjs && node scripts/google-sheets-sync-tests.cjs && node scripts/google-sheets-entity-tests.cjs",
     "test:google-sheets-ui": "node scripts/google-sheets-ui-browser-tests.cjs",

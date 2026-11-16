@@ -1,3 +1,5 @@
+import { utilityRobots } from "@/lib/seo/public-seo";
+export const metadata = { robots: utilityRobots };
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import type { ReactNode } from "react";
