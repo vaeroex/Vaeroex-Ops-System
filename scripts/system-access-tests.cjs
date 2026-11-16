@@ -55,7 +55,7 @@ function load(file){
  const html=renderToStaticMarkup(React.createElement(SystemsCatalog,{decisions,reason:`SYNTHETIC ${name}-access fixture. No customer data or authorization.`}));
  const articles=html.match(/<article\b[\s\S]*?<\/article>/g);assert.equal(articles.length,3);for(const card of articles.slice(1)){assert.match(card,/In Development/);assert.doesNotMatch(card,/<a\b|<button\b|<form\b/)}
  assert.equal(html.includes('Switch system'),name==='multiple');assert.equal(html.includes('href="/not-a-real-system"'),false);
- if(process.env.SYSTEMS_FIXTURE_DIR){fs.mkdirSync(process.env.SYSTEMS_FIXTURE_DIR,{recursive:true});fs.writeFileSync(path.join(process.env.SYSTEMS_FIXTURE_DIR,`${name}.html`),`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Isolated ${name} system fixture</title><link rel="stylesheet" href="/style.css"></head><body><main class="min-h-screen bg-slate-50 p-5 text-slate-900"><div class="mx-auto max-w-7xl">${html}</div></main></body></html>`)}
+ if(process.env.SYSTEMS_FIXTURE_DIR){fs.mkdirSync(process.env.SYSTEMS_FIXTURE_DIR,{recursive:true});fs.writeFileSync(path.join(process.env.SYSTEMS_FIXTURE_DIR,`${name}.html`),`<!doctype html><html class="dark pulsar" data-theme="pulsar"><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Isolated ${name} system fixture</title><link rel="stylesheet" href="/style.css"></head><body><main class="min-h-screen bg-slate-50 p-5 text-slate-900"><div class="mx-auto max-w-7xl">${html}</div></main></body></html>`)}
  }
  assert.equal(SYSTEM_CATALOG.length,3);assert.equal(SYSTEM_CATALOG.filter(x=>x.status==='available').length,1);
  // Actual auth handlers with only synthetic SDK transport; no network or emails.
