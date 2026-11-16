@@ -188,7 +188,7 @@ async function submitSupportRequest(formData: FormData): Promise<ContactFormStat
   }); } catch { console.error("support_saved_audit_failed", { requestId: supportRequest.id }); }
 
   if (text(formData, "return_path") === "/contact") {
-    try { await notifyPublicInquiry(admin, { id: supportRequest.id, name, email, category: issueType, message: fullMessage }); }
+    try { await notifyPublicInquiry(admin, { id: supportRequest.id, name, email, category: issueType, message: `${message.slice(0, 900)}\n\n${contextLines.join("\n").slice(0, 280)}` }); }
     catch { console.error("inquiry_notification_unavailable", { requestId: supportRequest.id }); }
   }
 
