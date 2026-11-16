@@ -17,6 +17,9 @@ begin
  if not exists(select 1 from public.support_requests where id=request_id and status='open' and notification_status='failed') then raise exception 'email failure must preserve saved request'; end if;
 end $$;
 select pass('saved request survives failure and duplicate claim is rejected');
+-- Local CLI grants differ from hosted API defaults. This fixture-only grant
+-- is rolled back; it lets us test the trigger rather than table ACL denial.
+grant insert on public.support_requests to anon;
 set local role anon;
 do $$
 declare rejection text;
