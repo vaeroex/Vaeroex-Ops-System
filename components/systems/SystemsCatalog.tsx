@@ -4,14 +4,14 @@ import { SYSTEM_CATALOG } from "@/lib/systems/catalog";
 import { accessibleSystemLinks, type SystemDecision } from "@/lib/systems/routing";
 import { SystemNavigation } from "./SystemNavigation";
 
-export function SystemsCatalog({ decisions, reason, needsWorkspaceSetup = false }: { decisions: readonly SystemDecision[]; reason: string; needsWorkspaceSetup?: boolean }) {
+export function SystemsCatalog({ decisions, needsWorkspaceSetup = false }: { decisions: readonly SystemDecision[]; needsWorkspaceSetup?: boolean }) {
   const accessible = accessibleSystemLinks(decisions);
   return <>
     <SystemNavigation systems={accessible} />
     <div className="mb-10 max-w-3xl">
       <p className="text-xs font-semibold uppercase tracking-widest text-vaeroex-blue">Vaeroex account</p>
       <h1 className="mt-3 text-4xl font-semibold tracking-tight text-ink sm:text-5xl">Your Systems</h1>
-      <p className="mt-5 text-base leading-7 text-slate-600">{reason}</p>
+      <p className="mt-5 text-base leading-7 text-slate-600">Choose a system to get started.</p>
       <div className="mt-5 flex flex-wrap gap-5 text-sm font-semibold text-vaeroex-blue"><Link className="inline-flex min-h-11 items-center underline underline-offset-4" href="/#solutions">Explore Solutions</Link><Link className="inline-flex min-h-11 items-center underline underline-offset-4" href="/contact">Contact Vaeroex</Link></div>
     </div>
     <div className="grid items-stretch gap-5 lg:grid-cols-3">

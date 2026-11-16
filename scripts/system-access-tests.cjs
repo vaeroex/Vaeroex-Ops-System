@@ -43,14 +43,20 @@ function load(file){
  ['database failure',{memberships:[member(workspace('a'))],dbError:true},0],
  ];
  const results=[];
- for(const [name,data,count] of cases){reset(data);const access=await loadSystemAccess(db,fixture.user);assert.equal(routing.accessibleSystemLinks(access.decisions).length,count,name);assert.equal(routing.defaultSystemDestination(access.decisions),count?'/app/intelligence':'/systems',name);results.push({name,passed:true});}
+ for(const [name,data,count] of cases){reset(data);const access=await loadSystemAccess(db,fixture.user);assert.equal(routing.accessibleSystemLinks(access.decisions).length,count,name);results.push({name,passed:true});}
  reset({subscriptions:[stripe('future-setup')]});assert.equal((await loadSystemAccess(db,fixture.user)).needsWorkspaceSetup,true);
- reset({preferred:'b',memberships:[member(workspace('a',{subscription_required:false})),member(workspace('b'))]});let access=await loadSystemAccess(db,fixture.user);assert.equal(access.activeAllowed,false);assert.equal(routing.defaultSystemDestination(access.decisions),'/systems');assert.match(access.reason,/Choose an accessible workspace/);
+ reset({preferred:'b',memberships:[member(workspace('a',{subscription_required:false})),member(workspace('b'))]});let access=await loadSystemAccess(db,fixture.user);assert.equal(access.activeAllowed,false);assert.match(access.reason,/Choose an accessible workspace/);
  reset({preferred:'foreign',memberships:[member(workspace('a',{subscription_required:false}))]});assert.equal((await loadSystemAccess(db,fixture.user)).activeAllowed,true);
+ const {default:AccessPage}=load('app/access/page.tsx');
+ for(const preferred of [null,'a','foreign']){reset({preferred,memberships:[member(workspace('a',{subscription_required:false}))]});await assert.rejects(AccessPage(),e=>e.url==='/systems');}
+ const {default:Chooser}=load('app/systems/page.tsx');
+ for(const memberships of [[],[member(workspace('a',{subscription_required:false}))],[member(workspace('a',{subscription_required:false})),member(workspace('b',{subscription_required:false}))]]){
+   reset({memberships,preferred:'a'});const html=renderToStaticMarkup(await Chooser());assert.match(html,/Choose a system to get started\./);assert.equal((html.match(/<article/g)||[]).length,3);assert.equal(calls.filter(c=>c[0]==='cookie').length,0);
+ }
  const one={id:'executive-intelligence',name:'Vaeroex Executive Intelligence',href:'/app/intelligence',available:true,allowed:true};
  const second={id:'fixture-second',name:'Synthetic second system',href:'/fixture-second',available:true,allowed:true};
  const upcoming={id:'biological-intelligence',name:'Biological Intelligence',href:'/not-a-real-system',available:false,allowed:true};
- assert.equal(routing.defaultSystemDestination([one,upcoming]),'/app/intelligence');assert.equal(routing.defaultSystemDestination([one,second,upcoming]),'/systems');assert.equal(routing.accessibleSystemLinks([one,one]).length,1);
+ assert.equal(routing.accessibleSystemLinks([one,one]).length,1);
  for(const [name,decisions] of [['zero',[]],['one',[one]],['multiple',[one,second,upcoming]]]){
  const html=renderToStaticMarkup(React.createElement(SystemsCatalog,{decisions,reason:`SYNTHETIC ${name}-access fixture. No customer data or authorization.`}));
  const articles=html.match(/<article\b[\s\S]*?<\/article>/g);assert.equal(articles.length,3);for(const card of articles.slice(1)){assert.match(card,/In Development/);assert.doesNotMatch(card,/<a\b|<button\b|<form\b/)}
@@ -60,20 +66,26 @@ function load(file){
  assert.equal(SYSTEM_CATALOG.length,3);assert.equal(SYSTEM_CATALOG.filter(x=>x.status==='available').length,1);
  // Actual auth handlers with only synthetic SDK transport; no network or emails.
  const actions=load('lib/auth/actions.ts');const {safeAuthRedirectPath}=load('lib/auth/safe-redirect.ts');
- for(const next of ['', '//attacker.invalid','/%255cattacker.invalid','https://attacker.invalid'])assert.equal(safeAuthRedirectPath(next),'/access');
+ for(const next of ['', '//attacker.invalid','/%255cattacker.invalid','https://attacker.invalid'])assert.equal(safeAuthRedirectPath(next),'/systems');
  for(const next of ['/app/sources?file=fixture#review','/checkout/legal','/reset-password'])assert.equal(safeAuthRedirectPath(next),next);
  reset();let form=new FormData();form.set('email','fixture@example.invalid');form.set('password','synthetic-only');
- await assert.rejects(actions.signInAction(form),e=>e.url==='/access');assert.equal(calls[0][0],'signIn');assert.equal(calls[1][1],'accept_workspace_invites_for_current_user');
+ await assert.rejects(actions.signInAction(form),e=>e.url==='/systems');assert.equal(calls[0][0],'signIn');assert.equal(calls[1][1],'accept_workspace_invites_for_current_user');
+ await assert.rejects(actions.signOutAction(),e=>e.url==='/login');await assert.rejects(actions.signInAction(form),e=>e.url==='/systems');
  form.set('next','/app/sources?file=fixture');await assert.rejects(actions.signInAction(form),e=>e.url==='/app/sources?file=fixture');
  fixture.authError={message:'synthetic rejection'};await assert.rejects(actions.signInAction(form),e=>e.url.startsWith('/login?error='));
  await assert.rejects(actions.signOutAction(),e=>e.url==='/login');assert.ok(calls.some(c=>c[0]==='signOut'));
  await assert.rejects(actions.forgotPasswordAction(form),e=>e.url.startsWith('/forgot-password?message='));assert.ok(calls.some(c=>c[0]==='reset'&&c[2].redirectTo==='https://fixture.invalid/auth/callback?next=/reset-password'));
- const callback=load('app/auth/callback/route.ts');assert.equal((await callback.GET({url:'https://fixture.invalid/auth/callback?code=fixture-code&next=%2Fapp%2Fsources'})).location,'https://fixture.invalid/app/sources');assert.equal((await callback.GET({url:'https://fixture.invalid/auth/callback?code=fixture-code&next=https://attacker.invalid'})).location,'https://fixture.invalid/access');
+ const callback=load('app/auth/callback/route.ts');
+ assert.equal((await callback.GET({url:'https://fixture.invalid/auth/callback?code=fixture-code'})).location,'https://fixture.invalid/systems');
+ for(const next of ['/reset-password','/app/setup','/checkout/legal','/app/intelligence?finding=fixture'])assert.equal((await callback.GET({url:'https://fixture.invalid/auth/callback?code=fixture-code&next='+encodeURIComponent(next)})).location,'https://fixture.invalid'+next);
+assert.equal((await callback.GET({url:'https://fixture.invalid/auth/callback?code=fixture-code&next=%2Fapp%2Fsources'})).location,'https://fixture.invalid/app/sources');assert.equal((await callback.GET({url:'https://fixture.invalid/auth/callback?code=fixture-code&next=https://attacker.invalid'})).location,'https://fixture.invalid/systems');
  const {selectWorkspaceAction}=load('lib/workspaces/actions.ts');reset({memberships:[member(workspace('a',{subscription_required:false}))]});
  const selection=new FormData();selection.set('workspace_id','a');await assert.rejects(selectWorkspaceAction(selection),e=>e.url.startsWith('/app/intelligence?message='));assert.equal(calls.filter(c=>c[0]==='cookie').length,1);
  calls=[];selection.set('workspace_id','foreign');await assert.rejects(selectWorkspaceAction(selection),e=>e.url.startsWith('/app/intelligence?error='));assert.equal(calls.length,0);
  // Destination gates and workspace switch keep their established authority.
  const read=f=>fs.readFileSync(path.join(root,f),'utf8');assert.match(read('app/app/layout.tsx'),/hasAcceptedLatestLegalPolicies[\s\S]*LegalAcceptanceGate/);assert.match(read('lib/security/require-workspace-access.ts'),/getCurrentWorkspace[\s\S]*requireActiveSubscription/);assert.match(read('lib/workspaces/actions.ts'),/\.eq\("user_id", user.id\)[\s\S]*\.eq\("status", "active"\)/);
+ for(const file of ['components/legal/PublicSiteHeader.tsx','components/marketing/PublicNavigation.tsx'])assert.match(read(file),/loggedIn \? "\/systems" : "\/login"/);
+ assert.doesNotMatch(read('app/systems/page.tsx'),/redirect\(|useRouter|router\.push/);
  assert.match(read('app/(auth)/login/page.tsx'),/Welcome to Vaeroex/);assert.doesNotMatch(read('app/(auth)/login/page.tsx')+read('components/auth/AuthShell.tsx'),/Executive Intelligence|SYSTEM_CATALOG|SystemsCatalog/);
  for(const file of ['components/legal/PublicSiteHeader.tsx','components/marketing/PublicNavigation.tsx']){assert.match(read(file),/Discuss a Project/);assert.doesNotMatch(read(file),/Get Executive Intelligence/)}
  assert.match(read('app/page.tsx'),/Get Executive Intelligence/);assert.match(read('app/executive-intelligence/page.tsx'),/Start Executive Intelligence/);

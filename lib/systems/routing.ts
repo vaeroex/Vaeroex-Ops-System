@@ -13,8 +13,3 @@ export function accessibleSystemLinks(decisions: readonly SystemDecision[]): Sys
   })
     .map(({ id, name, href }) => ({ id, name, href }));
 }
-
-export function defaultSystemDestination(decisions: readonly SystemDecision[]): Route {
-  const accessible = accessibleSystemLinks(decisions);
-  return accessible.length === 1 ? accessible[0].href : "/systems" as Route;
-}

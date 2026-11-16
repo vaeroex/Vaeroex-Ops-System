@@ -23,7 +23,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
     >
       <form action={signUpAction} className="space-y-4">
         <AuthMessage error={params?.error} message={params?.message} />
-        <input type="hidden" name="next" value={params?.next || "/access"} />
+        <input type="hidden" name="next" value={params?.next || "/systems"} />
         <label className="block text-sm font-medium">
           Full name
           <input
@@ -61,7 +61,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
       </form>
       <p className="mt-5 text-sm text-muted">
         Already have an account?{" "}
-        <Link href={`/login?next=${encodeURIComponent(params?.next || "/access")}`} className="text-vaeroex-blue">
+        <Link href={`/login?next=${encodeURIComponent(params?.next || "/systems")}`} className="text-vaeroex-blue">
           Log in
         </Link>
       </p>

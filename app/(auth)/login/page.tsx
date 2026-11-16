@@ -23,7 +23,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     >
       <form action={signInAction} className="space-y-4">
         <AuthMessage error={params?.error} message={params?.message} />
-        <input type="hidden" name="next" value={params?.next || "/access"} />
+        <input type="hidden" name="next" value={params?.next || "/systems"} />
         <label className="block text-sm font-medium">
           Email
           <input
@@ -54,7 +54,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <Link href="/forgot-password" className="text-vaeroex-blue">
           Forgot password?
         </Link>
-        <Link href={`/signup?next=${encodeURIComponent(params?.next || "/access")}`} className="text-vaeroex-blue">
+        <Link href={`/signup?next=${encodeURIComponent(params?.next || "/systems")}`} className="text-vaeroex-blue">
           Create account
         </Link>
       </div>
