@@ -1,4 +1,7 @@
 begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select plan(2);
 do $$
 declare request_id uuid; claimed int;
 begin
@@ -13,6 +16,7 @@ begin
  update public.support_requests set notification_status='failed',notification_detail='configuration_missing' where id=request_id;
  if not exists(select 1 from public.support_requests where id=request_id and status='open' and notification_status='failed') then raise exception 'email failure must preserve saved request'; end if;
 end $$;
+select pass('saved request survives failure and duplicate claim is rejected');
 set local role anon;
 do $$
 declare rejection text;
@@ -29,4 +33,6 @@ begin
  values('SYNTHETIC legacy intake','synthetic@example.invalid','General Inquiry','No email','open');
 end $$;
 reset role;
+select pass('anonymous status forgery rejected and legacy intake preserved');
+select * from finish();
 rollback;
