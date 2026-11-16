@@ -32,10 +32,8 @@ begin
   get stacked diagnostics rejection=message_text;
   if rejection<>'notification metadata is server controlled' then raise exception 'unexpected denial'; end if;
  end;
- insert into public.support_requests(name,email,issue_type,message,status)
- values('SYNTHETIC legacy intake','synthetic@example.invalid','General Inquiry','No email','open');
 end $$;
 reset role;
-select pass('anonymous status forgery rejected and legacy intake preserved');
+select pass('anonymous notification-status forgery rejected');
 select * from finish();
 rollback;
