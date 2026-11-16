@@ -185,12 +185,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
             <details className={styles.disclosure}>
               <summary>How are refunds handled?</summary>
               <p>
-                All purchases and subscription payments are final and
-                non-refundable, except where a refund is required by applicable
-                law. Cancellation does not provide a prorated refund or credit
-                for unused time. Review the{" "}
-                <Link href="/refund-policy">Vaeroex Refund Policy</Link> for
-                details.
+                Executive Intelligence subscription payments follow the existing <Link href="/subscription-billing-terms">Subscription and Billing Terms</Link> and <Link href="/refund-policy">Refund Policy</Link>. Optional workspace capacity payments follow the <Link href="/workspace-capacity-terms">Workspace Capacity Terms</Link> and applicable Refund Policy provisions. Commissioned-project payment, cancellation, and refund terms are defined in the individual written project agreement.
               </p>
             </details>
             <details className={styles.disclosure}>
@@ -218,7 +213,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
           </div>
         </div>
       </section>
-      <section className={styles.section} aria-labelledby="project-pricing"><div className={styles.container}><p className={styles.sectionLabel}>Custom projects</p><h2 id="project-pricing">Development and ongoing support.</h2><p className={styles.copy}>Project fees and maintenance are defined in an individual written project agreement before work begins. The subscription details above describe Executive Intelligence.</p><div className={solutions.two}><ProjectPricing /><ProjectPricing website /></div></div></section>
+      <section className={styles.section} aria-labelledby="project-pricing"><div className={styles.container}><p className={styles.sectionLabel}>Custom projects</p><h2 id="project-pricing">Development and ongoing support.</h2><p className={styles.copy}>Every project begins with a written agreement defining the scope, pricing, deliverables, and ongoing support. The subscription details above describe Executive Intelligence.</p><div className={solutions.two}><ProjectPricing /><ProjectPricing website showAgreementDetails={false} /></div></div></section>
       <PublicFooter />
     </main>
   );

@@ -6,7 +6,7 @@ export const SOLUTIONS = [
     name: "Intelligence Systems",
     route: "/intelligence-systems",
     description:
-      "Subscribe to a product for business information, analysis, and evidence.",
+      "Explore specialized intelligence systems built to help you understand information and investigate what matters.",
     kind: "intelligence",
     label: "01 / PRODUCTS",
   },

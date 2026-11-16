@@ -7,15 +7,15 @@ import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emai
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Vaeroex Network",
-  description: "The Vaeroex Network is a curated professional relationship network for operators, domain experts, technology partners, and organizations aligned with evidence-backed intelligence systems.",
+  title: "Vaeroex Network | Software, AI & Technology Relationships",
+  description: "Connect with Vaeroex around practical software, AI tools, integrations, websites, and strategic technology relationships.",
   path: "/networking"
 });
 
 const relationshipTypes = [
-  ["Operators and domain experts", "Experienced leaders who understand evidence, operating performance, and executive decision rhythms."],
-  ["Technology and plug-in partners", "Organizations that can help connect Vaeroex with the external systems customers already use."],
-  ["Implementation relationships", "Qualified professionals who help organizations improve how they review and respond to intelligence."],
+  ["Operators and domain experts", "People with practical experience in the work, needs, and challenges of their domain."],
+  ["Technology and integration relationships", "Organizations that can help connect Vaeroex with the external systems customers already use."],
+  ["Software, AI, and website implementation relationships", "Professionals interested in building, connecting, or improving useful software and digital experiences."],
   ["Strategic relationships", "Industry experts and aligned organizations interested in the long-term Vaeroex direction."]
 ] as const;
 
@@ -30,9 +30,9 @@ export default function NetworkingPage() {
     <main className="vaeroex-public-site min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
       <PublicPageHero
-        eyebrow="Vaeroex Executive Intelligence"
-        title="A curated network for relationships that strengthen evidence-backed intelligence."
-        description="The Vaeroex Network connects credible operators, domain experts, technology partners, and strategic organizations around one goal: helping leadership understand complex information with greater clarity."
+        eyebrow="Vaeroex Network"
+        title="Connect around what comes next."
+        description="The Vaeroex Network brings together operators, developers, domain experts, and technology organizations interested in practical software, AI tools, integrations, and digital experiences."
         actions={
           <a href={VAEROEX_MAILTO_LINKS.partners} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
             Start a partner conversation
@@ -46,7 +46,7 @@ export default function NetworkingPage() {
           <PublicSectionHeading
             eyebrow="Who should reach out"
             title="Focused relationships, not an open directory."
-            description="The Network is for people and organizations with a credible way to improve intelligence context, product quality, plug-ins, or customer understanding."
+            description="The Network is for people and organizations with a credible way to contribute to practical software, AI tools, integrations, websites, or customer understanding."
           />
           <div className="mt-8 grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 md:grid-cols-2">
             {relationshipTypes.map(([title, body]) => (
@@ -92,8 +92,8 @@ export default function NetworkingPage() {
         description={`Send a concise introduction to ${VAEROEX_CONTACT_EMAILS.partners}. Include your background, organization, and the relationship you want to explore.`}
         primaryHref="/contact"
         primaryLabel="Contact Vaeroex"
-        secondaryHref="/executive-intelligence"
-        secondaryLabel="Understand the product"
+        secondaryHref="/#solutions"
+        secondaryLabel="Explore Solutions"
       />
       <PublicFooter />
     </main>

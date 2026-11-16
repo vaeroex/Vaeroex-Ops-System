@@ -1,3 +1,5 @@
+import { utilityRobots } from "@/lib/seo/public-seo";
+export const metadata = { robots: utilityRobots };
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireAuth } from "@/lib/security/require-auth";

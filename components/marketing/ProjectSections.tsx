@@ -28,7 +28,7 @@ export function ProjectProcess() {
   );
 }
 
-export function ProjectPricing({ website = false }: { website?: boolean }) {
+export function ProjectPricing({ website = false, showAgreementDetails = true }: { website?: boolean; showAgreementDetails?: boolean }) {
   return (
     <div className={styles.projectPrice}>
       <p className={styles.eyebrow}>Quoted per project</p>
@@ -37,6 +37,7 @@ export function ProjectPricing({ website = false }: { website?: boolean }) {
           ? "Website Development & Enhancement"
           : "Custom Business Systems"}
       </h3>
+      <p className={styles.copy}>Every project begins with a written agreement defining the scope, pricing, deliverables, and ongoing support.</p>
       <p className={styles.copy}>
         Projects use a one-time development fee with an upfront deposit,
         followed by scoped monthly maintenance and support. The individual
@@ -53,7 +54,7 @@ export function ProjectPricing({ website = false }: { website?: boolean }) {
         substantial scope changes are quoted separately. Custom project
         proposals are separate from the Executive Intelligence subscription.
       </p>
-      <p className={styles.copy}>{PROJECT_AGREEMENT_NOTICE}</p>
+      {showAgreementDetails ? <details className={styles.copy}><summary className="min-h-11 cursor-pointer py-3 font-semibold focus-visible:outline focus-visible:outline-2">Project agreements and inquiry-only information</summary><p>{PROJECT_AGREEMENT_NOTICE}</p></details> : null}
       <div className={styles.actions}>
         <Link
           href={
