@@ -20,10 +20,10 @@ function redirect(url){throw Object.assign(new Error('redirect'),{url})}
 const cache=new Map();
 function load(file){
  if(cache.has(file))return cache.get(file).exports;
- const module={exports:{}};cache.set(file,module);
+ const loadedModule={exports:{}};cache.set(file,loadedModule);
  const mocks={'server-only':{},'next/link':{__esModule:true,default:({children,href,...props})=>React.createElement('a',{href,...props},children)},'next/navigation':{redirect},'next/headers':{cookies:async()=>({get:()=>fixture.preferred?{value:fixture.preferred}:undefined,set:(...args)=>calls.push(['cookie',...args])})},'next/server':{NextResponse:{redirect:url=>({location:String(url)})}},'@/lib/supabase/server':{createSupabaseServerClient:async()=>db},'@/lib/supabase/config':{getAppUrl:()=> 'https://fixture.invalid'},'@/lib/admin/admin-emails':{isVaeroexAdminUser:()=>false,isVaeroexAdminEmail:()=>false}};
  const code=ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
- vm.runInNewContext(code,{module,exports:module.exports,console,FormData,URL,URLSearchParams,process:{env:{}},require(spec){if(spec in mocks)return mocks[spec];if(spec.startsWith('@/')||spec.startsWith('.')){let base=spec.startsWith('@/')?spec.slice(2):path.join(path.dirname(file),spec);const target=[base,base+'.ts',base+'.tsx'].find(f=>fs.existsSync(path.join(root,f)));return load(target)}return require(spec)}},{filename:file});return module.exports;
+ vm.runInNewContext(code,{module:loadedModule,exports:loadedModule.exports,console,FormData,URL,URLSearchParams,process:{env:{}},require(spec){if(spec in mocks)return mocks[spec];if(spec.startsWith('@/')||spec.startsWith('.')){let base=spec.startsWith('@/')?spec.slice(2):path.join(path.dirname(file),spec);const target=[base,base+'.ts',base+'.tsx'].find(f=>fs.existsSync(path.join(root,f)));return load(target)}return require(spec)}},{filename:file});return loadedModule.exports;
 }
 (async()=>{
  reset(); const {loadSystemAccess}=load('lib/systems/access.ts');const routing=load('lib/systems/routing.ts');const {SYSTEM_CATALOG}=load('lib/systems/catalog.ts');const {SystemsCatalog}=load('components/systems/SystemsCatalog.tsx');
