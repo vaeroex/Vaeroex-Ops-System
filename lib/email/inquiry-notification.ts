@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { VAEROEX_CONTACT_EMAILS } from "@/lib/contact/emails";
+import { getAppUrl } from "@/lib/supabase/config";
 
 const escape = (s: string) => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 type Inquiry = { id: string; name: string; email: string; category: string; message: string };
@@ -13,8 +14,13 @@ export async function notifyPublicInquiry(admin: SupabaseClient<Database>, input
     .eq("id", input.id).eq("notification_status", "pending").select("id").maybeSingle();
   if (error || !data) { if (error) console.error("inquiry_notification_claim_failed", { requestId: input.id }); return; }
   let status = "failed", detail = "configuration_missing", providerId: string | null = null;
-  const key = process.env.RESEND_API_KEY, from = process.env.RESEND_FROM_EMAIL;
-  const origin = process.env.INQUIRY_ADMIN_ORIGIN;
+  // Reuse the established welcome/agreement sender configuration. No second key.
+  const key = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM_EMAIL || `Vaeroex <${VAEROEX_CONTACT_EMAILS.general}>`;
+  // Preview must not inherit a Production NEXT_PUBLIC_APP_URL as its default.
+  const origin = process.env.INQUIRY_ADMIN_ORIGIN || (process.env.VERCEL_ENV === "preview"
+    ? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
+    : getAppUrl());
   try {
     if (!key || !from || !origin) throw new Error("configuration_missing");
     const sender = from.match(/^(?:[^<>\r\n]+ <)?([^<>\s]+@vaeroex\.com)>?$/i);
