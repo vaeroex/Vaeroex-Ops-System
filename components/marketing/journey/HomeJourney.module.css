@@ -190,3 +190,10 @@
   .root .hero,.root .chapter,.finish { min-height: 0; }
 }
 @media(prefers-reduced-motion:reduce) { .canvas { transition: none; } }
+
+/* A compact technology interlude, not a fourth offering or new camera chapter. */
+.root .technology { padding-block: 28px; border: 0; }
+.technology > div { width: min(1216px, calc(100% - 80px)); padding: 28px 34px; background: #070d17ed; border: 1px solid #9cb5ff30; border-radius: 8px; }
+.technology h2 { max-width: 800px; font-size: clamp(26px, 2.6vw, 36px); }
+.technology p { max-width: 920px; }
+@media(max-width:760px) { .technology > div { width: calc(100% - 36px); padding: 24px; } }

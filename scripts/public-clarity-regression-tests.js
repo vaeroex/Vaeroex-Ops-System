@@ -106,6 +106,20 @@ async function main() {
     "$250/month",
   );
 
+  const companyAbout = await renderPage("app/about/page.tsx");
+  const companyWhy = await renderPage("app/about/why-vaeroex/page.tsx");
+  assert.match(companyAbout, /id="vsi"/);
+  assert.match(companyAbout, /VSI—the AI behind Vaeroex/);
+  assert.match(companyAbout, /U.S. Air Force service/);
+  assert.doesNotMatch(companyAbout + companyWhy, /Executive Intelligence|breakfast|trip planning|prevents? hallucinated/);
+  assert.match(companyWhy, /Start with your needs. Build from there/);
+  assert.equal((companyWhy.match(/<details/g) || []).length, 8);
+  assert.match(companyWhy, /Custom implementation requirements and controls are defined for each project/);
+  for (const html of [companyAbout, companyWhy]) {
+    assert.equal((html.match(/<h1(?:\s|>)/g) || []).length, 1);
+    assert.match(html, /href="\/#solutions"/);
+    assert.match(html, /href="\/contact\?inquiry=custom-business-systems"/);
+  }
   const routes = [
     "/",
     "/pricing",
