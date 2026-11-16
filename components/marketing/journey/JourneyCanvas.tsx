@@ -2,7 +2,7 @@
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
-import { ACESFilmicToneMapping, Object3D, PerspectiveCamera, type InstancedMesh } from "three";
+import { ACESFilmicToneMapping, Object3D, PerspectiveCamera, type InstancedMesh, type PointLight } from "three";
 import { PublicSpatialContextGuard } from "@/components/spatial/PublicSpatialCanvasGuard";
 import { probeRenderedCanvas } from "@/components/spatial/CanvasPixelProbe";
 import { SpatialResizeObserver } from "@/components/spatial/SpatialResizeObserver";
@@ -12,6 +12,7 @@ import { createJourneyWorld, journeyAssembly, journeyCamera, journeyLens, journe
 
 type Props = {
   progress: number;
+  finalShift?: number;
   active: boolean;
   compact: boolean;
   onReady: () => void;
@@ -19,20 +20,18 @@ type Props = {
 };
 
 const materials = [
-  { color: "#263545", metalness: .88, roughness: .29 },
-  { color: "#a6b5c5", metalness: .94, roughness: .25 },
-  { color: "#15232e", metalness: .12, roughness: .58 },
-  { color: "#a2c8ff", metalness: .2, roughness: .28, emissive: "#6a9fff", emissiveIntensity: .9 },
-  { color: "#9fdacb", metalness: .3, roughness: .3, emissive: "#6fb9aa", emissiveIntensity: .55 },
-  { color: "#8bb1c7", metalness: .08, roughness: .56, transparent: true, opacity: .38, depthWrite: false },
+  { color: "#557f9f", metalness: .78, roughness: .29 },
+  { color: "#659abb", metalness: .82, roughness: .27 },
 ];
 
-function World({ progress, active, compact, onReady, onFailure }: Props) {
+function World({ progress, finalShift = 0, active, compact, onReady, onFailure }: Props) {
   const state = useThree();
   const { gl, camera, invalidate, size } = state;
   const current = useRef(progress);
   const painted = useRef(false);
   const frames = useRef(0);
+  const seamLight = useRef<PointLight>(null);
+  const projection = useRef<number[]>([]);
   const meshes = useRef<Array<InstancedMesh | null>>([]);
   const resources = useMemo(() => ({
     geometry: createSculptureGeometries(compact), finish: createSculptureFinish(), object: new Object3D(),
@@ -78,7 +77,7 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
 
   useLayoutEffect(() => {
     paint(current.current);
-    gl.domElement.dataset.journeyWorld = "vaeroex-folded-sculpture";
+    gl.domElement.dataset.journeyWorld = "vaeroex-logo-sculpture";
     gl.domElement.dataset.journeyInstances = String(batches.reduce((sum, batch) => sum + batch.parts.length, 0));
     invalidate();
   }, [batches, paint, gl, invalidate]);
@@ -90,7 +89,7 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
 
   useEffect(() => {
     if (active || !painted.current) invalidate();
-  }, [progress, active, compact, size.width, size.height, invalidate]);
+  }, [progress, finalShift, active, compact, size.width, size.height, invalidate]);
 
   useEffect(() => probeRenderedCanvas(state, result => {
     if (result === "nonblank") onReady();
@@ -105,6 +104,15 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
     const view = journeyCamera(current.current, compact, size.width / size.height);
     camera.position.set(...view.position);
     camera.lookAt(...view.target);
+    if (camera instanceof PerspectiveCamera) {
+      const next = [size.width, size.height, view.offset[0], view.offset[1] - finalShift];
+      if (next.some((value, index) => value !== projection.current[index])) {
+        camera.setViewOffset(size.width, size.height, view.offset[0] * size.width,
+          (view.offset[1] - finalShift) * size.height, size.width, size.height);
+        projection.current = next;
+      }
+    }
+    if (seamLight.current) seamLight.current.intensity = 30 + 30 * journeyAssembly(current.current).closure;
     const assembly = journeyAssembly(current.current), node = gl.domElement;
     node.dataset.journeyFrames = String(++frames.current);
     node.dataset.journeyProgress = current.current.toFixed(5);
@@ -114,6 +122,8 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
     node.dataset.journeyTarget = view.target.map(value => value.toFixed(2)).join(",");
     node.dataset.journeyQuality = compact ? "compact" : "full";
     node.dataset.journeyAssembly = JSON.stringify(assembly);
+    node.dataset.journeyOffset = view.offset.join(",");
+    node.dataset.journeyFinalShift = finalShift.toFixed(5);
     node.dataset.journeyDocking = assembly.docking.toFixed(4);
     painted.current = true;
     if (active && current.current !== progress) invalidate();
@@ -121,13 +131,13 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
 
   return <>
     <color attach="background" args={["#080d16"]} />
-    <fog attach="fog" args={["#080d16", 85, 210]} />
+    <fog attach="fog" args={["#080d16", 150, 320]} />
     <StudioEnvironment />
     <hemisphereLight args={["#d6e4f2", "#131e2a", .9]} />
     <directionalLight position={[-22, 36, 32]} intensity={3} color="#e0ebfa" />
     <directionalLight position={[25, 15, -32]} intensity={2.2} color="#7b9fc8" />
-    <pointLight position={[0, 7, -10]} intensity={120} color="#9abfff" distance={32} />
-    <pointLight position={[8, 5, -29]} intensity={95} color="#aed7cd" distance={23} />
+    <pointLight ref={seamLight} position={[0, 7, 8]} intensity={30} color="#9abfff" distance={65} />
+    <pointLight position={[8, 5, -29]} intensity={80} color="#97b6d7" distance={35} />
     {batches.map((batch, index) => <instancedMesh
       key={batch.geometry + "-" + batch.material}
       ref={mesh => { meshes.current[index] = mesh; }}
@@ -139,10 +149,6 @@ function World({ progress, active, compact, onReady, onFailure }: Props) {
         roughnessMap={batch.material < 2 ? resources.finish : undefined}
       />
     </instancedMesh>)}
-    <mesh position={[0, -14.5, -15]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[180, 180]} />
-      <meshStandardMaterial color="#0c1521" metalness={.22} roughness={.72} />
-    </mesh>
   </>;
 }
 

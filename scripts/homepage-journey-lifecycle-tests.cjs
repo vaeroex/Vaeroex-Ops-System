@@ -18,6 +18,7 @@ function load(relative, mocks, globals = {}) {
   return result.exports;
 }
 const policy = load('components/marketing/clarity/clarityDevicePolicy.ts', {});
+const logoOutline = load('components/marketing/journey/logoOutline.ts', {});
 function events() {
   const listeners = new Map();
   return {
@@ -42,7 +43,7 @@ const milestones = [
 const documentTops = [500,1230,2160,3100,4200,5050,6200];
 function fixture({reduced=false,compact=false,saveData=false,missing=[]}={}) {
   const slots=[],pending=[],rafs=new Map(),intersections=[],resizes=[];
-  let cursor=0,dirty=false,tree,frameId=0,scroll=0;
+  let cursor=0,dirty=false,tree,frameId=0,scroll=0,visualTop=0;
   const window={...events(),innerHeight:1000,innerWidth:compact?390:1440},document={...events(),visibilityState:'visible',getElementById(id){
     if(id==='home-connected-journey')return {};
     const index=milestones.findIndex(([anchor])=>anchor===id);
@@ -51,6 +52,7 @@ function fixture({reduced=false,compact=false,saveData=false,missing=[]}={}) {
   }};
   const motion={...events(),matches:reduced},small={...events(),matches:compact};
   const node={getBoundingClientRect:()=>({bottom:300})};
+  const visualNode={getBoundingClientRect:()=>({top:visualTop})};
   const same=(a,b)=>a && b && a.length===b.length && a.every((v,i)=>Object.is(v,b[i]));
   const react={Component:class{},useState(initial){const i=cursor++;if(!slots[i])slots[i]={value:typeof initial==='function'?initial():initial};return [slots[i].value,value=>{
     const next=typeof value==='function'?value(slots[i].value):value;
@@ -60,13 +62,14 @@ function fixture({reduced=false,compact=false,saveData=false,missing=[]}={}) {
   const Scene=()=>null;
   const {HomeJourney}=load('components/marketing/journey/HomeJourney.tsx',{
     react,'react/jsx-runtime':{jsx,jsxs:jsx},'next/dynamic':{__esModule:true,default:()=>Scene},
-    '../clarity/clarityDevicePolicy':policy,'./HomeJourney.module.css':{__esModule:true,default:new Proxy({},{get:(_,key)=>key})},
+    '../clarity/clarityDevicePolicy':policy,'./logoOutline':logoOutline,'./HomeJourney.module.css':{__esModule:true,default:new Proxy({},{get:(_,key)=>key})},
   },{window,document,navigator:{hardwareConcurrency:8,deviceMemory:8,connection:{saveData}},matchMedia:q=>q.includes('reduced-motion')?motion:small,
     requestAnimationFrame(fn){const id=++frameId;rafs.set(id,fn);return id;},cancelAnimationFrame:id=>rafs.delete(id),
     IntersectionObserver:class {constructor(callback,options){this.callback=callback;this.options=options;this.connected=false;intersections.push(this);}observe(){this.connected=true;}disconnect(){this.connected=false;}},
     ResizeObserver:class {constructor(callback){this.callback=callback;this.connected=false;resizes.push(this);}observe(){this.connected=true;}disconnect(){this.connected=false;}},
   });
-  const render=()=>{cursor=0;tree=HomeJourney();tree.props.ref.current=node;};
+  const render=()=>{cursor=0;tree=HomeJourney();tree.props.ref.current=node;
+    walk(tree,n=>n.props?.className==='visual').forEach(n=>{n.props.ref.current=visualNode;});};
   const commit=()=>{let turns=0;do{dirty=false;render();while(pending.length)pending.shift()();assert.ok(++turns<20,'Lifecycle settles without render loop');}while(dirty);};
   const flush=()=>{const callbacks=[...rafs.values()];rafs.clear();callbacks.forEach(fn=>fn());commit();};
   const intersect=(visible)=>{for(const observer of intersections)if(observer.connected)observer.callback([{isIntersecting:visible}]);commit();};
@@ -74,6 +77,7 @@ function fixture({reduced=false,compact=false,saveData=false,missing=[]}={}) {
   return {get tree(){return tree;},scene:()=>walk(tree,n=>n.type===Scene)[0],poster:()=>walk(tree,n=>n.props?.className?.split(' ').includes('poster'))[0],
     commit,flush,intersect,window,document,motion,small,rafs,
     scrollTo(value){scroll=value;window.emit('scroll');},
+    setVisualTop(value){visualTop=value;},
     unmount(){slots.forEach(slot=>slot.cleanup?.());assert.equal(window.count(),0);assert.equal(document.count(),0);assert.equal(motion.count(),0);assert.equal(small.count(),0);assert.equal(rafs.size,0);assert.ok(intersections.every(o=>!o.connected));assert.ok(resizes.every(o=>!o.connected));},
   };
 }
@@ -167,6 +171,32 @@ for (const failure of ['render', 'readPixels']) {
   assert.equal(h.tree.props['data-reason'],'rendering-unavailable');assert.ok(!h.poster().props.className.includes('hidden'));
   cleanup();assert.equal(frames.size,0);h.unmount();
 }
+// Final composition follows the CTA only in portrait. Account for the sticky
+// visual moving at its root boundary so scrolling cannot double-shift the logo.
+{
+  const h=fixture({compact:true});h.intersect(true);h.flush();h.scene().props.onReady();h.commit();
+  h.scrollTo(5700);h.flush();assert.equal(h.scene().props.progress,1);assert.equal(h.scene().props.finalShift,0);
+  h.scrollTo(6300);h.flush();assert.equal(h.scene().props.finalShift,-.1);assert.equal(h.tree.props.style['--journey-final-shift'],'-10svh');
+  h.scrollTo(6500);h.flush();assert.equal(h.scene().props.finalShift,-.3);
+  h.setVisualTop(-120);h.window.emit('resize');h.flush();assert.equal(h.scene().props.finalShift,-.18);
+  assert.equal(h.scene().props.finalShift*h.window.innerHeight-120,-300,'Sticky-root motion and final shift add to the CTA displacement exactly once');
+  h.scrollTo(5200);h.flush();assert.ok(h.scene().props.progress<.94);assert.equal(h.scene().props.finalShift,0,'Reverse scroll resets final-only following');
+  h.scrollTo(6500);h.flush();h.window.innerWidth=844;h.window.innerHeight=390;h.window.emit('resize');h.flush();
+  assert.equal(h.scene().props.finalShift,0,'Compact landscape uses the side composition, not portrait following');h.unmount();
+}
+for(const fallback of ['static','failure','reduced-motion']) {
+  const h=fixture({compact:true});h.intersect(true);h.flush();h.scene().props.onReady();h.commit();h.scrollTo(6500);h.flush();
+  assert.ok(h.scene().props.finalShift<0);
+  if(fallback==='static')walk(h.tree,n=>n.type==='button')[0].props.onClick();
+  else if(fallback==='failure')h.scene().props.onFailure();
+  else {h.motion.matches=true;h.motion.emit('change');}
+  h.commit();assert.equal(h.scene(),undefined);assert.equal(h.tree.props.style['--journey-final-shift'],'0svh',
+    'Static/failure/reduced-motion poster cannot retain a stale offscreen final shift');
+  assert.equal(h.window.count('scroll'),0);assert.equal(h.rafs.size,0);h.unmount();
+}
+{
+  const h=fixture();h.intersect(true);h.flush();h.scrollTo(6500);h.flush();assert.equal(h.scene().props.finalShift,0,'Desktop keeps the logo beside the CTA');h.unmount();
+}
 for(const cancelAfterFirst of [false,true]) {
   const frames=new Map();let id=0,renders=0,callbacks=0;
   const {probeRenderedCanvas}=load('components/spatial/CanvasPixelProbe.tsx',{}, {
@@ -177,4 +207,4 @@ for(const cancelAfterFirst of [false,true]) {
   assert.equal(frames.size,1);cleanup();assert.equal(frames.size,0,'Probe cleanup cancels either pending frame');
   assert.equal(renders,0);assert.equal(callbacks,0,'Unmounted probe cannot call the owner');
 }
-console.log('Homepage journey mocked lifecycle: seven exact content milestones, interpolation/reversal, viewport resize, missing anchors, deferred mount, reduced motion/data-saving, offscreen/hidden pause, responsive quality, static toggle, context-loss and driver-exception fallback, HTML links, and listener/observer/frame cleanup passed. No browser or WebGL rendering is claimed.');
+console.log('Homepage journey mocked lifecycle: seven exact content milestones, interpolation/reversal, viewport resize, missing anchors, deferred mount, reduced motion/data-saving, offscreen/hidden pause, responsive quality, portrait final CTA following/root cancellation, static shift reset, static toggle, context-loss and driver-exception fallback, HTML links, and listener/observer/frame cleanup passed. No browser or WebGL rendering is claimed.');
