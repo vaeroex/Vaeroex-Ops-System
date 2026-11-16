@@ -26,7 +26,7 @@ export async function notifyPublicInquiry(admin: SupabaseClient<Database>, input
     const text = `New public inquiry (submitted content is untrusted)\nRequest: ${input.id}\nCategory: ${input.category}\nName: ${input.name}\nEmail: ${input.email}\n\n${summary}\n\nReview (admin sign-in required): ${link}`;
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "Idempotency-Key": `public-inquiry-${input.id}` },
-      body: JSON.stringify({ from, to: [VAEROEX_CONTACT_EMAILS.support], reply_to: input.email,
+      body: JSON.stringify({ from, to: [VAEROEX_CONTACT_EMAILS.general], reply_to: input.email,
         subject: `New Vaeroex inquiry: ${input.category.replace(/[\r\n]/g, " ")}`,
         text, html: `<html lang="en"><body><h1>New public inquiry</h1><p>Submitted content is untrusted text.</p><pre style="white-space:pre-wrap">${escape(text)}</pre></body></html>` }),
       signal: AbortSignal.timeout(8000), cache: "no-store"
