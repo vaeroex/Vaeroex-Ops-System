@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import type { Route } from "next";
 import { ChevronDown, Menu, ArrowUpRight } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
@@ -100,8 +101,8 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
         </details>
       </nav>
       <div className="vx-mobile-nav">
-        <Link href={loggedIn ? "/app" : "/login"}>
-          {loggedIn ? "App" : "Login"}
+        <Link href={(loggedIn ? "/systems" : "/login") as Route}>
+          {loggedIn ? "Your Systems" : "Log in"}
         </Link>
         <details>
           <summary aria-label="Open navigation menu">
@@ -128,10 +129,10 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
             ))}
             <Link href="/help">Help</Link>
             <Link
-              href="/checkout/legal"
+              href="/contact?inquiry=custom-business-systems"
               className="vx-button vx-button--primary"
             >
-              Get Executive Intelligence
+              Discuss a Project
               <ArrowUpRight size={15} aria-hidden="true" />
             </Link>
           </nav>

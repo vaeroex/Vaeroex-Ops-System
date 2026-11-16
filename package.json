@@ -96,6 +96,7 @@
     "test:security-high-remediation": "node scripts/security-high-remediation-regression-tests.js",
     "test:security-medium-hardening": "node scripts/security-medium-hardening-regression-tests.js",
     "test:auth-captcha": "node scripts/auth-captcha-regression-tests.js",
+    "test:system-access": "node scripts/system-access-tests.cjs",
     "test:demo-retirement": "node scripts/demo-retirement-regression-tests.js",
     "test:evidence-boundary": "node scripts/platform-failure-evidence-regression-tests.js",
     "test:evidence-lineage": "node scripts/evidence-lineage-regression-tests.js",

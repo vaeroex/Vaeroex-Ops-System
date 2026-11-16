@@ -58,6 +58,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Unified systems, authentication and CAPTCHA regressions
+        run: |
+          pnpm test:system-access
+          pnpm test:auth-captcha
+
       - name: Workspace audit security, evidence and workflow regressions
         run: pnpm test:workspace-audit
 

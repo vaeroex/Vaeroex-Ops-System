@@ -285,7 +285,7 @@ async function sharedBrowserRace(n, outcomes, order) {
 }
 
 (async () => {
-  assert.deepEqual(config.matcher, ['/app/:path*']);
+  assert.deepEqual(config.matcher, ['/app/:path*', '/systems', '/access']);
   phase = 'consecutive_requests';
   const state = fixture(1), writes = await expectedCookieWrites(state);
   const original = reconstructed(state.jar);

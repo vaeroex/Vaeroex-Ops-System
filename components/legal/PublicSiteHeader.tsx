@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Route } from "next";
 import Image from "next/image";
 import { ArrowUpRight } from "lucide-react";
 import { PublicNavigation } from "@/components/marketing/PublicNavigation";
@@ -28,11 +29,11 @@ export async function PublicSiteHeader() {
         </Link>
         <PublicNavigation loggedIn={loggedIn} />
         <div className="vx-header-actions">
-          <Link href={loggedIn ? "/app" : "/login"}>
-            {loggedIn ? "Go to App" : "Login"}
+          <Link href={(loggedIn ? "/systems" : "/login") as Route}>
+            {loggedIn ? "Your Systems" : "Log in"}
           </Link>
-          <Link href="/checkout/legal" className="vx-button vx-button--primary">
-            Get Executive Intelligence
+          <Link href="/contact?inquiry=custom-business-systems" className="vx-button vx-button--primary">
+            Discuss a Project
             <ArrowUpRight size={15} aria-hidden="true" />
           </Link>
         </div>
