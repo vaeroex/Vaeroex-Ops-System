@@ -95,7 +95,7 @@ export function SupportRequestsInbox({ requests, filters, total }: { requests: S
           <input aria-label={`Select request from ${request.name}: ${request.issue_type}`} type="checkbox" checked={selected.has(request.id)} disabled={pending} onChange={() => toggle(request.id)} className="mt-1 h-4 w-4 shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0"><p className="break-words text-sm font-semibold">{request.issue_type}</p><p className="break-words text-sm text-muted">{request.name} · {request.email}</p></div>
+              <div className="min-w-0"><p className="break-words text-sm font-semibold">{request.issue_type}</p><p className="break-words text-sm text-muted">{request.name} · {request.email}</p>{request.notification_status ? <p className="text-xs text-muted">Staff email: {request.notification_status === "accepted" ? "provider accepted (inbox unconfirmed)" : request.notification_status} {request.notification_detail ? `· ${request.notification_detail}` : ""}</p> : null}</div>
               <div className="flex flex-wrap gap-1"><StatusBadge value={request.priority} /><StatusBadge value={request.status} />{request.deleted_at ? <StatusBadge value="Deleted" /> : request.archived_at ? <StatusBadge value="Archived" /> : null}</div>
             </div>
             <p className="mt-1 break-words text-xs text-muted">{request.workspaceName} · <AdminLocalTime value={request.created_at} label="Created" /></p>

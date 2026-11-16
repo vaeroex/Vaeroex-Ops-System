@@ -11,6 +11,7 @@ function load(file) {
   if(cache.has(file)) return cache.get(file).exports;
   const loadedModule = { exports: {} }; cache.set(file,loadedModule);
   const mocks = {
+    '@/lib/email/inquiry-notification': { notifyPublicInquiry: async () => { if(config.notifyThrows) throw Error('synthetic email outage'); } },
     'next/navigation': { redirect: url => { throw Object.assign(new Error('redirect'), { url }); } },
     '@/lib/security/tool-execution-gateway': { logSecurityAuditEvent: async row => { audit.push(row); } },
     '@/lib/security/rate-limit': { enforceRateLimit: async () => { if(config.rateError) throw Error('unavailable'); return { allowed: config.allowed }; }, rateLimitMessage: () => 'Too many requests.' },
@@ -52,6 +53,7 @@ function form(category = 'Custom Business Systems', extra = {}) {
   for (const settings of [{admin:false},{allowed:false},{rateError:true},{result:{data:null,error:{message:'db error'}}},{result:{data:null,error:null}},{insertThrows:true}]) {
     reset(settings); const result = await actions.createContactRequestAction({},form()); assert.ok(result.error); assert.equal(result.message,undefined); assert.equal(audit.length,0);
   }
+  reset({notifyThrows:true}); assert.ok((await actions.createContactRequestAction({},form())).message); assert.equal(inserted.length,1);
   reset(); data = form('Support Request',{return_path:'/support'});
   await assert.rejects(actions.createSupportRequestAction(data), error => error.url.startsWith('/support?message='));
   reset(); data = form('Support Request',{return_path:'https://attacker.invalid'});

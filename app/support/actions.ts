@@ -1,5 +1,6 @@
 "use server";
 
+import { notifyPublicInquiry } from "@/lib/email/inquiry-notification";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { INQUIRY_CATEGORIES, isProjectInquiry, type ContactFormState } from "@/lib/contact/inquiries";
@@ -155,7 +156,8 @@ async function submitSupportRequest(formData: FormData): Promise<ContactFormStat
       issue_type: issueType,
       message: fullMessage,
       priority,
-      status: "open"
+      status: "open",
+      ...(text(formData, "return_path") === "/contact" ? { notification_status: "pending" } : {})
     })
     .select("id")
     .maybeSingle();
@@ -164,7 +166,7 @@ async function submitSupportRequest(formData: FormData): Promise<ContactFormStat
     return { error: "The request could not be submitted. Please try again or use the direct email links." };
   }
 
-  await logSecurityAuditEvent({
+  try { await logSecurityAuditEvent({
     supabase: admin,
     workspaceId,
     userId,
@@ -183,7 +185,12 @@ async function submitSupportRequest(formData: FormData): Promise<ContactFormStat
       authenticated: Boolean(userId),
       workspace_scoped: Boolean(workspaceId)
     } satisfies Json
-  });
+  }); } catch { console.error("support_saved_audit_failed", { requestId: supportRequest.id }); }
+
+  if (text(formData, "return_path") === "/contact") {
+    try { await notifyPublicInquiry(admin, { id: supportRequest.id, name, email, category: issueType, message: fullMessage }); }
+    catch { console.error("inquiry_notification_unavailable", { requestId: supportRequest.id }); }
+  }
 
   const successMessage =
     issueType === "Demo request" || issueType === "Product Demo"

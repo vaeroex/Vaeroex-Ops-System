@@ -4665,6 +4665,10 @@ export type Database = {
           workspace_id: string | null;
           user_id: string | null;
           folder_id: string | null;
+          notification_status?: string | null;
+          notification_attempted_at?: string | null;
+          notification_detail?: string | null;
+          notification_provider_id?: string | null;
           name: string;
           email: string;
           issue_type: string;
@@ -4681,6 +4685,10 @@ export type Database = {
           workspace_id?: string | null;
           user_id?: string | null;
           folder_id?: string | null;
+          notification_status?: string | null;
+          notification_attempted_at?: string | null;
+          notification_detail?: string | null;
+          notification_provider_id?: string | null;
           name: string;
           email: string;
           issue_type: string;

@@ -34,7 +34,7 @@ Before submitting, the actual Preview endpoint was verified as Supabase project 
 
 The retained synthetic requests are `0070a63d-9335-492f-a29d-1f8ba329adc0` (Custom Business Systems) and `bd071d59-01f9-4f7c-a532-59c494b82983` (Website Development / Enhancement). Both are open, Medium priority, and anonymous with no workspace association. Saved project context and both audit records were verified. A temporary Preview admin identity used for the real UI test was signed out and disabled afterward.
 
-Platform admins see these entries at **Admin → Support Requests** (`/app/admin/support-requests`), newest first. Expand **Request details and triage**, then **Read support message** for the project fields. `/app/admin` displayed an **Open support** count of 2. These views expose requests when opened or refreshed; the handler has no email transport, and the interface has no incoming-request notification, unread badge, polling, or realtime subscription. Assign a queue reviewer before relying on manual follow-up.
+Platform admins see these entries at **Admin → Support Requests** (`/app/admin/support-requests`), newest first. Expand **Request details and triage**, then **Read support message** for the project fields. `/app/admin` displayed an **Open support** count of 2. These views expose requests when opened or refreshed; the interface has no unread badge, polling, or realtime subscription. Public contact submissions now attempt a Resend staff notification after saving; provider acceptance is not inbox confirmation. Assign a queue reviewer before relying on manual follow-up.
 
 ## Policy language requiring owner review
 
