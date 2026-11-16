@@ -773,7 +773,7 @@ jobs:
 
       - name: Verify Square Production runtime foundation in the isolated database
         if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
-        run: node scripts/run-isolated-database-tests.js supabase/tests/square_production_runtime_foundation.test.sql
+        run: node scripts/run-isolated-database-tests.js supabase/tests/square_production_runtime_foundation.test.sql supabase/tests/public_inquiry_notification.test.sql
 
       - name: Qualify dormant Square authority and atomic pages in disposable local databases
         if: ${{ !cancelled() && steps.isolated_database_setup.outcome == 'success' }}
