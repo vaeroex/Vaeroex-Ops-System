@@ -232,7 +232,7 @@ export default function HomePage() {
                 src="/brand/nvidia-inception-program-badge.svg"
                 alt="NVIDIA Inception Program badge"
                 width={190}
-                height={60}
+                height={82}
                 unoptimized
               />
               <small>

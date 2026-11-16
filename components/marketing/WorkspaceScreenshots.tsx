@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import styles from "./WorkspaceScreenshots.module.css";
 
 const captures = {
@@ -18,7 +18,13 @@ const views = ["intelligence", "findings", "performance-comparison", "performanc
 export function WorkspaceCapture({ view }: { view: CaptureView }) {
   const capture = captures[view];
   const base = `/images/workspace-demo/${view}`;
-  return <figure className={styles.capture} data-workspace-capture={view}>
+  const narrow = "narrow" in capture ? capture.narrow : capture.mobile;
+  const captureStyle = {
+    "--capture-desktop-ratio": `${capture.desktop[0]} / ${capture.desktop[1]}`,
+    "--capture-mobile-ratio": `${capture.mobile[0]} / ${capture.mobile[1]}`,
+    "--capture-narrow-ratio": `${narrow[0]} / ${narrow[1]}`,
+  } as CSSProperties;
+  return <figure className={styles.capture} data-workspace-capture={view} style={captureStyle}>
     <div className={styles.caption}>
       <strong>{capture.title}</strong>
       <span>{capture.caption}</span>
