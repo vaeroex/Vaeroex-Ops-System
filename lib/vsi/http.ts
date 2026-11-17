@@ -7,7 +7,7 @@ import { readVsiJson } from "@/lib/vsi/request-boundary";
 import { hasProhibitedVsiIdentifiers, VSI_PROHIBITED_INPUT_MESSAGE } from "@/lib/vsi/sensitive-input";
 import { getVsiConfig } from "@/lib/vsi/config";
 import { runVsiAnswer, VsiEngineError } from "@/lib/vsi/engine";
-import { qualificationSlot, VSI_QUALIFICATION_LIMITS, VsiQualificationError } from "@/lib/vsi/qualification";
+import { qualificationAccountingPermit, qualificationSlot, VSI_QUALIFICATION_LIMITS, VsiQualificationError } from "@/lib/vsi/qualification";
 import { confirmVsiNote, conversationView, listVsiConversations, loadVsiConversation, mutateVsi, settleFailedVsi, settleGeneratedVsi, questionHash, requireVsiAccess, updateVsiSummary, VsiHttpError, vsiUuid, type ConversationRow } from "@/lib/vsi/storage";
 
 type RouteAction = "list" | "create" | "detail" | "rename" | "delete" | "messages" | "continue" | "remember" | "usage";
@@ -110,6 +110,7 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
       if (!exchange) throw new VsiHttpError(404, "not_found", "This chat has been deleted. Start a new chat.");
       return json({ ...common, conversation: saved.conversation, exchange, replayed: true });
     }
+    const accountingPermit = qualificationAccountingPermit(qualification, claim.request);
     let generated;
     try {
       generated = await runVsiAnswer({ conversationId, reservedRequest: claim.request, readTicket: readTicket!, supabase: access.supabase, workspaceId, actorUserId: access.userId, question: input.message,
@@ -122,13 +123,13 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
       const uncertainCost = !engineError || engineError.accountingUncertain || engineError.usage.costEstimated === true;
       const usage = { ...engineError?.usage, estimatedCostUsd: uncertainCost ? Math.max(config.requestReserveUsd, engineError?.usage.estimatedCostUsd || 0) : engineError.usage.estimatedCostUsd,
         failed: true, costEstimated: uncertainCost };
-      await settleFailedVsi(access, { conversationId, id: claim.request.id, attempt: claim.request.attempt, usage });
+      await settleFailedVsi(access, { conversationId, id: claim.request.id, attempt: claim.request.attempt, usage }, accountingPermit);
       if (engineError) throw new VsiHttpError(503, "answer_unavailable", engineError.message);
       throw new VsiHttpError(503, "answer_unavailable", "Vaeroex could not complete this answer. Please retry; this question was not counted.");
     }
     await settleGeneratedVsi(access, { conversationId, readTicketId: readTicket!.ticketId, id: claim.request.id, attempt: claim.request.attempt, question: input.message, answer: generated.content,
       citations: generated.citations, publicResearchTopics: generated.publicResearchTopics || [], rememberProposal: generated.noteDraft || null, usage: generated.usage,
-      summary: updateVsiSummary(chat.row.context_summary, input.message, generated.content) }, generated.sharedManifestId);
+      summary: updateVsiSummary(chat.row.context_summary, input.message, generated.content) }, generated.sharedManifestId, accountingPermit);
     const saved = await loadVsiConversation(access, conversationId);
     return json({ ...common, conversation: saved.conversation, exchange: saved.exchanges.find((item) => item.id === claim.request.id) });
   } catch (error) {

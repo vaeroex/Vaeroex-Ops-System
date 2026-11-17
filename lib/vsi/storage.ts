@@ -1,3 +1,4 @@
+import { qualificationAccountingAllowed, type QualificationAccountingPermit } from "@/lib/vsi/qualification";
 import { vsiFailureAccountingEnabled } from "./failure-accounting-gate";
 import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources, type GoogleSheetsReadTicket } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
@@ -151,8 +152,8 @@ export async function mutateVsi<T>(access: VsiAccess, action: string, input: Rec
  * The SQL operation independently rechecks authority and races under row locks. */
 export async function settleFailedVsi(access: VsiAccess, input: {
   id: unknown; conversationId: unknown; attempt: unknown; usage: unknown;
-}): Promise<void> {
-  if (!vsiFailureAccountingEnabled()) {
+}, qualification?: QualificationAccountingPermit): Promise<void> {
+  if (!vsiFailureAccountingEnabled() && !qualificationAccountingAllowed(qualification, { ...input, actorUserId: access.userId, workspaceId: access.workspaceId })) {
     await mutateVsi(access, "settle", { id: input.id, conversationId: input.conversationId, attempt: input.attempt,
       usage: { ...(input.usage as Record<string, unknown>), failed: true } });
     return;
@@ -190,14 +191,15 @@ export async function settleFailedVsi(access: VsiAccess, input: {
 
 /** Reconcile an uncertain success before failure accounting. Never regenerate,
  * overwrite an observed completed exchange, or retry the successful submission. */
-export async function settleGeneratedVsi(access:VsiAccess,input:Record<string,unknown>,sharedManifestId?:string) {
+export async function settleGeneratedVsi(access:VsiAccess,input:Record<string,unknown>,sharedManifestId?:string, qualification?: QualificationAccountingPermit) {
   try { return await mutateVsi(access,"settle",input,sharedManifestId); }
   catch(error) {
-    if (vsiFailureAccountingEnabled()) {
+    if (vsiFailureAccountingEnabled() || qualificationAccountingAllowed(qualification, { actorUserId: access.userId, workspaceId: access.workspaceId,
+      conversationId: input.conversationId, id: input.id, attempt: input.attempt })) {
       // A failed save can have an uncertain outcome. Reconcile only terminal
       // status here; neither hidden output nor expired source content is read.
       try { await settleFailedVsi(access, { id: input.id, conversationId: input.conversationId,
-        attempt: input.attempt, usage: input.usage }); }
+        attempt: input.attempt, usage: input.usage }, qualification); }
       catch { console.error("[vsi-storage]", { operation: "failure_accounting", code: "unconfirmed" }); }
       throw error;
     }

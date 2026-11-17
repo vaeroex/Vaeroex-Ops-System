@@ -15,6 +15,7 @@ const slot = z.object({ caseId: z.enum(["owner_private", "demo_private", "busine
 const manifestSchema = z.object({ campaignId: z.string().uuid(), startsAt: z.string().datetime(),
   expiresAt: z.string().datetime(), slots: z.array(slot).length(3) }).strict();
 export type VsiQualificationSlot = z.infer<typeof slot>;
+const issuedSlots = new WeakSet<VsiQualificationSlot>();
 type Scope = { actorUserId: string; workspaceId: string; conversationId?: string; question: string };
 const markers = { owner_private: "amber otter has 17 tokens", demo_private: "violet heron has 23 tokens" };
 export const qualificationHash = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -46,7 +47,8 @@ export function qualificationSlot(input: Scope): VsiQualificationSlot | null {
     && s.conversationId === input.conversationId
     && s.questionHash === qualificationHash(input.question));
   if (!selected) throw new VsiQualificationError("scope");
-  return selected;
+  issuedSlots.add(selected);
+  return Object.freeze(selected);
 }
 export function qualificationDispatchGuard(input: Scope & { requestId: string; reservedRequest?: { id: string; attempt: number } }) {
   const selected = qualificationSlot(input), campaign = manifest();
@@ -55,7 +57,7 @@ export function qualificationDispatchGuard(input: Scope & { requestId: string; r
     throw new VsiQualificationError("attempt");
   }
   let calls = 0;
-  return (serialized: string, manifestId?: string) => {
+  return Object.assign((serialized: string, manifestId?: string) => {
     // Recheck expiry and immutable configuration at every actual dispatch.
     if (manifest()?.hash !== campaign.hash) throw new VsiQualificationError("configuration");
     if (calls >= VSI_QUALIFICATION_LIMITS.callsPerRequest) throw new VsiQualificationError("limit");
@@ -101,7 +103,7 @@ export function qualificationDispatchGuard(input: Scope & { requestId: string; r
     if (remainingMs < 4000) throw new VsiQualificationError("limit");
     calls++;
     return remainingMs;
-  };
+  }, { sharedEvidence: selected.caseId === "business_brief" });
 }
 
 /** The manifest pins reviewed original projections, not just a valid workspace.
@@ -110,10 +112,34 @@ export function qualificationDispatchGuard(input: Scope & { requestId: string; r
 export function assertQualificationSources(input: Scope, rows: readonly { hash: string; provider: string }[]) {
   const selected = qualificationSlot(input);
   if (!selected) return;
-  if (rows.some(row => !selected.approvedSourceHashes.includes(row.hash))
+  if (new Set(rows.map(row => row.hash)).size !== selected.approvedSourceHashes.length
+    || rows.some(row => !selected.approvedSourceHashes.includes(row.hash))
     || (selected.caseId === "business_brief" && (!rows.some(row => row.provider === "xero")
       || !rows.some(row => row.provider === "google_sheets")
       || rows.some(row => !["xero", "google_sheets"].includes(row.provider))))) {
     throw new VsiQualificationError("context");
   }
+}
+
+// A process-local capability, never serialized or accepted from the browser.
+// Issued from a slot already validated before reservation; terminal accounting
+// may finish after expiry but cannot authorize another request or generation.
+declare const accountingBrand: unique symbol;
+export type QualificationAccountingPermit = { readonly [accountingBrand]: true };
+type AccountingBinding = { actorUserId: string; workspaceId: string; conversationId: string; id: string; attempt: number };
+const accountingPermits = new WeakMap<QualificationAccountingPermit, AccountingBinding>();
+export function qualificationAccountingPermit(selected: VsiQualificationSlot | null, request: { id: string; attempt: number }): QualificationAccountingPermit | undefined {
+  if (!selected) return undefined;
+  if (!issuedSlots.has(selected) || !z.string().uuid().safeParse(request.id).success
+    || !Number.isSafeInteger(request.attempt) || request.attempt < 1) throw new VsiQualificationError("attempt");
+  const permit = Object.freeze({}) as QualificationAccountingPermit;
+  accountingPermits.set(permit, { actorUserId: selected.actorUserId, workspaceId: selected.workspaceId,
+    conversationId: selected.conversationId, id: request.id, attempt: request.attempt });
+  return permit;
+}
+export function qualificationAccountingAllowed(permit: QualificationAccountingPermit | undefined,
+  input: { actorUserId: string; workspaceId: string; conversationId: unknown; id: unknown; attempt: unknown }): boolean {
+  const bound = permit && accountingPermits.get(permit);
+  return Boolean(bound && bound.actorUserId === input.actorUserId && bound.workspaceId === input.workspaceId
+    && bound.conversationId === input.conversationId && bound.id === input.id && bound.attempt === input.attempt);
 }

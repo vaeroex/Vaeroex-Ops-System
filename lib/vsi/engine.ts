@@ -251,7 +251,9 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   let sharedManifestId:string|undefined;
   let sharedPrepared:SharedPrepared|undefined;
   let sharedWindowLimitation: string | undefined;
-  if(sharedEvidenceRuntimeEnabled()) {
+  const qualifiedSharedEvidence = qualification?.sharedEvidence === true;
+  const hypothesesEnabled = qualifiedSharedEvidence || qualitativeSynthesisEnabled();
+  if(qualifiedSharedEvidence || sharedEvidenceRuntimeEnabled()) {
     let preparationPhase: SharedPreparationPhase = "request_binding";
     try {
       if(!input.reservedRequest) throw new Error("shared_request_binding_missing");
@@ -383,7 +385,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     reasoning: { effort: tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, shared || tier === "deep" ? 6000 : 4000),
     // Derive from this exact packed JSON, not the larger canonical payload.
     // The same factory participates in every packing measurement and transport.
-    text: { format: { type: "json_schema", name: shared ? "vsi_shared_answer_v2" : "vsi_answer_v1", strict: true, schema: shared ? sharedAnswerJsonSchemaForResults(view.sharedRelationships, qualitativeSynthesisEnabled(), invoiceSelections(view.qualitative_sources,view.question), schemaSources.map(source=>source.ref), schemaSources) : answerJsonSchema } } });
+    text: { format: { type: "json_schema", name: shared ? "vsi_shared_answer_v2" : "vsi_answer_v1", strict: true, schema: shared ? sharedAnswerJsonSchemaForResults(view.sharedRelationships, hypothesesEnabled, invoiceSelections(view.qualitative_sources,view.question), schemaSources.map(source=>source.ref), schemaSources) : answerJsonSchema } } });
   };
   const packAnswer = (payload: ReturnType<typeof makePayload>, tier: VsiResearchTier, shared: boolean, phase: "preflight" | "answer") => {
     try {
@@ -570,7 +572,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const decodedAnswer = validateAt("answer_json", () => JSON.parse(outputText(reply)));
   const structuredAnswer = sharedAnswer ? validateAt("answer_schema", () => sharedAnswerSchema.parse(decodedAnswer)) : validateAt("answer_schema", () => answerSchema.parse(decodedAnswer));
   const composed = sharedAnswer
-    ? validateAt("shared_answer_contract", () => renderSharedAnswer(structuredAnswer,{question:input.question,sources:[...selectedPremises,...issueContextFactSources(payload.productSources,payload.livePublicLookup)],requiredSourceGroups:packedContext.requiredSourceGroups,results:selectedRelationships,hypothesesEnabled:qualitativeSynthesisEnabled(),scopes:new Map(selectedPremises.map(source=>[source.ref,sharedPrepared!.rows.find(row=>row.hash===source.binding)!.scope]))}))
+    ? validateAt("shared_answer_contract", () => renderSharedAnswer(structuredAnswer,{question:input.question,sources:[...selectedPremises,...issueContextFactSources(payload.productSources,payload.livePublicLookup)],requiredSourceGroups:packedContext.requiredSourceGroups,results:selectedRelationships,hypothesesEnabled,scopes:new Map(selectedPremises.map(source=>[source.ref,sharedPrepared!.rows.find(row=>row.hash===source.binding)!.scope]))}))
     : validateAt("shared_relationships", () => {
       const legacy = answerSchema.parse(structuredAnswer);
       if (legacy.interpretations.length) throw new Error("Interpretations require current admitted source composition before citation validation.");

@@ -48,5 +48,25 @@ function reset(){state={calls:[],statusReads:0,status:{data:{status:'pending',at
  reset();await assert.rejects(settleGeneratedVsi(access,input,id(6)),e=>e.code==='access_denied');assert.deepEqual(state.calls.map(c=>c.name),['vsi_mutate_v3','fail_vsi_request_accounting_v1']);
  reset();state.status.data.status='completed';await assert.rejects(settleGeneratedVsi(access,input,id(6)),e=>e.code==='access_denied');assert.deepEqual(state.calls.map(c=>c.name),['vsi_mutate_v3']);
  reset();gate=false;await settleFailedVsi(access,input);assert.equal(state.calls[0].name,'vsi_mutate_v2');assert.equal(state.statusReads,0);assert.equal(state.calls[0].args.p_input.answer,undefined);assert.equal(state.calls[0].args.p_input.usage.failed,true);
+ // Scoped preview activation works with the global release gate still false.
+ const q=require('../lib/vsi/qualification.ts');
+ const question='Synthetic qualification accounting question';
+ const now=Date.now();
+ const campaign={campaignId:id(70),startsAt:new Date(now-1000).toISOString(),expiresAt:new Date(now+60000).toISOString(),slots:
+ ['owner_private','demo_private','business_brief'].map((caseId,i)=>({caseId,actorUserId:id(2+i*10),workspaceId:id(1),conversationId:id(5+i*10),requestId:id(80+i),questionHash:q.qualificationHash(question),approvedSourceHashes:i===2?['a'.repeat(64),'b'.repeat(64)]:[]}))};
+ process.env.VERCEL_ENV='preview';process.env.VAEROEX_VSI_QUALIFICATION=JSON.stringify(campaign);
+ const selected=q.qualificationSlot({actorUserId:id(2),workspaceId:id(1),conversationId:id(5),question});
+ assert.throws(()=>q.qualificationAccountingPermit({...selected},{id:id(3),attempt:2}),/attempt/,'forged or deserialized slot denied');
+ const permit=q.qualificationAccountingPermit(selected,{id:id(3),attempt:2});
+ const bound={actorUserId:id(2),workspaceId:id(1),conversationId:id(5),id:id(3),attempt:2};
+ assert(q.qualificationAccountingAllowed(permit,bound));
+ for(const change of [{actorUserId:id(99)},{workspaceId:id(99)},{conversationId:id(99)},{id:id(99)},{attempt:3}])assert(!q.qualificationAccountingAllowed(permit,{...bound,...change}));
+ assert(!q.qualificationAccountingAllowed({},bound),'browser-shaped capability denied');
+ process.env.VAEROEX_VSI_QUALIFICATION=JSON.stringify({...campaign,expiresAt:new Date(now-500).toISOString()});
+ assert.throws(()=>q.qualificationSlot({actorUserId:id(2),workspaceId:id(1),conversationId:id(5),question}),/configuration/);
+ reset();await settleFailedVsi(access,input,permit);assert.equal(state.calls[0].name,'fail_vsi_request_accounting_v1','terminal accounting remains available after expiry');
+ reset();await assert.rejects(settleGeneratedVsi(access,input,id(6),permit),e=>e.code==='access_denied');assert.deepEqual(state.calls.map(c=>c.name),['vsi_mutate_v3','fail_vsi_request_accounting_v1']);
+ reset();state.status.data.status='completed';await assert.rejects(settleGeneratedVsi(access,input,id(6),permit),e=>e.code==='access_denied');assert.deepEqual(state.calls.map(c=>c.name),['vsi_mutate_v3']);
+ delete process.env.VAEROEX_VSI_QUALIFICATION;
  console.log('Accounting-only application path passed: fixed scalar projection, status-only reconciliation, no success conversion, no retry/fallback, unknown count preserved, invalid input and competing completion denied; gate false retains old behavior. No external calls.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

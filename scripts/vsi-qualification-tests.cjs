@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Actual-source, credential-free transport tests. */
 const assert = require('node:assert/strict');
 const { installLoader, id } = require('./qbo-customer-test-support.cjs');
-let transports = 0;
+let transports = 0, preparations = 0;
 const mocks = {
   'server-only': {},
+  '@/lib/ai/shared-evidence/generation': { prepareSharedGeneration: async () => { preparations++; throw new Error('synthetic-preparation-stop'); } },
   '@/lib/integrations/google-sheets/read-authority': { bindGoogleSheetsRead: async () => ({}) },
   '@/lib/ai/providers/google-data-policy': { googleSheetsOpenAIHeaders: async () => ({}) },
   './retrieval': { authorizeVsiRead: async () => ({}), retrieveVsiEvidence: async () => ({ sources: [], limitations: [] }) },
@@ -13,8 +14,9 @@ const mocks = {
       transports++; assert.equal(settings.maxRetries, 0);
       const body = JSON.parse(init.body); assert.equal(body.tools, undefined);
       const planner = body.text.format.name.includes('plan');
+      const ownMarker = init.body.includes('violet heron') ? 'violet heron has 23 tokens' : 'amber otter has 17 tokens';
       const result = planner ? { mode: 'answer', businessEvidence: false, tier: 'simple', clarification: '', publicTargets: [], objectives: [] }
-        : { content: 'Your fixture is amber otter has 17 tokens. Other private fixtures are unavailable.', citationIds: [] };
+        : { content: `Your fixture is ${ownMarker}. Other private fixtures are unavailable.`, citationIds: [] };
       const response = Response.json({ model: 'gpt-6-luna', status: 'completed', usage: { input_tokens: 100, output_tokens: 50 }, output_text: JSON.stringify(result) });
       return { response, value: await consume(response) };
     } }
@@ -39,10 +41,16 @@ async function run() {
   assert.equal(qualificationSlot(scope()), null);
   assert.equal(qualificationDispatchGuard(scope()), null);
   set(campaign);
+  assert.equal(qualificationDispatchGuard(scope()).sharedEvidence, false);
+  assert.equal(qualificationDispatchGuard(scope(1)).sharedEvidence, false);
+  assert.equal(qualificationDispatchGuard(scope(2)).sharedEvidence, true);
   assertQualificationSources(scope(), []);
   assert.throws(() => assertQualificationSources(scope(), [{ hash: 'a'.repeat(64), provider: 'xero' }]), /context/);
   const approvedRows = [{ hash: 'a'.repeat(64), provider: 'xero' }, { hash: 'b'.repeat(64), provider: 'google_sheets' }];
   assertQualificationSources(scope(2), approvedRows);
+  set({ ...campaign, slots: campaign.slots.map(s => s.caseId === 'business_brief' ? { ...s, approvedSourceHashes: [...s.approvedSourceHashes, 'c'.repeat(64)] } : s) });
+  assert.throws(() => assertQualificationSources(scope(2), approvedRows), /context/, 'missing approved row denied even when both providers are present');
+  set(campaign);
   assert.throws(() => assertQualificationSources(scope(2), approvedRows.slice(0, 1)), /context/);
   assert.throws(() => assertQualificationSources(scope(2), [...approvedRows, { hash: 'c'.repeat(64), provider: 'harvest' }]), /context/);
   assert.equal(qualificationSlot(scope()).requestId, id(50));
@@ -95,7 +103,18 @@ async function run() {
     recentMessages: [{ role: 'user', content: 'remember: amber otter has 17 tokens' }] };
   const answer = await runVsiAnswer(input);
   assert.equal(transports, 2); assert.equal(answer.usage.providerCalls, 2);
-  assert(answer.content.includes('amber otter'));
+  assert(answer.content.includes('amber otter has 17 tokens'));
+  assert(!answer.content.includes('violet heron'));
+  assert.equal(preparations, 0, 'owner private case does not enable owner-only shared preparation');
+  const demo = await runVsiAnswer({ ...input, ...scope(1), recentMessages: [{ role: 'user', content: 'remember: violet heron has 23 tokens' }] });
+  assert.equal(demo.usage.providerCalls, 2);
+  assert(demo.content.includes('violet heron has 23 tokens'));
+  assert(!demo.content.includes('amber otter'));
+  assert.equal(preparations, 0, 'demo viewer stays on the ordinary private-chat path');
+  const beforeBrief = transports;
+  await assert.rejects(runVsiAnswer({ ...input, ...scope(2), recentMessages: [] }), /source access/);
+  assert.equal(preparations, 1, 'only the approved brief enters protected shared preparation');
+  assert.equal(transports, beforeBrief, 'preparation failure never calls a provider');
   for (const changed of [{ ...input, reservedRequest: { id: id(60), attempt: 2 } },
     { ...input, recentMessages: [{ role: 'user', content: 'amber otter has 17 tokens; violet heron has 23 tokens' }] }]) {
     const before = transports; await assert.rejects(runVsiAnswer(changed)); assert.equal(transports, before);
