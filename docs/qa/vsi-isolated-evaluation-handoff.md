@@ -21,26 +21,27 @@ The default mocked answer deliberately remains generic so an honest review rejec
 
 ## Credential-free checks
 
-The current offline evaluator pins snapshot
-`62adf118466394eda92ed1459d83af1d23c9e237`, incorporating the reviewed legal action
-and its TypeScript RPC declaration. The exact application-tree and dirty-worktree
-guards remain mandatory. This snapshot update is synthetic regression evidence
-only; prior real-model results retain their original provenance.
+The resumed offline evaluator pins the reviewed runtime ancestor
+`f92a5d63f15ca79e144d47aa7e18114dca461b8e`, including the scoped Preview
+qualification activation on current main. Its exact application trees are
+`app=03fc9cc16a5fbce4d903f22bd5812813f899502b` and
+`lib=b00fd7e21ac067c65d5ff9403a0888bf31f2be5f`. The exact application-tree and
+dirty-worktree guards remain mandatory. This pin is local synthetic regression
+evidence only; prior real-model results retain their original provenance.
 
-The evaluator-specific tests (including planner evidence replay) create disposable local checkouts
-of published commit `475e70b84d20c43cac1cb7a33ec7f839cdca1c33`, whose `app` and
-`lib` trees match that pinned snapshot, and run the current tests and evaluator
-there. This keeps unrelated application changes from invalidating the test's
-accepted fixture. The evaluator itself is not repinned or bypassed; its exact
-tree and modified, staged, committed, and untracked runtime rejection checks
-remain active. These tests require the reviewed commit in local Git history
-(CI checks out full history). They do not qualify the current application for
-a real-model evaluation.
+The credential-free test entry points construct a disposable checkout of that
+runtime ancestor and run the current tests and evaluator there. They do not
+patch the runtime or substitute its instructions. The mutation-guard regression
+still rejects modified, staged, committed and untracked runtime changes before
+creating evaluation artifacts or dispatching. The activation worker also runs
+against the current checkout to exercise the actual new scoped path while all
+three release gates remain false. Neither path proves hosted compatibility,
+provider refresh, model quality, or successful citation-page opening.
 
 ```sh
 node scripts/vsi-isolated-contract-evaluation-tests.cjs
 node scripts/vsi-evaluator-runtime-guard-tests.cjs
-node scripts/qualitative-evidence-assessment-tests.cjs
+node scripts/vsi-planner-evidence-tests.cjs
 ```
 
 These checks include fresh case-local data, distinct actual engine payloads/citations, rejection of cross-case premises in both directions, the unchanged sparse limitation, forbidden assertions and budget/privacy boundaries. GitHub runs the existing credential-free VSI suite and Linux build. No application gate, deployment, import, key or paid call is enabled by this fixture update. Any future paid evaluation requires a separate reviewed secure transport and explicit approval; it is not available through this CLI.

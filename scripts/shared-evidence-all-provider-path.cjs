@@ -153,7 +153,7 @@ module.exports = async function run({ db, uuid, w, other, owner, owner2, session
     process.env.VAEROEX_VSI_MAX_OUTPUT_TOKENS = '6000';
     const engineRequests = [], measured = [], packing = require('../lib/vsi/answer-context.ts'), actualPack = packing.packVsiAnswerContext;
     packing.packVsiAnswerContext = (...args) => { const canonical = JSON.stringify(args[0]), result = actualPack(...args); assert.equal(JSON.stringify(args[0]), canonical); measured.push(result.metrics); return result; };
-    const { runVsiAnswer, VSI_SYSTEM_PROMPT } = require('../lib/vsi/engine.ts');
+    const { runVsiAnswer, VSI_SHARED_SYSTEM_PROMPT } = require('../lib/vsi/engine.ts');
     global.fetch = async (url, init) => {
       assert.equal(url, 'https://api.openai.com/v1/responses'); assert.equal(init.headers.Authorization, 'Bearer synthetic-all12-no-access');
       const body = JSON.parse(init.body), payload = JSON.parse(body.input[1].content);
@@ -166,8 +166,8 @@ module.exports = async function run({ db, uuid, w, other, owner, owner2, session
         output = { mode: 'answer', businessEvidence: true, tier: 'simple', clarification: '', publicTargets: [], objectives: [] };
       } else {
         assert.equal(body.text.format.name, 'vsi_shared_answer_v2');
-        assert(body.input[0].content.length > VSI_SYSTEM_PROMPT.length, 'actual full shared engine prompt is present');
-        assert(body.input[0].content.endsWith(SHARED_ANSWER_INSTRUCTIONS));
+        assert.equal(body.input[0].content, VSI_SHARED_SYSTEM_PROMPT, 'actual shared engine prompt is preserved exactly');
+        assert(body.input[0].content.endsWith(`\n\n${SHARED_ANSWER_INSTRUCTIONS}`), 'complete shared-answer contract remains attached');
         assert.equal(payload.businessSources.length, 12);
         assert.deepEqual(payload.qualitative_sources.map(source => source.provider).sort(), [...requestedProviders].sort());
         for (const source of payload.qualitative_sources) {
