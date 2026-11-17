@@ -53,6 +53,14 @@ async function run() {
   set(campaign);
   assert.throws(() => assertQualificationSources(scope(2), approvedRows.slice(0, 1)), /context/);
   assert.throws(() => assertQualificationSources(scope(2), [...approvedRows, { hash: 'c'.repeat(64), provider: 'harvest' }]), /context/);
+  const preparedSelection = { fingerprint: 'e'.repeat(64), start: '2026-10-01', end: '2026-10-30' };
+  set({ ...campaign, slots: campaign.slots.map(s => s.caseId === 'business_brief' ? { ...s, preparedSelection } : s) });
+  assertQualificationSources(scope(2), approvedRows, preparedSelection);
+  for (const change of [{ fingerprint: 'f'.repeat(64) }, { start: '2026-10-02' }, { end: '2026-10-31' }])
+    assert.throws(() => assertQualificationSources(scope(2), approvedRows, { ...preparedSelection, ...change }), /context/);
+  assert.throws(() => assertQualificationSources(scope(2), approvedRows), /context/);
+  assert.throws(() => assertQualificationSources(scope(2), [{ ...approvedRows[0], hash: 'f'.repeat(64) }, approvedRows[1]], preparedSelection), /context/);
+  set(campaign);
   assert.equal(qualificationSlot(scope()).requestId, id(50));
   for (const change of [{ actorUserId: id(99) }, { workspaceId: id(99) }, { conversationId: id(99) }, { question: 'different' }]) {
     assert.throws(() => qualificationSlot({ ...scope(), ...change }), /scope/);

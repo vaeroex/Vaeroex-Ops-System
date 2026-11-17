@@ -1,10 +1,11 @@
+import { prepareVsiSharedEvidence } from "./shared-preparation";
 import { invoiceSelections, InvoiceSelectionMetadataError } from "@/lib/ai/shared-evidence/invoice-selection";
 import { validateSharedVsiRelationships } from "@/lib/ai/shared-evidence/vsi-validation";
 import type { SynthesisSource } from "@/lib/ai/shared-evidence/answer-contract";
 import { sharedAnswerSchema, sharedAnswerJsonSchemaForResults, SharedAnswerContractError, renderSharedAnswer, renderSharedClarification, sharedDraftTextPattern, issueAnswerResults, issueContextFactSources, SHARED_ANSWER_INSTRUCTIONS } from "@/lib/ai/shared-evidence/answer-contract";
 import { qualitativeSynthesisEnabled } from "@/lib/ai/shared-evidence/qualitative-policy";
 import { sharedEvidenceRuntimeEnabled } from "@/lib/ai/shared-evidence/runtime-gate";
-import { prepareSharedGeneration, sealSharedGeneration, sharedTargetHref, sharedRpc, type SharedClient, type SharedPrepared } from "@/lib/ai/shared-evidence/generation";
+import { sealSharedGeneration, sharedTargetHref, sharedRpc, type SharedClient, type SharedPrepared } from "@/lib/ai/shared-evidence/generation";
 import { sharedPreparationDiagnostic, type SharedPreparationPhase } from "@/lib/ai/shared-evidence/preparation-diagnostics";
 import { googleSheetsOpenAIHeaders } from "@/lib/ai/providers/google-data-policy";
 import { bindGoogleSheetsRead } from "@/lib/integrations/google-sheets/read-authority";
@@ -22,7 +23,6 @@ import { VSI_PLANNER_PROMPT, VSI_PLAN_JSON_SCHEMA, VSI_PUBLIC_RESEARCH_JSON_SCHE
 import type { VsiPublicResearchResult, VsiResearchTier } from "./research";
 import { explicitStoredVsiQuestion } from "./context-selection";
 import type { VsiAnswer, VsiCitation, VsiEvidenceResult, VsiMessage, VsiRunInput, VsiUsage } from "./types";
-import { vsiEvidenceWindowSelection } from "./evidence-window";
 import { packVsiAnswerContext, serializeVsiAnswerContext, serializeVsiProviderRequest, VsiAnswerContextLimit } from "./answer-context";
 import { vsiValidationDiagnostic, type VsiValidationStage } from "./validation-diagnostics";
 import { qualificationDispatchGuard, assertQualificationSources, VSI_QUALIFICATION_LIMITS } from "./qualification";
@@ -257,13 +257,11 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     let preparationPhase: SharedPreparationPhase = "request_binding";
     try {
       if(!input.reservedRequest) throw new Error("shared_request_binding_missing");
-      preparationPhase = "window_selection";
-      const window = vsiEvidenceWindowSelection(input.question);
-      const { start, end } = window;
-      sharedWindowLimitation = window.limitation;
       preparationPhase = "preparation";
-      sharedPrepared=await prepareSharedGeneration(input.supabase,input.workspaceId,start,end,input.question);
-      assertQualificationSources(input, sharedPrepared.rows);
+      const selection = await prepareVsiSharedEvidence(input.supabase,input.workspaceId,input.question);
+      sharedWindowLimitation = selection.window.limitation;
+      sharedPrepared = selection.prepared;
+      assertQualificationSources(input, sharedPrepared.rows, sharedPrepared);
       // Product context binds connection roots; finalize those before sealing.
       preparationPhase = "product_context";
       product=await loadVsiProductContext(access,input.readTicket);

@@ -17,6 +17,9 @@ class VsiHttpError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
 }
 const mocks = {
+  './shared-preparation': { prepareVsiSharedEvidence: async () => { throw new Error('unexpected preparation'); } },
+  './preparation-scope': { assertVsiPreparationScope: () => { throw new Error('unexpected preparation'); } },
+  './retrieval': { authorizeVsiRead: async () => { throw new Error('unexpected preparation'); } },
   '@/lib/vsi/qualification': qualification,
   'server-only': {},
   '@/lib/integrations/google-sheets/read-authority': { beginGoogleSheetsRead: async () => ({ ticketId: requestId }), bindGoogleSheetsRead: async () => ({ ticketId: requestId }), googleSheetsReadSources: (table, rows) => rows.map(({ id }) => ({ table, id })) },

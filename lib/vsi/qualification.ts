@@ -13,7 +13,9 @@ const slot = z.object({ caseId: z.enum(["owner_private", "demo_private", "busine
   actorUserId: z.string().uuid(), workspaceId: z.string().uuid(), conversationId: z.string().uuid(),
   requestId: z.string().uuid(), questionHash: z.string().regex(/^[a-f0-9]{64}$/),
   approvedSourceHashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)).max(24),
-  approvedProviders: z.array(z.enum(pluginProviders)).min(2).max(12).optional() }).strict();
+  approvedProviders: z.array(z.enum(pluginProviders)).min(2).max(12).optional(),
+  preparedSelection: z.object({ fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+    start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict().optional() }).strict();
 const manifestSchema = z.object({ campaignId: z.string().uuid(), startsAt: z.string().datetime(),
   expiresAt: z.string().datetime(), slots: z.array(slot).length(3), inspectCitations: z.boolean().optional() }).strict();
 export type VsiQualificationSlot = z.infer<typeof slot>;
@@ -113,9 +115,12 @@ export function qualificationDispatchGuard(input: Scope & { requestId: string; r
 /** The manifest pins reviewed original projections, not just a valid workspace.
  * Fail before sealing/dispatch if preparation adds any other business source.
  * These checks supplement normal protected admission; they cannot grant access. */
-export function assertQualificationSources(input: Scope, rows: readonly { hash: string; provider: string }[]) {
+export function assertQualificationSources(input: Scope, rows: readonly { hash: string; provider: string }[], prepared?: { fingerprint: string; start: string; end: string }) {
   const selected = qualificationSlot(input);
   if (!selected) return;
+  if (selected.preparedSelection && (!prepared || Object.entries(selected.preparedSelection).some(([key, value]) => prepared[key as keyof typeof prepared] !== value))) {
+    throw new VsiQualificationError("context");
+  }
   const providers = selected.approvedProviders ?? ["xero", "google_sheets"];
   if (new Set(rows.map(row => row.hash)).size !== selected.approvedSourceHashes.length
     || rows.some(row => !selected.approvedSourceHashes.includes(row.hash))

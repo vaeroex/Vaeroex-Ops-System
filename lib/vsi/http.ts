@@ -1,3 +1,6 @@
+import { prepareVsiSharedEvidence } from "./shared-preparation";
+import { assertVsiPreparationScope } from "./preparation-scope";
+import { authorizeVsiRead } from "./retrieval";
 import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 import { NextResponse } from "next/server";
@@ -10,7 +13,7 @@ import { runVsiAnswer, VsiEngineError } from "@/lib/vsi/engine";
 import { qualificationAccountingPermit, qualificationSlot, VSI_QUALIFICATION_LIMITS, VsiQualificationError } from "@/lib/vsi/qualification";
 import { confirmVsiNote, conversationView, listVsiConversations, loadVsiConversation, mutateVsi, settleFailedVsi, settleGeneratedVsi, questionHash, requireVsiAccess, updateVsiSummary, VsiHttpError, vsiUuid, type ConversationRow } from "@/lib/vsi/storage";
 
-type RouteAction = "list" | "create" | "detail" | "rename" | "delete" | "messages" | "continue" | "remember" | "usage";
+type RouteAction = "list" | "create" | "detail" | "rename" | "delete" | "messages" | "continue" | "remember" | "usage" | "prepare";
 const base = z.object({ expectedWorkspaceId: vsiUuid });
 const NO_STORE = { "Cache-Control": "private, no-store", "Vary": "Cookie" };
 function json(value: unknown, status = 200) { return NextResponse.json(value, { status, headers: NO_STORE }); }
@@ -40,6 +43,24 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
       if (!rate.allowed) throw new VsiHttpError(429, "burst_limit", rateLimitMessage(rate));
     }
     operation = action;
+    if (action === "prepare") {
+      const input = base.extend({ question: z.string().trim().min(1).max(getVsiConfig().maxQuestionChars) }).strict().parse(raw);
+      if (hasProhibitedVsiIdentifiers(input.question)) throw new VsiHttpError(422, "prohibited_identifiers", VSI_PROHIBITED_INPUT_MESSAGE);
+      const scope = { actorUserId: access.userId, workspaceId, question: input.question };
+      assertVsiPreparationScope(scope);
+      const authorized = await authorizeVsiRead({ ...scope, supabase: access.supabase });
+      if (authorized.membership.role !== "owner") throw new VsiHttpError(403, "owner_required", "Only the workspace owner can prepare qualification evidence.");
+      const ticket = await beginGoogleSheetsRead(access.supabase, workspaceId, access.userId);
+      await bindGoogleSheetsRead(access.supabase, ticket.ticketId, []);
+      const { window, prepared } = await prepareVsiSharedEvidence(access.supabase, workspaceId, input.question);
+      await bindGoogleSheetsRead(access.supabase, ticket.ticketId, prepared.rows.flatMap(row => row.roots));
+      assertVsiPreparationScope(scope);
+      // Never reserve a question, seal an answer manifest, save a chat, or invoke a model.
+      return json({ workspaceId, actorUserId: access.userId, questionHash: questionHash(input.question),
+        preparedAt: new Date().toISOString(), window, fingerprint: prepared.fingerprint,
+        sources: prepared.rows.map(row => ({ identity: row.identity, hash: row.hash, provider: row.provider,
+          scope: row.scope, factTimes: row.factTimes })), coverage: prepared.coverage, limitations: prepared.limitations });
+    }
     const readTicket = ["create", "rename", "continue", "remember", "messages"].includes(action)
       ? await beginGoogleSheetsRead(access.supabase, workspaceId, access.userId) : null;
     if (readTicket) await bindGoogleSheetsRead(access.supabase, readTicket.ticketId, []);

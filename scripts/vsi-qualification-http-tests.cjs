@@ -18,6 +18,9 @@ let claim = 'reserved', attempt = 1, transports = 0, engineCalls = 0, mutations 
 class VsiHttpError extends Error { constructor(status, code, message) { super(message); this.status = status; this.code = code; } }
 class VsiEngineError extends Error { constructor(cost = 0) { super('Synthetic bounded stop'); this.usage = { estimatedCostUsd: cost, providerCalls: cost ? 1 : 0 }; this.accountingUncertain = false; } }
 const mocks = {
+  './shared-preparation': { prepareVsiSharedEvidence: async () => { throw new Error('unexpected preparation'); } },
+  './preparation-scope': { assertVsiPreparationScope: () => { throw new Error('unexpected preparation'); } },
+  './retrieval': { authorizeVsiRead: async () => { throw new Error('unexpected preparation'); } },
   'server-only': {}, zod: { z }, 'next/server': { NextResponse: { json: (body, opts) => Response.json(body, opts) } },
   '@/lib/vsi/qualification': qualification,
   '@/lib/vsi/config': { getVsiConfig: () => ({ maxQuestionChars: 8000, requestReserveUsd: 0.25, workspaceMonthlyBudgetUsd: 50 }) },
