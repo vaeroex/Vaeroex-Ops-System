@@ -8,6 +8,9 @@ import { admin, enabled } from "@/lib/integrations/wix-orders/server";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import { DateRangeFields, SavedHistoryFilter } from "@/components/integrations/DateRangeFields";
 import { resolveImportRange, resolveViewRange } from "@/lib/integrations/date-range";
+import { importRecurringAllowed } from "@/lib/integrations/import-refresh/scope";
+import { readImportRecurringSettings } from "@/lib/integrations/import-refresh/settings-read";
+import { ImportRecurringSettings, importRecurringResultMessage } from "@/components/integrations/ImportRecurringSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -28,23 +31,27 @@ export default async function WixOrdersPage({ searchParams }: { searchParams?: P
   let view = { startDate: null, endDate: null } as ReturnType<typeof resolveViewRange>;
   let invalidFilter = false;
   try { view = resolveViewRange(params?.from, params?.to, now); } catch { invalidFilter = true; }
-  const db = available ? admin() : null;
+  let db: ReturnType<typeof admin> | null = null;
+  try { db = admin(); } catch { /* Saved connection reads do not require provider credentials. */ }
   const { data: connections, error: connectionError } = db
     ? await db.from("wix_order_connections").select("id,status,last_sync_at,last_error_code,sync_lease_expires_at")
       .eq("workspace_id", access.workspaceId).neq("status", "disconnected").order("created_at", { ascending: false })
     : { data: [], error: null };
   const connection = connections?.[0];
+  const recurringAllowed = available && importRecurringAllowed(access.workspaceId, "wix-orders");
+  const recurring = db && connection && ["connected", "reauthorization_required"].includes(connection.status)
+    ? await readImportRecurringSettings(db, access.workspaceId, "wix-orders", connection.id) : null;
   const { data: reportData, error: factsError } = db && connection && !invalidFilter
     ? await db.rpc("wix_order_history_report", { p_workspace_id: access.workspaceId,
       p_connection_id: connection.id, p_from: view.startDate, p_to: view.endDate })
     : { data: null, error: null };
   const report = reportData as HistoryReport | null;
-  const message = result === "connected" ? "Wix connected. Choose a date range to import orders." :
+  const message = importRecurringResultMessage(result) ?? (result === "connected" ? "Wix connected. Choose a date range to import orders." :
     result === "synced" ? "Selected Wix period imported. Previously saved orders outside that period are retained." :
     result === "disconnected" ? "Wix disconnected and stored order data removed." :
     result === "invalid_range" ? "Choose valid dates ending today or earlier, up to 366 days per import. Older periods can be imported separately." :
     result === "range_too_large" ? "This import was too large or took too long. Choose a smaller range. Previously saved orders are unchanged." :
-    result === "error" ? "The Wix action could not be confirmed. Saved history remains available; try a smaller range or reconnect if required." : null;
+    result === "error" ? "The Wix action could not be confirmed. Saved history remains available; try a smaller range or reconnect if required." : null);
 
   return <div className="workspace-page mx-auto max-w-5xl space-y-5">
     <PageHeader eyebrow="Plug-ins" title="Wix online orders" description="Read-only order counts and totals for this workspace."
@@ -59,8 +66,7 @@ export default async function WixOrdersPage({ searchParams }: { searchParams?: P
     </SectionCard>
     {connection ? <EvidenceMappingLink workspaceId={access.workspaceId} provider={"wix-orders"} connectionId={connection.id} owner={owner} status={connection.status}/> : null}
     <SectionCard title="Connection" description="Only the workspace owner can connect or disconnect a Wix site.">
-      {!available ? <p className="text-sm text-slate-600">Wix setup is being completed. Connection will appear here when ready.</p> :
-        connectionError ? <p role="alert" className="text-sm text-red-700">Connection status is unavailable.</p> :
+      {connectionError ? <p role="alert" className="text-sm text-red-700">Connection status is unavailable.</p> :
         connection ? <div className="space-y-4">
           <div className="flex items-center gap-3"><StatusBadge value={connection.status === "connected" ? "Connected" : connection.status === "pending" ? "Waiting for Wix installation" : "Reconnect required"} /></div>
           {connection.last_error_code ? <p role="status" className="text-sm text-amber-800">The last update failed. Try importing again or reconnect the Wix site.</p> : null}
@@ -70,7 +76,7 @@ export default async function WixOrdersPage({ searchParams }: { searchParams?: P
               <h3 className="font-semibold">Import orders</h3>
               <p className="text-sm text-slate-600">Choose up to 366 calendar days per import, including older years. Import additional periods to build your history. Re-importing a period updates its saved orders without duplicates. Large periods may need smaller imports.</p>
               <DateRangeFields idPrefix="wix-import" defaultStartDate={defaultRange.startDate} defaultEndDate={defaultRange.endDate} maxDate={today} />
-              <button type="submit" disabled={Boolean(connection.sync_lease_expires_at && Date.parse(connection.sync_lease_expires_at) > Date.now())}
+              <button type="submit" disabled={!available || Boolean(connection.sync_lease_expires_at && Date.parse(connection.sync_lease_expires_at) > Date.now()) || Boolean(recurring?.refreshNotBefore && Date.parse(recurring.refreshNotBefore) > Date.now())}
                 className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-vaeroex-blue disabled:opacity-50">Import selected dates</button>
             </form>
             <form method="post" action="/api/integrations/wix-orders/disconnect">
@@ -82,8 +88,10 @@ export default async function WixOrdersPage({ searchParams }: { searchParams?: P
             <input type="hidden" name="connectionId" value={connection.id} /><input type="hidden" name="confirmation" value="disconnect" />
             <button type="submit" className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-red-700">Clear connection and try again</button>
           </form> : null}
-          {connection.last_sync_at ? <p className="text-sm text-slate-600">Last sync: {new Date(connection.last_sync_at).toLocaleString("en-US", { timeZone: "UTC" })} UTC</p> : null}
-        </div> : owner ? <form method="post" action="/api/integrations/wix-orders/connect">
+          {["connected", "reauthorization_required"].includes(connection.status) ? <ImportRecurringSettings provider="wix-orders" connectionId={connection.id}
+            settings={recurring} allowed={recurringAllowed} owner={owner} status={connection.status} lastSuccess={connection.last_sync_at}
+            timeZone={access.context.activeWorkspace?.reporting_timezone} asOf={now.toISOString()}/> : null}
+        </div> : !available ? <p className="text-sm text-slate-600">Wix setup is being completed. Connection will appear here when ready.</p> : owner ? <form method="post" action="/api/integrations/wix-orders/connect">
           <button type="submit" className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-vaeroex-blue">Connect a Wix site</button>
         </form> : <p className="text-sm text-slate-600">The workspace owner can connect a Wix site.</p>}
     </SectionCard>

@@ -50,6 +50,10 @@
     {
       "path": "/api/integrations/reporting/scheduled-sync",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/integrations/imports/scheduled-sync",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

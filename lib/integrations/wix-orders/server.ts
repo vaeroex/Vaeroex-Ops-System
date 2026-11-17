@@ -1,4 +1,5 @@
 import "server-only";
+import { throwImportProviderError } from "../import-refresh/provider-error";
 
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
@@ -115,7 +116,7 @@ export async function accessToken(instanceId: string, signal = AbortSignal.timeo
   const response = await fetch(`${API}/oauth2/token`, { method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ grant_type: "client_credentials", client_id: appId, client_secret: appSecret, instance_id: instanceId }),
     cache: "no-store", redirect: "error", signal });
-  if (!response.ok) throw new Error(response.status === 400 || response.status === 401 || response.status === 403 ? "wix_authorization_required" : "wix_provider_unavailable");
+  if (!response.ok) return throwImportProviderError(response, "wix", true);
   return z.object({ access_token: z.string().min(10).max(8192) }).parse(await response.json()).access_token;
 }
 
@@ -148,7 +149,7 @@ export async function recentOrders(token: string, start: string, end: string, si
     const response = await fetch(`${API}/ecom/v1/orders/search`, { method: "POST", headers: {
       authorization: token, "content-type": "application/json", accept: "application/json"
     }, body: JSON.stringify({ search }), cache: "no-store", redirect: "error", signal });
-    if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "wix_authorization_required" : "wix_provider_unavailable");
+    if (!response.ok) return throwImportProviderError(response, "wix");
     const body = await response.text();
     if (body.length > 4_000_000) throw new Error("wix_response_too_large");
     const parsed = searchResponse.parse(JSON.parse(body));

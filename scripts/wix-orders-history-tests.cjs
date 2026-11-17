@@ -2,16 +2,17 @@
 const {test,after} = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const path = require("node:path");
 const Module = require("node:module");
 const ts = require("typescript");
 const oldLoad = Module._load, oldTs = require.extensions[".ts"], oldFetch = global.fetch;
 const routeMocks = {};
 Module._load = function(name,parent,main) {
   if (name === "server-only") return {};
-  if (name === "@/lib/integrations/wix-orders/server") return routeMocks.server;
-  if (name === "@/lib/security/require-workspace-access") return {requireWorkspaceAccess:async()=>({workspaceId:"workspace",membership:{role:"owner"}})};
+  if (name === "@/lib/integrations/wix-orders/server" || (name === "../wix-orders/server" && parent.filename.endsWith("import-refresh/execution.ts"))) return routeMocks.server;
+  if (name === "@/lib/security/require-workspace-access") return {requireWorkspaceAccess:async()=>({workspaceId:"workspace",user:{id:"33333333-3333-4333-8333-333333333333"},membership:{role:"owner"}})};
   if (name === "@/lib/integrations/date-range") return require("../lib/integrations/date-range.ts");
-  return oldLoad.call(this,name,parent,main);
+  return oldLoad.call(this,name.startsWith("@/") ? path.resolve(__dirname,"..",name.slice(2)) : name,parent,main);
 };
 require.extensions[".ts"] = (module,file)=>module._compile(ts.transpileModule(fs.readFileSync(file,"utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,esModuleInterop:true}}).outputText,file);
 const {recentOrders} = require("../lib/integrations/wix-orders/server.ts");
@@ -57,13 +58,15 @@ test("Wix excludes non-approved orders and rejects provider failure without a pa
 
 function routeSetup({failure}={}) {
   const changes=[],applied=[],reads=[];
+  const lazy=run=>{const chain={then:(yes,no)=>Promise.resolve().then(run).then(yes,no),abortSignal:()=>chain};return chain;};
   const db={from:table=>{
-    const chain={update:data=>{changes.push({table,data});return chain;},eq:()=>chain,or:()=>chain,select:()=>chain,
-      maybeSingle:async()=>({data:{id:connection},error:null}),single:async()=>({data:{instance_ciphertext:"opaque"},error:null})};
+    const chain=lazy(()=>({data:table==='wix_order_connections'?{id:connection}:{instance_ciphertext:"opaque"},error:null}));
+    for(const name of ['eq','gt','select','single'])chain[name]=()=>chain;
     return chain;
-  },rpc:async(name,args)=>{applied.push({name,args});return {error:null};}};
+  },rpc:(name,args)=>lazy(()=>{applied.push({name,args});return {data:name==='apply_wix_order_snapshot'?0:true,error:null};})};
   routeMocks.server={assertOrigin:()=>{},requireOwner:()=>{},admin:()=>db,decryptInstance:()=>"instance",accessToken:async()=>"token",
     recentOrders:async(token,a,b,signal)=>{reads.push({token,a,b,signal});if(failure)throw failure;return [];} };
+  delete require.cache[require.resolve("../lib/integrations/import-refresh/execution.ts")];
   delete require.cache[require.resolve("../app/api/integrations/wix-orders/sync/route.ts")];
   const {POST}=require("../app/api/integrations/wix-orders/sync/route.ts");
   const run=(fields={})=>POST(new Request("https://www.vaeroex.com/api/integrations/wix-orders/sync",{method:"POST",body:new URLSearchParams({connectionId:connection,...fields})}));
@@ -72,9 +75,10 @@ function routeSetup({failure}={}) {
 
 test("Wix route validates dates before lease and passes old selected range to one atomic apply",async()=>{
   const a=routeSetup();const response=await a.run({startDate:"2020-01-01",endDate:"2020-01-31"});
-  assert.match(response.headers.get("location"),/result=synced/);assert.equal(a.applied.length,1);
-  assert.equal(a.applied[0].args.p_window_start,start);assert.equal(a.applied[0].args.p_window_end,end);
-  assert.equal(a.applied[0].args.p_workspace_id,"workspace");assert.equal(a.applied[0].args.p_connection_id,connection);
+  assert.match(response.headers.get("location"),/result=synced/);assert.deepEqual(a.applied.map(call=>call.name),['claim_import_refresh','apply_wix_order_snapshot']);
+  assert.equal(a.applied[0].args.p_trigger,'manual');assert.equal(a.applied[0].args.p_actor,'33333333-3333-4333-8333-333333333333');
+  assert.equal(a.applied[1].args.p_window_start,start);assert.equal(a.applied[1].args.p_window_end,end);
+  assert.equal(a.applied[1].args.p_workspace_id,"workspace");assert.equal(a.applied[1].args.p_connection_id,connection);
   assert.ok(a.reads[0].signal instanceof AbortSignal);
   const b=routeSetup();assert.match((await b.run({startDate:"2020-01-01"})).headers.get("location"),/invalid_range/);
   assert.equal(b.changes.length,0);assert.equal(b.reads.length,0);assert.equal(b.applied.length,0);
@@ -84,7 +88,9 @@ test("Wix route preserves saved history on failed or oversized fetch and only re
   for(const failure of [new Error("wix_provider_unavailable"),new Error("wix_too_many_orders"),new DOMException("timed out","TimeoutError")]) {
     const a=routeSetup({failure});const response=await a.run({startDate:"2020-01-01",endDate:"2020-01-31"});
     assert.match(response.headers.get("location"),/result=(error|range_too_large)/);
-    assert.equal(a.applied.length,0);assert.equal(a.changes.length,2);
-    assert.deepEqual(a.changes[1],{table:"wix_order_connections",data:{sync_lease_id:null,sync_lease_expires_at:null,last_error_code:"sync_failed"}});
+    assert.deepEqual(a.applied.map(call=>call.name),['claim_import_refresh','fail_import_refresh']);assert.equal(a.changes.length,0);
+    assert.equal(a.applied[1].args.p_lease,a.applied[0].args.p_lease);
+    assert.equal(a.applied[1].args.p_workspace,'workspace');assert.equal(a.applied[1].args.p_connection,connection);
+    assert.equal(a.applied[1].args.p_error,failure.message==='wix_too_many_orders'?'snapshot_too_large':'sync_failed');
   }
 });

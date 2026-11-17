@@ -295,3 +295,20 @@ its existing GCP path pending restored read-only inspection and live witness.
 Square, Loyverse, Zoho Books and Wix Orders still need their respective missing
 unattended paths. No connector leaves scope because it is outside this first
 hosted pair, and no global activation is implied by local mapping or fixtures.
+
+## Standalone import extension (local only)
+
+The candidate also adds `20261117012702_import_recurring_refresh.sql` for
+Loyverse, Zoho Books and Wix Orders. It depends on the reporting recurring
+migration and existing connector/history tables. It shares the four-active /
+one-per-workspace admission boundary across all nine reporting/import providers.
+Its cron is independently bounded; `IMPORT_AUTOMATIC_REFRESH_ENABLED`,
+`IMPORT_AUTOMATIC_REFRESH_WORKSPACE_IDS` and
+`IMPORT_AUTOMATIC_REFRESH_PROVIDERS` must all explicitly select the intended
+connections before recurring consent can be enabled. They remain unset here.
+
+This does not expand the proposed Clockify/Katana hosted record changes or model
+campaign. A standalone-provider witness needs its own exact synthetic account,
+record, consent and immutable source/version inventory. The local three-provider
+composition test proves actual SQL writes and protected source version changes
+using controlled HTTP responses; it is not a hosted delivery receipt.

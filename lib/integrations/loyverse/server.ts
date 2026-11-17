@@ -1,4 +1,5 @@
 import "server-only";
+import { throwImportProviderError } from "../import-refresh/provider-error";
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
@@ -99,10 +100,10 @@ function verifyScope(scope: string) {
     throw new Error("loyverse_scope_mismatch");
 }
 
-async function tokenRequest(input: URLSearchParams) {
+async function tokenRequest(input: URLSearchParams, signal?: AbortSignal) {
   const response = await fetch(TOKEN_URL, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: input, cache: "no-store", signal: AbortSignal.timeout(12_000) });
-  if (!response.ok) throw new Error(response.status === 400 || response.status === 401 ? "loyverse_authorization_required" : "loyverse_provider_unavailable");
+    body: input, cache: "no-store", redirect: "error", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(12_000)]) : AbortSignal.timeout(12_000) });
+  if (!response.ok) return throwImportProviderError(response, "loyverse", true);
   const payload = tokenResponse.parse(await response.json());
   verifyScope(payload.scope);
   return { accessToken: payload.access_token, refreshToken: payload.refresh_token,
@@ -115,10 +116,10 @@ export async function exchangeCode(code: string) {
     redirect_uri: c.redirectUri, code, grant_type: "authorization_code" }));
 }
 
-export async function refreshToken(refreshToken: string) {
+export async function refreshToken(refreshToken: string, signal?: AbortSignal) {
   const c = config();
   return tokenRequest(new URLSearchParams({ client_id: c.clientId, client_secret: c.clientSecret,
-    refresh_token: refreshToken, grant_type: "refresh_token" }));
+    refresh_token: refreshToken, grant_type: "refresh_token" }), signal);
 }
 
 export function encryptToken(workspaceId: string, connectionId: string, value: z.infer<typeof savedToken>) {
@@ -140,7 +141,7 @@ export function decryptToken(workspaceId: string, connectionId: string, cipherte
 async function apiGet(path: string, accessToken: string, signal?: AbortSignal) {
   const response = await fetch(`${API_URL}${path}`, { headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" },
     cache: "no-store", redirect: "error", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000) });
-  if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "loyverse_authorization_required" : response.status === 429 ? "loyverse_quota_exceeded" : "loyverse_provider_unavailable");
+  if (!response.ok) return throwImportProviderError(response, "loyverse");
   const text = await response.text();
   if (text.length > 4_000_000) throw new Error("loyverse_response_too_large");
   return JSON.parse(text) as unknown;

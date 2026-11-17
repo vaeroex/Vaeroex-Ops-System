@@ -122,7 +122,8 @@ assert.doesNotMatch(vercel, /report-subscriptions/, "retired report scheduling r
 assert.deepEqual(JSON.parse(vercel).crons, [
   { path: "/api/storage-capacity/maintenance", schedule: "*/15 * * * *" },
   { path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" },
-  { path: "/api/integrations/reporting/scheduled-sync", schedule: "*/15 * * * *" }
+  { path: "/api/integrations/reporting/scheduled-sync", schedule: "*/15 * * * *" },
+  { path: "/api/integrations/imports/scheduled-sync", schedule: "*/15 * * * *" }
 ], "only scoped integration refresh and storage-retention schedules are permitted; generated-report scheduling remains retired");
 
 // Run the actual client date formatter in independent host timezone contexts.

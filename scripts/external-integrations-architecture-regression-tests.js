@@ -431,6 +431,7 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026100502201
   currentMigrations.filter(name => name !== "20261019070953_loyverse_import_history.sql"),
   currentMigrations.filter(name => name !== "20261019071008_wix_orders_import_history.sql"),
   currentMigrations.filter(name => name !== "20261117005822_reporting_recurring_refresh.sql"),
+  currentMigrations.filter(name => name !== "20261117012702_import_recurring_refresh.sql"),
   currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
   currentMigrations.filter(name => name !== "20260902191325_square_production_internal_pilot_runtime.sql"),
   currentMigrations.filter(name => name !== "20260907225626_square_remote_sandbox_binding.sql"),
@@ -457,6 +458,7 @@ for (const name of [
   "20261019070953_loyverse_import_history.sql",
   "20261019071008_wix_orders_import_history.sql",
   "20261117005822_reporting_recurring_refresh.sql",
+  "20261117012702_import_recurring_refresh.sql",
 ]) {
   for (const manifest of [currentMigrations.map(item => item === name ? item.replace("_", "1_") : item),
     [...currentMigrations, name]]) {
@@ -565,9 +567,10 @@ assert.deepEqual(JSON.parse(read("vercel.json")), {
   crons: [
     { path: "/api/storage-capacity/maintenance", schedule: "*/15 * * * *" },
     { path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" },
-    { path: "/api/integrations/reporting/scheduled-sync", schedule: "*/15 * * * *" }
+    { path: "/api/integrations/reporting/scheduled-sync", schedule: "*/15 * * * *" },
+    { path: "/api/integrations/imports/scheduled-sync", schedule: "*/15 * * * *" }
   ]
-}, "Main and held review branches cannot auto-deploy; only reviewed authenticated storage, Sheets and explicitly scoped reporting crons are configured");
+}, "Main and held review branches cannot auto-deploy; only reviewed authenticated storage, Sheets and explicitly scoped reporting/import crons are configured");
 equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
 for (const protectedPath of [
   ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),
@@ -612,6 +615,7 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20261017184954_loyverse_merchant_reconnect_guard.sql",
   "supabase/migrations/20261019001207_ready_account_reporting_connectors.sql",
   "supabase/migrations/20261019033506_reporting_supported_jwt_role.sql",
+  "supabase/migrations/20261117012702_import_recurring_refresh.sql",
   "supabase/migrations/20260820233007_external_integrations_phase_1_canonical_foundation.sql",
   "supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql",
   "supabase/migrations/20260821064333_external_integrations_phase_2_reconciliation.sql",

@@ -91,9 +91,9 @@ access or a claim that every workspace has records.
 | **Toggl 2.0** | Owner bearer key and selected organization/workspace; visible active-project/lifetime-hours snapshot | PR #571 adds explicitly opted-in six-hour snapshot replacement, scoped scheduling and recovery. **Local verified; not deployed** | Project count is a current snapshot; hours are lifetime totals of visible active projects, not weekly hours or historical trend | Shared gated and exact legacy binding; no ordinary dedicated producer | Designated-account report success October 19 recorded. Synthetic mapping is not real changing-snapshot → answer proof |
 | **Zoho Inventory** | U.S. OAuth and selected organization; current active-item and low-stock counts | PR #571 adds opted-in six-hour snapshot refresh, token renewal, scoped scheduling and recovery. **Local verified; not deployed** | Aggregate item/count snapshot; no SKU quantities, costs, orders or inventory adjustments; not inventory valuation | Shared gated and exact legacy binding; no ordinary dedicated producer | Designated test report success October 19 recorded. Automatic change detection and hosted VSI use unproved |
 | **Katana** | Owner private key; account bound to immutable connection/key incarnation; stock-row/availability-count snapshot | PR #571 adds opted-in six-hour snapshot refresh, scoped scheduling and recovery; key replacement retains checked lifecycle. **Local verified; not deployed** | Variant/location-row count; unavailable class is on-hand less committed quantity ≤0; no SKU cost/profit or shortage cause | Shared gated and exact legacy binding; no ordinary dedicated producer | Designated-account report success October 19 recorded; public OAuth partnership still not approved. Automatic and hosted shared-answer proof absent |
-| **Loyverse** | OAuth, verified merchant currency; minimized receipts/type/tax/discount/cancellation/creation time and historical coverage | Manual owner `/sync`; 65-second lease, renewal on demand, complete bounded fetch/atomic import, scoped cleanup and reauthorization state; **no unattended schedule** | SALE/REFUND keep stored sign; cancellation explicit; no netting/tax double addition/accounting-revenue equivalence. Receipt date differs from import inclusion `created_at` | Shared gated and exact legacy binding. Protected currency projection was added by #558; no ordinary dedicated producer | SQL/projection fixtures cover currency revocation and refund/cancellation semantics. No new live automatic-refresh or end-to-end shared-answer witness |
-| **Zoho Books** | U.S. OAuth and eligible organization; retained invoice/expense IDs/date/currency/total/outstanding and history coverage | Manual owner `/sync`; 65-second lease, active-token renewal, atomic full-window import, auth failure/cleanup; **no unattended schedule** | USD/counting policy retained; foreign/draft/void exclusions not business zeros; invoice balance at import is not collection history or profit | Shared gated and exact legacy binding; no ordinary dedicated producer | Setup document says real-customer verification was pending; no current receipt inspected supersedes it. Synthetic typed mapping is not live provider proof |
-| **Wix Orders** | Approved app installation/instance; approved orders with ID/time/amount/currency/payment status; historical coverage | Manual owner `/sync`; instance token, lease, 45-second complete cursor fetch, atomic window, auth recovery; **no unattended schedule** | Provider-reported order amount/status; PAID is not bank settlement or posted revenue; no refund transaction/line-item matching | Shared gated and exact legacy binding; no ordinary dedicated producer | Local import/coverage/mapping qualification exists. No current automatic new-order → shared-answer proof |
+| **Loyverse** | OAuth, verified merchant currency; minimized receipts/type/tax/discount/cancellation/creation time and historical coverage | PR #571 adds explicit owner opt-in, daily refresh of the last seven complete UTC creation dates, bounded pagination/atomic import, renewal fencing, shared nine-connector concurrency, retry/backoff and recovery. **Local candidate; not deployed** | SALE/REFUND keep stored sign; cancellation explicit; no netting/tax double addition/accounting-revenue equivalence. Receipt date differs from import inclusion `created_at` | Shared gated and exact legacy binding. Protected currency projection was added by #558; no ordinary dedicated producer | SQL/projection fixtures cover currency revocation and refund/cancellation semantics. No new live automatic-refresh or end-to-end shared-answer witness |
+| **Zoho Books** | U.S. OAuth and eligible organization; retained invoice/expense IDs/date/currency/total/outstanding and history coverage | PR #571 adds opted-in daily refresh of the last seven complete UTC invoice/expense dates, guarded token renewal, complete atomic import, shared nine-connector concurrency and failure recovery. **Local candidate; not deployed** | USD/counting policy retained; foreign/draft/void exclusions not business zeros; invoice balance at import is not collection history or profit | Shared gated and exact legacy binding; no ordinary dedicated producer | Setup document says real-customer verification was pending; no current receipt inspected supersedes it. Synthetic typed mapping is not live provider proof |
+| **Wix Orders** | Approved app installation/instance; approved orders with ID/time/amount/currency/payment status; historical coverage | PR #571 adds opted-in daily refresh of the last seven complete UTC order-creation dates, instance-token access, bounded complete cursor fetch, shared nine-connector concurrency and atomic import/recovery. **Local candidate; not deployed** | Provider-reported order amount/status; PAID is not bank settlement or posted revenue; no refund transaction/line-item matching | Shared gated and exact legacy binding; no ordinary dedicated producer | Local import/coverage/mapping qualification exists. No current automatic new-order → shared-answer proof |
 
 The current offered catalog is the twelve rows above, established by
 `app/app/integrations/page.tsx` and `lib/integrations/reporting/catalog.ts`.
@@ -247,12 +247,12 @@ was **$0**. CI must be checked at the final pushed head, not inferred from the
 older green run. No deployment, migration, membership, entitlement, source
 mapping, provider record, scheduler or production setting changed.
 
-The read-only GCP scheduler listing for project `vaeroex-qbo-prod-20260827`,
-region `us-central1`, could not refresh the existing login: reauthentication is
-required. No login, scheduler mutation or alternate credential lookup was done.
-The exact next operational action for this check is owner reauthentication via
-`gcloud auth login`, then repeat the read-only scheduler/queue/worker inspection.
-This is an authentication blocker to inspection, not proof that jobs are paused.
+The local Google Cloud session was reauthenticated. The read-only November 17
+check of `vaeroex-qbo-prod-20260827` / `us-central1` found the three five-minute
+scheduler jobs enabled, the queue running, all five Cloud Run services ready,
+and recent scheduler/dispatcher/broker/runtime requests returning HTTP 200.
+This establishes infrastructure liveness only; a controlled new-record witness
+is still required. No infrastructure or provider data was changed.
 
 ## Why the existing hosted campaign cannot prove automatic arrival
 
@@ -276,6 +276,7 @@ compatible isolated database; any temporary membership/entitlement/lock changes
 with expiry/restoration; and the fixed paid-model slots and maximum spend after
 current rates are checked. Provider test-record mutations and scheduler execution
 need their own exact scope. Production promotion and global gate activation are
-not part of that approval. The next code slice is owner-approved automatic
-refresh admission and bounded scheduling for the reporting connector family,
-reusing its existing adapters and atomic commit functions.
+not part of that approval. Reporting and standalone import refresh are now implemented as local candidates.
+Square recurring authority is the remaining missing refresh implementation; the
+separate hosted activation prerequisites still require resolution before any
+execution approval request.

@@ -1,4 +1,4 @@
-import { isHistoricalProvider, type Provider } from "@/lib/integrations/reporting/catalog";
+import { isHistoricalProvider, isProvider, type Provider } from "@/lib/integrations/reporting/catalog";
 import { dashboardTimestamp } from "@/lib/integrations/dashboard/model";
 
 export type ReportingRecurringState = {
@@ -25,7 +25,7 @@ export function ReportingRefreshTime({ value, timeZone }: { value: string | null
 const button = "min-h-11 rounded-md border border-line px-4 py-2 text-sm font-semibold text-vaeroex-blue disabled:opacity-50";
 
 export function ReportingRecurringSettings({ provider, connectionId, state, authority, owner, allowed, connected, lastSuccess, timeZone, asOf }: {
-  provider: Provider;
+  provider: Provider | "loyverse" | "zoho-books" | "wix-orders";
   connectionId: string;
   state: ReportingRecurringState;
   authority: ReportingRecurringAuthority | null;
@@ -36,7 +36,14 @@ export function ReportingRecurringSettings({ provider, connectionId, state, auth
   timeZone?: string | null;
   asOf: string;
 }) {
-  const historical = isHistoricalProvider(provider);
+  const historical = isProvider(provider) ? isHistoricalProvider(provider) : true;
+  const importCoverage = provider === "loyverse"
+    ? "Receipts are selected by their creation date on Loyverse's server, which can differ from the receipt date. Totals are receipt activity, not accounting revenue or profit."
+    : provider === "zoho-books"
+      ? "Refresh covers supported USD invoices and expenses by their provider dates. Outstanding amounts are balances when imported, not historical closing balances."
+      : provider === "wix-orders"
+        ? "Refresh covers approved orders created in that window, separated by currency. Payment status is not bank settlement; refund transactions are not included."
+        : null;
   const active = state.recurring_enabled && allowed && connected && authority?.authorized === true && authority.reason === "active";
   const authorityUnknown = state.recurring_enabled && allowed && connected && !authority;
   const renewalNeeded = state.recurring_enabled && allowed && connected && authority?.reason === "owner_unavailable";
@@ -48,6 +55,7 @@ export function ReportingRecurringSettings({ provider, connectionId, state, auth
     <p className="text-sm text-slate-600">{historical
       ? "Once a day, Vaeroex rereads the last seven completed UTC calendar dates. This picks up changes within that window. Today and older dates are not refreshed automatically; you can import them separately below."
       : "Every six hours, Vaeroex reads the supported current snapshot. Each successful refresh replaces the snapshot; it does not reconstruct past inventory, project totals, or activity."}</p>
+    {importCoverage ? <p className="text-sm text-slate-600">{importCoverage}</p> : null}
     <dl className="space-y-2 text-sm">
       <div><dt className="text-slate-600">Last successful refresh</dt><dd className="break-words"><ReportingRefreshTime value={lastSuccess} timeZone={timeZone}/></dd></div>
       {state.recurring_last_attempt_at ? <div><dt className="text-slate-600">Last automatic attempt</dt><dd className="break-words"><ReportingRefreshTime value={state.recurring_last_attempt_at} timeZone={timeZone}/></dd></div> : null}

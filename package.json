@@ -15,6 +15,8 @@
     "test:reporting-connectors": "node --test scripts/reporting-connectors-tests.cjs scripts/reporting-connectors-routes-tests.cjs scripts/reporting-connectors-db-tests.mjs",
     "test:reporting-recurring": "node --test scripts/reporting-recurring-tests.cjs scripts/reporting-recurring-db-tests.mjs scripts/reporting-refresh-evidence-tests.mjs",
     "test:reporting-recurring:browser": "node scripts/reporting-recurring-browser-tests.cjs",
+    "test:import-recurring": "node --test scripts/import-recurring-tests.cjs scripts/import-recurring-settings-tests.cjs scripts/import-recurring-db-tests.mjs scripts/import-refresh-evidence-tests.mjs",
+    "test:import-recurring:browser": "node scripts/import-recurring-browser-tests.cjs",
     "test:reporting-connectors:browser": "node scripts/reporting-connectors-browser-tests.cjs",
     "test:reporting-connectors:oauth-browser": "node scripts/reporting-oauth-handoff-browser-tests.cjs",
     "test:loyverse-connector": "node --test scripts/loyverse-connector-db-tests.mjs scripts/loyverse-history-tests.mjs scripts/loyverse-history-adapter-tests.cjs",
