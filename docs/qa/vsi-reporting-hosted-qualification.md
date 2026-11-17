@@ -11,7 +11,7 @@ before asking to execute it.
 | Item | Target / status |
 | --- | --- |
 | GitHub candidate | PR #571, branch `codex/vsi-bounded-qualification`; merged-main baseline `796ade18fde960c253b6023c29b182c9222c6f2f`; prior reviewed head `7d105ddb182ce09bfdaa6e36090f84ca693466f9` |
-| Final immutable source | Root delivery must insert the final commit and successful exact-head CI run before execution. The previous head does not include this reporting refresh group. |
+| Runtime implementation source | `74f46d55938757810a197ee3d27ac627c3006e2f`. The PR records the final review head and exact-head CI after additive test-manifest corrections. Bind any future deployment and execution approval to that final immutable head; this runtime source alone is not execution authorization. |
 | Isolated database | Existing disposable Supabase project `bdmrcmbkiohcqkmcvvua`, named `executive-security-disposable-20261014`. This is the proposed target; it is not currently qualified for the campaign. |
 | Preview project | Vercel project `prj_J810bZ9ECoN4CyLKujUoEEH8N6ja`, team `team_uORtrMvad77Qz6HikOgD4cnp` (`vaeroex-2167s-projects`). Create a protected **Preview**, bound to the final source and isolated database. No Preview build has been created for this group; there is no verified deployment ID or URL to publish yet. |
 | Production exclusion | Do not target Supabase `mdiianhfrojmxqpwrflh`, assign/promote any Production domain, change Production environment values, or change main's automatic-deployment hold. |
