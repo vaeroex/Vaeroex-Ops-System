@@ -1,12 +1,26 @@
 import "server-only";
 
+export class ReportingProviderError extends Error {
+  constructor(message: "authorization_required" | "quota_exceeded" | "provider_unavailable", readonly retryAfterSeconds = 0) {
+    super(message);
+    this.name = "ReportingProviderError";
+  }
+}
+/** Retry-After is a delay hint, never a URL or provider response body. */
+export function reportingRetryAfter(value: string | null, now = Date.now()) {
+  if (!value || value.length > 128) return 0;
+  const seconds = /^\d+$/.test(value) ? Number(value) : Math.ceil((Date.parse(value) - now) / 1000);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.min(86_400, Math.max(60, Math.ceil(seconds))) : 0;
+}
+
 // No caller-supplied host, redirects, implicit retries, or provider error-body logging.
 export async function readJson(url: URL, init: RequestInit, signal: AbortSignal): Promise<unknown> {
   const response = await fetch(url, { ...init, redirect: "error", cache: "no-store", signal });
   if (!response.ok) {
     await response.body?.cancel();
-    throw new Error(response.status === 401 || response.status === 403 ? "authorization_required" :
-      response.status === 402 || response.status === 429 ? "quota_exceeded" : "provider_unavailable");
+    throw new ReportingProviderError(response.status === 401 || response.status === 403 ? "authorization_required" :
+      response.status === 402 || response.status === 429 ? "quota_exceeded" : "provider_unavailable",
+      response.status === 429 || response.status === 503 ? reportingRetryAfter(response.headers.get("retry-after")) : 0);
   }
   const reader = response.body?.getReader();
   if (!reader) throw new Error("invalid_response");

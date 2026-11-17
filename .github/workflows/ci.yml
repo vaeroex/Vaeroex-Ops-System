@@ -236,6 +236,11 @@ jobs:
       - name: Verify reporting OAuth handoff headers and isolated browser navigation
         run: pnpm test:reporting-connectors:oauth-browser
 
+      - name: Verify scoped automatic reporting refresh, SQL fences and evidence
+        run: |
+          pnpm test:reporting-recurring
+          pnpm test:reporting-recurring:browser
+
       - name: Verify historical import controls and saved report coverage
         run: pnpm test:plugin-import-history:browser
 
