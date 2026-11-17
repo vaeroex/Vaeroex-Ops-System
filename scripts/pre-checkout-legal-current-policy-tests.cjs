@@ -22,7 +22,7 @@ function ledger(row, error = null) {
   return { from(table) { assert.equal(table, 'checkout_legal_acceptances'); return query; } };
 }
 (async () => {
-  assert.equal(PRE_CHECKOUT_ACCEPTANCE_SET_VERSION, '2026-10-12.sheets1');
+  assert.equal(PRE_CHECKOUT_ACCEPTANCE_SET_VERSION, '2026-11-16.scope1');
   assert.deepEqual([...PRE_CHECKOUT_REQUIRED_POLICY_IDS], ['terms', 'privacy', 'subscription-billing-terms',
     'refund-policy', 'acceptable-use', 'ai-disclaimer', 'sensitive-data-policy', 'data-retention', 'human-review']);
   assert.deepEqual(preCheckoutAcceptanceSnapshot(), snapshot, 'unchanged content has deterministic hashes');

@@ -1,3 +1,5 @@
+import { publicPageMetadata } from "@/lib/seo/public-seo";
+export const metadata = publicPageMetadata({ title: "Contact Support | Vaeroex", description: "Contact Vaeroex about accounts, available products, setup, billing, and support. Find the existing support and billing contact routes.", path: "/support" });
 import Link from "next/link";
 import { createSupportRequestAction } from "@/app/support/actions";
 import { PublicFooter } from "@/components/legal/PublicFooter";

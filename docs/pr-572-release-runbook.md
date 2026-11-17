@@ -1,0 +1,36 @@
+# PR #572 release runbook
+
+Production release remains on hold. Design is owner-approved. The owner confirmed delivery/receipt of the single HQ notification and assigned Isaac Vizcarra to review the inquiry queue each business day. No further test email is authorized. Marketing and Executive Intelligence remain one application. This document prepares a release; it does not authorize merge, migration, deployment or promotion.
+
+## Verified readiness
+
+- Three policy documents and the checkout set advance together to 2026-11-16.scope1. Terms/refund/subscription scope is explicit; optional capacity terms and all unrelated policy content/versions remain unchanged. Project terms require individual written agreements, and inquiries create no purchase, payment obligation or service contract.
+- Real isolated Preview browser consent verified old-version rejection, explicit new in-app acceptance through the live-session-protected v2 writer, and a fresh checkout snapshot alongside an old synthetic snapshot. Original records were fingerprinted and preserved. No bypass guard or historical backfill was introduced.
+- Existing synthetic inquiry ce5f3eb2-8b44-46e1-827c-dd91a224249c was read in authenticated Admin → Support Requests, expanded through Request details and triage → Read support message. No new inquiry/email was created. Its provider-accepted label is separate from the owner's receipt confirmation recorded here.
+- The approved temporary synthetic account was signed out, all its sessions revoked, its admin flag removed, its temporary password invalidated and its original disabled state restored. Production was read-only throughout.
+- Preview lacks claim_stripe_checkout_intent_v1, which Production already has. The consent write succeeded before that separate billing boundary failed. Do not describe this as a successful Stripe handoff or payment test. Restore/qualify Preview billing separately if a complete payment rehearsal is required.
+
+## Order after explicit owner release authorization
+
+1. Freeze the exact reviewed SHA and confirm all four required CI jobs pass on it. Retain the previous Production deployment/source SHA 475e70b84d20c43cac1cb7a33ec7f839cdca1c33 and configuration inventory as rollback references. Confirm the current target before every operation: Production Supabase mdiianhfrojmxqpwrflh, never isolated Preview zfpnhvcmuuvtswttmnjd.
+2. Inspect Production migration history/schema and backup/PITR readiness read-only. Confirm the existing checkout_legal_acceptances ledger, immutable trigger/RLS, protected legal v2 writer/live-session guards, checkout-intent RPC and existing email configuration remain present. They already exist in Production; do not replay Preview-only restoration migrations or synchronize the entire drifted Preview baseline into Production. Do not copy synthetic users, sessions, consent fixtures or inquiry rows.
+3. Apply only these two new additive migrations, in order, before new application code can run:
+   - 20261116010000_public_inquiry_notification_status.sql
+   - 20261116010100_public_inquiry_notification_write_guard.sql
+   Prefer one reviewed deployment operation/transaction for the pair. If the tooling records them separately, finish and verify both before deploying the application. The first adds nullable delivery columns; historical requests remain null and are not mailed. The second rejects forged client notification metadata. Keep existing table grants/RLS intact.
+4. Verify the four nullable columns, status constraint and metadata guard in Production using read-only schema checks. Confirm no existing request was changed/backfilled to pending. No data migration, acceptance rewrite, capacity-version bump or historical-consent backfill is required by this PR.
+5. Build the approved SHA using the existing **Production** environment, then deploy that Production build only after authorization. Do not promote/relabel the isolated Preview artifact: public endpoint values are build-time configuration, and its database must never become the live site's backend. Preserve www.vaeroex.com, auth callback/allowlist configuration, Stripe checkout/portal/webhook routing, support/billing addresses and existing customer identifiers. Use the existing verified Resend sender/key; public inquiry recipient is server-fixed hq@vaeroex.com. Keep the branch-only Preview NEXT_PUBLIC_APP_URL override out of Production.
+6. Verify live deployment SHA, Production endpoint, public pages/routes, login/signup/billing URLs and legal versions read-only. Existing non-admin accounts with only the old Terms version must receive the required-review gate; checkout must require the current set/hash. Fresh explicit consent appends records. Admin exemption remains existing behavior. Do not auto-accept terms for customers or run an unapproved synthetic Production inquiry/email/payment.
+7. Isaac reviews Admin → Support Requests each business day, including new/open inquiries and pending/failed/unknown notification outcomes. Reconcile provider logs before retrying an uncertain attempt. A queued/saved inquiry remains valid even if notification fails. This cadence is internal and creates no customer response-time or support guarantee.
+
+## Rollback
+
+- If either migration fails before code deployment, keep the old application running and diagnose the failed migration; do not deploy code that expects incomplete tracking schema. The nullable columns are compatible with old code.
+- If application release fails, stop new rollout and restore a known-good Production build/configuration. Keep the additive columns and guard, saved requests, delivery state/provider receipts, immutable acceptance ledgers and retained agreements. Do not drop data, reset attempted/unknown notifications, reclassify existing rows as pending or resend historical requests.
+- A full rollback to 475e70b8 also restores old policy copy/version gates. It can ask newer users for obsolete versions and will not recognize new-only acceptance as old consent. Prefer a forward fix or rollback candidate retaining the approved scope text/current consent identities. If emergency full rollback is necessary, hold new checkout/affected access until that consent mismatch is reviewed; never relabel or delete newer acceptance proof to satisfy an old gate.
+- Rollback cannot unsend emails or undo a user's acceptance. Preserve provider receipts and historical snapshots; reconcile uncertain notification outcomes once before any explicitly approved retry.
+- Do not disable live-session guards, RLS, immutable triggers or audit protections as a rollback shortcut. Rollback must preserve Production auth callback URLs, billing configuration and customer identifiers. No automatic migration down script is needed for these additive columns.
+
+## Preview configuration
+
+The browser-verified branch override is NEXT_PUBLIC_APP_URL=https://vaeroex-ops-system-git-codex-vaer-2b71a3-vaeroex-2167s-projects.vercel.app for Preview branch codex/vaeroex-three-offerings only. Existing shared Production configuration was not edited. Verify a fresh deployment's internal checkout redirects stay on that Preview origin. This corrects Preview navigation without changing application code or Production billing URLs. No further email is needed to verify it.

@@ -11,10 +11,10 @@
 .attribution { margin-top: 10px; color: #aab8cb; font-size: 12px; line-height: 1.5; }
 .imageLink { display: block; border: 1px solid #344052; border-radius: 8px; overflow: hidden; background: #0c1220; }
 .imageLink picture, .imageLink img { display: block; width: 100%; }
-.imageLink img { height: auto; }
+.imageLink img { height: auto; aspect-ratio: var(--capture-desktop-ratio); }
 .enlarge { margin: 10px 0 0; color: #99a7bb; font-size: 12px; }
-@media(max-width:600px) { .capture { max-width: 340px; } .tabs { gap: 6px; } .tabs button { padding: 8px 10px; font-size: 12px; } .caption { font-size: 13px; } }
+@media(max-width:600px) { .capture { max-width: 340px; } .imageLink img { aspect-ratio: var(--capture-mobile-ratio, var(--capture-desktop-ratio)); } .tabs { gap: 6px; } .tabs button { padding: 8px 10px; font-size: 12px; } .caption { font-size: 13px; } }
 
 .capture[data-workspace-capture="performance-comparison"] { max-width: 880px; }
 @media(max-width:600px) { .capture[data-workspace-capture="performance-comparison"] { max-width: 340px; } }
-@media(max-width:360px) { .capture[data-workspace-capture="performance-comparison"] { max-width: 270px; } }
+@media(max-width:360px) { .imageLink img { aspect-ratio: var(--capture-narrow-ratio, var(--capture-mobile-ratio)); } .capture[data-workspace-capture="performance-comparison"] { max-width: 270px; } }

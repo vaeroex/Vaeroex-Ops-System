@@ -2,13 +2,13 @@ import type { Route } from "next";
 import { VAEROEX_COMPANY_ADDRESS_SINGLE_LINE, VAEROEX_CONTACT_EMAILS } from "@/lib/contact/emails";
 
 export const LEGAL_DOCUMENT_VERSIONS = {
-  terms: "2026-08-20",
+  terms: "2026-11-16.scope1",
   privacy: "2026-10-12.sheets1",
   aiDisclaimer: "2026-08-20",
   acceptableUse: "2026-08-20",
-  refundPolicy: "2026-08-20",
+  refundPolicy: "2026-11-16.scope1",
   sensitiveData: "2026-08-20",
-  subscriptionBillingTerms: "2026-10-12.1",
+  subscriptionBillingTerms: "2026-11-16.scope1",
   dataRetention: "2026-10-12.sheets1",
   workspaceCapacity: "storage-capacity-v1",
   humanReview: "2026-08-20"
@@ -61,10 +61,11 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     href: "/terms",
     updated: LEGAL_DOCUMENT_VERSIONS.terms,
     sections: [
+      { title: "Scope", body: ["These subscription provisions apply to Executive Intelligence. Optional workspace capacity purchases retain their separate Workspace Capacity Terms and applicable Refund Policy provisions. Commissioned software and website projects require individual written agreements defining scope, payments, maintenance, ownership or licensing, delivery, cancellation, and handover before work begins. Submitting an inquiry creates no purchase, payment obligation, or service contract."] },
       {
         title: "Acceptance of Terms",
         body: [
-          "By creating an account, accessing a workspace, purchasing a subscription, or using Vaeroex, you agree to these Terms of Service and the policies incorporated or referenced by these Terms.",
+          "By creating an Executive Intelligence account, accessing an Executive Intelligence workspace, or purchasing an Executive Intelligence subscription, you agree to these Terms of Service and the policies incorporated or referenced by these Terms.",
           "If you use Vaeroex on behalf of a company, you represent that you have authority to accept these terms for that company."
         ]
       },
@@ -113,7 +114,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "Refunds",
         body: [
-          "All purchases and subscription payments are final and non-refundable, except where a refund is required by applicable law.",
+          "Executive Intelligence subscription payments and optional workspace capacity payments are final and non-refundable, except where a refund is required by applicable law.",
           "Cancellation does not provide a prorated refund, credit, or refund for unused time in the current paid billing period.",
           "Promotions, discounts, and special offers may be available through the Vaeroex Direct Website or official Vaeroex sales channels."
         ]
@@ -137,8 +138,8 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "License to Use the Platform",
         body: [
-          "Subject to these terms and active access, Vaeroex grants customers a limited, non-exclusive, non-transferable right to use the platform for internal business purposes.",
-          "Customers may not resell, sublicense, or misuse the platform."
+          "Subject to these terms and active access, Vaeroex grants customers a limited, non-exclusive, non-transferable right to use Executive Intelligence for internal business purposes. Ownership and licensing of commissioned-project deliverables are defined in the individual written project agreement.",
+          "Customers may not resell, sublicense, or misuse Executive Intelligence."
         ]
       },
       {
@@ -311,10 +312,11 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     href: "/refund-policy",
     updated: LEGAL_DOCUMENT_VERSIONS.refundPolicy,
     sections: [
+      { title: "Scope", body: ["These subscription provisions apply to Executive Intelligence. Optional workspace capacity purchases retain their separate Workspace Capacity Terms and applicable Refund Policy provisions. Commissioned software and website projects require individual written agreements defining scope, payments, maintenance, ownership or licensing, delivery, cancellation, and handover before work begins. Submitting an inquiry creates no purchase, payment obligation, or service contract."] },
       { title: "Vaeroex Subscription", body: [`Vaeroex subscriptions are purchased through the Vaeroex Direct Website or official Vaeroex sales channels. Customers may manage and cancel an eligible subscription through Manage billing in the Stripe Customer Portal. ${VAEROEX_CONTACT_EMAILS.billing} remains available for billing assistance.`] },
-      { title: "Automatic Renewal", body: ["Vaeroex subscriptions renew automatically unless cancellation is scheduled before the next renewal. A scheduled cancellation prevents renewal for the next billing period."] },
+      { title: "Automatic Renewal", body: ["Executive Intelligence subscriptions renew automatically unless cancellation is scheduled before the next renewal. A scheduled cancellation prevents renewal for the next billing period."] },
       { title: "Cancellation Timing and Access", body: ["Cancellation takes effect at the end of the current paid billing period, based on the billing provider's actual period-end timestamp. Customers retain access through that paid period."] },
-      { title: "Final and Non-Refundable Payments", body: ["All purchases and subscription payments are final and non-refundable, except where a refund is required by applicable law."] },
+      { title: "Final and Non-Refundable Payments", body: ["Executive Intelligence subscription payments and optional workspace capacity payments are final and non-refundable, except where a refund is required by applicable law."] },
       { title: "No Prorated Refunds or Credits", body: ["Cancellation does not provide a prorated refund, credit, or refund for unused time in the current paid billing period."] },
       { title: "Promotions", body: [`Promotions, discounts, and special offers may be available through the Vaeroex Direct Website or official Vaeroex sales channels. ${VAEROEX_CONTACT_EMAILS.billing} can help customers with questions about eligible offers.`] },
       { title: "Subscription Pricing", body: ["Your subscription price will not increase while your subscription remains continuously active. If Vaeroex lowers the applicable subscription price, active subscribers will receive the lower price for future renewals.", "If you cancel and later resubscribe, your new subscription will be subject to the pricing available at the time you resubscribe. A price reduction does not provide a retroactive refund or credit for billing periods already paid."] }
@@ -356,12 +358,13 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     href: "/subscription-billing-terms",
     updated: LEGAL_DOCUMENT_VERSIONS.subscriptionBillingTerms,
     sections: [
+      { title: "Scope", body: ["These subscription provisions apply to Executive Intelligence. Optional workspace capacity purchases retain their separate Workspace Capacity Terms and applicable Refund Policy provisions. Commissioned software and website projects require individual written agreements defining scope, payments, maintenance, ownership or licensing, delivery, cancellation, and handover before work begins. Submitting an inquiry creates no purchase, payment obligation, or service contract."] },
       { title: "Base Plan", body: ["The Vaeroex Executive Intelligence base subscription is $250/month and includes the product's standard features and allowances. Optional workspace capacity is purchased explicitly and billed separately under the Workspace Capacity Terms."] },
       { title: "Vaeroex Checkout", body: ["Vaeroex subscriptions are purchased through Vaeroex checkout, the Vaeroex Direct Website, or official Vaeroex sales channels. Promotions, discounts, and special offers may be available through those same Vaeroex channels."] },
       { title: "Access Matching", body: ["Customers should create their Vaeroex account with the same email used for Vaeroex checkout so subscription access can be matched."] },
       { title: "Manage Billing and Cancellation", body: [`Customers may manage and cancel an eligible subscription through Manage billing in the Stripe Customer Portal. ${VAEROEX_CONTACT_EMAILS.billing} remains available for billing assistance.`] },
-      { title: "Renewal and Cancellation Timing", body: ["Vaeroex subscriptions renew automatically unless cancellation is scheduled. A scheduled cancellation prevents the next renewal and takes effect at the end of the current paid billing period, based on the billing provider's actual period-end timestamp. Access continues through that paid period."] },
-      { title: "Refunds and Unused Time", body: ["All purchases and subscription payments are final and non-refundable, except where a refund is required by applicable law. Cancellation does not provide a prorated refund, credit, or refund for unused time in the current paid billing period."] },
+      { title: "Renewal and Cancellation Timing", body: ["Executive Intelligence subscriptions renew automatically unless cancellation is scheduled. A scheduled cancellation prevents the next renewal and takes effect at the end of the current paid billing period, based on the billing provider's actual period-end timestamp. Access continues through that paid period."] },
+      { title: "Refunds and Unused Time", body: ["Executive Intelligence subscription payments and optional workspace capacity payments are final and non-refundable, except where a refund is required by applicable law. Cancellation does not provide a prorated refund, credit, or refund for unused time in the current paid billing period."] },
       { title: "Access Changes", body: ["Once the current paid billing period ends, a canceled subscription may be routed to the billing-required flow unless access is manually unlocked by Vaeroex. Expired or past-due subscriptions may also be routed to that flow."] },
       { title: "Optional Workspace Capacity", body: ["Capacity purchases are separate from the base subscription. Canceling or failing to renew a capacity purchase does not cancel base-plan access or delete existing originals. Only new uploads that exceed the resulting workspace allowance are blocked. Owners manage capacity purchases in Settings → Usage & Storage; the Workspace Capacity Terms describe that allowance and purchase consent."] },
       { title: "Subscription Pricing", body: ["Your subscription price will not increase while your subscription remains continuously active. If Vaeroex lowers the applicable subscription price, active subscribers will receive the lower price for future renewals.", "If you cancel and later resubscribe, your new subscription will be subject to the pricing available at the time you resubscribe. A price reduction does not provide a retroactive refund or credit for billing periods already paid."] }

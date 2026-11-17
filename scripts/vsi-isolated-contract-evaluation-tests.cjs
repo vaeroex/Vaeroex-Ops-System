@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Offline evaluator safety tests; all model replies are synthetic. */
+if (require('./vsi-pinned-evaluation-test-fixture.cjs').runInPinnedEvaluationFixture(__filename)) return;
 const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const {candidate,cases,limits,endpoint,checkRequest,createEvaluation,mockDispatch,fixtureForCase}=require('./vsi-isolated-contract-evaluation.cjs');

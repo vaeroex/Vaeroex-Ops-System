@@ -1,0 +1,199 @@
+.root {
+  position: relative;
+  isolation: isolate;
+}
+/* An absolute parent supplies the full page boundary. The scene and controls
+   stick independently inside it, leaving document flow and scroll untouched. */
+.journey {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  pointer-events: none;
+}
+.visual {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  z-index: 0;
+  overflow: hidden;
+  background: #080d16;
+  contain: layout paint;
+}
+.poster, .canvas, .vignette {
+  position: absolute;
+  inset: 0;
+}
+.poster svg {
+  position: absolute;
+  left: 55%;
+  top: 50%;
+  width: 38%;
+  height: auto;
+  max-height: 68svh;
+  transform: translateY(calc(-50% + var(--journey-final-shift, 0px)));
+  opacity: .95;
+}
+.canvas { opacity: 0; transition: opacity .35s; }
+.ready { opacity: 1; }
+.hidden { visibility: hidden; }
+.vignette {
+  background: linear-gradient(90deg,#03070cb0, #03070c28 50%,transparent 80%), linear-gradient(0deg,#03070c70,transparent 22%,transparent 80%,#03070c55);
+}
+.caption {
+  position: sticky;
+  top: calc(100svh - 66px);
+  z-index: 4;
+  width: fit-content;
+  max-width: calc(100% - 40px);
+  height: 48px;
+  margin: -100svh 24px 0 auto;
+  padding: 0 12px 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  color: #d8e0f2;
+  background: #0b111bf5;
+  border: 1px solid #9bbaff40;
+  border-radius: 6px;
+  box-shadow: 0 8px 32px #0006;
+  font-size: 12px;
+  pointer-events: auto;
+}
+.label { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.label small { display: block; color: #a8b3c8; margin-top: 3px; font-size: 8px; }
+.offerings { display: flex; gap: 18px; }
+.offerings a:first-child { color: #a8bdff; }
+.offerings a:nth-child(2) { color: #9cddcd; }
+.offerings a:last-child { color: #d4bdef; }
+.caption button {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid #657696;
+  border-radius: 4px;
+  color: #d8e0f2;
+  background: #101b2b;
+  cursor: pointer;
+}
+.caption a { padding-block: 12px; }
+.caption a:focus-visible,.caption button:focus-visible { outline: 2px solid #d2dfff; outline-offset: 3px; }
+.static { color: #b9c4d8; }
+.root > :not(.journey) { position: relative; z-index: 1; }
+.root :is(section[id],h2[id],div[id]) { scroll-margin-top: 130px; }
+.root :is(a,button) { scroll-margin-block: 120px 90px; }
+.root .hero {
+  min-height: calc(100svh - 85px);
+  display: flex;
+  align-items: center;
+  padding-block: 90px 120px;
+  border: 0;
+  background: linear-gradient(90deg,#050a12de,#050a129c 48%,transparent 76%);
+}
+.hero > div { width: 100%; }
+.root .hero h1 { max-width: 760px; font-size: clamp(44px,5.2vw,74px); }
+.root .hero p { max-width: 590px; }
+.root .hero p:not(:first-child) { color: #d3dbe9; text-shadow: 0 2px 12px #000; }
+.root .overview {
+  min-height: 90svh;
+  padding-block: 100px 130px;
+  border: 0;
+  background: linear-gradient(0deg,transparent,#060a12a0 25%,#060a12a0 75%,transparent);
+}
+.overview h2, .overview > div > p { text-shadow: 0 2px 12px #000; }
+.root .chapter {
+  min-height: 105svh;
+  padding: 100px 0 140px;
+  display: flex;
+  align-items: center;
+  border: 0;
+}
+.root .chapter > div {
+  width: min(640px,52%);
+  margin: 0 auto 0 max(40px,calc((100% - 1216px)/2));
+  padding: 34px;
+  display: block;
+  background: #070d17e8;
+  border: 1px solid #9cb5ff30;
+  border-radius: 8px;
+  box-shadow: 0 20px 70px #0003;
+}
+.chapter > div > :nth-child(2) { margin-top: 30px; }
+.root .chapter h2 { font-size: clamp(30px,3vw,43px); }
+.process { padding: 80px 0 100px; }
+.process > section { border: 0; padding: 0; }
+.process > section > div {
+  max-width: 1216px;
+  width: calc(100% - 80px);
+  padding: 34px;
+  background: #070d17e8;
+  border: 1px solid #9cb5ff30;
+  border-radius: 8px;
+}
+.root .credentials {
+  max-width: 1216px;
+  width: calc(100% - 80px);
+  padding-inline: 34px;
+  margin-block: 60px;
+  background: #070d17ec;
+  border: 1px solid #9cb5ff30;
+  border-radius: 8px;
+}
+.finish { min-height: 100svh; display: flex; align-items: center; padding-block: 90px; }
+.finish > section { width: 100%; padding: 0; background: transparent; }
+.finish > section > div {
+  width: min(560px,42%);
+  margin: 0 auto 0 max(40px,calc((100% - 1216px)/2));
+  padding: 34px;
+  background: #070d17e8;
+  border: 1px solid #9cb5ff30;
+  border-radius: 8px;
+}
+.finish h2 { font-size: clamp(30px,3.1vw,44px); }
+@media(max-width:1000px) {
+  .root .hero h1 { max-width: 650px; }
+  .root .chapter > div { width: 62%; margin-left: 30px; padding: 28px; }
+  .finish > section > div { margin-left: 30px; padding: 28px; }
+  .caption { gap: 16px; }
+}
+@media(max-width:760px) {
+  .vignette { background: linear-gradient(90deg,#03070c60,#03070c20),linear-gradient(0deg,#03070c50,transparent 40%); }
+  .root .hero { padding-block: 80px 110px; min-height: calc(100svh - 69px); background: linear-gradient(90deg,#050a1280,#050a1220); }
+  .root .hero h1 { font-size: clamp(38px,9vw,58px); text-shadow: 0 2px 20px #000; }
+  .hero > div { background: linear-gradient(90deg,#060b14a0,#060b1440); padding-block: 22px; }
+  .root .overview { padding-block: 60px 100px; }
+  .root .chapter { min-height: 0; padding-block: 100px 130px; }
+  .root .chapter > div { width: calc(100% - 36px); margin-inline: 18px; padding: 24px; background: #070d17d4; }
+  .root .chapter h2 { font-size: 32px; }
+  .process { padding-block: 80px; }
+  .process > section > div,.root .credentials { width: calc(100% - 36px); padding-inline: 24px; background: #070d17db; }
+  .finish > section > div { margin-left: 18px; padding: 24px; }
+  .caption { top: calc(100svh - 60px); margin-right: 12px; max-width: calc(100% - 24px); width: calc(100% - 24px); padding-inline: 12px; gap: 10px; font-size: 11px; }
+  .label { display: none; }
+  .offerings { gap: 14px; }
+  .caption button { padding: 5px 8px; font-size: 10px; }
+  .root :is(section[id],h2[id],div[id]) { scroll-margin-top: 100px; }
+}
+/* The portrait ending reserves one bounded art band above the ordinary CTA.
+   The live canvas follows that band; the static SVG keeps its completed pose. */
+@media(max-width:760px) and (max-aspect-ratio:23/20) {
+  .poster svg { left: 10%; top: 29svh; width: 80%; max-height: 32svh; }
+  .finish { min-height: 0; display: block; padding-top: 42svh; padding-bottom: 110px; }
+  .finish > section > div {
+    width: calc(100% - 36px);
+    margin-inline: 18px;
+    padding: 24px;
+    background: #070d17f0;
+  }
+}
+@media(max-height:550px) {
+  .caption { top: calc(100svh - 48px); height: 42px; }
+  .root .hero,.root .chapter,.finish { min-height: 0; }
+}
+@media(prefers-reduced-motion:reduce) { .canvas { transition: none; } }
+
+/* A compact technology interlude, not a fourth offering or new camera chapter. */
+.root .technology { padding-block: 28px; border: 0; }
+.technology > div { width: min(1216px, calc(100% - 80px)); padding: 28px 34px; background: #070d17ed; border: 1px solid #9cb5ff30; border-radius: 8px; }
+.technology h2 { max-width: 800px; font-size: clamp(26px, 2.6vw, 36px); }
+.technology p { max-width: 920px; }
+@media(max-width:760px) { .technology > div { width: calc(100% - 36px); padding: 24px; } }

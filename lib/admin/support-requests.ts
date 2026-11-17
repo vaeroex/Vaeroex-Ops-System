@@ -1,5 +1,5 @@
 /** Safe support inbox fields; request contents are fetched only after opening a request. */
-export const SUPPORT_REQUEST_LIST_FIELDS = "id,workspace_id,name,email,issue_type,priority,status,created_at,updated_at,archived_at,deleted_at";
+export const SUPPORT_REQUEST_LIST_FIELDS = "id,workspace_id,name,email,issue_type,priority,status,created_at,updated_at,archived_at,deleted_at,notification_status,notification_detail";
 export const SUPPORT_STATUSES = ["open", "in_review", "waiting_on_customer", "resolved", "closed"] as const;
 export const SUPPORT_PRIORITIES = ["Low", "Medium", "High", "Urgent"] as const;
 export const SUPPORT_LIFECYCLES = ["active", "archived", "deleted", "all"] as const;
@@ -10,7 +10,7 @@ export const SUPPORT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 export type SupportRequestSummary = {
   id: string; workspace_id: string | null; name: string; email: string; issue_type: string;
   priority: string; status: string; created_at: string; updated_at: string;
-  archived_at: string | null; deleted_at: string | null; workspaceName: string;
+  archived_at: string | null; deleted_at: string | null; workspaceName: string; notification_status?: string | null; notification_detail?: string | null;
 };
 export type SupportFilters = { q: string; status: string; view: typeof SUPPORT_LIFECYCLES[number]; page: number };
 export type SupportMutationResult = { ok: boolean; message: string; changedCount?: number; requestedCount?: number; replayed?: boolean };

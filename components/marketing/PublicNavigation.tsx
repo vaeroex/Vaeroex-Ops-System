@@ -1,9 +1,10 @@
 "use client";
 import Link from "next/link";
+import type { Route } from "next";
 import { ChevronDown, Menu, ArrowUpRight } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
+import { SOLUTIONS } from "@/lib/marketing/solutions";
 
 const company = [
   ["About", "/about"],
@@ -55,20 +56,20 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
       <nav className="vx-desktop-nav" aria-label="Public navigation">
         <details name="public-navigation">
           <summary>
-            Intelligence
+            Solutions
             <ChevronDown size={12} aria-hidden="true" />
           </summary>
           <div className="vx-dropdown">
-            {PUBLIC_SYSTEMS.map((system) => (
-              <div key={system.id} className="vx-nav-product" role="group" aria-label={system.name}>
+            {SOLUTIONS.map((system) => (
+              <div key={system.route} className="vx-nav-product" role="group" aria-label={system.name}>
                 <Link href={system.route}>
                   <strong>{system.name}</strong>
-                  <small className="vx-nav-description">Featuring Vaeroex Super Intelligence, our flagship conversational AI feature.</small>
+                  <small className="vx-nav-description">{system.description}</small>
                 </Link>
               </div>
             ))}
-            <Link href="/intelligence-systems" className="vx-dropdown-overview">
-              The Vaeroex approach
+            <Link href="/executive-intelligence" className="vx-dropdown-overview">
+              Executive Intelligence
               <ArrowUpRight size={14} aria-hidden="true" />
             </Link>
           </div>
@@ -100,8 +101,8 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
         </details>
       </nav>
       <div className="vx-mobile-nav">
-        <Link href={loggedIn ? "/app" : "/login"}>
-          {loggedIn ? "App" : "Login"}
+        <Link href={(loggedIn ? "/systems" : "/login") as Route}>
+          {loggedIn ? "Your Systems" : "Log in"}
         </Link>
         <details>
           <summary aria-label="Open navigation menu">
@@ -110,15 +111,15 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
           <nav className="vx-mobile-menu" aria-label="Public navigation mobile">
             <span>EXPLORE VAEROEX</span>
             <Link href="/">Home</Link>
-            {PUBLIC_SYSTEMS.map((system) => (
-              <div key={system.id} className="vx-nav-product" role="group" aria-label={system.name}>
+            {SOLUTIONS.map((system) => (
+              <div key={system.route} className="vx-nav-product" role="group" aria-label={system.name}>
                 <Link href={system.route}>
                   {system.name}
-                  <small className="vx-nav-description">Featuring Vaeroex Super Intelligence, our flagship conversational AI feature.</small>
+                  <small className="vx-nav-description">{system.description}</small>
                 </Link>
               </div>
             ))}
-            <Link href="/intelligence-systems">The Vaeroex approach</Link>
+            <Link href="/executive-intelligence">Executive Intelligence</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/trust">Trust Center</Link>
             {company.map(([label, href]) => (
@@ -128,10 +129,10 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
             ))}
             <Link href="/help">Help</Link>
             <Link
-              href="/checkout/legal"
+              href="/contact?inquiry=custom-business-systems"
               className="vx-button vx-button--primary"
             >
-              Get Executive Intelligence
+              Discuss a Project
               <ArrowUpRight size={15} aria-hidden="true" />
             </Link>
           </nav>

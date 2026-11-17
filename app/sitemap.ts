@@ -4,6 +4,8 @@ import { PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
 const publicPages = [
   "/",
   "/intelligence-systems",
+  "/custom-business-systems",
+  "/website-development",
   "/executive-intelligence",
   "/pricing",
   "/networking",
@@ -12,7 +14,18 @@ const publicPages = [
   "/contact",
   "/about",
   "/about/why-vaeroex",
-  "/careers"
+  "/careers",
+  "/support",
+  "/terms",
+  "/privacy",
+  "/refund-policy",
+  "/subscription-billing-terms",
+  "/workspace-capacity-terms",
+  "/acceptable-use",
+  "/sensitive-data-policy",
+  "/data-retention",
+  "/ai-disclaimer",
+  "/human-review"
 ] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {

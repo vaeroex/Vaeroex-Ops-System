@@ -1,6 +1,11 @@
+import { utilityRobots } from "@/lib/seo/public-seo";
+export const metadata = { robots: utilityRobots };
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import type { ReactNode } from "react";
+import { SYSTEM_CATALOG } from "@/lib/systems/catalog";
+import { loadSystemAccess } from "@/lib/systems/access";
+import { accessibleSystemLinks } from "@/lib/systems/routing";
 import { AppShell } from "@/components/app/AppShell";
 import { LegalAcceptanceGate } from "@/components/legal/LegalAcceptanceGate";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
@@ -50,6 +55,8 @@ export default async function ProtectedAppLayout({
       activeWorkspace={context.activeWorkspace}
       membership={context.membership}
       isVaeroexAdmin={isVaeroexAdmin}
+      switchableSystems={SYSTEM_CATALOG.filter(system => system.status === "available").length > 1
+        ? accessibleSystemLinks((await loadSystemAccess(supabase, user, context)).decisions) : []}
     >
       {acceptedLatestPolicies ? (
         children
