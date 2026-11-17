@@ -16,6 +16,7 @@ function load(file, deps) {
   return loaded.exports;
 }
 const preparationDiagnostics = load('lib/ai/shared-evidence/preparation-diagnostics.ts', { zod: { z } });
+const sharedContracts = load('lib/ai/shared-evidence/contracts.ts', { zod: { z } });
 const authority = load('lib/integrations/google-sheets/read-authority.ts', { zod: { z },
   '@/lib/ai/shared-evidence/preparation-diagnostics': preparationDiagnostics });
 const workspaceId = '11111111-1111-4111-8111-111111111111';
@@ -43,7 +44,8 @@ class VsiHttpError extends Error { constructor(status, code, message) { super(me
 class VsiEngineError extends Error {}
 let staleDuringProvider = false, providerTicket;
 const deps = {
-  '@/lib/vsi/qualification': load('lib/vsi/qualification.ts', { zod: { z }, 'node:crypto': require('node:crypto') }),
+  '@/lib/vsi/qualification': load('lib/vsi/qualification.ts', { zod: { z }, 'node:crypto': require('node:crypto'),
+    '@/lib/ai/shared-evidence/contracts': sharedContracts }),
   'next/server': { NextResponse: { json: (value, init) => Response.json(value, init) } }, zod: { z },
   '@/lib/integrations/google-sheets/read-authority': authority,
   '@/lib/security/rate-limit': { enforceRateLimit: async () => ({ allowed: true }) },

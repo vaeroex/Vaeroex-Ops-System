@@ -13,7 +13,7 @@ before asking to execute it.
 | GitHub candidate | PR #571, branch `codex/vsi-bounded-qualification`; merged-main baseline `796ade18fde960c253b6023c29b182c9222c6f2f`; prior reviewed head `7d105ddb182ce09bfdaa6e36090f84ca693466f9` |
 | Implementation source | Reporting group `74f46d55938757810a197ee3d27ac627c3006e2f`; standalone group `34bf9893d8e5a2950f601f2949c0d81601eabc93`; Square and scoped qualification changes are part of the final PR candidate. Bind execution to the final immutable PR head and exact-head CI, not one earlier group commit. This document grants no deployment authority. |
 | Isolated database | Existing disposable Supabase project `bdmrcmbkiohcqkmcvvua`, named `executive-security-disposable-20261014`. This is the proposed target; it is not currently qualified for the campaign. |
-| Preview project | Vercel project `prj_J810bZ9ECoN4CyLKujUoEEH8N6ja`, team `team_uORtrMvad77Qz6HikOgD4cnp` (`vaeroex-2167s-projects`). Create a protected **Preview**, bound to the final source and isolated database. No Preview build has been created for this group; there is no verified deployment ID or URL to publish yet. |
+| Preview project | Vercel project `prj_J810bZ9ECoN4CyLKujUoEEH8N6ja`, team `team_uORtrMvad77Qz6HikOgD4cnp` (`vaeroex-2167s-projects`). Use at most two protected **Preview** deployments at the same final code head: Phase A for connection/refresh and Phase B for the fixed-source questions. Both bind the same isolated database. No qualified deployment ID or URL has been recorded for either phase yet. |
 | Production exclusion | Do not target Supabase `mdiianhfrojmxqpwrflh`, assign/promote any Production domain, change Production environment values, or change main's automatic-deployment hold. |
 | Application activation | All three ordinary shared-evidence, qualitative-synthesis, and failure-accounting gates remain `false`. Refresh consent and the Preview qualification manifest are separate authorities. |
 
@@ -35,11 +35,13 @@ an existing installation or copy Production credentials/data to make it work.
 ## Compatibility work required before an execution request
 
 1. The exact 13-file forward closure below has passed an empty local structural
-   installation rehearsal. Finish the remaining metadata checks for existing
-   trigger/function composition, restrictive policies, keys/defaults and renamed
-   helper collisions. Preserve the disposable target's existing records and
-   establish its writer-quiescence boundary; no reset, ledger repair or target
-   SQL execution is authorized. Private captures remain outside the PR and CI.
+   installation rehearsal and the scoped target catalog comparison. No catalog
+   incompatibility remains identified for this additive Clockify/Katana package.
+   Pin the checked contracts and hashes in the installation preflight and rerun
+   it on the exact target immediately before any separately approved execution.
+   Name the bounded writer-quiescence window and preserve existing records; no
+   reset, ledger repair or target SQL execution is authorized by this document.
+   Private captures remain outside the PR and CI.
 2. Both existing billing helper definitions and ACLs match the reviewed local
    source. Do not replay `20261002040031_google_sheets_lifecycle.sql` or
    `20261005022017_workspace_security_boundaries.sql`; their required functions
@@ -48,9 +50,12 @@ an existing installation or copy Production credentials/data to make it work.
    ACLs after any separately authorized installation. The shared bootstrap is
    an additional dependency, not something supplied by the recurring migration.
 3. The candidate now supports an explicit `REPORTING_PREVIEW_QUALIFICATION`
-   manifest for **Clockify/Katana key-based forms only**. It binds the immutable
-   `VERCEL_URL`, exact owner and workspace, provider list, start and expiry (at
-   most two hours), and fixed connect/select/import/consent/disconnect paths.
+   manifest for **Clockify/Katana key-based forms only**. Its required
+   `sourceCommit` must equal platform `VERCEL_GIT_COMMIT_SHA`; the exact request
+   origin is derived from platform `VERCEL_URL`. Optional `deploymentHost`, if
+   supplied, must match that platform hostname. It also binds owner/workspace,
+   provider list, start and expiry (at most two hours), and fixed connect/select/
+   import/consent/disconnect paths.
    Host, forwarded host/protocol, Origin and same-origin CSRF checks remain.
    OAuth callbacks stay canonical; no host spoofing or Production credentials
    are part of the witness. This manifest is not configured here.
@@ -74,12 +79,14 @@ an existing installation or copy Production credentials/data to make it work.
    provider or model execution. Reconcile different results; do not replay
    bootstrap SQL or relax access controls.
 
-The Preview does not yet exist. The forward closure has local structural and
-regression evidence, while target writer/policy compatibility and real Auth are
-not yet qualified. Items 3–5 have local code and regression coverage. This artifact is
-**not ready for hosted execution approval** until the target schema closure,
-source/build identity, credentials provenance and exact provider-record execution
-manifest are complete. Local mocks do not resolve those remaining conditions.
+The forward closure now has local structural/regression evidence and matching
+scoped target metadata. Items 3–5 also have local code and regression coverage.
+The campaign still needs its final source/build identity, isolated configuration,
+dedicated provider-account and record identifiers, exact timer/access manifest,
+and explicit bounded execution approval. No qualified protected Preview or real
+Auth/provider/model acceptance is asserted here. Those acceptance checks occur
+within the later authorized isolated run; a full Production clone is not an
+intrinsic prerequisite for this additive package.
 
 ## Reviewed isolated forward closure and local rehearsal
 
@@ -135,9 +142,9 @@ The November 17 metadata checks established:
 
 - Of 64 writer-fence targets, 43 already exist and 21 are supplied by the package
   (nine shared tables and twelve connector fact/connection/coverage tables).
-- None of the package's 30 new table names or 94 directly created function names
-  collides with an existing target object. Renamed helper aliases and new trigger/
-  policy names still require their explicit collision check.
+- None of the package's 30 new table names, 94 directly created function names
+  or ten renamed helper aliases collides with an existing target object. The
+  new owner-policy names and writer-fence trigger names are absent as required.
 - The entity `(workspace_id,id)` unique key exists. The required Auth user/session
   UUID and timestamp columns exist, including nullable session `not_after`, as
   the unchanged owner/session helper expects. No Auth record was read.
@@ -147,18 +154,103 @@ The November 17 metadata checks established:
   `qbo_customer_preview_v1`. Preserve them and exclude QBO from this witness;
   reconcile them separately before QBO hosted qualification. These differences
   do not justify replaying QBO infrastructure or broadening this provider pair.
-- Both billing helper definitions and ACLs match. Metadata reads returned no
-  credentials, record contents or function bodies. Their success is not consent
-  to alter the isolated database.
+- Both billing helper definitions and ACLs match. All 19 screened artifact/VSI/
+  entity trigger definitions match and are enabled. All ten screened function
+  security contracts match: body fingerprint, owner, definer/search-path settings
+  and anon/authenticated/service-role execution privileges.
+- All 43 existing fence targets have non-null UUID workspace keys. Required
+  workspace/profile primary keys, the entity key, conversation tenant/actor key,
+  request idempotency key and once-only `(request_id,attempt)` cost key exist and
+  are validated. The relevant VSI defaults remain compatible with the existing
+  request/settlement contract.
+- VSI history retains actor-private SELECT policies plus restrictive live-session
+  and Sheets-expiry boundaries. Customers cannot mutate the transcript or ledger
+  tables directly; request/cost tables remain inaccessible to customer SELECT.
+  Private terminal claims and billing exemptions have no application-role read
+  or write grants. Metadata reads returned no credentials, record contents or
+  function bodies. Their success is not consent to alter the database.
 
-The next authorized action is a metadata-only comparison of the existing
-artifact/VSI trigger graph and relevant grants/policies, prerequisite keys and
-new alias/trigger/policy names against the qualified contracts. Use its result
-to pin fail-closed installation checks and rehearse any actual dependency change
-locally. Do not leave this as an unspecified full-database parity audit or assume
-that matching migration version numbers are sufficient. Real Auth, protected
-Preview behavior and concurrent writer acceptance belong to the later explicitly
-approved isolated qualification, after this compatibility comparison passes.
+The final comparison receipt is
+`vsi-isolated-forward-final-compatibility-receipt.json`, retained privately with
+the structural receipt. It identifies **no remaining catalog incompatibility for
+the additive two-provider closure**. The next local work is to pin these checks
+and the package bytes to the final passing head and complete the concrete
+account/build/timer manifest. The next database action requires exact isolated
+installation and writer-window approval. Real Auth, protected Preview behavior,
+concurrent writer acceptance, provider arrival and actual answers remain later
+hosted acceptance checks, not reasons to demand a full Production clone.
+
+### Preview configuration preparation
+
+An exact deployment lookup for `3f0b7540aa376522213dbf7e1a65edb912c01be5`
+returned no deployments; the branch auto-deployment hold remains preserved.
+The existing owner-authenticated Vercel CLI (59.1.4) successfully listed the
+correct team's/project's Preview environment names. There are zero branch-specific
+entries for this VSI branch. Common Preview entries include
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. Other listed
+entries are shared between Preview and Production: `CRON_SECRET`, `OPENAI_API_KEY`,
+`NVIDIA_API_KEY`, `AI_PROVIDER`, `NEXT_PUBLIC_APP_URL` and `RESEND_API_KEY`.
+No reporting provider, recurring-scope or qualification-manifest names were listed.
+Values were not read, so their target/provenance is not qualified. The connector's
+403 is not an owner-role or sign-in blocker; the existing CLI access works.
+
+Prepare the following **deployment-only** overrides for the two eventual
+approved builds. Do not persist either manifest or rollout settings at branch or
+project scope, where a later build could inherit active authority. None is configured by this document. Do not edit common Preview
+or Production values, infer safe provenance from an environment label, or copy a
+Production credential. Keep secret values in the existing protected secret store;
+receipts contain only names, approved target, provenance and nonsecret fingerprints.
+
+| Code configuration | Exact campaign requirement |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Bind all three explicitly to disposable project `bdmrcmbkiohcqkmcvvua`. Provision that project's approved credentials through the protected deployment path; do not reuse inherited credentials on assumption. |
+| `NEXT_PUBLIC_APP_URL` | Set the exact approved protected Preview origin. Preserve Vercel-provided `VERCEL_ENV=preview` and immutable `VERCEL_URL`; never spoof Production or use a Production app URL. |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Use a key matched to the isolated Auth project's CAPTCHA configuration and explicitly approved campaign hostname. Verify isolated Auth site/redirect settings and hostname compatibility; any required change must name the isolated target or narrowly approved widget action. Never remove CAPTCHA or change Production settings to pass. |
+| `CRON_SECRET` | Phase A: provision a campaign-specific 32–512-character secret and give only the exact ephemeral timer its protected reference. This overrides the shared entry for this deployment; it does not alter the Production secret. Protected-Preview access is a separate requirement. |
+| `REPORTING_CONNECTOR_TOKEN_KEY` | Phase A only: provision a separate canonical base64 encoding of 32 random bytes for this isolated campaign. Existing code encrypts the entered test-provider credentials with it. Never copy the Production encryption key. |
+| `CLOCKIFY_REPORTING_ENABLED`, `KATANA_REPORTING_ENABLED` | Phase A only: set exactly `true` only for the selected campaign. These key-based adapters require no new OAuth client IDs, client secrets or scopes. Test keys enter through the normal owner connection forms and are stored encrypted; no invented provider-key environment variable is needed. |
+| `REPORTING_AUTOMATIC_REFRESH_ENABLED`, `REPORTING_AUTOMATIC_REFRESH_WORKSPACE_IDS`, `REPORTING_AUTOMATIC_REFRESH_PROVIDERS` | Phase A only: set `true`, the one actual approved isolated workspace UUID, and exactly `clockify,katana`. Per-connection owner consent remains independently required. Keep standalone/Square rollout scopes unset. |
+| `REPORTING_PREVIEW_QUALIFICATION` | Phase A only: required `sourceCommit` equals the final 40-character lowercase Git SHA and platform `VERCEL_GIT_COMMIT_SHA`; owner/workspace UUIDs, exact provider pair and start/expiry (at most two hours) are fixed. Omit unknown `deploymentHost` before creation; the runtime derives its exact HTTPS origin from platform `VERCEL_URL`, failing closed if platform identity is missing or mismatched. Its fixed actions do not cover OAuth callbacks or arbitrary routes. |
+| `VAEROEX_VSI_QUALIFICATION` | Phase B only: create a second same-head Preview with the three reviewed slots after Phase A stops and actual hashes are frozen. Bind actor/workspace/chat/request/question IDs; use at most 30 minutes for this campaign (within the code maximum of one hour), business `approvedProviders: ["clockify","katana"]`, and `inspectCitations: true`. |
+| `OPENAI_API_KEY` | Phase A: explicitly override with an empty value to prevent inheriting a paid model connection. Phase B: bind an explicitly approved test-provider credential/project, with provenance and the proposed call/spend ceiling recorded. If no suitable test key already exists, provisioning it is a named execution dependency. Do not assume the inherited Preview/Production key is approved. VSI's Luna routing and ordinary budget controls remain unchanged. |
+
+Inherited NVIDIA, generic provider-selection and email configuration is not
+needed to authorize this two-provider/model witness. Do not invoke unrelated
+billing, email or provider features. Application configuration is only one
+boundary: the actual provider accounts, synthetic actor/workspace/entity IDs,
+qualified Auth/CAPTCHA path and ephemeral timer/protection mechanism still need
+their exact execution-manifest entries. No deployment, environment change,
+provider credential read or account mutation occurred in this preparation.
+
+### Two immutable deployments and deadline
+
+A deployment's random hostname is unknown before creation, and changing its
+environment produces another deployment. Resolve that without broadening origin
+checks: Phase A receives the final source-pinned reporting manifest through
+**deployment-only** overrides; its server accepts only its own platform hostname.
+After the protected build is ready, record and verify its actual deployment ID,
+URL, code SHA, Preview environment and isolated configuration before any provider
+change or timer start. Do not override platform `VERCEL_URL` or
+`VERCEL_GIT_COMMIT_SHA`, and do not accept a branch alias in place of that origin.
+
+Phase B is a **second immutable protected Preview at the same code SHA**, created
+only after the successful automatic refresh is stopped and its source versions
+are frozen. It receives its own deployment-only VSI manifest and isolated
+configuration, with no reporting-form manifest or recurring rollout scope. Record
+its actual URL/ID and sign in normally on the new hostname. Do not copy cookies,
+reuse a session from another host or edit a live deployment's environment.
+
+Keep the Phase A deployment available for its authorized cleanup. Start Phase B
+only if **at least 45 minutes remain** before Phase A's fixed two-hour expiry;
+Phase B's answer window is at most **30 minutes**. Stop the timer and disable
+recurring consent on A before freezing the answer sources. Complete the three
+questions, citation/reopen checks and normal owner disconnect on A before A
+expires, then retire the deployments and temporary access. If builds, sign-in,
+provider latency or failures leave too little time, report the completed partial
+results and clean up A; do not shorten a provider cooldown, edit freshness/due
+values, create a third deployment, rotate request IDs or renew a manifest without
+a separately approved continuation.
 
 ## Phase A — real unattended ingestion, zero model calls
 
@@ -215,7 +307,9 @@ cleanup in the private execution record before approval.
   protected Preview `/api/integrations/reporting/scheduled-sync` endpoint every
   15 minutes for at most two hours (at most 8 timer dispatches). The chosen
   timer service/job ID, protected-deployment access mechanism, and secret-store
-  references must be fixed before approval; none has been created. Do not add a
+  references must be fixed in the execution manifest. Bind the job to Phase A's
+  actual immutable URL after build verification and before changing provider
+  records; none has been created. Do not add a
   Production job or assume possession of `CRON_SECRET` bypasses Vercel protection.
 - Honor the real one-hour manual cooldown. First eligible recurring work should
   occur on the next 15-minute tick after that cooldown (normally 60–75 minutes
@@ -258,11 +352,15 @@ For each integration require:
    revoked-source tests remain fixture proof unless the same fault is actually
    observed in this hosted run. An unsuccessful refresh does not become zero.
 
-Stop the external timer after the Phase A receipt and before pinning the Phase B
-source hashes. Disabling the timer is not disabling source access or changing
-saved evidence. No new provider refresh, import, mapping edit or record mutation
-is allowed during the fixed-hash model campaign. An unexpected source change
-invalidates that campaign and must stop dispatch; do not silently update hashes.
+Stop/delete the external timer after the Phase A receipt, let bounded admitted
+work settle, and disable recurring consent through A's normal owner form while
+its reporting manifest remains valid. This retains source eligibility and saved
+facts; verify that before pinning Phase B hashes. Then create the second protected
+Preview at the same code head with the frozen answer manifest. No new provider
+refresh, import, mapping edit or record mutation is allowed during the fixed-hash
+model campaign. An unexpected source change invalidates the campaign and must
+stop dispatch; do not silently update hashes. Disconnect test connections only
+after the answer/citation checks, using A before its expiry.
 
 ## Phase B — three immutable questions over the retained sources
 
@@ -294,9 +392,9 @@ live stale-answer handling was not witnessed. Do not backdate stored timestamps
 to manufacture that claim. Missing/incomplete scope must still be explained;
 local stale/failure fixtures remain separately labeled.
 
-The manifest pins the actual actor/workspace/chat/request IDs, exact question
-hashes, complete approved source hash set, final build and a window of at most
-60 minutes. Private source lists are empty. Inspect actual serialized dispatch
+Phase B's manifest pins the actual actor/workspace/chat/request IDs, exact
+question hashes and complete approved source hash set. Its deployment is recorded
+at the same final code SHA and its campaign window is at most 30 minutes. Private source lists are empty. Inspect actual serialized dispatch
 receipts, not only the proposed prompt. Save/reopen the answer, inspect each
 allowed citation, and deny copied links in the foreign workspace/viewer case.
 Do not replace a failed immutable request ID, retry a model call, or expand slots.
@@ -336,21 +434,26 @@ change or paid timer/model usage must be named in the later execution request.
 
 Restoration order:
 
-1. Stop/delete the exact ephemeral timer; verify no future dispatch remains.
-2. Let admitted bounded reads settle or recover expired leases. Reconcile every
-   model ledger reservation and terminal result before revoking test access.
-3. Remove the Preview qualification manifest/recurring rollout configuration;
-   disable recurring consent on the designated test connections through the
-   normal authorized path. Revoke only the temporary provider keys and test
-   deployment access that were introduced for this campaign.
+1. Stop/delete the exact Phase A timer and verify no future dispatch remains.
+   Let admitted bounded reads settle or recover expired leases; while A's form
+   manifest is valid, disable recurring consent through its normal owner path.
+   Do this before the Phase B source freeze, and verify saved facts remain eligible.
+2. Complete or stop the bounded Phase B questions and reconcile every ledger
+   reservation/terminal result. While A still has its approved owner session and
+   unexpired form manifest, disconnect only the designated test connections
+   through the normal owner path. Do not remove the form authority before cleanup.
+3. Retire both exact deployments and their deployment-only manifests/scopes.
+   Revoke only temporary provider keys, timer secrets and deployment access
+   introduced for this campaign. Do not alter shared project/branch/Production env.
 4. Restore only approved temporary test membership/entitlement/lock changes.
    Preserve audit/source-version/chat receipts under normal retention rules.
    Remove fictional provider records only according to the approved exact
    cleanup list; do not delete a reused test account or overwrite old records.
-5. Retire the Preview and verify Production domains, source deployment,
-   environment settings, provider connections and auto-deployment holds match
-   the recorded pre-test baseline. Schema rollback is not automatic; preserve
-   isolated data and use the separately reviewed target rollback if required.
+5. Verify Production domains, source deployment, environment settings, provider
+   connections and auto-deployment holds match the recorded baseline. Schema
+   rollback is not automatic; preserve isolated data and use the separately
+   reviewed target rollback if required. A missed deadline is a partial result,
+   not authority to create another deployment or extend access.
 
 ## Scope after this group
 
@@ -399,3 +502,16 @@ function is owned by postgres, SECURITY DEFINER, and executable only by postgres
 and service_role. This supports exact comparison of the proposed Square increment;
 it does not authorize applying that increment. No source records, credentials or
 function bodies were returned by the preflight.
+
+
+## Current code and CI receipt
+
+Native isolated database CI passed at `3f0b7540aa376522213dbf7e1a65edb912c01be5`:
+107 baseline migrations, 163 assertions and 36 recurring-refresh assertions;
+closed gates, no provider calls, and no claim of concurrent-session testing.
+The other native/broker jobs at that head passed. Its general verification job
+failed on an isolated test-loader dependency, which is being corrected together
+with the source-pinned deployment manifest. Those earlier passes do not establish
+CI for the final revised head; read every required job at that exact head before
+requesting hosted execution. No CI run here constitutes a hosted provider/model
+or protected-browser acceptance receipt.
