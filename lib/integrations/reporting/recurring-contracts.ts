@@ -11,4 +11,3 @@ export type ReportingRecurringAuthority = {
   authorized: boolean;
   reason: "active" | "owner_unavailable" | "entitlement_unavailable" | "disabled" | "connection_unavailable";
 };
-
