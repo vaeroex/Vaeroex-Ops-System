@@ -84,6 +84,10 @@ deps['@/lib/vsi/storage'].settleGeneratedVsi = async (access, input, manifestId)
 };
 deps['@/lib/vsi/storage'].settleFailedVsi = async (access, input) =>
   deps['@/lib/vsi/storage'].mutateVsi(access, 'settle', { ...input, usage: { ...input.usage, failed: true } });
+// These scenarios exercise chat settlement, never qualification preparation.
+for (const [name, method] of [['./shared-preparation', 'prepareVsiSharedEvidence'], ['./preparation-scope', 'assertVsiPreparationScope'], ['./retrieval', 'authorizeVsiRead']]) {
+  deps[name] = { [method]: () => { throw new Error('Unexpected qualification preparation in legacy authority fixture'); } };
+}
 const { vsiRoute } = load('lib/vsi/http.ts', deps);
 function request() { return new Request('https://synthetic.test/api/vsi/conversations/' + conversationId + '/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedWorkspaceId: workspaceId, message: 'Review our aggregate operations', requestId }) }); }
 (async () => {
