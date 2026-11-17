@@ -430,6 +430,7 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026100502201
   currentMigrations.filter(name => name !== "20261019070949_zoho_books_import_history.sql"),
   currentMigrations.filter(name => name !== "20261019070953_loyverse_import_history.sql"),
   currentMigrations.filter(name => name !== "20261019071008_wix_orders_import_history.sql"),
+  currentMigrations.filter(name => name !== "20261117005822_reporting_recurring_refresh.sql"),
   currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
   currentMigrations.filter(name => name !== "20260902191325_square_production_internal_pilot_runtime.sql"),
   currentMigrations.filter(name => name !== "20260907225626_square_remote_sandbox_binding.sql"),
@@ -448,17 +449,18 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026100502201
   [...currentMigrations, "20990101000000_square_activation.sql"]]) {
   assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "missing or unreviewed tail still rejects");
 }
-// Each separately reviewed history migration is exact: renames and duplicate
+// Each separately reviewed history/refresh migration is exact: renames and duplicate
 // ledger entries must fail, just like an unknown Square activation migration.
 for (const name of [
   "20261019070945_reporting_import_history.sql",
   "20261019070949_zoho_books_import_history.sql",
   "20261019070953_loyverse_import_history.sql",
   "20261019071008_wix_orders_import_history.sql",
+  "20261117005822_reporting_recurring_refresh.sql",
 ]) {
   for (const manifest of [currentMigrations.map(item => item === name ? item.replace("_", "1_") : item),
     [...currentMigrations, name]]) {
-    assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "history migration names and uniqueness remain strict");
+    assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "history/refresh migration names and uniqueness remain strict");
   }
 }
 matches(
@@ -562,9 +564,10 @@ assert.deepEqual(JSON.parse(read("vercel.json")), {
   git: { deploymentEnabled: { "codex/vsi-cross-source-date-contract": false, "codex/vsi-cross-source-date-quality-canary": false, "codex/session-refresh-conflict": false, "codex/session-refresh-persistence": false, "codex/vsi-citation-read-stages": false, "codex/vsi-citation-read-stages-canary": false, "codex/vsi-citation-reopen-diagnosis": false, "codex/vsi-temporal-citation-liveness": false, "codex/vsi-reporting-count-units": false, "codex/vsi-fact-reference-contract": false, "codex/vsi-source-coverage-contract": false, "codex/evidence-mapping-setup-only": false, "codex/vsi-final-context-packing": false, "codex/vsi-relevant-context-packing": false, "codex/vsi-validation-diagnostics": false, "codex/vsi-qualitative-premise-identity": false, "codex/vsi-isolated-contract-evaluation": false, "codex/vsi-evidence-assessment-language": false, "codex/vsi-production-reasoning-release": false, "codex/vsi-prompts-retirement-only": false, "main": false, "codex/intelligence-health-consolidation": false, "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false, "codex/workspace-audit-security": false, "codex/workspace-audit-evidence": false, "codex/workspace-audit-workflows": false, "codex/all12-qualified-release": false, "codex/vsi-exact-fact-bindings": false, "codex/vsi-context-overhead": false, "codex/vsi-preparation-diagnostics": false, "codex/vsi-all12-harness-qualification": false, "codex/legal-acceptance-v2": false, "codex/vsi-bounded-qualification": false } },
   crons: [
     { path: "/api/storage-capacity/maintenance", schedule: "*/15 * * * *" },
-    { path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" }
+    { path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" },
+    { path: "/api/integrations/reporting/scheduled-sync", schedule: "*/15 * * * *" }
   ]
-}, "Main and held review branches cannot auto-deploy; only reviewed authenticated storage and Sheets crons are configured");
+}, "Main and held review branches cannot auto-deploy; only reviewed authenticated storage, Sheets and explicitly scoped reporting crons are configured");
 equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
 for (const protectedPath of [
   ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),
