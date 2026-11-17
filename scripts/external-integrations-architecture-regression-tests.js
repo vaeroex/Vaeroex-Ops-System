@@ -481,7 +481,7 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 251, "dormant scope permits only exact reviewed migrations, UI/upload feedback, nine customer presentation paths, nine Admin clarity paths, one approved subscription action path and three approved Admin pilot follow-up paths, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent and manual read, internal-pilot runtime, offline pilot, bounded provisioner and customer candidate files");
+equal(approvedSquareQualificationPaths.length, 253, "dormant scope permits only exact reviewed migrations, UI/upload feedback, nine customer presentation paths, nine Admin clarity paths, one approved subscription action path and three approved Admin pilot follow-up paths, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent and manual read, internal-pilot runtime, offline pilot, bounded provisioner, customer candidate files and the reviewed recurring overlay and SQL test");
 const workspaceClarityPaths = [
   "app/app/intelligence/page.tsx",
   "app/app/kpis/page.tsx",
@@ -533,7 +533,9 @@ const directCustomerProtectedPaths = [
   "supabase/production-migrations/20260929041048_square_customer_payment_history.sql",
   "supabase/tests/square_customer_payment_history.test.sql",
   "supabase/production-migrations/20260929052211_square_customer_payment_browse.sql",
-  "supabase/tests/square_customer_payment_browse.test.sql"
+  "supabase/tests/square_customer_payment_browse.test.sql",
+  "supabase/production-migrations/20261117014116_square_customer_recurring_refresh.sql",
+  "supabase/tests/square_customer_recurring.test.sql"
 ];
 equal(withoutSquareQualificationPaths(directCustomerProtectedPaths.join("\n")), "", "exact closed direct customer component, migration and qualification are in scope");
 for (const unapprovedDirectPath of [
@@ -547,6 +549,9 @@ for (const unapprovedDirectPath of [
   "supabase/production-migrations/20260929052212_square_customer_payment_browse.sql",
   "supabase/migrations/20260929052211_square_customer_payment_browse.sql",
   "supabase/tests/square_customer_payment_browse_unreviewed.test.sql",
+  "supabase/production-migrations/20261117014117_square_customer_recurring_refresh.sql",
+  "supabase/migrations/20261117014116_square_customer_recurring_refresh.sql",
+  "supabase/tests/square_customer_recurring_unreviewed.test.sql",
   "app/api/integrations/square/direct-activation/route.ts"
 ]) {
   equal(withoutSquareQualificationPaths(unapprovedDirectPath), unapprovedDirectPath, "direct customer exception cannot authorize neighboring paths or activation");
@@ -568,9 +573,10 @@ assert.deepEqual(JSON.parse(read("vercel.json")), {
     { path: "/api/storage-capacity/maintenance", schedule: "*/15 * * * *" },
     { path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" },
     { path: "/api/integrations/reporting/scheduled-sync", schedule: "*/15 * * * *" },
-    { path: "/api/integrations/imports/scheduled-sync", schedule: "*/15 * * * *" }
+    { path: "/api/integrations/imports/scheduled-sync", schedule: "*/15 * * * *" },
+    { path: "/api/integrations/square/scheduled-sync", schedule: "*/15 * * * *" }
   ]
-}, "Main and held review branches cannot auto-deploy; only reviewed authenticated storage, Sheets and explicitly scoped reporting/import crons are configured");
+}, "Main and held review branches cannot auto-deploy; only reviewed authenticated storage, Sheets and explicitly scoped reporting/import/Square crons are configured");
 equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
 for (const protectedPath of [
   ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),

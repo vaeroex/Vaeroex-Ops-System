@@ -191,7 +191,7 @@ test('owner membership, account bans and billing revocation are rechecked before
       await connectReporting(db); await claimReporting(db); await apply(db, 'harvest');
       const saved = await state(db);
       await dueNow(db); await claimReporting(db);
-      if (change === 'membership') await db.query("update workspace_members set status='inactive' where user_id=$1", [ids.actor]);
+      if (change === 'membership') await db.query("update workspace_members set status='disabled' where user_id=$1", [ids.actor]);
       if (change === 'ban') await db.query("update auth.users set banned_until=clock_timestamp()+interval '1 day' where id=$1", [ids.actor]);
       if (change === 'deleted-user') await db.query('update auth.users set deleted_at=clock_timestamp() where id=$1', [ids.actor]);
       if (change === 'billing') await db.query("insert into customer_subscriptions(workspace_id,billing_provider,status,current_period_end,stripe_customer_id,stripe_subscription_id) values($1,'stripe','canceled',now()+interval '1 day','fictional-customer','fictional-subscription')", [ids.workspace]);
@@ -256,7 +256,7 @@ test('a new owner must give their own consent and cannot reuse the former author
   const db = await createReportingRecurringTestDb();
   try {
     await connectReporting(db); await claimReporting(db);
-    await db.query("update workspace_members set status='inactive' where user_id=$1", [ids.actor]);
+    await db.query("update workspace_members set status='disabled' where user_id=$1", [ids.actor]);
     await db.query("update workspace_members set role='owner' where user_id=$1", [ids.viewer]);
     await db.query('select set_reporting_recurring($1,$2,$3,$4,true)', [ids.workspace, 'harvest', ids.connection, ids.viewer]);
     const renewed = await state(db);
@@ -277,7 +277,7 @@ test('settings truthfully show paused authority and scope status to the requeste
     assert.equal(await status(ids.other), null);
     await db.query('select set_reporting_recurring($1,$2,$3,$4,true)', [ids.workspace, 'harvest', ids.connection, ids.actor]);
     assert.deepEqual(await status(), { authorized: true, reason: 'active' });
-    await db.query("update workspace_members set role='member' where user_id=$1", [ids.actor]);
+    await db.query("update workspace_members set role='staff' where user_id=$1", [ids.actor]);
     assert.deepEqual(await status(), { authorized: false, reason: 'owner_unavailable' });
     await db.query("update workspace_members set role='owner' where user_id=$1", [ids.actor]);
     await db.query("update workspaces set subscription_required=true,subscription_status='expired' where id=$1", [ids.workspace]);

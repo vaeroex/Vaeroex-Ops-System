@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { reportingRetryAfter } from "../reporting/transport";
 import { CredentialEnvelopeSchema, type CredentialEnvelope } from "@/lib/integrations/credentials/contracts";
 import { ProviderAccessCredential } from "@/lib/integrations/credentials/broker";
 import { ProviderApplicationSecret } from "@/lib/integrations/credentials/secret-manager";
@@ -12,6 +13,9 @@ import { parseSquarePaymentResponse } from "@/lib/integrations/providers/square/
 
 export const directCallbackUri = "https://www.vaeroex.com/api/integrations/square/callback";
 const origin = "https://connect.squareup.com";
+export class SquareDirectRateLimitError extends Error {
+  constructor(readonly retryAfterSeconds: number) { super("square_direct_provider_failed"); }
+}
 const failure = () => new Error("square_direct_provider_failed");
 const reauthorize = () => new Error("square_direct_reauthorization_required");
 const id = z.string().min(1).max(191).regex(/^[A-Za-z0-9._:-]+$/);
@@ -22,6 +26,7 @@ const paymentInput = z.object({ workspaceId: z.string().uuid(), connectionId: z.
   cursor: z.string().regex(/^[A-Za-z0-9._~:+-]{1,4096}={0,2}$/).nullable(),
   cursorBindingFingerprint: fingerprint, cursorFingerprint: fingerprint }).strict();
 function outward(error: unknown): never {
+  if (error instanceof SquareDirectRateLimitError) throw error;
   if (error instanceof Error && error.message === "square_direct_reauthorization_required" ||
       error instanceof ProviderCredentialRefreshFailure && ["invalid_grant", "provider_revoked", "scope_loss"].includes(error.code)) {
     throw reauthorize();
@@ -37,6 +42,10 @@ function credentialForProduction(value: CredentialEnvelope, now?: Date) {
   return credential;
 }
 async function boundedJson(response: Response, maximumBytes: number): Promise<Record<string, unknown>> {
+  if (response.status === 429 || response.status === 503) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new SquareDirectRateLimitError(reportingRetryAfter(response.headers.get("retry-after")));
+  }
   if (response.redirected || response.status >= 300 && response.status < 400 || !response.body) {
     await response.body?.cancel().catch(() => undefined); throw failure();
   }
@@ -59,7 +68,7 @@ async function boundedJson(response: Response, maximumBytes: number): Promise<Re
 /** Uses the existing provider validators; no database LOGIN/broker authority or VM is involved. */
 export function createDirectSquareProvider(input: {
   applicationId: string; applicationSecret: string; network?: typeof fetch; now?: () => Date;
-  authorize?: () => Promise<void>;
+  authorize?: () => Promise<void>; signal?: AbortSignal;
 }) {
   try {
     const applicationId = z.string().min(8).max(191).regex(/^[A-Za-z0-9._:-]+$/).parse(input.applicationId);
@@ -68,27 +77,33 @@ export function createDirectSquareProvider(input: {
     const network = input.network ?? fetch, now = input.now ?? (() => new Date());
     const policy = createSquareOAuthPolicy({ environment: "production", applicationId, redirectUri: directCallbackUri,
       returnPath: "/app/settings/integrations/square" });
+    let transportRetryAfter: number | null = null;
     const transport: SquareOAuthTransport = async request => {
-      const url = new URL(request.url);
+      const url = new URL(request.url), signal = input.signal ? AbortSignal.any([input.signal, request.signal]) : request.signal;
       const discovery = ["/v2/merchants/me", "/v2/locations", "/v2/locations/main"].includes(url.pathname);
       if (url.origin !== origin || url.username || url.password || url.search || url.hash ||
           (!discovery && !["/oauth2/token", "/oauth2/token/status"].includes(url.pathname)) ||
-          request.method !== (discovery ? "GET" : "POST") || request.signal.aborted) throw failure();
+          request.method !== (discovery ? "GET" : "POST") || signal.aborted) throw failure();
       await input.authorize?.();
-      if (request.signal.aborted) throw failure();
+      if (signal.aborted) throw failure();
       const response = await network(request.url, { method: request.method, headers: request.headers, body: request.body,
-        signal: request.signal, redirect: "error", credentials: "omit", cache: "no-store" });
+        signal, redirect: "error", credentials: "omit", cache: "no-store" });
+      if (response.status === 429 || response.status === 503) {
+        await response.body?.cancel().catch(() => undefined);
+        transportRetryAfter = reportingRetryAfter(response.headers.get("retry-after"));
+        throw new SquareDirectRateLimitError(transportRetryAfter);
+      }
       if (response.redirected || response.status >= 300 && response.status < 400 || !response.body) {
         await response.body?.cancel().catch(() => undefined); throw failure();
       }
       const reader = response.body.getReader(); let bytes = 0, closed = false;
-      const close = async () => { if (closed) return; closed = true; request.signal.removeEventListener("abort", abort);
+      const close = async () => { if (closed) return; closed = true; signal.removeEventListener("abort", abort);
         await reader.cancel().catch(() => undefined); try { reader.releaseLock(); } catch { /* In-flight read settles on cancellation. */ } };
       const abort = () => { void close(); };
-      request.signal.addEventListener("abort", abort, { once: true });
-      if (request.signal.aborted) { await close(); throw failure(); }
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) { await close(); throw failure(); }
       async function* body() {
-        try { for (;;) { if (closed || request.signal.aborted) throw failure();
+        try { for (;;) { if (closed || signal.aborted) throw failure();
           const part = await reader.read(); if (part.done) return;
           bytes += part.value.length; if (bytes > request.maximumResponseBytes) throw failure(); yield part.value;
         } } finally { await close(); }
@@ -101,6 +116,7 @@ export function createDirectSquareProvider(input: {
         try { return squareAuthorizationUrl({ policy, applicationId, state }); } catch (error) { return outward(error); }
       },
       async exchange(code: string, onCredential?: (credential: CredentialEnvelope) => Promise<void>) {
+        transportRetryAfter = null;
         try {
           const credential = credentialForProduction(CredentialEnvelopeSchema.parse(await oauth.exchangeAuthorizationCode({
             authorizationCode: code, applicationSecret, requestedScopes: SQUARE_OAUTH_SCOPES, now: now()
@@ -119,12 +135,13 @@ export function createDirectSquareProvider(input: {
           const locations = verified.locations.filter(location => location.status === "ACTIVE").map(({ id, label }) => ({ id, label }));
           if (!locations.length) throw failure();
           return { credential, merchantId: verified.merchantId, sellerLabel: verified.merchantLabel, locations };
-        } catch (error) { return outward(error); }
+        } catch (error) { if (transportRetryAfter !== null) throw new SquareDirectRateLimitError(transportRetryAfter); return outward(error); }
       },
       async refresh(value: CredentialEnvelope): Promise<CredentialEnvelope> {
+        transportRetryAfter = null;
         try { return credentialForProduction(CredentialEnvelopeSchema.parse(await oauth.refreshCredential({
           credential: credentialForProduction(value), applicationSecret, now: now()
-        })), now()); } catch (error) { return outward(error); }
+        })), now()); } catch (error) { if (transportRetryAfter !== null) throw new SquareDirectRateLimitError(transportRetryAfter); return outward(error); }
       },
       async payments(raw: z.infer<typeof paymentInput> & { credential: CredentialEnvelope }) {
         try {
@@ -152,9 +169,10 @@ export function createDirectSquareProvider(input: {
           // Validate continuation authority before exposing the token to a network request.
           if (parseSquarePaymentResponse({ ...parsedInput, response: { payments: [] } }).outcome !== "accepted") throw failure();
           await input.authorize?.();
+          input.signal?.throwIfAborted();
           const response = await network(`${origin}/v2/payments?${new URLSearchParams(query)}`, { method: "GET",
             headers: { Authorization: `Bearer ${credential.accessToken}`, "Square-Version": SQUARE_API_VERSION },
-            redirect: "error", credentials: "omit", cache: "no-store", signal: AbortSignal.timeout(15_000) });
+            redirect: "error", credentials: "omit", cache: "no-store", signal: input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000) });
           const value = await boundedJson(response, 2_097_152);
           const parsed = parseSquarePaymentResponse({ ...parsedInput, response: value });
           if (parsed.outcome !== "accepted") throw failure();
@@ -185,7 +203,7 @@ export function createDirectSquareProvider(input: {
             headers: { Authorization: applicationSecret.use(secret => `Client ${secret.clientSecret}`),
               "Square-Version": SQUARE_API_VERSION, "Content-Type": "application/json" },
             body: JSON.stringify({ client_id: applicationId, merchant_id: credential.externalAuthorizedEntityReference, revoke_only_access_token: false }),
-            redirect: "error", credentials: "omit", cache: "no-store", signal: AbortSignal.timeout(15_000) });
+            redirect: "error", credentials: "omit", cache: "no-store", signal: input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000) });
           const result = await boundedJson(response, 65_536);
           if (result.success !== true || (Array.isArray(result.errors) && result.errors.length > 0)) throw failure();
         } catch (error) { return outward(error); }

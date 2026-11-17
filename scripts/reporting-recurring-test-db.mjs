@@ -26,7 +26,8 @@ export async function createReportingRecurringTestDb({ beforeRecurringMigration 
     create table public.customer_subscriptions(id uuid primary key default gen_random_uuid(),workspace_id uuid,billing_provider text,
       manually_activated boolean not null default false,status text,current_period_end timestamptz,
       stripe_customer_id text,stripe_subscription_id text,created_at timestamptz default now());
-    create table public.workspace_members(workspace_id uuid,user_id uuid,status text,role text,primary key(workspace_id,user_id));
+    create table public.workspace_members(workspace_id uuid,user_id uuid,status text check(status in ('active','invited','disabled')),
+      role text check(role in ('owner','admin','manager','staff','viewer')),primary key(workspace_id,user_id));
     grant usage on schema public,auth to authenticated,service_role;
     grant select on public.workspace_members to authenticated,service_role;`);
   const lifecycle = sql('20261002040031_google_sheets_lifecycle.sql');

@@ -3,7 +3,7 @@
 This is a concrete preparation artifact for PR #571, not an execution receipt or
 an approval request. No deployment, database migration, provider mutation,
 temporary access grant, scheduler activation, or paid model call has been made
-by this plan. Complete the remaining code and schema compatibility work below
+by this plan. Complete the remaining target compatibility and execution-manifest work below
 before asking to execute it.
 
 ## Exact proposed targets and current status
@@ -11,7 +11,7 @@ before asking to execute it.
 | Item | Target / status |
 | --- | --- |
 | GitHub candidate | PR #571, branch `codex/vsi-bounded-qualification`; merged-main baseline `796ade18fde960c253b6023c29b182c9222c6f2f`; prior reviewed head `7d105ddb182ce09bfdaa6e36090f84ca693466f9` |
-| Runtime implementation source | `74f46d55938757810a197ee3d27ac627c3006e2f`. The PR records the final review head and exact-head CI after additive test-manifest corrections. Bind any future deployment and execution approval to that final immutable head; this runtime source alone is not execution authorization. |
+| Implementation source | Reporting group `74f46d55938757810a197ee3d27ac627c3006e2f`; standalone group `34bf9893d8e5a2950f601f2949c0d81601eabc93`; Square and scoped qualification changes are part of the final PR candidate. Bind execution to the final immutable PR head and exact-head CI, not one earlier group commit. This document grants no deployment authority. |
 | Isolated database | Existing disposable Supabase project `bdmrcmbkiohcqkmcvvua`, named `executive-security-disposable-20261014`. This is the proposed target; it is not currently qualified for the campaign. |
 | Preview project | Vercel project `prj_J810bZ9ECoN4CyLKujUoEEH8N6ja`, team `team_uORtrMvad77Qz6HikOgD4cnp` (`vaeroex-2167s-projects`). Create a protected **Preview**, bound to the final source and isolated database. No Preview build has been created for this group; there is no verified deployment ID or URL to publish yet. |
 | Production exclusion | Do not target Supabase `mdiianhfrojmxqpwrflh`, assign/promote any Production domain, change Production environment values, or change main's automatic-deployment hold. |
@@ -25,61 +25,48 @@ absent from the disposable database: `discover_shared_evidence_v2`,
 `fail_vsi_request_accounting_v1`. Presence alone would not establish correct
 bodies, grants, RLS, dependencies, or Auth compatibility.
 
-The migration-history comparison also found **29 repository versions absent from
+The migration-history comparison also found **30 repository versions absent from
 that target and 72 hosted versions absent from the repository**. These are
-inventory differences, not permission to apply 29 migrations, repair history,
+inventory differences, not permission to apply 30 migrations, repair history,
 or overwrite the database. Preserve the existing disposable contents until its
 ownership and reuse boundary are confirmed. Do not apply a full bootstrap over
 an existing installation or copy Production credentials/data to make it work.
 
 ## Compatibility work required before an execution request
 
-1. Reconcile the disposable schema with the exact source contracts. Prepare a
-   reviewed, checksum-pinned forward dependency closure against its actual
-   catalog. Check Auth/profile/workspace/session/membership tables, billing
-   eligibility, reporting RLS and credentials, evidence entity bindings,
-   protected source admission/sealing, VSI chat/ledger/accounting, and required
-   grants. Existing private SQL captures remain local and must not be uploaded
-   into a public PR or CI artifact. No target SQL is authorized by this document.
-2. The reporting increment is
-   `supabase/migrations/20261117005822_reporting_recurring_refresh.sql`. It depends
-   on `20261019001207_ready_account_reporting_connectors.sql`,
-   `20261019033506_reporting_supported_jwt_role.sql`, and
-   `20261019070945_reporting_import_history.sql`, plus billing
-   authority functions (`private.require_google_sheets_eligible_v1` and
-   `private.workspace_billing_entitled_v1`). Their repository source migrations are
-   `20261002040031_google_sheets_lifecycle.sql` and
-   `20261005022017_workspace_security_boundaries.sql`; these references identify
-   prerequisites, not a safe instruction to replay either full migration on the
-   disposable target. Verify their exact bodies and ACLs;
-   these billing helpers do not authorize broadening the separate Google pilot.
-   Check new recurring fields, due index, consent RPC, recovery RPC, wrappers,
-   private original-function ACLs, and absence of already-renamed functions
-   before applying this one-time increment. Test the assembled forward package
-   locally before any hosted request. Do not label the outstanding shared schema
-   installation as covered by this single migration.
-3. Reporting mutation/OAuth routes currently accept only
-   `https://www.vaeroex.com`. Therefore connection, account selection, consent,
-   and disconnect forms **cannot currently be qualified on a Preview hostname**.
-   Implement and test narrowly pinned Preview-origin compatibility before
-   requesting execution. Preserve canonical Production/OAuth behavior and CSRF
-   checks. Do not use host-header spoofing, disabled origin checks, or a
-   Production callback with Preview credentials as a workaround.
-4. The current three-slot qualification source guard explicitly admits the
-   reviewed **Xero + Google Sheets** provider pair. It cannot accept the proposed
-   Clockify + Katana pair below. A narrow, separately reviewed Preview campaign
-   change is required to bind this exact pair in addition to the complete source
-   hash set. Reuse the immutable three slots, actor/workspace/chat/request binding,
-   normal protected source authority, and budget; do not enable all providers or
-   a global source gate. Without this change, Phase A may later be qualified
-   independently, but Phase B cannot demonstrate the same refreshed sources.
-5. The existing qualification presentation hides citation markers/cards and the
-   protected source page remains behind the disabled global gate. Implement and
-   test a Preview-only read authorization bound to the approved actor, workspace,
-   source identity/version and expiry before claiming inspectable citations.
-   Stored canonical provenance inspection alone is not customer source-link
-   acceptance. A foreign actor, foreign workspace, expired campaign, revoked
-   mapping or changed source must fail closed.
+1. The exact 13-file forward closure below has passed an empty local structural
+   installation rehearsal. Finish the remaining metadata checks for existing
+   trigger/function composition, restrictive policies, keys/defaults and renamed
+   helper collisions. Preserve the disposable target's existing records and
+   establish its writer-quiescence boundary; no reset, ledger repair or target
+   SQL execution is authorized. Private captures remain outside the PR and CI.
+2. Both existing billing helper definitions and ACLs match the reviewed local
+   source. Do not replay `20261002040031_google_sheets_lifecycle.sql` or
+   `20261005022017_workspace_security_boundaries.sql`; their required functions
+   already exist. The Google pilot remains unchanged. Verify newly installed
+   recurring columns, due/consent/recovery RPCs, wrapped originals and private
+   ACLs after any separately authorized installation. The shared bootstrap is
+   an additional dependency, not something supplied by the recurring migration.
+3. The candidate now supports an explicit `REPORTING_PREVIEW_QUALIFICATION`
+   manifest for **Clockify/Katana key-based forms only**. It binds the immutable
+   `VERCEL_URL`, exact owner and workspace, provider list, start and expiry (at
+   most two hours), and fixed connect/select/import/consent/disconnect paths.
+   Host, forwarded host/protocol, Origin and same-origin CSRF checks remain.
+   OAuth callbacks stay canonical; no host spoofing or Production credentials
+   are part of the witness. This manifest is not configured here.
+4. The three-slot VSI manifest now accepts an explicit `approvedProviders` list
+   for its business slot. Omitted lists preserve the old Xero/Sheets campaign.
+   Phase B must name exactly `clockify,katana` and the complete reviewed source
+   hash set. Missing, extra or changed source/provider sets fail closed. Private
+   slots cannot supply provider lists. The immutable questions, actor/workspace/
+   chat/request bindings, call/spend limits and normal admission remain.
+5. An optional `inspectCitations: true` enables a Preview-only source inspection
+   window for the business slot's owner/workspace. The saved exchange must match
+   the approved chat and question through the authenticated client's normal RLS;
+   the existing reopen RPC then checks the saved artifact, current permissions,
+   mappings and exact source versions. Source hashes/providers must still equal
+   the reviewed set after the read, and expiry closes the path. No admin source
+   reader or global gate is enabled. Old manifests continue hiding citations.
 6. Freeze the final source, run required exact-head CI, and prepare a protected
    Preview with **only isolated** database/provider configuration. Record the
    immutable deployment ID, URL, commit and nonsecret configuration fingerprint.
@@ -87,9 +74,91 @@ an existing installation or copy Production credentials/data to make it work.
    provider or model execution. Reconcile different results; do not replay
    bootstrap SQL or relax access controls.
 
-The Preview does not yet exist, the database installation closure is not yet
-qualified, and items 3–5 are code boundaries. This artifact is intentionally
-**not ready for hosted execution approval** while those gaps remain.
+The Preview does not yet exist. The forward closure has local structural and
+regression evidence, while target writer/policy compatibility and real Auth are
+not yet qualified. Items 3–5 have local code and regression coverage. This artifact is
+**not ready for hosted execution approval** until the target schema closure,
+source/build identity, credentials provenance and exact provider-record execution
+manifest are complete. Local mocks do not resolve those remaining conditions.
+
+## Reviewed isolated forward closure and local rehearsal
+
+The proposed database target remains `bdmrcmbkiohcqkmcvvua`. The smallest reviewed
+closure for this Clockify/Katana Preview is the following ordered package. These
+are existing exact source bytes, not a reconstructed migration-history upgrade.
+The shared bootstrap is appropriate only because its objects are absent here;
+it must never be replayed over an existing shared-evidence installation.
+
+| Order | Source file | SHA-256 |
+| --- | --- | --- |
+| 1 | `supabase/migrations/20261017013603_loyverse_read_only_connection.sql` | `a3755d4cda49495b197e8eb189568ffc7cb931034f5a8d1b360397fa5525ddfb` |
+| 2 | `supabase/migrations/20261017023221_zoho_books_read_only_connection.sql` | `bae4ee841f129f787ab7a54015ebb50ed6773e801877555581e343cf47262e25` |
+| 3 | `supabase/migrations/20261017051502_wix_orders_read_only_connection.sql` | `fd00638b38e6042d4f4ca863ce225e863378673b1352f2b5ddcc1b0f7e7c7d6b` |
+| 4 | `supabase/migrations/20261017184954_loyverse_merchant_reconnect_guard.sql` | `c4dee8d1a023f08c706bbbcd2f9ab09a341731b55edb74a58baea793121dac8a` |
+| 5 | `supabase/migrations/20261019001207_ready_account_reporting_connectors.sql` | `19b9ec711bc48f2c4e8da03d45bb3643d231480fc93bdd34b0c52789f45b2724` |
+| 6 | `supabase/migrations/20261019033506_reporting_supported_jwt_role.sql` | `7d719156d8a62641f222f14e1782ea3a6485cbae090adadd6398f583e1799ddb` |
+| 7 | `supabase/migrations/20261019070945_reporting_import_history.sql` | `f16404ea373c576671880789e1ee380c181f8a1706150ee894209bc9cff33c5f` |
+| 8 | `supabase/migrations/20261019070949_zoho_books_import_history.sql` | `8dda6837bf6421386d0734cb3b11647b6a8e20e522157d9661dc7f3d6206658e` |
+| 9 | `supabase/migrations/20261019070953_loyverse_import_history.sql` | `e53a5c864e6a5b39e94490ab97ed85088bc7c8e6aa755c087953c300c1e88d4b` |
+| 10 | `supabase/migrations/20261019071008_wix_orders_import_history.sql` | `b7f4b537a7f78cfa740eccf2c188e47c5ca74ec8e1cdd7f70264cf4ea79a6367` |
+| 11 | `docs/security-drafts/release/forward.sql` | `7ceebc67399a92cd968ffa46dcf245665aecc28b9f6b822406842e4b96bab264` |
+| 12 | `supabase/migrations/20261117005822_reporting_recurring_refresh.sql` | `9be7c03b199fe2e7c685209eabe3ee43a95b760e9e03e2761d87a613e89b6473` |
+| 13 | `supabase/migrations/20261117012702_import_recurring_refresh.sql` | `434f2801e3769ec752ca9473e541b759dbdd10f0a6ccae6c10c7805da1e3a861` |
+
+The ten canonical connector files are required by the shared dispatch/fence
+schema even though only two providers participate in the witness. The two
+recurring increments preserve the candidate's reporting/import contracts. The
+sixteen absent historical Square canonical migrations and two unrelated marketing
+migrations are excluded. The separate Square recurring production overlay is
+also excluded from this Preview package: its Production-only runtime stays
+closed. Before deploying the changed application where that Square backend can
+run, its reviewed overlay must precede the app; a missing-status UI fallback is
+not general runtime compatibility. See [Square release order](vsi-square-refresh-group.md).
+
+Local rehearsal executed all 13 files unchanged and installed all **64 workspace
+writer fences**. It used empty tables with the isolated target's observed column
+names/types and 16 exact-matching screened authority/Sheets/VSI function bodies.
+No customer rows, credentials, hosted connection, provider transport or model
+were used. The exact bootstrap assembler/tail and the reporting/import/Square
+migration suites also passed. This is structural installation evidence, not a
+clone of the target's defaults, constraints, policies, existing triggers or
+records, and not hosted Auth/PostgREST or multi-session writer proof.
+
+Private local receipts are `vsi-isolated-forward-package-review.json`,
+`vsi-isolated-structural-rehearsal-receipt.json` and the reproducible local
+`vsi-isolated-structural-rehearsal.cjs`; they remain outside the repository.
+The tracked bootstrap is independently reproducible with
+`node scripts/shared-evidence-release-package.cjs --check`. Recompute this
+package's hashes against the final frozen head before any execution request.
+
+The November 17 metadata checks established:
+
+- Of 64 writer-fence targets, 43 already exist and 21 are supplied by the package
+  (nine shared tables and twelve connector fact/connection/coverage tables).
+- None of the package's 30 new table names or 94 directly created function names
+  collides with an existing target object. Renamed helper aliases and new trigger/
+  policy names still require their explicit collision check.
+- The entity `(workspace_id,id)` unique key exists. The required Auth user/session
+  UUID and timestamp columns exist, including nullable session `not_after`, as
+  the unchanged owner/session helper expects. No Auth record was read.
+- All 16 screened authority/Sheets/VSI helper definitions match. Eight of eleven
+  distinct typed helpers match; the three differing QBO definitions are
+  `qbo_customer_source_browse_v1`, `read_qbo_customer_accounting_authority_v1` and
+  `qbo_customer_preview_v1`. Preserve them and exclude QBO from this witness;
+  reconcile them separately before QBO hosted qualification. These differences
+  do not justify replaying QBO infrastructure or broadening this provider pair.
+- Both billing helper definitions and ACLs match. Metadata reads returned no
+  credentials, record contents or function bodies. Their success is not consent
+  to alter the isolated database.
+
+The next authorized action is a metadata-only comparison of the existing
+artifact/VSI trigger graph and relevant grants/policies, prerequisite keys and
+new alias/trigger/policy names against the qualified contracts. Use its result
+to pin fail-closed installation checks and rehearse any actual dependency change
+locally. Do not leave this as an unspecified full-database parity audit or assume
+that matching migration version numbers are sufficient. Real Auth, protected
+Preview behavior and concurrent writer acceptance belong to the later explicitly
+approved isolated qualification, after this compatibility comparison passes.
 
 ## Phase A — real unattended ingestion, zero model calls
 
@@ -291,10 +360,12 @@ The six-provider reporting group adds local recurring implementation for Xero,
 Harvest, Clockify, Toggl, Zoho Inventory and Katana. Each still needs its own
 hosted provider witness; a Clockify/Katana success would prove only those two.
 Google Sheets retains its existing opted-in pilot scheduler; QuickBooks retains
-its existing GCP path pending restored read-only inspection and live witness.
-Square, Loyverse, Zoho Books and Wix Orders still need their respective missing
-unattended paths. No connector leaves scope because it is outside this first
-hosted pair, and no global activation is implied by local mapping or fixtures.
+its existing GCP path; restored read-only inspection confirmed service/scheduler
+liveness, with the new-record witness still outstanding. Loyverse, Zoho Books and
+Wix Orders and Square now have locally verified recurring implementations. Square
+retains its Production-only backend gate and needs its own hosted arrangement.
+No connector leaves scope because it is outside this first hosted pair, and no
+global activation is implied by local mapping or fixtures.
 
 ## Standalone import extension (local only)
 
@@ -312,3 +383,19 @@ campaign. A standalone-provider witness needs its own exact synthetic account,
 record, consent and immutable source/version inventory. The local three-provider
 composition test proves actual SQL writes and protected source version changes
 using controlled HTTP responses; it is not a hosted delivery receipt.
+
+## November 17 nonsecret isolated catalog preflight
+
+A read-only catalog query confirmed PostgreSQL 17.11 and the existing protected
+VSI chat/ledger tables, business entities, membership and billing helpers. The
+reporting tables and shared manifest/legacy-reference tables are absent. The
+listed shared reader/seal/completion entry points are also absent. This is a
+missing installation, not a request to weaken RLS or create broad service grants.
+
+The target already has the Square direct backend and payment-history columns.
+Its `public.square_customer_backend_v1` definition SHA-256 is
+`9351187f0ccbda25958291916f8454f050bf1331812322596729dcde45453c89`; the
+function is owned by postgres, SECURITY DEFINER, and executable only by postgres
+and service_role. This supports exact comparison of the proposed Square increment;
+it does not authorize applying that increment. No source records, credentials or
+function bodies were returned by the preflight.

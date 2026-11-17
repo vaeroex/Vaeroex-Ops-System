@@ -66,6 +66,8 @@ const approvedSquareQualificationPaths = Object.freeze([
   // Read-only stored Payments browsing; exact migration and disposable qualification only.
   "supabase/production-migrations/20260929052211_square_customer_payment_browse.sql",
   "supabase/tests/square_customer_payment_browse.test.sql",
+  "supabase/production-migrations/20261117014116_square_customer_recurring_refresh.sql",
+  "supabase/tests/square_customer_recurring.test.sql",
   "app/api/integrations/square/read/route.ts",
   "services/external-integrations-production/internal-consent/customer-read.ts",
   "services/external-integrations-production/internal-consent/customer-read.test.cjs",

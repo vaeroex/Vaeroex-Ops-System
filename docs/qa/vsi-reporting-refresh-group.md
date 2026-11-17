@@ -30,8 +30,9 @@ on a database that has not received the new migration.
 The dispatcher uses the existing parsers, credential envelope, and complete-page
 atomic commits. It does not invoke a browser-only manual route. A tick selects at
 most 20 due connections, runs at most two local workers, and never runs two from
-one workspace together. SQL admits at most four active reporting leases across
-all dispatchers/manual calls and one per workspace. Work stops launching with
+one workspace together. After all three increments, SQL admits at most four active refresh leases
+across all ten reporting/import/Square connectors and one per workspace, including
+manual calls. Sheets and QuickBooks retain separate existing admission. Work stops launching with
 less than 65 seconds left in the 240-second work window; cleanup is bounded to
 285 seconds. Provider reads retain the existing 45-second and 12-request limits.
 Pagination is completed and validated before committing; oversized windows fail
@@ -71,8 +72,8 @@ not a measured large-capacity claim. Main's automatic deployment hold is unchang
 
 ## Verification and its limits
 
-- `pnpm test:reporting-recurring`: 31 tests, including 17 runtime, 13 SQL, and
-  one combined scheduler-to-protected-source test. Runtime tests exercise all
+- `pnpm test:reporting-recurring`: 33 tests, including 17 runtime, 13 SQL,
+  one combined scheduler-to-protected-source test, and two scoped Preview tests. Runtime tests exercise all
   six actual provider parsers with controlled HTTP fixtures. SQL tests execute
   the migration, current billing functions, admission, commits, ACL/RLS, revocation,
   retries and lease recovery in PGlite.
@@ -104,16 +105,16 @@ provider/model claim is inferred from them. Model spend for this group: **$0**.
 | --- | --- | --- |
 | Google Sheets | Existing opted-in 15-minute dispatcher, recovery and pilot controls | Controlled new row → real scheduled tick → protected source version; preserve pilot and provider data policy |
 | QuickBooks Online | Existing GCP scheduler/dispatch/queue/runtime/recovery | Controlled sandbox/company record → worker → validated accounting version; read-only infrastructure check below is complete |
-| Square | Still manual customer refresh; checkpoints and atomic upserts exist | Add explicit recurring consent and native scheduling using its own customer authority, then new-payment witness |
+| Square | New owner-consented hourly customer-backend refresh, four-page continuations; local fixture-verified | Guarded incremental overlay and environment-compatible isolated staging, then new-payment witness |
 | Xero | New daily bounded reporting refresh, local verified | Isolated OAuth/test account qualification; document old balances outside seven-day window |
 | Harvest | New daily bounded reporting refresh, local verified | Isolated visible-entry change, pagination/rate limits and source attribution |
 | Clockify | New daily bounded own-entry refresh, local verified | Isolated completed-entry change; no workforce inference |
 | Toggl 2.0 | New six-hour current snapshot refresh, local verified | Isolated visible-project change; retain lifetime-hours semantics |
 | Zoho Inventory | New six-hour current snapshot refresh, local verified | Isolated current-item count change; no invented inventory history |
 | Katana | New six-hour current snapshot refresh, local verified | Isolated variant/location change, credential incarnation and source revocation |
-| Loyverse | Still manual bounded history importer | Next implementation group: recurring consent/admission around its existing receipt importer and merchant-currency authority |
-| Zoho Books | Still manual bounded history importer | Same next group around its invoice/expense importer, USD/exclusion policy and organization authority |
-| Wix Orders | Still manual bounded history importer | Same next group around its cursor/order importer and app-instance lifecycle |
+| Loyverse | New daily seven-complete-UTC-date creation-window refresh; local fixture-verified | Isolated receipt change, verified merchant currency and source-version witness |
+| Zoho Books | New daily seven-complete-UTC-date invoice/expense refresh; local fixture-verified | Isolated eligible invoice/expense change with USD/exclusion and balance-at-import semantics |
+| Wix Orders | New daily seven-complete-UTC-date order-creation refresh; local fixture-verified | Isolated approved order change and app-instance/revocation witness |
 
 All twelve protected VSI projections remain implemented behind the existing
 release gates. This group changes ingestion; it does not silently release the
@@ -141,11 +142,15 @@ record reached VSI. The local reauthentication blocker is resolved.
 
 ## Next executable step
 
-Implement the three standalone reporting importers (Loyverse, Zoho Books, Wix)
-using their current atomic and revocation boundaries; then handle Square's native
-authority separately. In parallel, finish the nonproduction compatibility and
-scoped Preview read path identified in the [hosted packet](vsi-reporting-hosted-qualification.md).
-Do not request a paid/provider-change campaign while those code/schema prerequisites
-are unresolved. Deployment, temporary provider access and record mutations must
-have exact reviewed targets. No production or broad activation is needed to
-complete those independent implementation steps.
+All three implementation groups are complete locally; see the
+[standalone receipt](vsi-standalone-refresh-group.md) and
+[Square receipt](vsi-square-refresh-group.md). The next gate is exact isolated
+schema qualification and migration sequencing, then a protected candidate build.
+The candidate now includes expiring exact-host/actor/workspace Clockify/Katana
+Preview forms and an optional exact-source citation inspection window. These
+mechanisms are not activated and do not authorize hosted provider changes or paid
+calls. Resolve the target compatibility checks in the
+[hosted packet](vsi-reporting-hosted-qualification.md), then obtain precisely scoped
+Phase A provider/timer authorization before the real automatic-arrival witness.
+Freeze Phase B answer sources only after that refresh. No Production mutation,
+Square gate bypass or broad activation is part of this step.

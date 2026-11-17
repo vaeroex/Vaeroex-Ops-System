@@ -246,6 +246,11 @@ jobs:
           pnpm test:import-recurring
           pnpm test:import-recurring:browser
 
+      - name: Verify scoped Square automatic reads, consent and atomic pages
+        run: |
+          pnpm test:square-recurring
+          pnpm test:square-recurring:browser
+
       - name: Verify historical import controls and saved report coverage
         run: pnpm test:plugin-import-history:browser
 

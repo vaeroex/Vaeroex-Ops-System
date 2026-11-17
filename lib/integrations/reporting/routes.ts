@@ -3,7 +3,8 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
 import { isProvider, isHistoricalProvider, catalog, type Provider } from "./catalog";
-import { admin, assertRequest, available, formData, hashState, redirect, requireOwner, seal, unseal, credentialSchema } from "./security";
+import { admin, assertRequest, available, formData, hashState, redirect as reportingRedirect, origin, requireOwner, seal, unseal, credentialSchema } from "./security";
+import { assertReportingPreviewActor } from "./preview-qualification";
 import { authorizationHandoff, exchange } from "./oauth";
 import { accounts } from "./adapters";
 import { executeReportingRefresh } from "./execution";
@@ -22,11 +23,14 @@ export async function post(request: Request, context: Params) {
   const { provider: raw, action } = await context.params;
   if (!isProvider(raw) || !["connect","select-account","sync","disconnect","recurring-settings"].includes(action)) return new Response(null, { status: 404 });
   const provider = raw;
+  let destinationOrigin = origin;
+  const redirect = (selected: Provider, result: string) => reportingRedirect(selected, result, destinationOrigin);
   let cleanup: { workspace: string; connection: string } | null = null;
   let lease: { workspace: string; connection: string; id: string } | null = null;
   try {
-    assertRequest(request);
+    assertRequest(request, false, { provider, action });
     const access = await requireWorkspaceAccess(); requireOwner(access);
+    if (new URL(request.url).origin !== origin) destinationOrigin = assertReportingPreviewActor(request, provider, action, access);
     // Disconnect remains possible after a provider has been disabled or credentials rotated.
     if (action !== "disconnect" && action !== "recurring-settings" && !available(provider)) return redirect(provider, "configuration_required");
     const form = await formData(request);
@@ -105,6 +109,7 @@ export async function post(request: Request, context: Params) {
   }
 }
 export async function get(request: Request, context: Params) {
+  const redirect = reportingRedirect;
   const { provider: raw, action } = await context.params;
   if (!isProvider(raw) || action !== "callback" || catalog[raw].auth !== "oauth") return new Response(null, { status: 404 });
   const provider = raw;

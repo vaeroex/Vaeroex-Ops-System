@@ -23,6 +23,7 @@ function loadTsx(relative, mocks = {}) {
 const { SquareDirectCustomerPanel, squarePaymentAmount, squareBusinessTime, squarePaymentsHref } = loadTsx("components/integrations/SquareDirectCustomerPanel.tsx", {
   "next/link": { __esModule: true, default: ({ children, prefetch, ...props }) => { assert.equal(prefetch, false); return React.createElement("a", props, children); } },
   "@/lib/integrations/square-direct/result-visibility": require("./integrations-ui-test-support").loadSource("lib/integrations/square-direct/result-visibility.ts"),
+  "./SquareRecurringSettings": require("./integrations-ui-test-support").loadSource("components/integrations/SquareRecurringSettings.tsx"),
 });
 const render = (view, props = {}) => renderToStaticMarkup(React.createElement(SquareDirectCustomerPanel, { view, ...props }));
 const connection = {

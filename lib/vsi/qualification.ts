@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { pluginProviders } from "@/lib/ai/shared-evidence/contracts";
 
 // Opt-in, preview-only campaign. No keys, prompts, responses or source text are logged.
 // Three immutable request IDs use the existing durable reservation/idempotency ledger;
@@ -11,9 +12,10 @@ export const VSI_QUALIFICATION_LIMITS = Object.freeze({ requests: 3, callsPerReq
 const slot = z.object({ caseId: z.enum(["owner_private", "demo_private", "business_brief"]),
   actorUserId: z.string().uuid(), workspaceId: z.string().uuid(), conversationId: z.string().uuid(),
   requestId: z.string().uuid(), questionHash: z.string().regex(/^[a-f0-9]{64}$/),
-  approvedSourceHashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)).max(24) }).strict();
+  approvedSourceHashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)).max(24),
+  approvedProviders: z.array(z.enum(pluginProviders)).min(2).max(12).optional() }).strict();
 const manifestSchema = z.object({ campaignId: z.string().uuid(), startsAt: z.string().datetime(),
-  expiresAt: z.string().datetime(), slots: z.array(slot).length(3) }).strict();
+  expiresAt: z.string().datetime(), slots: z.array(slot).length(3), inspectCitations: z.boolean().optional() }).strict();
 export type VsiQualificationSlot = z.infer<typeof slot>;
 const issuedSlots = new WeakSet<VsiQualificationSlot>();
 type Scope = { actorUserId: string; workspaceId: string; conversationId?: string; question: string };
@@ -34,7 +36,9 @@ function manifest() {
     if (end <= start || end - start > 3_600_000 || now < start || now >= end
       || new Set(value.slots.map(s => s.caseId)).size !== 3
       || new Set(value.slots.map(s => s.requestId)).size !== 3
-      || value.slots.some(s => s.caseId === "business_brief" ? s.approvedSourceHashes.length < 2 : s.approvedSourceHashes.length !== 0)) throw new Error();
+      || value.slots.some(s => new Set(s.approvedSourceHashes).size !== s.approvedSourceHashes.length
+        || s.approvedProviders && new Set(s.approvedProviders).size !== s.approvedProviders.length
+        || (s.caseId === "business_brief" ? s.approvedSourceHashes.length < 2 : s.approvedSourceHashes.length !== 0 || s.approvedProviders !== undefined))) throw new Error();
     return { ...value, hash: qualificationHash(raw) };
   } catch { throw new VsiQualificationError("configuration"); }
 }
@@ -112,13 +116,25 @@ export function qualificationDispatchGuard(input: Scope & { requestId: string; r
 export function assertQualificationSources(input: Scope, rows: readonly { hash: string; provider: string }[]) {
   const selected = qualificationSlot(input);
   if (!selected) return;
+  const providers = selected.approvedProviders ?? ["xero", "google_sheets"];
   if (new Set(rows.map(row => row.hash)).size !== selected.approvedSourceHashes.length
     || rows.some(row => !selected.approvedSourceHashes.includes(row.hash))
-    || (selected.caseId === "business_brief" && (!rows.some(row => row.provider === "xero")
-      || !rows.some(row => row.provider === "google_sheets")
-      || rows.some(row => !["xero", "google_sheets"].includes(row.provider))))) {
+    || (selected.caseId === "business_brief" && (providers.some(provider => !rows.some(row => row.provider === provider))
+      || rows.some(row => !providers.includes(row.provider as typeof providers[number]))))) {
     throw new VsiQualificationError("context");
   }
+}
+
+/** Optional read-only acceptance window. This is an additional scope gate, not
+ * source authorization: callers must use the normal actor RLS and reopen RPC.
+ * Older manifests keep hiding citations. Expiry never enables ordinary access. */
+export function qualificationCitationScope(input: { actorUserId: string; workspaceId: string }) {
+  try {
+    const campaign = manifest();
+    if (!campaign?.inspectCitations) return null;
+    return campaign.slots.find(s => s.caseId === "business_brief" && s.actorUserId === input.actorUserId
+      && s.workspaceId === input.workspaceId) ?? null;
+  } catch { return null; }
 }
 
 // A process-local capability, never serialized or accepted from the browser.

@@ -1,18 +1,8 @@
 import { isHistoricalProvider, isProvider, type Provider } from "@/lib/integrations/reporting/catalog";
 import { dashboardTimestamp } from "@/lib/integrations/dashboard/model";
 
-export type ReportingRecurringState = {
-  recurring_enabled: boolean;
-  recurring_authorized_at: string | null;
-  recurring_next_refresh_at: string | null;
-  recurring_last_attempt_at: string | null;
-  recurring_failure_count: number;
-  recurring_last_failure_at: string | null;
-};
-export type ReportingRecurringAuthority = {
-  authorized: boolean;
-  reason: "active" | "owner_unavailable" | "entitlement_unavailable" | "disabled" | "connection_unavailable";
-};
+import type { ReportingRecurringState, ReportingRecurringAuthority } from "@/lib/integrations/reporting/recurring-contracts";
+export type { ReportingRecurringState, ReportingRecurringAuthority } from "@/lib/integrations/reporting/recurring-contracts";
 
 /** Match the integration dashboard: configured workspace zone, otherwise explicit UTC. */
 export function ReportingRefreshTime({ value, timeZone }: { value: string | null; timeZone?: string | null }) {

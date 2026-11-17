@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { VsiWorkspace } from "@/components/vsi/VsiWorkspace";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
+import { qualificationCitationScope } from "@/lib/vsi/qualification";
 
 export default async function SuperIntelligencePage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const { supabase, workspaceId, context } = await requireWorkspacePage();
@@ -8,7 +9,7 @@ export default async function SuperIntelligencePage({ searchParams }: { searchPa
   if (!user) redirect("/login");
   const params = (await searchParams) || {};
   return <VsiWorkspace key={`${workspaceId}:${user.id}`} workspaceId={workspaceId}
-    hideSourceCitations={process.env.VAEROEX_VSI_QUALIFICATION !== undefined}
+    hideSourceCitations={process.env.VAEROEX_VSI_QUALIFICATION !== undefined && !qualificationCitationScope({actorUserId:user.id,workspaceId})}
     timeZone={context.activeWorkspace?.reporting_timezone || undefined}
     workspaceName={context.activeWorkspace?.name || "this workspace"} userId={user.id}
     initialConversationId={typeof params.chat === "string" ? params.chat : ""}

@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { admin } from "@/lib/integrations/reporting/security";
-import type { ReportingRecurringAuthority, ReportingRecurringState } from "@/components/integrations/ReportingRecurringSettings";
+import type { ReportingRecurringAuthority, ReportingRecurringState } from "@/lib/integrations/reporting/recurring-contracts";
 import type { ImportProvider } from "./scope";
 
 const tables = { loyverse: "loyverse_connections", "zoho-books": "zoho_books_connections", "wix-orders": "wix_order_connections" } as const;

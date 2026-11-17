@@ -28,8 +28,10 @@ identity or disconnecting fences scheduled commits. Renewal token writes carry
 the same lease and authority checks. The original complete-window SQL validation
 is retained behind nonpublic functions with caller execution revoked.
 
-Manual and scheduled work across all nine reporting/import connectors share a
-four-active, one-per-workspace database admission limit. The standalone cron
+Manual and scheduled work shares a four-active, one-per-workspace database
+admission limit: nine reporting/import connectors at this increment, extended
+to all ten with the completed Square overlay. Sheets and QuickBooks retain
+their existing separate admission. The standalone cron
 runs at most twenty candidates with two local workers and a 240-second work
 window, leaving cleanup time within its 300-second route budget. Provider
 pagination remains bounded by the existing adapters. A partial page sequence
@@ -62,7 +64,7 @@ workspace time zone and daylight-saving rules already used by reporting pages.
 
 ## Local verification
 
-The standalone suite passed **36 tests**, the reporting suite passed **31**,
+The standalone suite passed **36 tests**, the reporting suite passed **33**,
 and the existing historical-import suite passed **59**. Targeted lint, TypeScript
 and whitespace checks passed. Exact-head CI is reported separately in PR #571;
 local results do not imply CI or hosted execution has passed.
@@ -75,7 +77,8 @@ local results do not imply CI or hosted execution has passed.
   content hashes and freshness. A revoked source cannot reopen; another actor or
   workspace cannot capture the source. No overlapping monetary sources are added.
 - Service-only SQL, manual/scheduled mutual exclusion, shared nine-provider
-  capacity, consent/owner/billing revocation, token-write fences, retry/recovery
+  capacity at this increment (extended to ten by the Square overlay),
+  consent/owner/billing revocation, token-write fences, retry/recovery
   and existing historical windows are exercised in isolated PGlite databases.
 - Settings POST routes check signed-in owner, fixed provider, server-selected
   workspace, strict origin/form, explicit confirmation and scoped activation.
@@ -95,7 +98,9 @@ fixture, not a showcase model response. Model/provider testing spend: **$0**.
 See `vsi-cross-integration-coverage-2026-11-16.md` for the full connector matrix.
 Sheets and QuickBooks already have unattended paths; their current hosted proof
 limits remain explicit. Six reporting and these three standalone paths are local
-candidates. Square requires its own recurring customer authority because the
-existing direct backend currently requires a live browser owner/session on each
-read. Shared VSI gates remain off. Hosted automatic-arrival and paid-answer
+candidates. The completed [Square group](vsi-square-refresh-group.md) adds its
+own consented recurring authority around the existing atomic read cores; manual
+operations retain their live owner/session checks. Its guarded incremental overlay
+must precede application deployment. All twelve paths are implemented locally,
+while shared VSI gates remain off. Hosted automatic-arrival and paid-answer
 qualification is still separate from this local implementation.

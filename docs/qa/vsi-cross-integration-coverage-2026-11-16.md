@@ -1,9 +1,13 @@
 # VSI cross-integration coverage — November 16, 2026
 
-Updated by the reporting refresh implementation group (November 17 UTC).
-See [completed group and verification](vsi-reporting-refresh-group.md) and the
+Updated after all three refresh implementation groups (November 17 UTC):
+[six reporting connectors](vsi-reporting-refresh-group.md),
+[three standalone importers](vsi-standalone-refresh-group.md), and
+[Square](vsi-square-refresh-group.md). Together with the existing Sheets and
+QuickBooks paths, the candidate implements unattended refresh for all twelve
+mapped integrations. The table distinguishes local/fixture verification from
+deployed and demonstrated live behavior. See the
 [isolated hosted qualification packet](vsi-reporting-hosted-qualification.md).
-The table distinguishes new local code from unchanged deployed behavior.
 
 This is an implementation and qualification inventory, not a claim that every
 connector has completed a live automatic-refresh-to-answer test. It continues
@@ -84,16 +88,16 @@ access or a claim that every workspace has records.
 | --- | --- | --- | --- | --- | --- |
 | **Google Sheets** | OAuth; selected spreadsheet/tab; approved stable-ID/date/metric mapping and retention/source approval; consistent double read; atomic normalized rows and KPI facts | Authenticated Vercel cron every 15 minutes; connected, approved, opted-in due sources only; pilot allowlist; lease fencing, token renewal, failure backoff and recovery route. Current dispatcher: four concurrent workspaces, at most 100 attempts, 240-second work / 285-second cleanup deadlines | Exact approved values/units and supplied row dates; deterministic validation and accepted fact links. Sheet labels cannot establish accounting semantics, complete coverage or a join | Legacy KPI/dashboard retrieval exists; shared reader also implemented/gated. Pilot, approval, source lifecycle and read tickets remain mandatory | Historical live connector release recorded; synthetic scheduler/SQL/changed-row tests exist. No current witnessed provider-row change → autonomous tick → shared VSI answer in this continuation. External Testing token expiry prevents an indefinite refresh claim |
 | **QuickBooks Online** | Owner OAuth, realm/entity mapping; native credential/task authority; normalized accounting records and reports plus validation work | Separate GCP initialization/ongoing scheduler, dispatcher, Cloud Tasks, CDC, validation/accounting recovery and disconnect drain. Terraform `execution_enabled` controls queue/scheduler pause state | Document totals, balance at import, report period/basis/currency and qualified summary totals. Checked P&L calculations exist; unsupported shapes/missing values do not become zero; overlapping rows not summed | Legacy accounting dashboard/P&L retrieval exists; shared typed admission implemented/gated. Validated current source/entity and consent required | Native/disposable DB and synthetic P&L qualification recorded. Read-only November 17 check: three jobs ENABLED, queue RUNNING, five services Ready, recent scheduler/dispatcher/broker/runtime HTTP 200s. New-record delivery still needs a controlled hosted witness; liveness is not ingestion proof |
-| **Square** | Owner OAuth; verified merchant/location; bounded Payments page, retained records and durable checkpoint/cursor | Customer-requested reads only. Renewal on demand, five-minute overlap, bounded catch-up and replay-safe upserts. Native mapped-sync helper is explicitly operator-invoked, not a scheduler | Completed payment amount in declared minor units with currency and event time; not orders, settlement, accounting revenue, profit or cash flow | Legacy saved-payment/dashboard retrieval exists; shared reader implemented/gated. **Unattended customer refresh is missing**, before the shared gate is reached | Existing customer/native fixture qualification is separate from live unattended operation. No current automatic new-payment → cross-source answer proof |
-| **Xero** | Owner OAuth/offline refresh; explicit account selection; retained invoice/bill IDs, supplied document dates, currency-partitioned numerical contributions and coverage | PR #571 adds explicit owner opt-in, daily refresh of the last seven completed UTC dates, scoped due dispatcher, current authority fences, shared admission, retry/backoff and expired-lease recovery. Existing 45-second/12-request parser and atomic commit reused. **Local verified; not deployed** | Invoice totals/bills by currency, outstanding balance at last import; no payment/bank/journal/payroll access, cash received or profit inference | Shared gated; exact legacy binding required. Not read by the ordinary three-provider dashboard | Six-provider baseline records designated Xero demo report success October 19. Synthetic shared reasoning passed. Automatic delivery and hosted shared-answer proof remain missing |
-| **Harvest** | OAuth and account selection; retained entry IDs/dates/completed hours/billable hours; running entries excluded | PR #571 adds the same daily, opted-in, scoped reporting dispatcher and recovery. Current-authorizer visibility remains the limit. **Local verified; not deployed** | Tracked hours within authorizer visibility; not team payroll or labor cost; no persisted names/rates/notes | Shared gated and exact legacy binding; no ordinary dedicated producer | Designated-account report success October 19 recorded. No automatic fresh-entry → shared-answer proof |
-| **Clockify** | Owner API key, selected workspace; retained own-entry history by UTC start day | PR #571 adds daily, opted-in, scoped last-seven-complete-UTC-date refresh and recovery. API key owner entries only. **Local verified; not deployed** | Own completed durations and billable hours; cross-midnight duration assigned to start date, not split; not workforce payroll | Shared gated and exact legacy binding; no ordinary dedicated producer | Designated-account report success October 19 recorded. Automatic refresh and hosted cross-source proof remain missing |
+| **Square** | Owner OAuth; verified merchant/location; bounded Payments page, retained records and durable checkpoint/cursor | PR #571 adds explicit owner-consented hourly update windows on the current customer backend, with up to four pages per tick, retained cursors, renewal, retry/backoff and recovery. Five-minute overlap and bounded catch-up/replay-safe upserts remain. **Local fixture-verified; not deployed** | Completed payment amount in declared minor units with currency and event time; not orders, settlement, accounting revenue, profit or cash flow | Legacy saved-payment/dashboard retrieval exists; shared reader implemented/gated. Recurring code now exists but requires its reviewed incremental Square overlay, exact deployment scope and customer consent; shared VSI remains gated | New real-SQL scheduler → protected payment reader → typed VSI fact composition verifies changed payments, partial windows, backoff and revoked access. Provider HTTP is controlled; no hosted automatic new-payment → cross-source answer proof |
+| **Xero** | Owner OAuth/offline refresh; explicit account selection; retained invoice/bill IDs, supplied document dates, currency-partitioned numerical contributions and coverage | PR #571 adds explicit owner opt-in, daily refresh of the last seven completed UTC dates, scoped due dispatcher, current authority fences, shared admission, retry/backoff and expired-lease recovery. Existing 45-second/12-request parser and atomic commit reused. **Local verified; not deployed** | Invoice totals/bills by currency, outstanding balance at last import; no payment/bank/journal/payroll access, cash received or profit inference | Shared gated; exact legacy binding required. Not read by the ordinary three-provider dashboard | Historical designated-account report success October 19; new real-SQL scheduler/protected-source composition and controlled provider fixtures pass. Automatic delivery and hosted shared-answer proof remain missing |
+| **Harvest** | OAuth and account selection; retained entry IDs/dates/completed hours/billable hours; running entries excluded | PR #571 adds the same daily, opted-in, scoped reporting dispatcher and recovery. Current-authorizer visibility remains the limit. **Local verified; not deployed** | Tracked hours within authorizer visibility; not team payroll or labor cost; no persisted names/rates/notes | Shared gated and exact legacy binding; no ordinary dedicated producer | Historical designated-account report success October 19; new real-SQL scheduler/protected-source composition and controlled provider fixtures pass. No hosted automatic fresh-entry → shared-answer proof |
+| **Clockify** | Owner API key, selected workspace; retained own-entry history by UTC start day | PR #571 adds daily, opted-in, scoped last-seven-complete-UTC-date refresh and recovery. API key owner entries only. **Local verified; not deployed** | Own completed durations and billable hours; cross-midnight duration assigned to start date, not split; not workforce payroll | Shared gated and exact legacy binding; no ordinary dedicated producer | Historical designated-account report success October 19; new scheduler/parser and SQL admission fixtures pass. Actual hosted automatic arrival and cross-source proof remain missing |
 | **Toggl 2.0** | Owner bearer key and selected organization/workspace; visible active-project/lifetime-hours snapshot | PR #571 adds explicitly opted-in six-hour snapshot replacement, scoped scheduling and recovery. **Local verified; not deployed** | Project count is a current snapshot; hours are lifetime totals of visible active projects, not weekly hours or historical trend | Shared gated and exact legacy binding; no ordinary dedicated producer | Designated-account report success October 19 recorded. Synthetic mapping is not real changing-snapshot → answer proof |
 | **Zoho Inventory** | U.S. OAuth and selected organization; current active-item and low-stock counts | PR #571 adds opted-in six-hour snapshot refresh, token renewal, scoped scheduling and recovery. **Local verified; not deployed** | Aggregate item/count snapshot; no SKU quantities, costs, orders or inventory adjustments; not inventory valuation | Shared gated and exact legacy binding; no ordinary dedicated producer | Designated test report success October 19 recorded. Automatic change detection and hosted VSI use unproved |
 | **Katana** | Owner private key; account bound to immutable connection/key incarnation; stock-row/availability-count snapshot | PR #571 adds opted-in six-hour snapshot refresh, scoped scheduling and recovery; key replacement retains checked lifecycle. **Local verified; not deployed** | Variant/location-row count; unavailable class is on-hand less committed quantity ≤0; no SKU cost/profit or shortage cause | Shared gated and exact legacy binding; no ordinary dedicated producer | Designated-account report success October 19 recorded; public OAuth partnership still not approved. Automatic and hosted shared-answer proof absent |
-| **Loyverse** | OAuth, verified merchant currency; minimized receipts/type/tax/discount/cancellation/creation time and historical coverage | PR #571 adds explicit owner opt-in, daily refresh of the last seven complete UTC creation dates, bounded pagination/atomic import, renewal fencing, shared nine-connector concurrency, retry/backoff and recovery. **Local candidate; not deployed** | SALE/REFUND keep stored sign; cancellation explicit; no netting/tax double addition/accounting-revenue equivalence. Receipt date differs from import inclusion `created_at` | Shared gated and exact legacy binding. Protected currency projection was added by #558; no ordinary dedicated producer | SQL/projection fixtures cover currency revocation and refund/cancellation semantics. No new live automatic-refresh or end-to-end shared-answer witness |
-| **Zoho Books** | U.S. OAuth and eligible organization; retained invoice/expense IDs/date/currency/total/outstanding and history coverage | PR #571 adds opted-in daily refresh of the last seven complete UTC invoice/expense dates, guarded token renewal, complete atomic import, shared nine-connector concurrency and failure recovery. **Local candidate; not deployed** | USD/counting policy retained; foreign/draft/void exclusions not business zeros; invoice balance at import is not collection history or profit | Shared gated and exact legacy binding; no ordinary dedicated producer | Setup document says real-customer verification was pending; no current receipt inspected supersedes it. Synthetic typed mapping is not live provider proof |
-| **Wix Orders** | Approved app installation/instance; approved orders with ID/time/amount/currency/payment status; historical coverage | PR #571 adds opted-in daily refresh of the last seven complete UTC order-creation dates, instance-token access, bounded complete cursor fetch, shared nine-connector concurrency and atomic import/recovery. **Local candidate; not deployed** | Provider-reported order amount/status; PAID is not bank settlement or posted revenue; no refund transaction/line-item matching | Shared gated and exact legacy binding; no ordinary dedicated producer | Local import/coverage/mapping qualification exists. No current automatic new-order → shared-answer proof |
+| **Loyverse** | OAuth, verified merchant currency; minimized receipts/type/tax/discount/cancellation/creation time and historical coverage | PR #571 adds explicit owner opt-in, daily refresh of the last seven complete UTC creation dates, bounded pagination/atomic import, renewal fencing, shared ten-connector concurrency after the Square overlay, retry/backoff and recovery. **Local fixture-verified; not deployed** | SALE/REFUND keep stored sign; cancellation explicit; no netting/tax double addition/accounting-revenue equivalence. Receipt date differs from import inclusion `created_at` | Shared gated and exact legacy binding. Protected currency projection was added by #558; no ordinary dedicated producer | New real-SQL scheduler/protected-source composition and controlled receipt fixtures pass; currency, refund/cancellation and revocation semantics remain tested. No hosted automatic-refresh or model-answer witness |
+| **Zoho Books** | U.S. OAuth and eligible organization; retained invoice/expense IDs/date/currency/total/outstanding and history coverage | PR #571 adds opted-in daily refresh of the last seven complete UTC invoice/expense dates, guarded token renewal, complete atomic import, shared ten-connector concurrency after the Square overlay and failure recovery. **Local fixture-verified; not deployed** | USD/counting policy retained; foreign/draft/void exclusions not business zeros; invoice balance at import is not collection history or profit | Shared gated and exact legacy binding; no ordinary dedicated producer | New real-SQL scheduler/protected-source composition and controlled invoice/expense fixtures pass. Existing setup document records real-customer verification as pending; no new hosted receipt supersedes that limit |
+| **Wix Orders** | Approved app installation/instance; approved orders with ID/time/amount/currency/payment status; historical coverage | PR #571 adds opted-in daily refresh of the last seven complete UTC order-creation dates, instance-token access, bounded complete cursor fetch, shared ten-connector concurrency after the Square overlay and atomic import/recovery. **Local fixture-verified; not deployed** | Provider-reported order amount/status; PAID is not bank settlement or posted revenue; no refund transaction/line-item matching | Shared gated and exact legacy binding; no ordinary dedicated producer | New real-SQL scheduler/protected-source composition and controlled order fixtures pass. No hosted automatic new-order → shared-answer proof |
 
 The current offered catalog is the twelve rows above, established by
 `app/app/integrations/page.tsx` and `lib/integrations/reporting/catalog.ts`.
@@ -113,15 +117,21 @@ unmerged code or developer applications exist.
   its `infra/main.tf` and `variables.tf`. Historical deployment/repair records:
   `docs/qbo-production-completion.md`, `docs/deployments/qbo-connect-live-repair-20261002.md`.
 - Square: `lib/integrations/square-direct/`,
-  `lib/integrations/control-plane/square-gcp-mapped-sync.ts` and
-  `square-gcp-mapped-runtime.ts`; `docs/square-customer-backend-release.md`.
+  `app/api/integrations/square/scheduled-sync/route.ts`;
+  `supabase/production-migrations/20261117014116_square_customer_recurring_refresh.sql`;
+  `docs/square-customer-backend-release.md`. The new recurring worker uses the
+  current customer backend, not the historical native control-plane scheduler.
 - Xero/Harvest/Clockify/Toggl/Zoho Inventory/Katana:
-  `lib/integrations/reporting/{catalog,routes,adapters,transport,security,oauth}.ts`;
-  `supabase/migrations/20261019001207_ready_account_reporting_connectors.sql`;
+  `lib/integrations/reporting/{catalog,routes,adapters,transport,security,oauth,execution,scheduler}.ts`;
+  `app/api/integrations/reporting/scheduled-sync/route.ts`;
+  `supabase/migrations/20261117005822_reporting_recurring_refresh.sql`;
   `docs/integrations/ready-account-reporting.md`.
 - Loyverse/Zoho Books/Wix:
   `app/api/integrations/{loyverse,zoho-books,wix-orders}/sync/route.ts`,
-  corresponding `lib/integrations/*/server.ts`, and
+  corresponding `lib/integrations/*/server.ts`, shared
+  `lib/integrations/import-refresh/{execution,scheduler}.ts`,
+  `app/api/integrations/imports/scheduled-sync/route.ts`,
+  `supabase/migrations/20261117012702_import_recurring_refresh.sql`, and
   `docs/integrations/historical-imports.md`.
 - Shared semantics: `lib/ai/shared-evidence/generation.ts`, `fact-time.ts`,
   `financial-boundaries.ts`, `invoice-selection.ts`, `answer-contract.ts`;
@@ -144,45 +154,54 @@ The reporting setup's statement that reports are not fed into VSI describes the
 legacy released behavior, while #558 supplied the separate dormant shared path.
 Historical reports do not refresh because someone merely opens or filters them.
 
-## Remaining work and staged implementation
+## Remaining hosted proof and enablement gates
 
-1. **Finish the bounded qualification candidate.** Reuse PR #571's immutable
-   actor/workspace/chat/question/source manifest and inspected activation plan.
-   Keep three ordinary gates off. Qualify the scoped preview entry into shared
-   preparation and terminal accounting, with exact-source and private-chat
-   isolation tests. This is a controlled hosted-answer qualification step, not
-   an automatic-ingestion implementation for the missing ten providers.
-2. **Add automatic-refresh admission where missing.** Reuse current provider
-   adapters and atomic commits. Introduce explicit owner consent for cadence,
-   selected historical refresh window and entity/source mapping, durable due
-   state, database entitlement/lifecycle checks independent of a browser session,
-   per-workspace concurrency, bounded provider calls, lease fencing and recovery.
-   Do not implement a timer that invokes an owner-only manual route or scans all
-   connected accounts as implicit consent. Reporting providers are a coherent
-   first group; Square and the three standalone legacy connectors retain their
-   own authority boundaries. Any new schema or hosted runtime requires its own
-   reviewed migration/deployment artifact; no such activation is implied here.
-3. **Define current versus historical coverage.** Refresh an approved rolling
-   overlap to pick up corrections while preserving older retained history.
-   Old invoices/outstanding balances outside that window remain observed-at-import
-   evidence; no last-sync timestamp may pretend every historic record was read.
-   Snapshot endpoints cannot reconstruct past inventory or lifetime-hour trends.
-   Failed/incomplete reads keep the previous committed facts with truthful
-   freshness and coverage. Account/credential incarnation changes invalidate the
-   applicable approved mapping and source hashes.
-4. **Prove a controlled whole path.** Choose eligible existing test connections
-   and approved originals from at least two integrations. Record baseline
-   source/version/typed facts, add approved non-sensitive provider test records,
-   wait for the real due scheduler without manual sync, verify one atomic fact
-   update and bounded retry behavior, then ask the real VSI engine a question
-   spanning those sources. Inspect exact dated provenance, omissions, stale
-   handling, unsupported joins and mathematical inputs; save/reopen with a
-   second unauthorized actor/workspace denied. Simulated provider transports
-   can qualify orchestration locally but cannot be called this live proof.
-5. **Expand qualification across every row.** Keep the matrix as the scope list;
-   a Sheets-plus-Xero success does not certify Square, payroll-like interpretations,
-   snapshot histories or all customer accounts. Qualify no-cost/incomplete,
-   cross-currency/cash-versus-accrual, revoked/stale and overlapping-money cases.
+The ten previously manual paths now have completed local recurring code. The
+remaining work is target qualification, authorized hosted execution and release
+review, not another connector mapping or unattended-admission implementation.
+
+1. **Qualify the exact isolated target and migration order.** The proposed
+   disposable database `bdmrcmbkiohcqkmcvvua` is not schema-qualified: the inspected
+   inventory has 29 repository versions absent and 72 hosted-only versions, and
+   the required shared eight-RPC surface is absent. Reconcile the exact dependency
+   closure and compatibility; do not apply all missing migrations or replay a
+   bootstrap. The reporting/import increments and guarded Square overlay must
+   precede their changed application runtime. Preserve existing data, source
+   eligibility and all three ordinary shared gates. The hosted packet records
+   the project, target and acceptance checks; no exact candidate Preview exists yet.
+2. **Stage the reviewed candidate in its permitted environment.** Clockify/Katana
+   key-based forms now have an expiring, exact-Preview-host/actor/workspace scope;
+   OAuth callbacks retain their production-origin policy. The answer manifest now
+   supports an explicit provider set and optional actor/chat/question/source-bound
+   citation inspection, without global access. These are locally tested mechanisms,
+   not enabled settings. Square retains its Production-only backend gate and needs
+   a separately reviewed isolated staging arrangement. Do not pretend a Preview is
+   Production or copy production credentials. Vercel does not run Preview crons;
+   the proposed temporary external authenticated timer needs its own exact scope.
+3. **Run Phase A: new records to refreshed evidence, without a model call.**
+   Obtain approval for exact isolated provider accounts, synthetic changes,
+   temporary credentials and timer lifetime after prerequisites are satisfied.
+   Capture the baseline; change the listed records; let the real schedule run
+   without manual sync; verify provider reads, atomic writes, dates, source versions
+   and freshness. Exercise failure, recovery, stale/incomplete coverage and revoked
+   access. Historical corrections outside the seven-date window still need an
+   explicit historical import; snapshot endpoints cannot reconstruct history.
+4. **Run Phase B against the resulting immutable source versions.** Freeze the
+   three-slot answer manifest only after Phase A produces its final source hashes.
+   Use the existing bounded Luna-only accounting and private-chat isolation checks.
+   Inspect a genuine cross-provider answer, exact dated source pages and saved
+   reopening; reject wrong actor/workspace, changed hashes and expired scope.
+   The existing ceiling is fifteen calls / USD 2, subject to the precise campaign
+   authorization and current rate verification. A controlled rendered fixture is
+   not a model-written answer and does not spend that allowance.
+5. **Qualify every connector in the matrix and review release separately.**
+   A first Clockify/Katana witness does not certify the other ten connectors,
+   payroll, snapshot history or arbitrary customer records. Continue in provider-
+   appropriate groups with explicit scope, records and expected semantics. Record
+   overlap, currency/basis/period mismatch, stale/empty/ineligible sources and
+   unsupported joins. Only exact-head CI, target preflight and authorized hosted
+   evidence can support a later reviewed release; no broad deployment is authorized
+   by the local implementation receipt.
 
 Payment activity, invoice/accounting revenue, profit, and cash flow remain
 separate measures. No overlap is added, no cross-provider transaction identity
@@ -233,6 +252,21 @@ Local checks on the continuation passed:
   **Modeled:** provider responses, SQL admission/commit, source resolution, and
   preexisting Xero data. No real provider arrival, hosted cron, automatic Xero
   refresh, hosted RLS or model answer is established by this test.
+- New recurring suites exercise all six reporting parsers, all three standalone
+  parsers and Square's original page parser. The reporting suite now includes
+  two exact-Preview scope regressions; its total is **33** (17 runtime, 13 SQL,
+  one real-SQL source composition, two Preview scope tests). Standalone has **36**.
+  Square has **33** (10 runtime, five settings, 17 SQL, one real-SQL composition).
+  The actual SQL composition tests cover changed facts and source hashes,
+  authorization/revocation, complete versus partial freshness and recovery.
+  Provider HTTP and identities remain controlled fixtures; browser tests cover
+  1280px, 390px and 320px. See each group receipt for exact limits.
+- The final Square overlay extends database admission to all **ten** new paths:
+  four active refresh leases in total, one per workspace, shared by manual and
+  scheduled work. Sheets and QuickBooks retain their separate existing budgets.
+  PGlite is single-backend state verification, not multi-session lock-contention
+  proof. Native PostgreSQL increment assertions are wired into existing isolated
+  CI; read the result on the final pushed head.
 - Existing screened, isolated SQL/database suite: 16 guard tests passed. The
   twelve-provider path passed actual SQL admission, packing, rendering, atomic
   save/reopen, all twelve revocations, wrong-actor/workspace denial and 110-row
@@ -258,18 +292,21 @@ is still required. No infrastructure or provider data was changed.
 
 The original three-slot campaign fixes original-source hashes and explicitly
 excludes imports and new mappings. A successful refresh changes those hashes and
-must be rejected by that manifest. It also hides citation links, while the source
-page remains behind the disabled shared gate. Do not treat that campaign as the
-requested full-path acceptance test or loosen hashes/gates to make it pass.
+must be rejected by that manifest. The original manifest also hides citation links. The new optional citation
+inspection scope is restricted to the approved business actor, workspace, saved
+chat/question and exact revalidated sources during the approved window; older
+manifests keep their original behavior. Do not treat the original static campaign
+as the requested full-path acceptance test or loosen hashes/gates to make it pass.
 
 Before hosted execution, prepare a separate reviewed two-phase refresh witness:
 identify the exact synthetic provider accounts/records and workspace, approve
 only the required provider mutations and existing scheduler window, capture the
 new eligible source versions, then freeze the answer manifest against those new
 versions. A citation-page qualification must independently retain its existing
-session/actor/workspace/original checks. The current candidate does not implement
-or authorize that new witness. A single static-source answer can qualify scoped
-answer generation first, but cannot close this delivery requirement.
+session/actor/workspace/original checks. The current candidate implements the narrow Preview forms, explicit provider
+manifest and citation-read mechanism needed for the proposed witness. No hosted
+configuration, provider mutation, timer or paid execution is thereby authorized
+or completed. A single static-source answer cannot close this delivery requirement.
 
 Additional authorization must name the exact protected Preview SHA/project and
 compatible isolated database; any temporary membership/entitlement/lock changes
@@ -277,6 +314,23 @@ with expiry/restoration; and the fixed paid-model slots and maximum spend after
 current rates are checked. Provider test-record mutations and scheduler execution
 need their own exact scope. Production promotion and global gate activation are
 not part of that approval. Reporting and standalone import refresh are now implemented as local candidates.
-Square recurring authority is the remaining missing refresh implementation; the
-separate hosted activation prerequisites still require resolution before any
+Square recurring authority is now a third local implementation group, using its
+existing customer backend rather than a timer around browser-session operations.
+The separate hosted activation prerequisites still require resolution before any
 execution approval request.
+
+## Completed refresh implementation groups
+
+The six reporting connectors, three standalone importers and Square now have
+local recurring implementations. Sheets and QuickBooks retain their existing
+automatic paths. Thus all twelve have an implemented refresh path in the candidate;
+this is not a statement that all twelve are deployed, activated or demonstrated
+with live records. Per-connector scope and the ordinary shared VSI gates remain
+closed unless their existing or separately reviewed authority permits use.
+
+Additional receipts: `vsi-standalone-refresh-group.md` and
+`vsi-square-refresh-group.md`. The Square overlay and standalone RPC migration
+must precede the changed application routes; optional UI metadata fallbacks do
+not authorize app-only rollout against older SQL. Hosted evidence still needs
+controlled new-record arrival, actual source/version verification and bounded
+Luna execution after the isolated target is qualified.

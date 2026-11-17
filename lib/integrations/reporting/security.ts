@@ -3,6 +3,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { catalog, type Provider } from "./catalog";
+import { reportingPreviewOrigin } from "./preview-qualification";
 
 export const origin = "https://www.vaeroex.com";
 export const accountSchema = z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/), name: z.string().min(1).max(200),
@@ -36,12 +37,14 @@ export function admin() {
 export function requireOwner(access: { membership?: { role?: string } | null }) {
   if (access.membership?.role !== "owner") throw new Error("owner_required");
 }
-export function assertRequest(request: Request, callback = false) {
+export function assertRequest(request: Request, callback = false, scope?: { provider: string; action: string }) {
   const url = new URL(request.url);
-  if (url.origin !== origin || request.headers.get("host") !== "www.vaeroex.com" ||
-    (request.headers.has("x-forwarded-host") && request.headers.get("x-forwarded-host") !== "www.vaeroex.com") ||
+  const expected = !callback && scope ? reportingPreviewOrigin(request, scope.provider, scope.action) ?? origin : origin;
+  const host = new URL(expected).host;
+  if (url.origin !== expected || request.headers.get("host") !== host ||
+    (request.headers.has("x-forwarded-host") && request.headers.get("x-forwarded-host") !== host) ||
     (request.headers.has("x-forwarded-proto") && request.headers.get("x-forwarded-proto") !== "https")) throw new Error("invalid_origin");
-  if (!callback && (request.method !== "POST" || url.search || request.headers.get("origin") !== origin ||
+  if (!callback && (request.method !== "POST" || url.search || request.headers.get("origin") !== expected ||
     (request.headers.has("sec-fetch-site") && request.headers.get("sec-fetch-site") !== "same-origin"))) throw new Error("invalid_origin");
 }
 export async function formData(request: Request) {
@@ -69,7 +72,7 @@ export function unseal(provider: Provider, workspace: string, connection: string
   cipher.setAAD(Buffer.from(`${provider}:${workspace}:${connection}:v1`)); cipher.setAuthTag(bytes.subarray(12, 28));
   return credentialSchema.parse(JSON.parse(Buffer.concat([cipher.update(bytes.subarray(28)), cipher.final()]).toString("utf8")));
 }
-export function redirect(provider: Provider, result: string) {
-  return new Response(null, { status: 303, headers: { Location: `${origin}/app/integrations/${provider}?result=${encodeURIComponent(result)}`,
+export function redirect(provider: Provider, result: string, destinationOrigin = origin) {
+  return new Response(null, { status: 303, headers: { Location: `${destinationOrigin}/app/integrations/${provider}?result=${encodeURIComponent(result)}`,
     "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
 }

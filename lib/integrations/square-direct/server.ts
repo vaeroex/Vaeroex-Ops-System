@@ -9,6 +9,8 @@ import { DirectActorSchema, DirectHistoricalWindowSchema } from "./contracts";
 import { createDirectSquareService } from "./service";
 import { createDirectSquareProvider } from "./provider";
 import { DirectPaymentBrowserSchema, parseDirectPaymentBrowseQuery } from "./payment-browse";
+import { SquareRecurringStatusSchema, type SquareRecurringView } from "./recurring-contracts";
+import { squareRecurringAllowed } from "./recurring-scope";
 
 export const squareSettingsPath = "/app/settings/integrations/square";
 const headers = { "cache-control": "no-store, max-age=0", "referrer-policy": "no-referrer",
@@ -27,7 +29,7 @@ export function directEncryptionKeyValid(value: unknown): value is string {
   try { return bytes.length === 32 && bytes.toString("base64") === value; }
   finally { bytes.fill(0); }
 }
-function config() {
+export function squareDirectConfig() {
   const applicationId = z.string().regex(/^sq0idp-[A-Za-z0-9_-]{1,184}$/).parse(process.env.SQUARE_CUSTOMER_APPLICATION_ID);
   const applicationSecret = z.string().min(16).max(16384).parse(process.env.SQUARE_CUSTOMER_APPLICATION_SECRET);
   const encryptionKey = process.env.SQUARE_CUSTOMER_ENCRYPTION_KEY;
@@ -48,7 +50,7 @@ async function ownerDatabase() {
   return { actor, call };
 }
 async function service() {
-  const settings = config();
+  const settings = squareDirectConfig();
   const { actor, call } = await ownerDatabase();
   return createDirectSquareService({ actor, encryptionKey: settings.encryptionKey,
     provider: authorize => createDirectSquareProvider({ ...settings, authorize }),
@@ -82,6 +84,42 @@ export async function squareDirectPayments(searchParams: Record<string, string |
   });
   if (result.error || result.data == null) throw new Error("square_customer_payment_browse_unavailable");
   return DirectPaymentBrowserSchema.parse(result.data);
+}
+/** Optional metadata only: no seller token, provider request or lease. Keep the
+ * legacy manual interface usable when the recurring migration is absent. */
+export async function squareDirectRecurringView(connectionId: string): Promise<SquareRecurringView | null> {
+  if (!squareDirectEnabled()) return null;
+  const connection = uuid.safeParse(connectionId);
+  if (!connection.success) return null;
+  let rolloutAllowed = false;
+  try {
+    const { actor, call } = await ownerDatabase();
+    rolloutAllowed = squareRecurringAllowed(actor.workspaceId);
+    const applicationId = z.string().regex(/^sq0idp-[A-Za-z0-9_-]{1,184}$/).parse(process.env.SQUARE_CUSTOMER_APPLICATION_ID);
+    const result = await call("square_customer_recurring_status_v1", { p_actor_id: actor.actorId, p_session_id: actor.sessionId,
+      p_workspace_id: actor.workspaceId, p_application_id: applicationId, p_connection_id: connection.data });
+    const parsed = SquareRecurringStatusSchema.safeParse(result.data);
+    return { connectionId: connection.data, rolloutAllowed, status: !result.error && parsed.success ? parsed.data : null };
+  } catch { return { connectionId: connection.data, rolloutAllowed, status: null }; }
+}
+
+export async function squareDirectRecurringRoute(request: Request) {
+  if (!squareDirectEnabled()) return Response.json({ error: "Square is unavailable." }, { status: 404, headers });
+  if (!directRequestAllowed("recurring-settings", request)) return Response.json({ error: "Square request denied." }, { status: 403, headers });
+  try {
+    const { actor, call } = await ownerDatabase();
+    const form = await directForm("recurring-settings", request);
+    if (!("enabled" in form) || !("connectionId" in form)) throw new Error("square_customer_form_denied");
+    if (form.enabled && !squareRecurringAllowed(actor.workspaceId)) throw new Error("square_recurring_unavailable");
+    const applicationId = z.string().regex(/^sq0idp-[A-Za-z0-9_-]{1,184}$/).parse(process.env.SQUARE_CUSTOMER_APPLICATION_ID);
+    const result = await call("square_customer_set_recurring_v1", { p_actor_id: actor.actorId, p_session_id: actor.sessionId,
+      p_workspace_id: actor.workspaceId, p_application_id: applicationId, p_connection_id: form.connectionId, p_enabled: form.enabled });
+    const parsed = SquareRecurringStatusSchema.safeParse(result.data);
+    if (result.error || !parsed.success || parsed.data.recurring_enabled !== form.enabled) throw new Error("square_recurring_unavailable");
+    return new Response(null, { status: 303, headers: { ...headers, location: `${squareSettingsPath}?recurring=${form.enabled ? "enabled" : "disabled"}` } });
+  } catch {
+    return new Response(null, { status: 303, headers: { ...headers, location: `${squareSettingsPath}?recurring=unavailable` } });
+  }
 }
 function escape(value: string) {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -127,6 +165,12 @@ export async function directForm(action: string, request: Request) {
     try { text = new TextDecoder("utf8", { fatal: true }).decode(bytes); } finally { bytes.fill(0); }
     for (const part of text.split("&")) for (const field of part.split("=")) decodeURIComponent(field.replace(/\+/g, " "));
     const form = new URLSearchParams(text), keys = [...form.keys()].sort().join(",");
+    if (action === "recurring-settings" && keys === "confirmation,connectionId,enabled") {
+      const enabled = form.get("enabled");
+      if (enabled !== "true" && enabled !== "false" || form.get("confirmation") !== (enabled === "true" ? "enable-recurring" : "disable-recurring"))
+        throw new Error("square_customer_form_denied");
+      return { connectionId: uuid.parse(form.get("connectionId")), enabled: enabled === "true" };
+    }
     if (action === "connect" && keys === "businessEntityId") return { businessEntityId: uuid.parse(form.get("businessEntityId")) };
     if (action === "mapping" && keys === "connectionId,locationId") return { connectionId: uuid.parse(form.get("connectionId")),
       locationId: z.string().regex(/^[A-Za-z0-9._:-]{1,50}$/).parse(form.get("locationId")) };

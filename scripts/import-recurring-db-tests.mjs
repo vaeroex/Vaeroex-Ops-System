@@ -208,7 +208,7 @@ test('membership, bans, deleted identity and billing loss are rechecked immediat
         const connection = (await db.query(`select id from ${importTables[provider]}`)).rows[0].id;
         const before = await saved(db, provider, connection);
         await dueImportNow(db, { provider, connection }); await claimImport(db, { provider, connection });
-        if (change === 'membership') await db.query("update workspace_members set status='inactive' where user_id=$1", [ids.actor]);
+        if (change === 'membership') await db.query("update workspace_members set status='disabled' where user_id=$1", [ids.actor]);
         if (change === 'ban') await db.query("update auth.users set banned_until=clock_timestamp()+interval '1 day' where id=$1", [ids.actor]);
         if (change === 'deleted') await db.query('update auth.users set deleted_at=clock_timestamp() where id=$1', [ids.actor]);
         if (change === 'billing') await db.query("update workspaces set subscription_required=true,subscription_status='expired' where id=$1", [ids.workspace]);
@@ -298,7 +298,7 @@ test('manual historical imports retain their chosen dates, use guarded tokens an
       assert.equal((await state(db, provider, connection)).recurring_next_refresh_at, null);
       assert.equal((await saved(db, provider, connection)).coverage.length, 31);
       assert.equal(await claimImport(db, { provider, connection, trigger: 'manual' }), true, 'successful manual imports receive no new one-hour cooldown');
-      await db.query("update workspace_members set status='inactive' where user_id=$1", [ids.actor]);
+      await db.query("update workspace_members set status='disabled' where user_id=$1", [ids.actor]);
       await assert.rejects(apply(db, provider, 99, { connection, period }), /authority_expired/);
       if (provider !== 'wix-orders') assert.equal(await saveToken(db, provider, { connection }), false);
       await fail(db, provider, { connection });
@@ -314,7 +314,7 @@ test('settings disclose paused authority and owner renewal cancels the prior own
     const status = async (workspace = ids.workspace) => (await db.query('select import_recurring_status($1,$2,$3) value', [workspace, provider, ids.connection])).rows[0].value;
     assert.equal(await status(ids.other), null);
     assert.deepEqual(await status(), { authorized: true, reason: 'active' });
-    await db.query("update workspace_members set status='inactive' where user_id=$1", [ids.actor]);
+    await db.query("update workspace_members set status='disabled' where user_id=$1", [ids.actor]);
     await db.query("update workspace_members set role='owner' where user_id=$1", [ids.viewer]);
     assert.deepEqual(await status(), { authorized: false, reason: 'owner_unavailable' });
     await db.query('select set_import_recurring($1,$2,$3,$4,true)', [ids.workspace, provider, ids.connection, ids.viewer]);
