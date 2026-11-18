@@ -180,11 +180,15 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, hideSourceCit
     });
   }
 
-  function newChat() {
-    if (pending || accessLost) return;
-    followLatest.current = true; setShowJump(false); setHasNewAnswer(false);
-    setChat(null); setExchanges([]); setMessage(""); setFailedQuestion(null); setError(""); setNotice(""); setRenaming(null); setDeleting(null);
-    ownedNavigation.current = ""; window.history.replaceState(null, "", window.location.pathname); composer.current?.focus();
+  async function newChat() {
+    await run("create", async (epoch) => {
+      const created = await request<ChatResponse>("/conversations", { method: "POST" });
+      if (!mounted.current || epoch !== viewEpoch.current) return;
+      followLatest.current = true; setShowJump(false); setHasNewAnswer(false);
+      rememberChat(created.conversation); setExchanges([]); setMessage(""); setFailedQuestion(null);
+      setCanEditNotes(Boolean(created.canEditBusinessNotes)); setRenaming(null); setDeleting(null);
+      setNotice("Empty chat saved."); composer.current?.focus();
+    });
   }
 
   async function send(retry?: FailedQuestion) {
@@ -289,7 +293,7 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, hideSourceCit
     <p role="status" aria-live="polite" className={notice && notice !== "Answer saved." ? "text-sm leading-6 text-slate-600" : "sr-only"}>{notice}</p>
     <div className="vsi-panels grid min-h-0 min-w-0 flex-1 gap-2 xl:grid-cols-[180px_minmax(0,1fr)]">
       <aside className="vsi-history min-h-0 min-w-0 rounded-xl border border-slate-200 bg-white p-2" aria-label="Private chat history">
-        <button type="button" onClick={newChat} disabled={disabled} className={`${button} w-full`}>New chat</button>
+        <button type="button" onClick={newChat} disabled={disabled} className={`${button} w-full`}>{pending === "create" ? "Creating…" : "New chat"}</button>
         <details className="mt-2" open={historyOpen} onToggle={(event) => setHistoryOpen(event.currentTarget.open)}><summary className="cursor-pointer text-sm font-semibold text-slate-700">Your chats</summary><p className="mt-1 text-xs leading-5 text-slate-500">Private to you in {workspaceName}.</p>
           <nav aria-label="Your chats" className="mt-2 max-h-40 space-y-1 overflow-y-auto overscroll-contain xl:max-h-[min(28rem,45dvh)]">
             {pending === "history" ? <p className="p-2 text-sm text-slate-500">Loading chats…</p> : chats.length ? chats.map((entry) => <div key={entry.id} className="vsi-chat-row group relative min-w-0">
