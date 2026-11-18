@@ -15,7 +15,7 @@ const longExchanges = () => Array.from({ length: 20 }, (_, index) => ({ ...excha
   answer: index === 19 ? briefTable : `## Workshop planning ${index + 1}\nReview the dated repair tickets and compare the promised completion date with the actual collection date. The current records do not establish why a repair was late. [B1]\n\nChoose one owner to inspect the matched records, then update the team with what they show.`,
   citations: Array.from({ length: index === 19 ? 8 : 2 }, (_, source) => ({ id: `B${source + 1}`, title: `Workshop source ${source + 1}`, url: source === 4 || source === 5 ? `https://public.example.test/source-${source + 1}` : `/app/sources/workshop-${source + 1}`, sourceType: source === 4 || source === 5 ? "web" : "file", sourceId: source === 4 || source === 5 ? null : `workshop-${source + 1}`, evidenceDate: source === 4 || source === 6 ? null : now, evidenceDateKind: ["publication", "updated", "observation", "event"][source], retrievedAt: now, excerpt: source === 4 || source === 5 ? "Legacy generated web summary mixes unsupported reporting." : "Approved workshop record with dated repair details. ".repeat(4) })) }));
 const stored = new Map(), answers = new Map();
-let createRequests = 0, failCreate = false;
+let createRequests = 0, failCreate = false, createReceived = null, releaseDelayedCreate = null;
 let posts = [], noteSaves = 0, usageReads = 0, firstFailure = true, lost = false, serverError = null, releaseDelayedAnswer = null;
 const output = fs.mkdtempSync(path.join(os.tmpdir(), "vsi-ui-browser-"));
 async function main() {
@@ -61,7 +61,7 @@ async function main() {
         const route = url.pathname.replace("/api/vsi", "");
         if (route === "/usage") { usageReads++; return send({ used: answers.size, limit: 100, remaining: 100 - answers.size, resetsAt: "2026-10-09T18:00:00.000Z", workspaceBudget: { spentUsd: 0.04, reservedUsd: 0, limitUsd: 100, periodStart: now } }); }
         if (route === "/conversations" && req.method === "GET") return send({ conversations: [...stored.values()].filter(value => (value.conversation.id === "old") === Boolean(url.searchParams.get("before"))).map(value => value.conversation), nextCursor: url.searchParams.get("before") ? null : "older-cursor", canEditBusinessNotes: true });
-        if (route === "/conversations" && req.method === "POST") { createRequests++; if (failCreate) return send({ error: "Could not save the empty chat." }, 503); const id = `chat-${stored.size}`; const value = { conversation: { ...chat(id, 0), title: body.title || "New chat" }, exchanges: [] }; stored.set(id, value); return send({ ...value, canEditBusinessNotes: true }); }
+        if (route === "/conversations" && req.method === "POST") { createRequests++; if (createReceived) { const received = createReceived; createReceived = null; await new Promise(resolve => { releaseDelayedCreate = resolve; received(); }); } if (failCreate) return send({ error: "Could not save the empty chat." }, 503); const id = `chat-${stored.size}`; const value = { conversation: { ...chat(id, 0), title: body.title || "New chat" }, exchanges: [] }; stored.set(id, value); return send({ ...value, canEditBusinessNotes: true }); }
         const [, , id, action] = route.split("/"); const value = stored.get(id); assert(value, "conversation exists");
         if (action === "messages") {
           if (body.message === "other tab filled this chat") { value.conversation.exchangeCount = 250; return send({ code: "thread_full", message: "This chat has reached 250 exchanges. Continue in a new chat." }, 409); }
@@ -344,8 +344,14 @@ async function main() {
       const create = emptyPage.getByRole("button", { name: "New chat", exact: true });
       await create.waitFor(); await emptyPage.waitForFunction(() => !document.querySelector('button')?.disabled);
       const beforeCreates = createRequests, beforePosts = posts.length, beforeNotes = noteSaves;
+      const creationReceived = new Promise(resolve => { createReceived = resolve; });
       await create.evaluate(button => { button.click(); button.click(); });
+      await creationReceived;
+      assert.equal(await emptyPage.getByRole("textbox", { name: "Message Vaeroex" }).getAttribute("readonly"), "", "pending creation must prevent typing from being discarded by its response");
+      assert(await emptyPage.getByRole("button", { name: "Creating…", exact: true }).isDisabled());
+      releaseDelayedCreate(); releaseDelayedCreate = null;
       await emptyPage.getByText("Empty chat saved.", { exact: true }).waitFor();
+      assert(await emptyPage.getByRole("textbox", { name: "Message Vaeroex" }).evaluate(element => document.activeElement === element), "saved empty chat focuses its composer");
       assert.equal(createRequests, beforeCreates + 1, "rapid clicks must create exactly one chat");
       const id = new URL(emptyPage.url()).searchParams.get("chat"); assert(id && stored.has(id));
       assert.equal(stored.get(id).conversation.exchangeCount, 0); assert.deepEqual(stored.get(id).exchanges, []);
@@ -374,6 +380,6 @@ async function main() {
       await emptyPage.close();
     }
     console.log(JSON.stringify({ passed: true, checks: ["persist empty chat without question", "empty rename and reload at desktop/390/320", "double-click creation fence", "failed creation preserves transcript and unsent draft", "general question", "App Router searchParams update", "older history pagination", "keyboard", "stable retry", "explicit note confirmation", "citation dates", "legacy web excerpts hidden without removing private evidence or public links", "Markdown headings and fenced code stay safe and readable", "rename reopen delete", "keyboard arrows and Escape menu", "touch menu at 390 and 320", "inactive chat actions preserve transcript", "delete cancellation and reload", "truncated titles", "compact usage viewport", "225 warning", "250 handoff preserves transcript", "second-tab thread boundary preserves unsent draft", "workspace access loss clears transcript", "on-demand usage", "desktop mobile no overflow", "20-exchange bounded transcript and composer", "old reading position and focus survive delayed answers", "keyboard jump and transcript scrolling", "safe compact business tables", "software-keyboard-sized viewport", "slow-response notice and recoverable 205-second timeout", "actual global CSS light/Pulsar contrast"], widths: [1440, 390, 320], output, scope: "Hydrated UI with synthetic loopback API; authenticated API and provider qualification are separate." }));
-  } finally { releaseDelayedAnswer?.(); if (browser) await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+  } finally { releaseDelayedCreate?.(); releaseDelayedAnswer?.(); if (browser) await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
