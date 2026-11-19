@@ -1,4 +1,5 @@
 import "server-only";
+import { throwImportProviderError } from "../import-refresh/provider-error";
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
@@ -103,10 +104,10 @@ export function authorizationUrl(state: string) {
   return url.toString();
 }
 
-async function tokenRequest(input: URLSearchParams) {
+async function tokenRequest(input: URLSearchParams, signal?: AbortSignal) {
   const response = await fetch(TOKEN_URL, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: input, cache: "no-store", signal: AbortSignal.timeout(12_000) });
-  if (!response.ok) throw new Error(response.status === 400 || response.status === 401 ? "zoho_books_authorization_required" : "zoho_books_provider_unavailable");
+    body: input, cache: "no-store", redirect: "error", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(12_000)]) : AbortSignal.timeout(12_000) });
+  if (!response.ok) return throwImportProviderError(response, "zoho_books", true);
   const payload = tokenResponse.parse(await response.json());
   return payload;
 }
@@ -120,10 +121,10 @@ export async function exchangeCode(code: string) {
     expiresAt: new Date(Date.now() + payload.expires_in * 1000).toISOString() };
 }
 
-export async function refreshToken(refreshToken: string) {
+export async function refreshToken(refreshToken: string, signal?: AbortSignal) {
   const c = config();
   const payload = await tokenRequest(new URLSearchParams({ client_id: c.clientId, client_secret: c.clientSecret,
-    redirect_uri: c.redirectUri, refresh_token: refreshToken, grant_type: "refresh_token" }));
+    redirect_uri: c.redirectUri, refresh_token: refreshToken, grant_type: "refresh_token" }), signal);
   return { accessToken: payload.access_token, refreshToken: payload.refresh_token ?? refreshToken,
     expiresAt: new Date(Date.now() + payload.expires_in * 1000).toISOString() };
 }
@@ -148,7 +149,7 @@ async function apiGet(path: string, accessToken: string, signal?: AbortSignal) {
   const response = await fetch(`${API_DOMAIN}/books/v3${path}`, { headers: {
     authorization: `Zoho-oauthtoken ${accessToken}`, accept: "application/json"
   }, cache: "no-store", redirect: "error", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000) });
-  if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "zoho_books_authorization_required" : "zoho_books_provider_unavailable");
+  if (!response.ok) return throwImportProviderError(response, "zoho_books");
   const text = await response.text();
   if (text.length > 4_000_000) throw new Error("zoho_books_response_too_large");
   return JSON.parse(text) as unknown;
@@ -185,11 +186,12 @@ function cents(value: number) {
 }
 
 /** Complete selected-period import. Only stable IDs, dates and numeric accounting facts leave this adapter. */
-export async function accountingFacts(accessToken: string, organizationId: string, startDate: string, endDate: string): Promise<AccountingFact[]> {
+export async function accountingFacts(accessToken: string, organizationId: string, startDate: string, endDate: string, parentSignal?: AbortSignal): Promise<AccountingFact[]> {
   if (!/^\d{5,30}$/.test(organizationId)) throw new Error("zoho_books_window_invalid");
   resolveImportRange(startDate, endDate);
-  const signal = AbortSignal.timeout(45_000);
-  const [invoices, expenses] = await Promise.all([
+  const controller = new AbortController();
+  const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(45_000), ...(parentSignal ? [parentSignal] : [])]);
+  const requests = [
     listPages("invoices", accessToken, organizationId, startDate, endDate, signal, (value) => {
       const result = invoiceResponse.parse(value);
       return { items: result.invoices, more: morePages(result.page_context) };
@@ -198,7 +200,10 @@ export async function accountingFacts(accessToken: string, organizationId: strin
       const result = expenseResponse.parse(value);
       return { items: result.expenses, more: morePages(result.page_context) };
     })
-  ]);
+  ] as const;
+  const [invoices, expenses] = await Promise.all(requests).catch(async error => {
+    controller.abort(); await Promise.allSettled(requests); throw error;
+  });
   const facts: AccountingFact[] = [], seen = new Set<string>();
   function identity(kind: AccountingFact["kind"], id: string, day: string) {
     if (!/^\d{1,30}$/.test(id) || seen.has(`${kind}:${id}`)) throw new Error("zoho_books_duplicate_or_invalid_id");

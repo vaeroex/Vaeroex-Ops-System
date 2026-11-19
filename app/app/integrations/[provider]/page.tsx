@@ -9,11 +9,15 @@ import { catalog, isHistoricalProvider, isProvider, type Account, type Metric, t
 import { admin, available, unseal, accountSchema } from "@/lib/integrations/reporting/security";
 import { validateSnapshot } from "@/lib/integrations/reporting/adapters";
 import { resolveImportRange, resolveViewRange } from "@/lib/integrations/date-range";
+import { reportingRecurringAllowed } from "@/lib/integrations/reporting/recurring-scope";
+import { ReportingRecurringSettings, ReportingRefreshTime, type ReportingRecurringState, type ReportingRecurringAuthority } from "@/components/integrations/ReportingRecurringSettings";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 const messages: Record<string,string> = {
   connected: "Connected. Sync to load your report.", choose_account: "Choose which account to connect to this workspace.",
+  recurring_enabled: "Automatic refresh is authorized. The next scheduled attempt will read the supported information described below.",
+  recurring_disabled: "Automatic refresh is off. Previously saved information was kept.",
   synced: "Report updated.", disconnected: "Disconnected. Stored credentials and report removed from this workspace. Revoke the app or key in the provider's settings to remove its permission there.",
   configuration_required: "Setup is not complete yet.", connection_exists: "A connection already exists. Finish or cancel it before starting again.",
   sync_wait: "A sync is running or the hourly reading window has not reopened yet.", quota_exceeded: "The provider's free API quota was reached. Wait before syncing again; no upgrade was requested.",
@@ -33,7 +37,16 @@ const historySchema = z.object({
   }).strict(),
   records: z.number().int().nonnegative()
 }).strict();
+const recurringAuthoritySchema = z.object({ authorized: z.boolean(), reason: z.enum([
+  "active", "owner_unavailable", "entitlement_unavailable", "disabled", "connection_unavailable"
+]) }).strict();
 type HistoryReport = z.infer<typeof historySchema>;
+const recurringSchema = z.object({
+  recurring_enabled: z.boolean(), recurring_authorized_at: z.string().datetime({ offset: true }).nullable(),
+  recurring_next_refresh_at: z.string().datetime({ offset: true }).nullable(),
+  recurring_last_attempt_at: z.string().datetime({ offset: true }).nullable(),
+  recurring_failure_count: z.number().int().nonnegative(), recurring_last_failure_at: z.string().datetime({ offset: true }).nullable()
+}).strict();
 
 function Metrics({ provider, metrics, label = "Report totals" }: { provider: Provider; metrics: Metric[]; label?: string }) {
   return <dl aria-label={label} className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{metrics.map(metric => <div key={`${metric.key}:${metric.currency ?? ""}`}>
@@ -77,6 +90,30 @@ export default async function ReportingPage({ params, searchParams }: { params: 
   try { viewRange = resolveViewRange(query.from, query.to, now); } catch { invalidView = true; }
   const {data: row,error} = await access.supabase.from("reporting_connections").select("id,status,account,snapshot,last_sync_at,last_error_code,next_sync_at,created_by")
     .eq("workspace_id", access.workspaceId).eq("provider", provider).neq("status","disconnected").maybeSingle();
+  const recurringAllowed = enabled && reportingRecurringAllowed(access.workspaceId, provider);
+  const timeZone = access.context.activeWorkspace?.reporting_timezone;
+  let recurring: ReportingRecurringState | null = null;
+  let recurringAuthority: ReportingRecurringAuthority | null = null;
+  // Read optional rollout columns separately so a pre-migration database can
+  // still show the existing connection and support manual imports/disconnect.
+  if (row && (row.status === "connected" || row.status === "reauthorization_required")) {
+    const saved = await access.supabase.from("reporting_connections")
+      .select("recurring_enabled,recurring_authorized_at,recurring_next_refresh_at,recurring_last_attempt_at,recurring_failure_count,recurring_last_failure_at")
+      .eq("workspace_id", access.workspaceId).eq("provider", provider).eq("id", row.id).maybeSingle();
+    const parsed = recurringSchema.safeParse(saved.data);
+    if (!saved.error && parsed.success) recurring = parsed.data;
+  }
+  if (recurring?.recurring_enabled && row) {
+    // The authenticated page has already selected this exact tenant/connection.
+    // Return only a safe status reason; never expose the original owner's ID.
+    try {
+      const status = await admin().rpc("reporting_recurring_status", {
+        p_workspace: access.workspaceId, p_provider: provider, p_connection: row.id
+      });
+      const parsed = recurringAuthoritySchema.safeParse(status.data);
+      if (!status.error && parsed.success) recurringAuthority = parsed.data;
+    } catch { /* A failed status read cannot claim that scheduled access is active. */ }
+  }
   let choices: Account[] = [], choiceError = false;
   if (owner && enabled && row?.status === "choose_account" && row.created_by === access.context.membership?.user_id) {
     try {
@@ -112,6 +149,11 @@ export default async function ReportingPage({ params, searchParams }: { params: 
           <input type="hidden" name="confirmation" value="select"/><button className={button} type="submit">Connect {a.name}</button>
         </form>)}
         {row.last_error_code ? <p role="alert">{messageFor(row.last_error_code)}</p> : null}
+        {recurring && (recurringAllowed || recurring.recurring_enabled) ? <ReportingRecurringSettings
+          provider={provider} connectionId={row.id} state={recurring} authority={recurringAuthority} owner={owner} allowed={recurringAllowed}
+          connected={row.status === "connected"} lastSuccess={row.last_sync_at} timeZone={timeZone} asOf={now.toISOString()}/>
+          : recurringAllowed && !recurring ? <p role="status" className="text-sm text-slate-600">Automatic refresh settings are unavailable. Your existing connection and saved reports are unchanged.</p>
+          : row.status === "connected" || row.status === "reauthorization_required" ? <p className="text-sm text-slate-600">Last successful refresh: <ReportingRefreshTime value={row.last_sync_at} timeZone={timeZone}/>.</p> : null}
         {owner && row.status === "connected" && enabled ? <form method="post" action={`${path}/sync`} className="space-y-3">
           <input type="hidden" name="connectionId" value={row.id}/>
           {historical ? <>
@@ -121,7 +163,7 @@ export default async function ReportingPage({ params, searchParams }: { params: 
             <p className="text-xs text-slate-600">Availability depends on the provider and your account permissions. If a range is too large for one import, choose a smaller range.</p>
           </> : null}
           <button className={button} type="submit" disabled={Date.parse(row.next_sync_at)>Date.now()}>{historical ? "Import selected dates" : "Sync report"}</button>
-          <p className="mt-2 text-xs text-slate-600">Manual updates are limited to once per hour. {Date.parse(row.next_sync_at)>Date.now() ? `Next available: ${new Date(row.next_sync_at).toISOString()}` : ""}</p>
+          <p className="mt-2 text-xs text-slate-600">Manual updates are limited to once per hour. {Date.parse(row.next_sync_at)>Date.now() ? <>Next available: <ReportingRefreshTime value={row.next_sync_at} timeZone={timeZone}/>.</> : null}</p>
         </form> : null}
         {owner ? <form method="post" action={`${path}/disconnect`} className="space-y-3">
           <input type="hidden" name="connectionId" value={row.id}/>
@@ -151,7 +193,7 @@ export default async function ReportingPage({ params, searchParams }: { params: 
               <p className="text-xs text-slate-600">{provider === "xero" ? "Invoices and bills are grouped by their provider dates. Outstanding amounts are the balances when those invoices were last imported, not historical balances as of the selected dates."
                 : provider === "clockify" ? "Completed entries are grouped by their start date in UTC and cover the API key owner's entries only."
                 : "Time entries are grouped by their Harvest spent date and limited by the connected user's permissions."} Today may be partial. Reimport a period to pick up later changes.</p>
-              <p className="text-xs text-slate-600">Most recent import affecting this selection: {history.coverage.lastImportedAt ?? "Unavailable"}.</p>
+              <p className="text-xs text-slate-600">Most recent import affecting this selection: <ReportingRefreshTime value={history.coverage.lastImportedAt} timeZone={timeZone}/>.</p>
             </> : null}
           </> : null}
         {report ? history?.hasHistory === false ? <div className="space-y-3 rounded-md border border-line p-4">
@@ -166,7 +208,7 @@ export default async function ReportingPage({ params, searchParams }: { params: 
     </SectionCard> : null}
     {!historical && report && row ? <SectionCard title="Last complete report" description={report.start === report.end ? `Snapshot at ${report.end}` : `${report.start.slice(0,10)} through ${report.end.slice(0,10)}.`}>
       <Metrics provider={provider} metrics={report.metrics}/>
-      <p className="mt-4 text-xs text-slate-600">Last successful sync: {row.last_sync_at}. These provider summaries are shown here; they are not combined with other plug-ins, added to financial KPIs, or sent to VSI chat.</p>
+      <p className="mt-4 text-xs text-slate-600">Last successful sync: <ReportingRefreshTime value={row.last_sync_at} timeZone={timeZone}/>. These provider summaries are shown here; they are not combined with other plug-ins, added to financial KPIs, or sent to VSI chat.</p>
     </SectionCard> : null}
   </div>;
 }

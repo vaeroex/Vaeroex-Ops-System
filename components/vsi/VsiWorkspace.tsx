@@ -7,7 +7,7 @@ import { Exchange } from "@/components/vsi/Exchange";
 import { displayDate, usagePercent, monthlyResetAt, type VsiChat, type VsiExchange, type VsiUsageView } from "@/components/vsi/contracts";
 import { suggestedPromptDraft, VSI_SUGGESTED_PROMPTS } from "@/lib/vsi/suggested-prompts";
 
-type Props = { workspaceId: string; workspaceName: string; userId: string; timeZone?: string; initialConversationId?: string; initialPrompt?: string };
+type Props = { workspaceId: string; workspaceName: string; userId: string; hideSourceCitations?: boolean; timeZone?: string; initialConversationId?: string; initialPrompt?: string };
 type ChatResponse = { workspaceId: string; conversation: VsiChat; exchanges?: VsiExchange[]; exchange?: VsiExchange; canEditBusinessNotes?: boolean };
 type FailedQuestion = { conversationId: string; message: string; requestId: string };
 const button = "min-h-11 sm:min-h-8 rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vaeroex-blue disabled:cursor-not-allowed disabled:opacity-50";
@@ -15,7 +15,7 @@ class RequestError extends Error {
   constructor(message: string, readonly accessLost = false, readonly code = "") { super(message); }
 }
 
-export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: workspaceTimeZone, initialConversationId = "", initialPrompt = "" }: Props) {
+export function VsiWorkspace({ workspaceId, workspaceName, userId, hideSourceCitations = false, timeZone: workspaceTimeZone, initialConversationId = "", initialPrompt = "" }: Props) {
   const [timeZone, setTimeZone] = useState(workspaceTimeZone || "UTC");
   useEffect(() => { setTimeZone(workspaceTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone); }, [workspaceTimeZone]);
   const [chats, setChats] = useState<VsiChat[]>([]), [chat, setChat] = useState<VsiChat | null>(null);
@@ -180,11 +180,15 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
     });
   }
 
-  function newChat() {
-    if (pending || accessLost) return;
-    followLatest.current = true; setShowJump(false); setHasNewAnswer(false);
-    setChat(null); setExchanges([]); setMessage(""); setFailedQuestion(null); setError(""); setNotice(""); setRenaming(null); setDeleting(null);
-    ownedNavigation.current = ""; window.history.replaceState(null, "", window.location.pathname); composer.current?.focus();
+  async function newChat() {
+    await run("create", async (epoch) => {
+      const created = await request<ChatResponse>("/conversations", { method: "POST" });
+      if (!mounted.current || epoch !== viewEpoch.current) return;
+      followLatest.current = true; setShowJump(false); setHasNewAnswer(false);
+      rememberChat(created.conversation); setExchanges([]); setMessage(""); setFailedQuestion(null);
+      setCanEditNotes(Boolean(created.canEditBusinessNotes)); setRenaming(null); setDeleting(null);
+      setNotice("Empty chat saved."); composer.current?.focus();
+    });
   }
 
   async function send(retry?: FailedQuestion) {
@@ -289,7 +293,7 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
     <p role="status" aria-live="polite" className={notice && notice !== "Answer saved." ? "text-sm leading-6 text-slate-600" : "sr-only"}>{notice}</p>
     <div className="vsi-panels grid min-h-0 min-w-0 flex-1 gap-2 xl:grid-cols-[180px_minmax(0,1fr)]">
       <aside className="vsi-history min-h-0 min-w-0 rounded-xl border border-slate-200 bg-white p-2" aria-label="Private chat history">
-        <button type="button" onClick={newChat} disabled={disabled} className={`${button} w-full`}>New chat</button>
+        <button type="button" onClick={newChat} disabled={disabled} className={`${button} w-full`}>{pending === "create" ? "Creating…" : "New chat"}</button>
         <details className="mt-2" open={historyOpen} onToggle={(event) => setHistoryOpen(event.currentTarget.open)}><summary className="cursor-pointer text-sm font-semibold text-slate-700">Your chats</summary><p className="mt-1 text-xs leading-5 text-slate-500">Private to you in {workspaceName}.</p>
           <nav aria-label="Your chats" className="mt-2 max-h-40 space-y-1 overflow-y-auto overscroll-contain xl:max-h-[min(28rem,45dvh)]">
             {pending === "history" ? <p className="p-2 text-sm text-slate-500">Loading chats…</p> : chats.length ? chats.map((entry) => <div key={entry.id} className="vsi-chat-row group relative min-w-0">
@@ -317,7 +321,7 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
         <div className="relative min-h-0 flex-1">
         <div ref={transcript} id="vsi-transcript" role="region" aria-label="Conversation transcript" tabIndex={0} onScroll={trackTranscriptPosition} className="h-full space-y-5 overflow-y-auto overscroll-contain p-3 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-vaeroex-blue sm:p-4">
           {!exchanges.length && !failedQuestion ? <div className="py-6 text-center sm:py-10"><h3 className="text-lg font-semibold text-slate-900">What would you like to explore?</h3><p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-slate-600">Write, plan, work through an idea, understand something new, or ask about your business.</p><p className="mx-auto mt-3 max-w-lg text-xs leading-6 text-slate-500">For current information, Vaeroex can check a live source. For business questions, it uses evidence you can access in this workspace.</p></div> : null}
-          {exchanges.map((entry) => <Exchange key={entry.id} exchange={entry} canEditNotes={canEditNotes} saving={pending === `remember:${entry.id}`} disabled={disabled} workspaceName={workspaceName} timeZone={timeZone} onRemember={saveNote} />)}
+          {exchanges.map((entry) => <Exchange key={entry.id} exchange={entry} hideSourceCitations={hideSourceCitations} canEditNotes={canEditNotes} saving={pending === `remember:${entry.id}`} disabled={disabled} workspaceName={workspaceName} timeZone={timeZone} onRemember={saveNote} />)}
           {failedQuestion ? <div className="space-y-3"><div className="ml-auto max-w-[92%] rounded-2xl bg-slate-100 p-4 text-sm leading-7 text-slate-900"><p className="text-xs font-semibold text-slate-500">You</p><p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{failedQuestion.message}</p></div>{pending !== "answer" ? <button type="button" onClick={() => send(failedQuestion)} disabled={disabled} className={button}>Retry this question</button> : null}</div> : null}
           {pending === "answer" ? <p role="status" className="text-sm leading-6 text-slate-600">Vaeroex is preparing your answer…{slowAnswer ? <span className="mt-1 block text-xs">Some questions take about three minutes. You can keep reading while Vaeroex finishes.</span> : null}</p> : null}
         </div>
@@ -342,7 +346,7 @@ export function VsiWorkspace({ workspaceId, workspaceName, userId, timeZone: wor
             <span id="vsi-prompt-help" className="text-xs text-slate-500">Edit, then send. Existing draft text is kept.</span>
           </div>
           <label htmlFor="vsi-message" className="sr-only">Message Vaeroex</label>
-          <div className="flex items-end gap-2"><textarea ref={composer} id="vsi-message" rows={2} value={message} onChange={(event) => setMessage(event.target.value)} onFocus={() => composer.current?.closest("form")?.scrollIntoView({ block: "nearest" })} maxLength={8000} disabled={accessLost} placeholder="Ask anything…" aria-describedby="vsi-composer-help" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} className="block max-h-32 min-h-14 min-w-0 flex-1 resize-y rounded-xl border border-slate-300 bg-white px-3 py-2 text-base leading-6 text-slate-900 placeholder:text-slate-500 focus:border-vaeroex-blue focus:outline-2 focus:outline-offset-2 focus:outline-vaeroex-blue disabled:opacity-50" />
+          <div className="flex items-end gap-2"><textarea ref={composer} id="vsi-message" rows={2} value={message} onChange={(event) => setMessage(event.target.value)} onFocus={() => composer.current?.closest("form")?.scrollIntoView({ block: "nearest" })} maxLength={8000} disabled={accessLost} readOnly={pending === "create"} placeholder="Ask anything…" aria-describedby="vsi-composer-help" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} className="block max-h-32 min-h-14 min-w-0 flex-1 resize-y rounded-xl border border-slate-300 bg-white px-3 py-2 text-base leading-6 text-slate-900 placeholder:text-slate-500 focus:border-vaeroex-blue focus:outline-2 focus:outline-offset-2 focus:outline-vaeroex-blue disabled:opacity-50" />
           <button type="submit" disabled={disabled || !message.trim()} aria-label={pending === "answer" ? "Preparing answer…" : "Send"} className="min-h-11 shrink-0 rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vaeroex-blue disabled:cursor-not-allowed disabled:opacity-50">{pending === "answer" ? "Waiting…" : "Send"}</button></div>
           <p id="vsi-composer-help" className="mt-2 text-xs leading-5 text-slate-500"><span className="hidden sm:inline">Enter to send · Shift+Enter for a new line · </span>Double-check important answers</p>
         </form> : null}

@@ -430,6 +430,8 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026100502201
   currentMigrations.filter(name => name !== "20261019070949_zoho_books_import_history.sql"),
   currentMigrations.filter(name => name !== "20261019070953_loyverse_import_history.sql"),
   currentMigrations.filter(name => name !== "20261019071008_wix_orders_import_history.sql"),
+  currentMigrations.filter(name => name !== "20261117005822_reporting_recurring_refresh.sql"),
+  currentMigrations.filter(name => name !== "20261117012702_import_recurring_refresh.sql"),
   currentMigrations.filter(name => name !== "20260907174326_square_dormant_account_connection.sql"),
   currentMigrations.filter(name => name !== "20260902191325_square_production_internal_pilot_runtime.sql"),
   currentMigrations.filter(name => name !== "20260907225626_square_remote_sandbox_binding.sql"),
@@ -448,17 +450,19 @@ for (const manifest of [currentMigrations.filter(name => name !== "2026100502201
   [...currentMigrations, "20990101000000_square_activation.sql"]]) {
   assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "missing or unreviewed tail still rejects");
 }
-// Each separately reviewed history migration is exact: renames and duplicate
+// Each separately reviewed history/refresh migration is exact: renames and duplicate
 // ledger entries must fail, just like an unknown Square activation migration.
 for (const name of [
   "20261019070945_reporting_import_history.sql",
   "20261019070949_zoho_books_import_history.sql",
   "20261019070953_loyverse_import_history.sql",
   "20261019071008_wix_orders_import_history.sql",
+  "20261117005822_reporting_recurring_refresh.sql",
+  "20261117012702_import_recurring_refresh.sql",
 ]) {
   for (const manifest of [currentMigrations.map(item => item === name ? item.replace("_", "1_") : item),
     [...currentMigrations, name]]) {
-    assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "history migration names and uniqueness remain strict");
+    assertionCount++; assert.throws(() => acceptsFixtureManifest(manifest), /fixture_manifest_denied/, "history/refresh migration names and uniqueness remain strict");
   }
 }
 matches(
@@ -477,7 +481,7 @@ matches(
   "the fixture must preserve the exact production-labelled 2-leased/1-pending shape"
 );
 
-equal(approvedSquareQualificationPaths.length, 251, "dormant scope permits only exact reviewed migrations, UI/upload feedback, nine customer presentation paths, nine Admin clarity paths, one approved subscription action path and three approved Admin pilot follow-up paths, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent and manual read, internal-pilot runtime, offline pilot, bounded provisioner and customer candidate files");
+equal(approvedSquareQualificationPaths.length, 253, "dormant scope permits only exact reviewed migrations, UI/upload feedback, nine customer presentation paths, nine Admin clarity paths, one approved subscription action path and three approved Admin pilot follow-up paths, native service/templates, provider-neutral Production composition and activation, restricted evidence host, query-stripping callback edge, repository-bound image trigger, internal-seller consent and manual read, internal-pilot runtime, offline pilot, bounded provisioner, customer candidate files and the reviewed recurring overlay and SQL test");
 const workspaceClarityPaths = [
   "app/app/intelligence/page.tsx",
   "app/app/kpis/page.tsx",
@@ -529,7 +533,9 @@ const directCustomerProtectedPaths = [
   "supabase/production-migrations/20260929041048_square_customer_payment_history.sql",
   "supabase/tests/square_customer_payment_history.test.sql",
   "supabase/production-migrations/20260929052211_square_customer_payment_browse.sql",
-  "supabase/tests/square_customer_payment_browse.test.sql"
+  "supabase/tests/square_customer_payment_browse.test.sql",
+  "supabase/production-migrations/20261117014116_square_customer_recurring_refresh.sql",
+  "supabase/tests/square_customer_recurring.test.sql"
 ];
 equal(withoutSquareQualificationPaths(directCustomerProtectedPaths.join("\n")), "", "exact closed direct customer component, migration and qualification are in scope");
 for (const unapprovedDirectPath of [
@@ -543,6 +549,9 @@ for (const unapprovedDirectPath of [
   "supabase/production-migrations/20260929052212_square_customer_payment_browse.sql",
   "supabase/migrations/20260929052211_square_customer_payment_browse.sql",
   "supabase/tests/square_customer_payment_browse_unreviewed.test.sql",
+  "supabase/production-migrations/20261117014117_square_customer_recurring_refresh.sql",
+  "supabase/migrations/20261117014116_square_customer_recurring_refresh.sql",
+  "supabase/tests/square_customer_recurring_unreviewed.test.sql",
   "app/api/integrations/square/direct-activation/route.ts"
 ]) {
   equal(withoutSquareQualificationPaths(unapprovedDirectPath), unapprovedDirectPath, "direct customer exception cannot authorize neighboring paths or activation");
@@ -559,12 +568,15 @@ assert.deepEqual(approvedSquareQualificationPaths.filter(file => file.startsWith
 "only the twenty-three bounded provisioner files are exempt");
 assertionCount++;
 assert.deepEqual(JSON.parse(read("vercel.json")), {
-  git: { deploymentEnabled: { "codex/vsi-cross-source-date-contract": false, "codex/vsi-cross-source-date-quality-canary": false, "codex/session-refresh-conflict": false, "codex/session-refresh-persistence": false, "codex/vsi-citation-read-stages": false, "codex/vsi-citation-read-stages-canary": false, "codex/vsi-citation-reopen-diagnosis": false, "codex/vsi-temporal-citation-liveness": false, "codex/vsi-reporting-count-units": false, "codex/vsi-fact-reference-contract": false, "codex/vsi-source-coverage-contract": false, "codex/evidence-mapping-setup-only": false, "codex/vsi-final-context-packing": false, "codex/vsi-relevant-context-packing": false, "codex/vsi-validation-diagnostics": false, "codex/vsi-qualitative-premise-identity": false, "codex/vsi-isolated-contract-evaluation": false, "codex/vsi-evidence-assessment-language": false, "codex/vsi-production-reasoning-release": false, "codex/vsi-prompts-retirement-only": false, "main": false, "codex/intelligence-health-consolidation": false, "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false, "codex/workspace-audit-security": false, "codex/workspace-audit-evidence": false, "codex/workspace-audit-workflows": false, "codex/all12-qualified-release": false, "codex/vsi-exact-fact-bindings": false, "codex/vsi-context-overhead": false, "codex/vsi-preparation-diagnostics": false, "codex/vsi-all12-harness-qualification": false, "codex/legal-acceptance-v2": false } },
+  git: { deploymentEnabled: { "codex/vsi-cross-source-date-contract": false, "codex/vsi-cross-source-date-quality-canary": false, "codex/session-refresh-conflict": false, "codex/session-refresh-persistence": false, "codex/vsi-citation-read-stages": false, "codex/vsi-citation-read-stages-canary": false, "codex/vsi-citation-reopen-diagnosis": false, "codex/vsi-temporal-citation-liveness": false, "codex/vsi-reporting-count-units": false, "codex/vsi-fact-reference-contract": false, "codex/vsi-source-coverage-contract": false, "codex/evidence-mapping-setup-only": false, "codex/vsi-final-context-packing": false, "codex/vsi-relevant-context-packing": false, "codex/vsi-validation-diagnostics": false, "codex/vsi-qualitative-premise-identity": false, "codex/vsi-isolated-contract-evaluation": false, "codex/vsi-evidence-assessment-language": false, "codex/vsi-production-reasoning-release": false, "codex/vsi-prompts-retirement-only": false, "main": false, "codex/intelligence-health-consolidation": false, "codex/square-remote-sandbox-binding": false, "codex/square-sandbox-qualification": false, "codex/square-gcp-sandbox-callback": false, "codex/workspace-audit-security": false, "codex/workspace-audit-evidence": false, "codex/workspace-audit-workflows": false, "codex/all12-qualified-release": false, "codex/vsi-exact-fact-bindings": false, "codex/vsi-context-overhead": false, "codex/vsi-preparation-diagnostics": false, "codex/vsi-all12-harness-qualification": false, "codex/legal-acceptance-v2": false, "codex/vsi-bounded-qualification": false } },
   crons: [
     { path: "/api/storage-capacity/maintenance", schedule: "*/15 * * * *" },
-    { path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" }
+    { path: "/api/integrations/google-sheets/scheduled-sync", schedule: "*/15 * * * *" },
+    { path: "/api/integrations/reporting/scheduled-sync", schedule: "*/15 * * * *" },
+    { path: "/api/integrations/imports/scheduled-sync", schedule: "*/15 * * * *" },
+    { path: "/api/integrations/square/scheduled-sync", schedule: "*/15 * * * *" }
   ]
-}, "Main and held review branches cannot auto-deploy; only reviewed authenticated storage and Sheets crons are configured");
+}, "Main and held review branches cannot auto-deploy; only reviewed authenticated storage, Sheets and explicitly scoped reporting/import/Square crons are configured");
 equal(withoutSquareQualificationPaths(approvedSquareQualificationPaths.join("\n")), "", "exact qualification paths are exempt from legacy phase-only scope assertions");
 for (const protectedPath of [
   ...approvedSquareQualificationPaths.map(file => `${file}.unexpected`),
@@ -609,6 +621,7 @@ const approvedProtectedPaths = new Set([
   "supabase/migrations/20261017184954_loyverse_merchant_reconnect_guard.sql",
   "supabase/migrations/20261019001207_ready_account_reporting_connectors.sql",
   "supabase/migrations/20261019033506_reporting_supported_jwt_role.sql",
+  "supabase/migrations/20261117012702_import_recurring_refresh.sql",
   "supabase/migrations/20260820233007_external_integrations_phase_1_canonical_foundation.sql",
   "supabase/tests/external_integrations_phase_1_canonical_foundation.test.sql",
   "supabase/migrations/20260821064333_external_integrations_phase_2_reconciliation.sql",

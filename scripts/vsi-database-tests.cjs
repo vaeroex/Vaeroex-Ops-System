@@ -48,6 +48,19 @@ async function run() {
   await admin.query("insert into public.workspace_members(workspace_id,user_id,role) values($1,$2,'owner')", [B, actors[0]]);
   const server = await connect(); await identity(server, 'service_role');
   const chat = await rpc(server, actors[0], 'create');
+  ok('New empty conversation has zero exchanges', chat.exchange_count, 0);
+  ok('Empty chat creation consumes no question', (await rpc(server, actors[0], 'usage')).used, 0);
+  ok('Empty chat creates no exchange', (await admin.query('select count(*)::int n from public.vsi_exchanges where conversation_id=$1', [chat.id])).rows[0].n, 0);
+  ok('Empty chat creates no request', (await admin.query('select count(*)::int n from public.vsi_requests where conversation_id=$1', [chat.id])).rows[0].n, 0);
+  await rpc(server, actors[0], 'rename', { conversationId: chat.id, title: 'Empty private plan' });
+  const emptyReader = await connect(); await identity(emptyReader, 'authenticated');
+  ok('Owner reopens renamed empty conversation', (await emptyReader.query('select title from public.vsi_conversations where id=$1', [chat.id])).rows[0].title, 'Empty private plan');
+  ok('Owner reopens an empty transcript', (await emptyReader.query('select count(*)::int n from public.vsi_exchanges where conversation_id=$1', [chat.id])).rows[0].n, 0);
+  await identity(emptyReader, 'authenticated', actors[1]);
+  ok('Another member cannot read empty private conversation', (await emptyReader.query('select count(*)::int n from public.vsi_conversations where id=$1', [chat.id])).rows[0].n, 0);
+  await identity(emptyReader, 'authenticated', actors[7]);
+  ok('Other workspace cannot read empty private conversation', (await emptyReader.query('select count(*)::int n from public.vsi_conversations where id=$1', [chat.id])).rows[0].n, 0);
+
   const reservation = (requestId = randomUUID(), conversationId = chat.id) => ({ conversationId, requestId, questionHash: 'synthetic-question', reserveUsd: .1, monthlyBudgetUsd: 50 });
   const input = reservation();
   const first = await rpc(server, actors[0], 'reserve', input);

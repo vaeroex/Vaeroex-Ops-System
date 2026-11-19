@@ -8,6 +8,9 @@ import { DateRangeFields, SavedHistoryFilter } from "@/components/integrations/D
 import { resolveImportRange, resolveViewRange } from "@/lib/integrations/date-range";
 import { admin, enabled } from "@/lib/integrations/loyverse/server";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
+import { importRecurringAllowed } from "@/lib/integrations/import-refresh/scope";
+import { readImportRecurringSettings } from "@/lib/integrations/import-refresh/settings-read";
+import { ImportRecurringSettings, importRecurringResultMessage } from "@/components/integrations/ImportRecurringSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +21,16 @@ export default async function LoyversePage({ searchParams }: PageProps) {
   const owner = access.context.membership?.role === "owner";
   const available = enabled();
   const params = await searchParams;
-  const db = available ? admin() : null;
+  let db: ReturnType<typeof admin> | null = null;
+  try { db = admin(); } catch { /* Saved connection reads do not require provider credentials. */ }
   const { data: connections, error: connectionError } = db
     ? await db.from("loyverse_connections").select("id,status,business_name,currency_code,last_sync_at,last_error_code,sync_lease_expires_at")
       .eq("workspace_id", access.workspaceId).neq("status", "disconnected").order("created_at", { ascending: false })
     : { data: [], error: null };
   const connection = connections?.[0];
+  const recurringAllowed = available && importRecurringAllowed(access.workspaceId, "loyverse");
+  const recurring = db && connection && ["connected", "reauthorization_required"].includes(connection.status)
+    ? await readImportRecurringSettings(db, access.workspaceId, "loyverse", connection.id) : null;
   const defaults = resolveImportRange(null, null);
   let view = { startDate: null, endDate: null } as ReturnType<typeof resolveViewRange>;
   let invalidFilter = false;
@@ -36,7 +43,7 @@ export default async function LoyversePage({ searchParams }: PageProps) {
   const sales = Number(report?.sales ?? 0), refunds = Number(report?.refunds ?? 0);
   const coveredDays = Number(report?.covered_days ?? 0), requestedDays = Number(report?.requested_days ?? 0);
   const unknownDates = Number(report?.unknown_date_receipts ?? 0);
-  const resultMessage = params?.result === "connected" ? "Loyverse connected. Choose a date range to import sales." :
+  const resultMessage = importRecurringResultMessage(params?.result) ?? (params?.result === "connected" ? "Loyverse connected. Choose a date range to import sales." :
     params?.result === "synced" ? "Selected sales history imported. Earlier imports are retained." :
     params?.result === "disconnected" ? "Loyverse disconnected and stored sales removed." :
     params?.result === "error" && params?.error === "merchant_mismatch"
@@ -44,7 +51,7 @@ export default async function LoyversePage({ searchParams }: PageProps) {
       : params?.result === "error" && params?.error === "invalid_date_range" ? "Choose a valid range of up to 366 days, ending today or earlier. Older periods are supported."
       : params?.result === "error" && params?.error === "range_too_large" ? "This period contains too many receipts for one import. Choose a smaller range. Saved history is unchanged."
       : params?.result === "error" && params?.error === "quota_exceeded" ? "Loyverse's request limit was reached. Wait before importing again. Saved history is unchanged."
-      : params?.result === "error" ? "The Loyverse action could not be confirmed. Check saved history and the last import time before trying a smaller range or checking account access." : null;
+      : params?.result === "error" ? "The Loyverse action could not be confirmed. Check saved history and the last import time before trying a smaller range or checking account access." : null);
 
   return <div className="workspace-page mx-auto max-w-5xl space-y-5">
     <PageHeader eyebrow="Plug-ins" title="Loyverse" description="Read only point of sale totals for your workspace."
@@ -52,8 +59,7 @@ export default async function LoyversePage({ searchParams }: PageProps) {
     {resultMessage ? <p role={params?.result === "error" ? "alert" : "status"} className="rounded-md border border-line p-3 text-sm">{resultMessage}</p> : null}
     {connection ? <EvidenceMappingLink workspaceId={access.workspaceId} provider={"loyverse"} connectionId={connection.id} owner={owner} status={connection.status}/> : null}
     <SectionCard title="Connection" description="For U.S. Loyverse merchants. Vaeroex requests merchant and receipt read permissions only.">
-      {!available ? <p className="text-sm text-slate-600">Loyverse setup is not complete yet.</p> :
-        connectionError ? <p role="alert" className="text-sm text-red-700">Connection status is unavailable.</p> :
+      {connectionError ? <p role="alert" className="text-sm text-red-700">Connection status is unavailable.</p> :
         connection ? <div className="space-y-4">
           <div className="flex items-center gap-3"><StatusBadge value={connection.status === "connected" ? "Connected" : connection.status === "pending" ? "Waiting for authorization" : "Reauthorization required"} />
             <span className="text-sm text-slate-600">{connection.business_name ?? "Loyverse account"}</span></div>
@@ -66,12 +72,15 @@ export default async function LoyversePage({ searchParams }: PageProps) {
             </form>
           </div> : null}
           {connection.last_error_code ? <p role="status" className="text-sm text-amber-800">The last import failed. Saved history is retained. Try a smaller range or reconnect if authorization has expired.</p> : null}
+          {["connected", "reauthorization_required"].includes(connection.status) ? <ImportRecurringSettings provider="loyverse" connectionId={connection.id}
+            settings={recurring} allowed={recurringAllowed} owner={owner} status={connection.status} lastSuccess={connection.last_sync_at}
+            timeZone={access.context.activeWorkspace?.reporting_timezone} asOf={new Date().toISOString()}/> : null}
           {connection.status === "connected" && owner ? <div className="flex flex-wrap gap-3">
             <form method="post" action="/api/integrations/loyverse/sync" className="w-full space-y-3">
               <DateRangeFields idPrefix="loyverse-import" defaultStartDate={defaults.startDate} defaultEndDate={defaults.endDate} maxDate={defaults.endDate} />
               <p className="text-sm text-slate-600">Import up to 366 UTC calendar days at a time. You can choose older periods. Provider availability and request limits apply; busy periods may need smaller imports. No paid upgrade is started.</p>
               <input type="hidden" name="connectionId" value={connection.id} />
-              <button type="submit" disabled={Boolean(connection.sync_lease_expires_at && Date.parse(connection.sync_lease_expires_at) > Date.now())}
+              <button type="submit" disabled={!available || Boolean(connection.sync_lease_expires_at && Date.parse(connection.sync_lease_expires_at) > Date.now()) || Boolean(recurring?.refreshNotBefore && Date.parse(recurring.refreshNotBefore) > Date.now())}
                 className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-vaeroex-blue disabled:opacity-50">Import selected dates</button>
             </form>
             <form method="post" action="/api/integrations/loyverse/disconnect">
@@ -80,7 +89,7 @@ export default async function LoyversePage({ searchParams }: PageProps) {
               <button type="submit" className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-red-700">Disconnect and remove sales</button>
             </form>
           </div> : null}
-          {connection.status === "reauthorization_required" && owner ? <form method="post" action="/api/integrations/loyverse/connect">
+          {connection.status === "reauthorization_required" && owner && available ? <form method="post" action="/api/integrations/loyverse/connect">
             <button type="submit" className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-vaeroex-blue">Reconnect Loyverse</button>
           </form> : null}
           {connection.status === "reauthorization_required" && owner ? <form method="post" action="/api/integrations/loyverse/disconnect">
@@ -88,8 +97,7 @@ export default async function LoyversePage({ searchParams }: PageProps) {
             <input type="hidden" name="confirmation" value="disconnect" />
             <button type="submit" className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-red-700">Disconnect and remove sales</button>
           </form> : null}
-          {connection.last_sync_at ? <p className="text-sm text-slate-600">Last sync: {new Date(connection.last_sync_at).toLocaleString("en-US", { timeZone: "UTC" })} UTC</p> : null}
-        </div> : owner ? <form method="post" action="/api/integrations/loyverse/connect">
+        </div> : !available ? <p className="text-sm text-slate-600">Loyverse setup is not complete yet.</p> : owner ? <form method="post" action="/api/integrations/loyverse/connect">
           <button type="submit" className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-vaeroex-blue">Connect Loyverse</button>
         </form> : <p className="text-sm text-slate-600">The workspace owner can connect Loyverse.</p>}
     </SectionCard>

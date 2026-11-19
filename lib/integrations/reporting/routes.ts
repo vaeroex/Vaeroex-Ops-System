@@ -3,9 +3,12 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
 import { isProvider, isHistoricalProvider, catalog, type Provider } from "./catalog";
-import { admin, assertRequest, available, formData, hashState, redirect, requireOwner, seal, unseal, credentialSchema, accountSchema } from "./security";
+import { admin, assertRequest, available, formData, hashState, redirect as reportingRedirect, origin, requireOwner, seal, unseal, credentialSchema } from "./security";
+import { assertReportingPreviewActor } from "./preview-qualification";
 import { authorizationHandoff, exchange } from "./oauth";
-import { accounts, importHistory, snapshot } from "./adapters";
+import { accounts } from "./adapters";
+import { executeReportingRefresh } from "./execution";
+import { reportingRecurringAllowed } from "./recurring-scope";
 import { resolveImportRange } from "../date-range";
 
 type Params = { params: Promise<{ provider: string; action: string }> };
@@ -18,15 +21,18 @@ function requireResult(result: { error: unknown; data: unknown }) {
 }
 export async function post(request: Request, context: Params) {
   const { provider: raw, action } = await context.params;
-  if (!isProvider(raw) || !["connect","select-account","sync","disconnect"].includes(action)) return new Response(null, { status: 404 });
+  if (!isProvider(raw) || !["connect","select-account","sync","disconnect","recurring-settings"].includes(action)) return new Response(null, { status: 404 });
   const provider = raw;
+  let destinationOrigin = origin;
+  const redirect = (selected: Provider, result: string) => reportingRedirect(selected, result, destinationOrigin);
   let cleanup: { workspace: string; connection: string } | null = null;
   let lease: { workspace: string; connection: string; id: string } | null = null;
   try {
-    assertRequest(request);
+    assertRequest(request, false, { provider, action });
     const access = await requireWorkspaceAccess(); requireOwner(access);
+    if (new URL(request.url).origin !== origin) destinationOrigin = assertReportingPreviewActor(request, provider, action, access);
     // Disconnect remains possible after a provider has been disabled or credentials rotated.
-    if (action !== "disconnect" && !available(provider)) return redirect(provider, "configuration_required");
+    if (action !== "disconnect" && action !== "recurring-settings" && !available(provider)) return redirect(provider, "configuration_required");
     const form = await formData(request);
     // Invalid dates consume neither a lease/cooldown nor provider requests.
     const range = action === "sync" && isHistoricalProvider(provider)
@@ -55,6 +61,15 @@ export async function post(request: Request, context: Params) {
       requireResult(await db.rpc("disconnect_reporting_connection", args));
       return redirect(provider, "disconnected");
     }
+    if (action === "recurring-settings") {
+      const enabled = form.get("enabled");
+      if (enabled !== "true" && enabled !== "false") throw new Error("invalid_form");
+      if (form.get("confirmation") !== (enabled === "true" ? "enable-recurring" : "disable-recurring")) throw new Error("confirmation_required");
+      if (enabled === "true" && (!available(provider) || !reportingRecurringAllowed(access.workspaceId, provider)))
+        return redirect(provider, "configuration_required");
+      requireResult(await db.rpc("set_reporting_recurring", { ...args, p_actor: access.user.id, p_enabled: enabled === "true" }));
+      return redirect(provider, enabled === "true" ? "recurring_enabled" : "recurring_disabled");
+    }
     const { data: row, error } = await db.from("reporting_connections").select("status,account,created_by")
       .eq("workspace_id", access.workspaceId).eq("provider", provider).eq("id", connection).single();
     if (error || !row) throw new Error("connection_missing");
@@ -69,7 +84,7 @@ export async function post(request: Request, context: Params) {
     const { data: saved, error: savedError } = await db.from("reporting_credentials").select("ciphertext")
       .eq("workspace_id", access.workspaceId).eq("provider", provider).eq("connection_id", connection).single();
     if (savedError || !saved) throw new Error("authorization_required");
-    let credential = unseal(provider, access.workspaceId, connection, saved.ciphertext);
+    const credential = unseal(provider, access.workspaceId, connection, saved.ciphertext);
     if (action === "select-account") {
       const selected = credential.accounts?.find(a => a.id === form.get("accountId") && (a.parent ?? "") === (form.get("parent") ?? ""));
       if (!selected || form.get("confirmation") !== "select") throw new Error("invalid_account");
@@ -78,21 +93,8 @@ export async function post(request: Request, context: Params) {
       requireResult(await db.rpc("select_reporting_account", { ...args, p_account: selected, p_ciphertext: seal(provider, access.workspaceId, connection, credential) }));
       return redirect(provider, "connected");
     }
-    const signal = AbortSignal.timeout(45_000);
-    if (credential.expiresAt && Date.parse(credential.expiresAt) < Date.now()+60_000) {
-      if (!credential.refreshToken) throw new Error("authorization_required");
-      credential = await exchange(provider, { refresh: credential.refreshToken }, signal);
-      requireResult(await db.rpc("save_reporting_refresh", { ...args, p_lease: lease!.id, p_ciphertext: seal(provider, access.workspaceId, connection, credential) }));
-    }
-    if (isHistoricalProvider(provider) && range) {
-      const report = await importHistory(provider, credential.accessToken, accountSchema.parse(row.account), signal, range);
-      requireResult(await db.rpc("apply_reporting_history", { ...args, p_lease: lease!.id,
-        p_start_date: report.startDate, p_end_date: report.endDate, p_records: report.records,
-        p_currencies: report.currencies, p_observed_through: range.endAt }));
-    } else {
-      const report = await snapshot(provider, credential.accessToken, accountSchema.parse(row.account), signal);
-      requireResult(await db.rpc("apply_reporting_snapshot", { ...args, p_lease: lease!.id, p_snapshot: report }));
-    }
+    await executeReportingRefresh({ db, workspaceId: access.workspaceId, provider, connectionId: connection,
+      leaseId: lease!.id, account: row.account, credential, range });
     lease = null; return redirect(provider, "synced");
   } catch (error) {
     const message = error instanceof Error ? error.message : "sync_failed";
@@ -107,6 +109,7 @@ export async function post(request: Request, context: Params) {
   }
 }
 export async function get(request: Request, context: Params) {
+  const redirect = reportingRedirect;
   const { provider: raw, action } = await context.params;
   if (!isProvider(raw) || action !== "callback" || catalog[raw].auth !== "oauth") return new Response(null, { status: 404 });
   const provider = raw;

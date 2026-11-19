@@ -15,6 +15,7 @@ const longExchanges = () => Array.from({ length: 20 }, (_, index) => ({ ...excha
   answer: index === 19 ? briefTable : `## Workshop planning ${index + 1}\nReview the dated repair tickets and compare the promised completion date with the actual collection date. The current records do not establish why a repair was late. [B1]\n\nChoose one owner to inspect the matched records, then update the team with what they show.`,
   citations: Array.from({ length: index === 19 ? 8 : 2 }, (_, source) => ({ id: `B${source + 1}`, title: `Workshop source ${source + 1}`, url: source === 4 || source === 5 ? `https://public.example.test/source-${source + 1}` : `/app/sources/workshop-${source + 1}`, sourceType: source === 4 || source === 5 ? "web" : "file", sourceId: source === 4 || source === 5 ? null : `workshop-${source + 1}`, evidenceDate: source === 4 || source === 6 ? null : now, evidenceDateKind: ["publication", "updated", "observation", "event"][source], retrievedAt: now, excerpt: source === 4 || source === 5 ? "Legacy generated web summary mixes unsupported reporting." : "Approved workshop record with dated repair details. ".repeat(4) })) }));
 const stored = new Map(), answers = new Map();
+let createRequests = 0, failCreate = false, createReceived = null, releaseDelayedCreate = null;
 let posts = [], noteSaves = 0, usageReads = 0, firstFailure = true, lost = false, serverError = null, releaseDelayedAnswer = null;
 const output = fs.mkdtempSync(path.join(os.tmpdir(), "vsi-ui-browser-"));
 async function main() {
@@ -37,7 +38,8 @@ async function main() {
   fs.writeFileSync(entry, 'import React from "react"; import { hydrateRoot } from "react-dom/client"; import { VsiWorkspace } from "@/components/vsi/VsiWorkspace"; const props = JSON.parse(document.getElementById("props")!.textContent!); const app = hydrateRoot(document.getElementById("fixture")!, <VsiWorkspace {...props}/>); const originalReplace = history.replaceState.bind(history); history.replaceState = (...args) => { originalReplace(...args); queueMicrotask(() => app.render(<VsiWorkspace {...props} initialConversationId={new URL(location.href).searchParams.get("chat") || ""}/>)); };');
   const webpack = require("next/dist/compiled/webpack/webpack"); webpack.init();
   await new Promise((resolve, reject) => webpack.webpack({ mode: "production", context: root, target: "web", devtool: false, optimization: { minimize: false }, entry, output: { path: output, filename: "fixture.js" },
-    resolve: { extensions: [".tsx", ".ts", ".js"], modules: [path.join(root, "node_modules"), "node_modules"], alias: { "@/app/app/reports/save-vsi-analysis$": path.join(root, "scripts/test-stubs/vsi-save-analysis.ts"), "@": root, "next/link": path.join(root, "scripts/test-stubs/current-integrations-link.tsx") } },
+    // Avoid traversing archived ancestor manifests when dependencies are cached via symlinks.
+    resolve: { symlinks: false, extensions: [".tsx", ".ts", ".js"], modules: [path.join(root, "node_modules"), "node_modules"], alias: { "scheduler$": require.resolve("scheduler", { paths: [path.dirname(require.resolve("react-dom/package.json"))] }), "@/app/app/reports/save-vsi-analysis$": path.join(root, "scripts/test-stubs/vsi-save-analysis.ts"), "@": root, "next/link": path.join(root, "scripts/test-stubs/current-integrations-link.tsx") } },
     module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, use: path.join(root, "scripts/test-stubs/qbo-browser-typescript-loader.cjs") }] }
   }, (error, stats) => error || stats.hasErrors() ? reject(error ?? new Error(stats.toString({ all: false, errors: true }))) : resolve()));
   const config = loadSource("tailwind.config.ts").default;
@@ -59,7 +61,7 @@ async function main() {
         const route = url.pathname.replace("/api/vsi", "");
         if (route === "/usage") { usageReads++; return send({ used: answers.size, limit: 100, remaining: 100 - answers.size, resetsAt: "2026-10-09T18:00:00.000Z", workspaceBudget: { spentUsd: 0.04, reservedUsd: 0, limitUsd: 100, periodStart: now } }); }
         if (route === "/conversations" && req.method === "GET") return send({ conversations: [...stored.values()].filter(value => (value.conversation.id === "old") === Boolean(url.searchParams.get("before"))).map(value => value.conversation), nextCursor: url.searchParams.get("before") ? null : "older-cursor", canEditBusinessNotes: true });
-        if (route === "/conversations" && req.method === "POST") { const id = `chat-${stored.size}`; const value = { conversation: { ...chat(id, 0), title: body.title || "New chat" }, exchanges: [] }; stored.set(id, value); return send(value); }
+        if (route === "/conversations" && req.method === "POST") { createRequests++; if (createReceived) { const received = createReceived; createReceived = null; await new Promise(resolve => { releaseDelayedCreate = resolve; received(); }); } if (failCreate) return send({ error: "Could not save the empty chat." }, 503); const id = `chat-${stored.size}`; const value = { conversation: { ...chat(id, 0), title: body.title || "New chat" }, exchanges: [] }; stored.set(id, value); return send({ ...value, canEditBusinessNotes: true }); }
         const [, , id, action] = route.split("/"); const value = stored.get(id); assert(value, "conversation exists");
         if (action === "messages") {
           if (body.message === "other tab filled this chat") { value.conversation.exchangeCount = 250; return send({ code: "thread_full", message: "This chat has reached 250 exchanges. Continue in a new chat." }, 409); }
@@ -334,7 +336,50 @@ async function main() {
     await page.goto(`${origin}/?chat=warning&zone=America/New_York`);
     await page.getByRole("article").waitFor();
     assert.match(await page.getByRole("article").locator("time").innerText(), /2:00 PM EDT/, "workspace timezone overrides viewer timezone");
-    console.log(JSON.stringify({ passed: true, checks: ["general question", "App Router searchParams update", "older history pagination", "keyboard", "stable retry", "explicit note confirmation", "citation dates", "legacy web excerpts hidden without removing private evidence or public links", "Markdown headings and fenced code stay safe and readable", "rename reopen delete", "keyboard arrows and Escape menu", "touch menu at 390 and 320", "inactive chat actions preserve transcript", "delete cancellation and reload", "truncated titles", "compact usage viewport", "225 warning", "250 handoff preserves transcript", "second-tab thread boundary preserves unsent draft", "workspace access loss clears transcript", "on-demand usage", "desktop mobile no overflow", "20-exchange bounded transcript and composer", "old reading position and focus survive delayed answers", "keyboard jump and transcript scrolling", "safe compact business tables", "software-keyboard-sized viewport", "slow-response notice and recoverable 205-second timeout", "actual global CSS light/Pulsar contrast"], widths: [1440, 390, 320], output, scope: "Hydrated UI with synthetic loopback API; authenticated API and provider qualification are separate." }));
-  } finally { if (browser) await browser.close(); await new Promise(resolve => server.close(resolve)); }
+    // Persist a real empty UI chat before any question; keep answer/note counters unchanged.
+    for (const width of [1440, 390, 320]) {
+      const emptyPage = await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width < 1280 });
+      await emptyPage.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+      await emptyPage.goto(origin);
+      const create = emptyPage.getByRole("button", { name: "New chat", exact: true });
+      await create.waitFor(); await emptyPage.waitForFunction(() => !document.querySelector('button')?.disabled);
+      const beforeCreates = createRequests, beforePosts = posts.length, beforeNotes = noteSaves;
+      const creationReceived = new Promise(resolve => { createReceived = resolve; });
+      await create.evaluate(button => { button.click(); button.click(); });
+      await creationReceived;
+      assert.equal(await emptyPage.getByRole("textbox", { name: "Message Vaeroex" }).getAttribute("readonly"), "", "pending creation must prevent typing from being discarded by its response");
+      assert(await emptyPage.getByRole("button", { name: "Creating…", exact: true }).isDisabled());
+      releaseDelayedCreate(); releaseDelayedCreate = null;
+      await emptyPage.getByText("Empty chat saved.", { exact: true }).waitFor();
+      assert(await emptyPage.getByRole("textbox", { name: "Message Vaeroex" }).evaluate(element => document.activeElement === element), "saved empty chat focuses its composer");
+      assert.equal(createRequests, beforeCreates + 1, "rapid clicks must create exactly one chat");
+      const id = new URL(emptyPage.url()).searchParams.get("chat"); assert(id && stored.has(id));
+      assert.equal(stored.get(id).conversation.exchangeCount, 0); assert.deepEqual(stored.get(id).exchanges, []);
+      assert.equal(await emptyPage.getByRole("article").count(), 0);
+      if (await emptyPage.locator(".vsi-history > details").getAttribute("open") === null) await emptyPage.getByText("Your chats", { exact: true }).click();
+      await emptyPage.locator(".vsi-chat-row").filter({ has: emptyPage.locator('[aria-current="page"]') }).getByRole("button", { name: /^Chat actions for / }).click();
+      await emptyPage.getByRole("menuitem", { name: "Rename", exact: true }).click();
+      await emptyPage.getByRole("textbox", { name: "Chat name" }).fill(`Empty planning ${width}`);
+      await emptyPage.getByRole("button", { name: "Save name", exact: true }).click();
+      await emptyPage.getByText("Chat renamed.", { exact: true }).waitFor();
+      await emptyPage.reload(); await emptyPage.getByRole("heading", { name: `Empty planning ${width}`, exact: true }).waitFor();
+      assert.equal(new URL(emptyPage.url()).searchParams.get("chat"), id);
+      assert.equal(await emptyPage.getByRole("article").count(), 0);
+      assert.equal(await emptyPage.getByRole("textbox", { name: "Message Vaeroex" }).inputValue(), "");
+      await emptyPage.screenshot({ path: path.join(output, `vsi-empty-chat-${width}.png`) });
+      await emptyPage.getByRole("textbox", { name: "Message Vaeroex" }).fill("Unsent draft survives a failed creation");
+      failCreate = true; const savedCount = stored.size;
+      await emptyPage.getByRole("button", { name: "New chat", exact: true }).click();
+      await emptyPage.getByRole("alert").getByText("Could not save the empty chat.", { exact: true }).waitFor(); failCreate = false;
+      assert.equal(stored.size, savedCount);
+      assert.equal(new URL(emptyPage.url()).searchParams.get("chat"), id);
+      assert.equal(await emptyPage.getByRole("textbox", { name: "Message Vaeroex" }).inputValue(), "Unsent draft survives a failed creation");
+      assert(await emptyPage.getByRole("button", { name: "New chat", exact: true }).isEnabled());
+      assert.equal(posts.length, beforePosts, "creating/naming/reopening empty chats must never submit a question");
+      assert.equal(noteSaves, beforeNotes, "empty chats must not save notes");
+      await emptyPage.close();
+    }
+    console.log(JSON.stringify({ passed: true, checks: ["persist empty chat without question", "empty rename and reload at desktop/390/320", "double-click creation fence", "failed creation preserves transcript and unsent draft", "general question", "App Router searchParams update", "older history pagination", "keyboard", "stable retry", "explicit note confirmation", "citation dates", "legacy web excerpts hidden without removing private evidence or public links", "Markdown headings and fenced code stay safe and readable", "rename reopen delete", "keyboard arrows and Escape menu", "touch menu at 390 and 320", "inactive chat actions preserve transcript", "delete cancellation and reload", "truncated titles", "compact usage viewport", "225 warning", "250 handoff preserves transcript", "second-tab thread boundary preserves unsent draft", "workspace access loss clears transcript", "on-demand usage", "desktop mobile no overflow", "20-exchange bounded transcript and composer", "old reading position and focus survive delayed answers", "keyboard jump and transcript scrolling", "safe compact business tables", "software-keyboard-sized viewport", "slow-response notice and recoverable 205-second timeout", "actual global CSS light/Pulsar contrast"], widths: [1440, 390, 320], output, scope: "Hydrated UI with synthetic loopback API; authenticated API and provider qualification are separate." }));
+  } finally { releaseDelayedCreate?.(); releaseDelayedAnswer?.(); if (browser) await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -24,7 +24,33 @@ const browseFiles = fs.readdirSync(migrationDirectory).filter(name => /^\d{14}_s
 assert.equal(browseFiles.length, 1, 'one additive stored-payment browse candidate');
 const browseFile = path.join(migrationDirectory, browseFiles[0]);
 const browseTestFile = path.join(root, 'supabase/tests/square_customer_payment_browse.test.sql');
+const recurringFile = path.join(migrationDirectory, '20261117014116_square_customer_recurring_refresh.sql');
+const recurringTestFile = path.join(root, 'supabase/tests/square_customer_recurring.test.sql');
 const cli = process.env.SUPABASE_CLI_PATH || 'supabase';
+
+// This final isolated overlay fixture is deliberately separate from the exact
+// historical 105/106/107 ledger checks above. Install the actual connector
+// prerequisites, not a replacement capacity/entitlement implementation. No
+// release ledger entries or hosted configuration are created by this fixture.
+async function installRecurringPrerequisites(client) {
+  const canonical = name => fs.readFileSync(path.join(root, 'supabase/migrations', name), 'utf8');
+  for (const [file, start, end] of [
+    ['20261002040031_google_sheets_lifecycle.sql', 'create function private.require_google_sheets_eligible_v1', 'create function public.google_sheets_lifecycle_v1'],
+    ['20261005022017_workspace_security_boundaries.sql', 'create function private.workspace_billing_entitled_v1', 'create function private.workspace_entitlement_active_v1'],
+  ]) {
+    const source = canonical(file); const from = source.indexOf(start); const to = source.indexOf(end);
+    assert(from >= 0 && to > from && source.indexOf(start, from + 1) === -1, 'exact existing billing helper and ACL fixture boundaries');
+    await client.query(source.slice(from, to));
+  }
+  for (const name of [
+    '20261019001207_ready_account_reporting_connectors.sql', '20261019033506_reporting_supported_jwt_role.sql',
+    '20261019070945_reporting_import_history.sql', '20261117005822_reporting_recurring_refresh.sql',
+    '20261017013603_loyverse_read_only_connection.sql', '20261017023221_zoho_books_read_only_connection.sql',
+    '20261017051502_wix_orders_read_only_connection.sql', '20261017184954_loyverse_merchant_reconnect_guard.sql',
+    '20261019070949_zoho_books_import_history.sql', '20261019070953_loyverse_import_history.sql',
+    '20261019071008_wix_orders_import_history.sql', '20261117012702_import_recurring_refresh.sql',
+  ]) await client.query(canonical(name));
+}
 
 function baselineManifest() {
   const names = fs.readdirSync(path.join(root, 'supabase/migrations'))
@@ -60,9 +86,12 @@ async function main() {
   const connectionString = localDatabaseUrl();
   const client = new Client({ connectionString, application_name: 'square_customer_backend_disposable_qualification' });
   const labels = new Set();
+  const recurringLabels = new Set();
   client.on('notice', notice => {
     const match = /^square_backend_test_passed:([a-z0-9_]+)$/.exec(notice.message || '');
     if (match) labels.add(match[1]);
+    const recurring = /^square_recurring_test_passed:([a-z0-9_]+)$/.exec(notice.message || '');
+    if (recurring) recurringLabels.add(recurring[1]);
   });
   try {
     await client.connect();
@@ -96,16 +125,30 @@ async function main() {
     assert.equal(closed.rows[0].closed, true);
     assert.equal(Number(closed.rows[0].connections), 0);
     assert.equal(Number(closed.rows[0].payments), 0);
+    await installRecurringPrerequisites(client);
+    // Run the candidate's complete current-contract preflight unchanged, then
+    // test the new SQL authority/page path on native PostgreSQL, not mocks.
+    await client.query(fs.readFileSync(recurringFile, 'utf8'));
+    await client.query(fs.readFileSync(recurringTestFile, 'utf8'));
+    assert.equal(recurringLabels.size, 36, 'all recurring overlay native SQL assertions executed');
+    const final = await client.query(`select
+      (select not enabled and application_id is null from square_customer_private.configuration) as closed,
+      (select count(*) from square_customer_private.connections) as connections,
+      (select count(*) from square_customer_private.payments) as payments`);
+    assert.deepEqual(final.rows, closed.rows, 'transactional recurring tests preserve closed empty fixture');
+    assert.deepEqual((await client.query('select version from supabase_migrations.schema_migrations order by version')).rows,
+      after.rows, 'incremental overlay fixture does not rewrite historical release bookkeeping');
     console.log(JSON.stringify({ label: 'square_customer_backend_postgres_qualification_passed',
-      baselineMigrations: 107, assertions: labels.size, closed: true, providerCalls: false }));
+      baselineMigrations: 107, assertions: labels.size, recurringAssertions: recurringLabels.size,
+      closed: true, providerCalls: false, concurrentSessionsTested: false }));
   } finally { await client.end(); }
 }
 
 main().catch(error => {
   const known = new Set(['square_backend_ci_fixture_only', 'square_backend_local_database_unavailable', 'square_backend_nonlocal_database_forbidden']);
-  const test = /^square_backend_test_failed:([a-z0-9_]+)$/.exec(error?.message || '');
+  const test = /^(square_backend|square_recurring)_test_failed:([a-z0-9_]+)$/.exec(error?.message || '');
   const sql = /^[0-9A-Z]{5}$/.test(error?.code || '') ? error.code : 'unknown';
-  const label = known.has(error?.message) ? error.message : test ? `square_backend_test_failed:${test[1]}` : sanitizedFailure(error);
+  const label = known.has(error?.message) ? error.message : test ? `${test[1]}_test_failed:${test[2]}` : sanitizedFailure(error);
   console.error(JSON.stringify({ label, sqlstate: sql, productionAccess: false }));
   process.exitCode = 1;
 });

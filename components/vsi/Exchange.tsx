@@ -8,13 +8,14 @@ import { vsiCitationNavigationUrl } from "@/lib/vsi/citation-links";
 
 const sourceDateLabels = { publication: "Published", updated: "Updated", observation: "Observed", event: "Event" } as const;
 
-export function Exchange({ exchange, canEditNotes, saving, disabled, workspaceName, timeZone, onRemember }: {
+export function Exchange({ exchange, canEditNotes, saving, disabled, workspaceName, timeZone, onRemember, hideSourceCitations = false }: {
   exchange: VsiExchange;
   canEditNotes: boolean;
   saving: boolean;
   disabled: boolean;
   workspaceName: string;
   timeZone?: string;
+  hideSourceCitations?: boolean;
   onRemember: (exchangeId: string) => void;
 }) {
   return <article className="space-y-3 border-b border-slate-200 pb-5 last:border-0" aria-label={`Exchange from ${displayDate(exchange.createdAt, true, timeZone)}`}>
@@ -27,10 +28,10 @@ export function Exchange({ exchange, canEditNotes, saving, disabled, workspaceNa
         <h3 className="text-sm font-semibold text-vaeroex-blue">Vaeroex</h3>
         <time dateTime={exchange.createdAt} className="text-xs text-slate-500">{displayDate(exchange.createdAt, true, timeZone)}</time>
       </div>
-      <AnswerContent content={exchange.answer} />
+      <AnswerContent content={hideSourceCitations ? exchange.answer.replace(/\s*\[[BWP]\d+\]/g, "") : exchange.answer} />
       <ComparisonCharts charts={exchange.citations.flatMap(source => source.sourceType === "financial_calculation" ? parseComparisons(source.comparisons) : [])} />
       {exchange.citations.some(source => parseComparisons(source.comparisons).length) ? <SaveVsiAnalysis exchangeId={exchange.id} /> : null}
-      {exchange.citations.length > 0 ? <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50">
+      {!hideSourceCitations && exchange.citations.length > 0 ? <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50">
         <summary className="min-h-11 cursor-pointer px-3 py-2.5 text-xs font-semibold text-slate-700">Sources ({exchange.citations.length})</summary>
         <ol className="grid gap-2 px-3 pb-3 sm:grid-cols-2">
           {exchange.citations.map((source) => {

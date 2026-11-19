@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { DirectPayment, DirectView } from "@/lib/integrations/square-direct/contracts";
 import type { DirectPaymentBrowser } from "@/lib/integrations/square-direct/payment-browse";
 import { squareResultVisibility } from "@/lib/integrations/square-direct/result-visibility";
+import type { SquareRecurringView } from "@/lib/integrations/square-direct/recurring-contracts";
+import { SquareRecurringSettings } from "./SquareRecurringSettings";
 
 type Connection = DirectView["connections"][number];
 const settingsPath = "/app/settings/integrations/square";
@@ -98,9 +100,10 @@ function DisconnectControl({ connection }: { connection: Connection }) {
   </details>;
 }
 
-function ConnectionPanel({ view, connection, entity, timeZone, timeZoneFallback }: { view: DirectView; connection: Connection; entity: string; timeZone: string; timeZoneFallback: boolean }) {
+function ConnectionPanel({ view, connection, entity, timeZone, timeZoneFallback, recurring }: { view: DirectView; connection: Connection; entity: string; timeZone: string; timeZoneFallback: boolean; recurring: SquareRecurringView | null }) {
   const readable = canRead(view, connection);
   const visibility = squareResultVisibility(connection);
+  const automaticReadPending = Boolean(recurring?.status?.recurring_enabled && recurring.status.has_more && !recurring.status.manual_read_in_progress);
   const updateTimes = [connection.lastSyncedAt, connection.lastCompletedRead?.completedAt].filter((value): value is string => Boolean(value));
   const lastUpdate = updateTimes.sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
   return <section className={`${cardClass} space-y-4`} aria-labelledby="current-square-connection">
@@ -119,6 +122,7 @@ function ConnectionPanel({ view, connection, entity, timeZone, timeZoneFallback 
       <div><dt className="text-muted">Last successful update</dt><dd className="mt-1 font-medium">{squareBusinessTime(lastUpdate, timeZone)}<span className="mt-0.5 block text-xs font-normal text-muted">{timeZone}{timeZoneFallback ? " · Fallback; business timezone unavailable" : ""}</span></dd></div>
     </dl> : <p className="text-sm text-muted">Square setup has not completed. No Payments have been imported for this connection.</p>}
     {connection.lastError ? <p role="status" className="text-sm text-amber-800">The last attempt did not finish.{connection.payments.length ? " Your last successfully saved Payments remain below." : " Check the connection details before trying again."}</p> : null}
+    {recurring?.connectionId === connection.connectionId ? <SquareRecurringSettings view={recurring} timeZone={timeZone} canRead={readable}/> : null}
     {connection.recoveryRequired ? <p role="status" className="text-sm">Square authorization outcome and this workspace’s account connection are unconfirmed. Contact support for checked recovery before taking any further connection action.</p> : null}
     {view.available && !connection.recoveryRequired && connection.state === "mapping_required" ? <form action="/api/integrations/square/mapping" method="post" className="space-y-3 border-t border-line pt-4">
       <input type="hidden" name="connectionId" value={connection.connectionId} />
@@ -135,9 +139,12 @@ function ConnectionPanel({ view, connection, entity, timeZone, timeZoneFallback 
     {readable ? <div className="space-y-3">
       <form action="/api/integrations/square/read" method="post">
         <input type="hidden" name="connectionId" value={connection.connectionId} />
-        <button type="submit" className={`${buttonClass} border-transparent bg-vaeroex-blue text-white`}>{connection.hasMore ? "Read next Payments page" : connection.activeRead ? "Continue Payments read" : connection.lastSyncedAt ? "Update Payments" : "Read Payments"}</button>
+        <button type="submit" disabled={automaticReadPending} className={`${buttonClass} border-transparent bg-vaeroex-blue text-white disabled:opacity-50`}>{connection.hasMore ? "Read next Payments page" : connection.activeRead ? "Continue Payments read" : connection.lastSyncedAt ? "Update Payments" : "Read Payments"}</button>
       </form>
-      {connection.hasMore || connection.activeRead ? <p role="status" className="text-sm text-amber-800">Current import is incomplete. Continue its next page to finish the searched dates.</p> : null}
+      {automaticReadPending ? <p className="text-sm text-muted">Automatic updates will continue this unfinished read. Turn off automatic updates before continuing it manually.</p> : null}
+      {connection.hasMore || connection.activeRead ? <p role="status" className="text-sm text-amber-800">{automaticReadPending
+        ? "The automatic import is incomplete. Its next scheduled attempt will continue the same searched dates."
+        : "Current import is incomplete. Continue its next page to finish the searched dates."}</p> : null}
       {view.historyAvailable && !connection.activeRead && !connection.hasMore ? <details className="text-sm">
         <summary className="cursor-pointer py-1 font-medium text-vaeroex-blue">Import older Payments</summary>
         <form action="/api/integrations/square/read" method="post" className="mt-3 space-y-3 rounded-md border border-line p-4">
@@ -233,7 +240,7 @@ function SavedPayments({ browser, connection, browseError }: { browser: DirectPa
   </section>;
 }
 
-export function SquareDirectCustomerPanel({ view, browser = null, browseError = null, browseConnectionId = null }: { view: DirectView; browser?: DirectPaymentBrowser | null; browseError?: string | null; browseConnectionId?: string | null }) {
+export function SquareDirectCustomerPanel({ view, browser = null, browseError = null, browseConnectionId = null, recurring = null, recurringResult = null }: { view: DirectView; browser?: DirectPaymentBrowser | null; browseError?: string | null; browseConnectionId?: string | null; recurring?: SquareRecurringView | null; recurringResult?: string | null }) {
   const entities = new Map(view.businessEntities.map(entity => [entity.id, entity.label]));
   const current = browser ? browser.currentConnection : view.connections.find(connection => connection.state !== "disconnected" || connection.revocationPending || connection.recoveryRequired) ?? null;
   const history = browser ? browser.connections.filter(connection => connection.connectionId !== current?.connectionId) : view.connections.filter(connection => connection.connectionId !== current?.connectionId).map(connection => ({
@@ -249,8 +256,12 @@ export function SquareDirectCustomerPanel({ view, browser = null, browseError = 
   return <div className="vaeroex-app-shell vaeroex-customer-workspace min-h-dvh"><main className="workspace-page workspace-square mx-auto max-w-5xl space-y-5 px-4 py-5 text-ink sm:p-6">
     <Link href="/app/settings" prefetch={false} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-vaeroex-blue shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">← Back to Settings</Link>
     <header className="workspace-page-header space-y-1"><h1 className="text-2xl font-semibold">Square</h1><p className="text-sm text-muted">Manage this workspace’s optional Square connection and saved Payments.</p></header>
+    {recurringResult ? <p role="status" className="rounded-md border border-line p-3 text-sm">{recurringResult === "enabled" && recurring?.status?.recurring_enabled === true
+      ? "Automatic Payments updates are authorized. Check the saved schedule below."
+      : recurringResult === "disabled" && recurring?.status?.recurring_enabled === false ? "Automatic Payments updates are off. Saved Payments were kept."
+        : "The automatic Payments setting could not be confirmed. Check the saved authorization below before trying again."}</p> : null}
     {!view.available ? <p role="status" className="rounded-md bg-slate-100 p-3 text-sm">New Square connections and Payments updates are unavailable for this workspace. Saved Payments and existing connection status remain available.</p> : null}
-    {current ? <ConnectionPanel view={view} connection={current} entity={entities.get(current.businessEntityId) ?? currentMetadata?.businessEntityLabel ?? "Unavailable"} timeZone={timeZone} timeZoneFallback={currentMetadata?.timeZoneFallback ?? true} /> : <section className={`${cardClass} space-y-3`}>
+    {current ? <ConnectionPanel view={view} connection={current} entity={entities.get(current.businessEntityId) ?? currentMetadata?.businessEntityLabel ?? "Unavailable"} timeZone={timeZone} timeZoneFallback={currentMetadata?.timeZoneFallback ?? true} recurring={recurring}/> : <section className={`${cardClass} space-y-3`}>
       <h2 className="text-lg font-semibold">Connect Square</h2><p role="status" className="text-sm text-muted">No Square account is connected to this workspace. Previous saved Payments are retained in Connection history.</p>
       {view.available && connectableEntities.length > 0 ? <form action="/api/integrations/square/connect" method="post" className="space-y-3">
         <label className="block text-sm font-semibold">Business Entity<select name="businessEntityId" required defaultValue="" className={inputClass}><option value="" disabled>Select a Business Entity</option>{connectableEntities.map(entity => <option key={entity.id} value={entity.id}>{entity.label}</option>)}</select></label>

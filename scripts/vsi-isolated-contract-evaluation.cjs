@@ -2,11 +2,11 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {fork,execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
-// Reviewed legal-acceptance snapshot. Relative to the preceding pin, only the
-// legal action and its TypeScript RPC declaration changed in app/lib. Keep exact
-// tree identity and dirty-source rejection; this is not a real-model qualification.
-const candidate="62adf118466394eda92ed1459d83af1d23c9e237";
-const runtimeTrees="040000 tree cfb0570e6c6fb866d6e30c37f31b54b266afe75c\tapp\n040000 tree a098be2a599485e3aa6f50c98f5b09bd2a7103ad\tlib";
+// Reviewed preview-scoped qualification snapshot. Exact app/lib tree identity and
+// dirty-source rejection remain mandatory; this is offline contract testing,
+// not evidence that the hosted model campaign has run.
+const candidate="f92a5d63f15ca79e144d47aa7e18114dca461b8e";
+const runtimeTrees="040000 tree 03fc9cc16a5fbce4d903f22bd5812813f899502b\tapp\n040000 tree b00fd7e21ac067c65d5ff9403a0888bf31f2be5f\tlib";
 const endpoint='https://api.openai.com/v1/responses';
 const limits=Object.freeze({questions:2,calls:4,callsPerQuestion:2,usd:1,reservePerCallUsd:.25,maxChars:48000,maxBytes:192000,maxOutputTokens:8000});
 const cases=Object.freeze([
@@ -145,7 +145,7 @@ async function fixtureWorker(caseId,variant='present'){
  for(const key of ['OPENAI_API_KEY','GOOGLE_SHEETS_OPENAI_API_KEY','GOOGLE_SHEETS_OPENAI_PROJECT_ID','GOOGLE_SHEETS_OPENAI_ORGANIZATION_ID','DATABASE_URL','SUPABASE_SERVICE_ROLE_KEY','NODE_OPTIONS'])assert.equal(process.env[key],undefined);
  const test=cases.find(c=>c.id===caseId);assert(test);
  // Offline worker variants cannot be selected by createEvaluation or the paid CLI.
- assert(['present','no_sources','missing_named_source','authority_denied','wrong_workspace','revoked_after_plan','ambiguous_scope','mixed_public','closed_plan'].includes(variant));
+ assert(['present','no_sources','missing_named_source','authority_denied','wrong_workspace','revoked_after_plan','ambiguous_scope','mixed_public','closed_plan','qualification_activation'].includes(variant));
  const workspace=id(1),actor=id(2),session=id(3),request=id(caseId==='qualified-brief'?4:40),ticket=id(5),manifest=id(6);
  const ActualDate=Date;global.Date=class extends ActualDate{constructor(...args){super(...(args.length?args:['2026-10-24T00:00:00.000Z']));}static now(){return new ActualDate('2026-10-24T00:00:00.000Z').getTime();}};
  const fixture=fixtureForCase(caseId),captureReferenceId=fixture.captureReferenceId;
@@ -166,7 +166,7 @@ async function fixtureWorker(caseId,variant='present'){
   if(name==='validate_shared_evidence_manifest_v1')return{data:!(variant==='revoked_after_plan'&&plannerReturned),error:null};throw Error('unexpected_fixture_rpc');
  }};
  require('./qbo-customer-test-support.cjs').installLoader({'server-only':{},'@supabase/supabase-js':{createClient:()=>{throw Error('database_client_denied');}},
-  '@/lib/ai/shared-evidence/runtime-gate':{sharedEvidenceRuntimeEnabled:()=>true},'@/lib/ai/shared-evidence/qualitative-policy':{qualitativeSynthesisEnabled:()=>true},
+  '@/lib/ai/shared-evidence/runtime-gate':{sharedEvidenceRuntimeEnabled:()=>variant!=='qualification_activation'},'@/lib/ai/shared-evidence/qualitative-policy':{qualitativeSynthesisEnabled:()=>variant!=='qualification_activation'},
   './retrieval':{authorizeVsiRead:async()=>({supabase:reader,workspaceId:workspace,user:{id:actor},membership:{role:'owner'},workspace:{id:workspace,name:'Synthetic evaluation workspace',industry:'Synthetic operations'}}),retrieveVsiEvidence:async()=>{throw Error('legacy_fallback_denied');}},
   './product-context':{loadVsiProductContext:async(access,t)=>require('../lib/vsi/product-context.ts').loadVsiProductContext(access,t)},
   '@/lib/billing/get-subscription-status':{getSubscriptionStatus:async()=>({allowed:true,status:'active',source:'subscription',plan_slug:'vaeroex'})},
@@ -177,9 +177,16 @@ async function fixtureWorker(caseId,variant='present'){
  const pending=new Map();let serial=0,answerCount=0;console.info=()=>{};console.error=()=>{};
  process.on('message',message=>{if(message?.type==='provider_response'&&pending.has(message.request)){if(message.request===1)plannerReturned=true;pending.get(message.request)(new Response(JSON.stringify(message.payload),{status:200}));pending.delete(message.request);}});
  global.fetch=async(url,init)=>{const n=++serial;assert(n<=(variant==='mixed_public'?4:2));const body=JSON.parse(init.body);if(body.text?.format?.name==='vsi_shared_answer_v2')answerCount++;return new Promise(resolve=>{pending.set(n,resolve);process.send({type:'provider_request',request:n,caseId,url,body:init.body});});};
+ if(variant==='qualification_activation') {
+  const {qualificationHash}=require('../lib/vsi/qualification.ts');
+  process.env.VERCEL_ENV='preview';
+  process.env.VAEROEX_VSI_QUALIFICATION=JSON.stringify({campaignId:id(90),startsAt:'2026-10-23T23:59:59.000Z',expiresAt:'2026-10-24T00:30:00.000Z',
+   slots:['owner_private','demo_private','business_brief'].map((caseId,i)=>({caseId,actorUserId:actor,workspaceId:workspace,conversationId:i===2?id(88):id(91+i),
+    requestId:i===2?id(7):id(93+i),questionHash:qualificationHash(question),approvedSourceHashes:i===2?raw.map(row=>row.hash):[]}))});
+ }
  const {runVsiAnswer}=require('../lib/vsi/engine.ts');
  try{
-  const answer=await runVsiAnswer({supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question,recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}});
+  const answer=await runVsiAnswer({conversationId:id(88),supabase:reader,workspaceId:workspace,actorUserId:actor,readTicket:{ticketId:ticket},question,recentMessages:[],requestId:id(7),reservedRequest:{id:request,attempt:1}});
   if(answerCount===0&&answer.usage.providerCalls===1&&!answer.noteDraft){process.send({type:'result',result:{mechanicalPass:false,failure:'planner_clarification',clarification:answer.content,citations:answer.citations,answerGenerationCalls:0,usage:{providerCalls:answer.usage.providerCalls,estimatedCostUsd:answer.usage.estimatedCostUsd},syntheticAuthorityOnly:true}});return;}
   assert.equal(answerCount,1);assert.equal(answer.citations.length,variant==='mixed_public'?3:2);assert.deepEqual(new Set(answer.citations.map(c=>c.sourceType)),new Set(variant==='mixed_public'?['shared_xero','shared_google_sheets','web']:['shared_xero','shared_google_sheets']));
   process.send({type:'result',result:{mechanicalPass:true,answer:answer.content,citations:answer.citations,usage:{providerCalls:answer.usage.providerCalls,estimatedCostUsd:answer.usage.estimatedCostUsd},syntheticAuthorityOnly:true}});

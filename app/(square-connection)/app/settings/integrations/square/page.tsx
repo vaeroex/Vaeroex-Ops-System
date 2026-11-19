@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { SquareConnectionPanel } from "@/components/integrations/SquareConnectionPanel";
 import { SquareProductionCustomerPanel } from "@/components/integrations/SquareProductionCustomerPanel";
 import { SquareDirectCustomerPanel } from "@/components/integrations/SquareDirectCustomerPanel";
-import { squareDirectEnabled, squareDirectView, squareDirectPayments } from "@/lib/integrations/square-direct/server";
+import { squareDirectEnabled, squareDirectView, squareDirectPayments, squareDirectRecurringView } from "@/lib/integrations/square-direct/server";
 import { parseDirectPaymentBrowseQuery, type DirectPaymentBrowser } from "@/lib/integrations/square-direct/payment-browse";
 import { productionSquareCustomerEnabled, productionSquareCustomerView,productionSquareReadViews } from "@/lib/integrations/control-plane/square-production-customer";
 import { PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
@@ -30,7 +30,11 @@ export default async function SquareConnectionPage({ searchParams }: {
     try { browseConnectionId = parseDirectPaymentBrowseQuery({ connectionId: query.connectionId }).connectionId; } catch { /* Invalid selection never broadens the current workspace. */ }
     try { browser = await squareDirectPayments(query); }
     catch { browseError = "Saved-payment browsing is unavailable or the filters are invalid. Your connection and saved records are unchanged."; }
-    return <SquareDirectCustomerPanel view={view} browser={browser} browseError={browseError} browseConnectionId={browseConnectionId} />;
+    const current = browser ? browser.currentConnection : view.connections.find(connection => connection.state !== "disconnected" || connection.revocationPending || connection.recoveryRequired);
+    const recurring = current ? await squareDirectRecurringView(current.connectionId) : null;
+    const recurringResult = typeof query.recurring === "string" && ["enabled", "disabled", "unavailable"].includes(query.recurring) ? query.recurring : null;
+    return <SquareDirectCustomerPanel view={view} browser={browser} browseError={browseError} browseConnectionId={browseConnectionId}
+      recurring={recurring} recurringResult={recurringResult}/>;
   }
   if (productionSquareCustomerEnabled()) {
     const incoming = await headers();

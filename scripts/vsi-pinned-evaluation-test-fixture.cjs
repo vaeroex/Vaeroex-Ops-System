@@ -4,9 +4,9 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
 
-// Published commit with the exact app/lib trees already pinned by the evaluator.
+// Reviewed runtime ancestor with the exact app/lib trees pinned by the evaluator.
 // Do not repin the evaluator merely because unrelated application code changes.
-const reviewedRuntimeCommit = '475e70b84d20c43cac1cb7a33ec7f839cdca1c33';
+const reviewedRuntimeCommit = 'f92a5d63f15ca79e144d47aa7e18114dca461b8e';
 const fixtureArgument = '--pinned-evaluation-test-fixture';
 
 function runInPinnedEvaluationFixture(testFile) {

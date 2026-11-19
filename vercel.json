@@ -34,7 +34,8 @@
       "codex/vsi-context-overhead": false,
       "codex/vsi-preparation-diagnostics": false,
       "codex/vsi-all12-harness-qualification": false,
-      "codex/legal-acceptance-v2": false
+      "codex/legal-acceptance-v2": false,
+      "codex/vsi-bounded-qualification": false
     }
   },
   "crons": [
@@ -44,6 +45,18 @@
     },
     {
       "path": "/api/integrations/google-sheets/scheduled-sync",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/integrations/reporting/scheduled-sync",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/integrations/imports/scheduled-sync",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/integrations/square/scheduled-sync",
       "schedule": "*/15 * * * *"
     }
   ]

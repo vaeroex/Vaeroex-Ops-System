@@ -4,18 +4,24 @@ import { sharedEvidenceRuntimeEnabled } from "@/lib/ai/shared-evidence/runtime-g
 import { reopenSharedCitation,sharedCitationTarget } from "@/lib/ai/shared-evidence/citation-reopen";
 import { sharedCitationDiagnostic } from "@/lib/ai/shared-evidence/citation-diagnostics";
 import { SharedCitationReadTrace } from "@/lib/supabase/citation-read-trace";
+import { qualificationCitationScope } from "@/lib/vsi/qualification";
+import { reopenQualificationCitation } from "@/lib/vsi/qualification-citations";
 
 export default async function SharedEvidencePage({params,searchParams}:{params:Promise<{kind:string;id:string}>;searchParams:Promise<{workspace?:string;revision?:string}>}) {
-  if(!sharedEvidenceRuntimeEnabled()) notFound();
+  const released = sharedEvidenceRuntimeEnabled();
+  if(!released && process.env.VAEROEX_VSI_QUALIFICATION === undefined) notFound();
   const path=await params, query=await searchParams;
   const target=sharedCitationTarget.safeParse({workspaceId:query.workspace,kind:path.kind,id:path.id,revision:query.revision});
   if(!target.success) notFound();
   const trace=new SharedCitationReadTrace();
   const access=await requireWorkspaceAccess(undefined,trace);
   if(access.workspaceId!==target.data.workspaceId||access.membership.role!=="owner"||access.membership.status!=="active") notFound();
+  if(!released && !qualificationCitationScope({actorUserId:access.user.id,workspaceId:access.workspaceId})) notFound();
   let sources:Awaited<ReturnType<typeof reopenSharedCitation>>;
   try {
-    sources=await reopenSharedCitation(access.supabase as unknown as Parameters<typeof reopenSharedCitation>[0],target.data,trace);
+    sources=released
+      ? await reopenSharedCitation(access.supabase as unknown as Parameters<typeof reopenSharedCitation>[0],target.data,trace)
+      : await reopenQualificationCitation(access.supabase,{actorUserId:access.user.id,workspaceId:access.workspaceId,target:target.data},trace);
     console.info("[shared-citation-transport]",trace.finish("completed"));
   }
   catch (error) {

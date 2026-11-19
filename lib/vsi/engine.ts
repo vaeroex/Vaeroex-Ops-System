@@ -1,10 +1,11 @@
+import { prepareVsiSharedEvidence } from "./shared-preparation";
 import { invoiceSelections, InvoiceSelectionMetadataError } from "@/lib/ai/shared-evidence/invoice-selection";
 import { validateSharedVsiRelationships } from "@/lib/ai/shared-evidence/vsi-validation";
 import type { SynthesisSource } from "@/lib/ai/shared-evidence/answer-contract";
 import { sharedAnswerSchema, sharedAnswerJsonSchemaForResults, SharedAnswerContractError, renderSharedAnswer, renderSharedClarification, sharedDraftTextPattern, issueAnswerResults, issueContextFactSources, SHARED_ANSWER_INSTRUCTIONS } from "@/lib/ai/shared-evidence/answer-contract";
 import { qualitativeSynthesisEnabled } from "@/lib/ai/shared-evidence/qualitative-policy";
 import { sharedEvidenceRuntimeEnabled } from "@/lib/ai/shared-evidence/runtime-gate";
-import { prepareSharedGeneration, sealSharedGeneration, sharedTargetHref, sharedRpc, type SharedClient, type SharedPrepared } from "@/lib/ai/shared-evidence/generation";
+import { sealSharedGeneration, sharedTargetHref, sharedRpc, type SharedClient, type SharedPrepared } from "@/lib/ai/shared-evidence/generation";
 import { sharedPreparationDiagnostic, type SharedPreparationPhase } from "@/lib/ai/shared-evidence/preparation-diagnostics";
 import { googleSheetsOpenAIHeaders } from "@/lib/ai/providers/google-data-policy";
 import { bindGoogleSheetsRead } from "@/lib/integrations/google-sheets/read-authority";
@@ -22,9 +23,9 @@ import { VSI_PLANNER_PROMPT, VSI_PLAN_JSON_SCHEMA, VSI_PUBLIC_RESEARCH_JSON_SCHE
 import type { VsiPublicResearchResult, VsiResearchTier } from "./research";
 import { explicitStoredVsiQuestion } from "./context-selection";
 import type { VsiAnswer, VsiCitation, VsiEvidenceResult, VsiMessage, VsiRunInput, VsiUsage } from "./types";
-import { vsiEvidenceWindowSelection } from "./evidence-window";
 import { packVsiAnswerContext, serializeVsiAnswerContext, serializeVsiProviderRequest, VsiAnswerContextLimit } from "./answer-context";
 import { vsiValidationDiagnostic, type VsiValidationStage } from "./validation-diagnostics";
+import { qualificationDispatchGuard, assertQualificationSources, VSI_QUALIFICATION_LIMITS } from "./qualification";
 
 const VSI_LIVE_FRESHNESS_INSTRUCTION = "For weather and other time-sensitive observations, describe the observation available in this lookup and give its source observation time. Compare that observation time with the supplied current lookup time, respecting the stated timezone. If the observation is more than about one hour old, explicitly say how old it is and that it may no longer reflect conditions now; never describe that reading as current or latest. If the observation time or timezone is missing or cannot be established, say its freshness cannot be verified and do not describe it as current or latest. Resolve today and tonight using the requested public location's local calendar date and the timezone established by its weather source, not the UTC/server date of the lookup. State the local date explicitly when giving today's conditions or tonight's forecast; the UTC lookup date can be a different calendar day. If the location timezone cannot be established, say so and do not guess a local date or label an uncertain forecast period today/tonight. Keep the observation time, forecast period and lookup time separate. A live lookup can return an older source; a fresh lookup timestamp does not make an older observation fresh.";
 
@@ -240,22 +241,27 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   let access;
   try { access = await authorizeVsiRead(input); }
   catch (error) { throw new VsiEngineError(error instanceof Error ? error.message : "Workspace access could not be verified. Please retry.", usage); }
+  let qualification: ReturnType<typeof qualificationDispatchGuard>;
+  try { qualification = qualificationDispatchGuard(input); }
+  catch { throw new VsiEngineError("This qualification request is not enabled. Stop the campaign and review its configuration.", usage, false, "context_block"); }
+  if (qualification) config.requestReserveUsd = VSI_QUALIFICATION_LIMITS.reserveUsd;
   if (hasProhibitedVsiIdentifiers(input.question)) throw new VsiEngineError(VSI_PROHIBITED_INPUT_MESSAGE, usage);
   if (!input.question.trim() || input.question.length > config.maxQuestionChars) throw new VsiEngineError("Use a question of 8,000 characters or fewer.", usage);
   let product:Awaited<ReturnType<typeof loadVsiProductContext>>|undefined;
   let sharedManifestId:string|undefined;
   let sharedPrepared:SharedPrepared|undefined;
   let sharedWindowLimitation: string | undefined;
-  if(sharedEvidenceRuntimeEnabled()) {
+  const qualifiedSharedEvidence = qualification?.sharedEvidence === true;
+  const hypothesesEnabled = qualifiedSharedEvidence || qualitativeSynthesisEnabled();
+  if(qualifiedSharedEvidence || sharedEvidenceRuntimeEnabled()) {
     let preparationPhase: SharedPreparationPhase = "request_binding";
     try {
       if(!input.reservedRequest) throw new Error("shared_request_binding_missing");
-      preparationPhase = "window_selection";
-      const window = vsiEvidenceWindowSelection(input.question);
-      const { start, end } = window;
-      sharedWindowLimitation = window.limitation;
       preparationPhase = "preparation";
-      sharedPrepared=await prepareSharedGeneration(input.supabase,input.workspaceId,start,end,input.question);
+      const selection = await prepareVsiSharedEvidence(input.supabase,input.workspaceId,input.question);
+      sharedWindowLimitation = selection.window.limitation;
+      sharedPrepared = selection.prepared;
+      assertQualificationSources(input, sharedPrepared.rows, sharedPrepared);
       // Product context binds connection roots; finalize those before sealing.
       preparationPhase = "product_context";
       product=await loadVsiProductContext(access,input.readTicket);
@@ -296,7 +302,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     }
     if (!key && !googleDataHeaders.Authorization) throw new VsiEngineError("Vaeroex Super Intelligence is temporarily unavailable because its provider connection is not configured. Please try again later.", usage);
     if (usage.estimatedCostUsd >= config.requestReserveUsd) throw new VsiEngineError("This question reached its spending safeguard. Please narrow it and retry.", usage, false, "budget_block");
-    const remaining = config.timeoutMs - (Date.now() - startedAt) - reserveAnswerMs;
+    let remaining = config.timeoutMs - (Date.now() - startedAt) - reserveAnswerMs;
     if (remaining < 4000) throw new VsiEngineError("This answer took too long. Please retry or ask a narrower question.", usage, false, "timeout");
     const serializedRequest = serializeVsiProviderRequest(body, config.maxOutputTokens);
     if ((usage.providerCalls || 0) >= config.maxProviderCalls || serializedRequest.length > config.maxInputChars || Buffer.byteLength(serializedRequest, "utf8") > config.maxProviderInputBytes) {
@@ -305,6 +311,11 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     // The shared provider guard rejects an open circuit synchronously, before fetch.
     // That is known-zero work, not an uncertain paid transport failure.
     if (getAIProviderCircuitSnapshot("openai").open) throw new VsiEngineError("Vaeroex is temporarily unavailable after repeated failed requests. Please retry shortly. Your question has not been counted.", usage, false, "provider");
+    try {
+      const campaignRemaining = qualification?.(serializedRequest, sharedManifestId);
+      if (campaignRemaining !== undefined) remaining = Math.min(remaining, campaignRemaining);
+    }
+    catch { throw new VsiEngineError("The qualification dispatch check stopped this request. Stop the campaign and review its receipt.", usage, false, "context_block"); }
     usage.providerCalls = (usage.providerCalls || 0) + 1;
     try {
       const { response, value } = await consumeAIProviderResponse("openai", "https://api.openai.com/v1/responses", {
@@ -372,7 +383,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
     reasoning: { effort: tier === "deep" ? "high" : "medium" }, max_output_tokens: Math.min(config.maxOutputTokens, shared || tier === "deep" ? 6000 : 4000),
     // Derive from this exact packed JSON, not the larger canonical payload.
     // The same factory participates in every packing measurement and transport.
-    text: { format: { type: "json_schema", name: shared ? "vsi_shared_answer_v2" : "vsi_answer_v1", strict: true, schema: shared ? sharedAnswerJsonSchemaForResults(view.sharedRelationships, qualitativeSynthesisEnabled(), invoiceSelections(view.qualitative_sources,view.question), schemaSources.map(source=>source.ref), schemaSources) : answerJsonSchema } } });
+    text: { format: { type: "json_schema", name: shared ? "vsi_shared_answer_v2" : "vsi_answer_v1", strict: true, schema: shared ? sharedAnswerJsonSchemaForResults(view.sharedRelationships, hypothesesEnabled, invoiceSelections(view.qualitative_sources,view.question), schemaSources.map(source=>source.ref), schemaSources) : answerJsonSchema } } });
   };
   const packAnswer = (payload: ReturnType<typeof makePayload>, tier: VsiResearchTier, shared: boolean, phase: "preflight" | "answer") => {
     try {
@@ -559,7 +570,7 @@ async function runVsiAnswerInternal(input: VsiRunInput, startedAt: number): Prom
   const decodedAnswer = validateAt("answer_json", () => JSON.parse(outputText(reply)));
   const structuredAnswer = sharedAnswer ? validateAt("answer_schema", () => sharedAnswerSchema.parse(decodedAnswer)) : validateAt("answer_schema", () => answerSchema.parse(decodedAnswer));
   const composed = sharedAnswer
-    ? validateAt("shared_answer_contract", () => renderSharedAnswer(structuredAnswer,{question:input.question,sources:[...selectedPremises,...issueContextFactSources(payload.productSources,payload.livePublicLookup)],requiredSourceGroups:packedContext.requiredSourceGroups,results:selectedRelationships,hypothesesEnabled:qualitativeSynthesisEnabled(),scopes:new Map(selectedPremises.map(source=>[source.ref,sharedPrepared!.rows.find(row=>row.hash===source.binding)!.scope]))}))
+    ? validateAt("shared_answer_contract", () => renderSharedAnswer(structuredAnswer,{question:input.question,sources:[...selectedPremises,...issueContextFactSources(payload.productSources,payload.livePublicLookup)],requiredSourceGroups:packedContext.requiredSourceGroups,results:selectedRelationships,hypothesesEnabled,scopes:new Map(selectedPremises.map(source=>[source.ref,sharedPrepared!.rows.find(row=>row.hash===source.binding)!.scope]))}))
     : validateAt("shared_relationships", () => {
       const legacy = answerSchema.parse(structuredAnswer);
       if (legacy.interpretations.length) throw new Error("Interpretations require current admitted source composition before citation validation.");

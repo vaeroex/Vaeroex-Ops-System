@@ -1,0 +1,23 @@
+{
+  "status": "local reviewed activation candidate; not a hosted qualification result",
+  "activation": "A valid preview-only VAEROEX_VSI_QUALIFICATION manifest enables protected shared preparation and qualitative rendering only for its exact business_brief actor/workspace/chat/question slot. Other manifest requests are rejected. Private slots retain the ordinary path so a viewer is never sent through owner-only shared preparation.",
+  "globalGates": "runtime-gate, qualitative-policy and failure-accounting-gate remain false. No ordinary or production shared-source activation.",
+  "sources": "The complete prepared source-hash set must equal the manifest allowlist. Existing protected admission, provider policy and seal validation still run.",
+  "accounting": "A process-local permit from a validated slot binds terminal accounting to its actor/workspace/chat/actual ledger request/attempt. It survives manifest expiry, but existing SQL session/membership/entitlement checks remain. Reconcile all requests before revoking access. No permit is accepted from a browser or persisted.",
+  "limits": {
+    "questions": 3,
+    "providerCalls": 15,
+    "callsPerQuestion": 5,
+    "usdCap": 2,
+    "reservedPerQuestionUsd": 0.572,
+    "conservativeTotalUsd": 1.716,
+    "web": 0,
+    "retries": 0,
+    "fallback": 0
+  },
+  "configuration": "Finalize and hash the manifest only after the designated empty brief chat exists and the exact start/deadline are recorded. Bind deployment source to this reviewed artifact. No credentials or real actor/source IDs belong in this public document.",
+  "restoration": "Expiry stops new dispatch. Reconcile accounting first, disable only the approved temporary viewer row, expire only the test entitlement, restore the locked test workspace and original selections, retire the preview deployment. Verify production aliases/source and automatic deployment holds unchanged.",
+  "tests": "Credential-free actual-engine tests include private owner/viewer isolation checks, successful scoped shared orchestration with both global source gates false, exact source set, expired accounting, competing completion and unchanged hidden citations. Synthetic RPC and IPC replies do not establish hosted compatibility.",
+  "citationOpening": "Optional inspectCitations=true permits only the live Preview business slot owner/workspace; authenticated exchange RLS binds its approved chat/question, the original protected reopen RPC checks exact current artifact/source authority, and the complete reviewed source hashes/providers are rechecked after I/O. Old manifests retain hidden citations. Local tests only; no hosted inspection claimed.",
+  "automaticRefresh": "Separate reporting and standalone owner-consented schedulers now exist, but the answer manifest never permits imports. Freeze the source hashes after the separately approved refresh witness, then use explicit approvedProviders for the exact pair. Omitted providers retain the original Xero/Sheets-only campaign."
+}

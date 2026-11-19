@@ -8,6 +8,9 @@ import { activeToken, admin, enabled, organizations } from "@/lib/integrations/z
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import { resolveImportRange, resolveViewRange } from "@/lib/integrations/date-range";
 import { DateRangeFields, SavedHistoryFilter } from "@/components/integrations/DateRangeFields";
+import { importRecurringAllowed } from "@/lib/integrations/import-refresh/scope";
+import { readImportRecurringSettings } from "@/lib/integrations/import-refresh/settings-read";
+import { ImportRecurringSettings, importRecurringResultMessage } from "@/components/integrations/ImportRecurringSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +27,17 @@ export default async function ZohoBooksPage({ searchParams }: PageProps) {
   const now = new Date(), defaultRange = resolveImportRange(null, null, now), maxDate = now.toISOString().slice(0, 10);
   let filter: ReturnType<typeof resolveViewRange> = { startDate: null, endDate: null }, invalidFilter = false;
   try { filter = resolveViewRange(params?.from, params?.to, now); } catch { invalidFilter = true; }
-  const db = available ? admin() : null;
+  let db: ReturnType<typeof admin> | null = null;
+  try { db = admin(); } catch { /* Saved connection reads do not require provider credentials. */ }
   const { data: connections, error: connectionError } = db
     ? await db.from("zoho_books_connections")
       .select("id,status,organization_name,last_sync_at,last_error_code,sync_lease_expires_at")
       .eq("workspace_id", access.workspaceId).neq("status", "disconnected").order("created_at", { ascending: false })
     : { data: [], error: null };
   const connection = connections?.[0];
+  const recurringAllowed = available && importRecurringAllowed(access.workspaceId, "zoho-books");
+  const recurring = db && connection && ["connected", "reauthorization_required"].includes(connection.status)
+    ? await readImportRecurringSettings(db, access.workspaceId, "zoho-books", connection.id) : null;
   const canViewHistory = connection && ["connected", "reauthorization_required"].includes(connection.status);
   const { data: historyData, error: summaryError } = db && canViewHistory && !invalidFilter
     ? await db.rpc("read_zoho_books_history", { p_workspace_id: access.workspaceId, p_connection_id: connection.id,
@@ -39,13 +46,14 @@ export default async function ZohoBooksPage({ searchParams }: PageProps) {
   const history = historyData as History | null;
   let choices: Awaited<ReturnType<typeof organizations>> = [];
   let choiceError = false;
-  if (owner && connection?.status === "choose_organization") {
+  if (owner && available && connection?.status === "choose_organization") {
     try { choices = await organizations(await activeToken(access.workspaceId, connection.id)); }
     catch { choiceError = true; }
   }
   const money = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
   const status = connection?.status === "connected" ? "Connected" : connection?.status === "choose_organization" ?
     "Choose an organization" : connection?.status === "reauthorization_required" ? "Reauthorization required" : "Waiting for authorization";
+  const recurringMessage = importRecurringResultMessage(params?.result);
 
   return <div className="workspace-page mx-auto max-w-5xl space-y-5">
     <PageHeader eyebrow="Plug-ins" title="Zoho Books" description="Import and keep invoice and expense history for your workspace."
@@ -54,15 +62,15 @@ export default async function ZohoBooksPage({ searchParams }: PageProps) {
     {params?.result === "invalid_range" ? <p role="alert" className="rounded-md border border-line p-3 text-sm">Choose both dates, ending today or earlier, with at most 366 calendar days per import. Older periods can be imported in separate ranges.</p> : null}
     {params?.result === "synced" ? <p role="status" className="rounded-md border border-line p-3 text-sm">The selected period was imported. Previously imported dates outside that period are retained.</p> : null}
     {params?.result === "disconnected" ? <p role="status" className="rounded-md border border-line p-3 text-sm">Zoho Books disconnected and stored history removed.</p> : null}
+    {recurringMessage ? <p role="status" className="rounded-md border border-line p-3 text-sm">{recurringMessage}</p> : null}
     {connection ? <EvidenceMappingLink workspaceId={access.workspaceId} provider={"zoho-books"} connectionId={connection.id} owner={owner} status={connection.status}/> : null}
     <SectionCard title="Connection" description="For U.S. Zoho Books organizations. Vaeroex requests read-only access to organization settings, invoices, and expenses.">
-      {!available ? <p className="text-sm text-slate-600">Zoho Books setup is not complete yet.</p> :
-        connectionError ? <p role="alert" className="text-sm text-red-700">Connection status is unavailable.</p> :
+      {connectionError ? <p role="alert" className="text-sm text-red-700">Connection status is unavailable.</p> :
         connection ? <div className="space-y-4">
           <div className="flex items-center gap-3"><StatusBadge value={status} />
             <span className="text-sm text-slate-600">{connection.organization_name ?? "Zoho Books account"}</span></div>
           {connection.status === "pending" && owner ? <p className="text-sm text-slate-600">Finish authorization in Zoho Books. If you closed that page, cancel this attempt and connect again.</p> : null}
-          {connection.status === "choose_organization" && owner ? choiceError ?
+          {connection.status === "choose_organization" && owner && available ? choiceError ?
             <p role="alert" className="text-sm text-red-700">Could not load organizations. Disconnect and try again.</p> :
             <form method="post" action="/api/integrations/zoho-books/select-organization" className="space-y-3">
               <input type="hidden" name="connectionId" value={connection.id} />
@@ -74,14 +82,17 @@ export default async function ZohoBooksPage({ searchParams }: PageProps) {
               <button type="submit" className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-vaeroex-blue">Use this organization</button>
             </form> : null}
           {connection.last_error_code ? <p role="status" className="text-sm text-amber-800">The last update failed. Saved history is retained. Try a smaller range or reconnect if authorization has expired.</p> : null}
+          {canViewHistory ? <ImportRecurringSettings provider="zoho-books" connectionId={connection.id} settings={recurring}
+            allowed={recurringAllowed} owner={owner} status={connection.status} lastSuccess={connection.last_sync_at}
+            timeZone={access.context.activeWorkspace?.reporting_timezone} asOf={now.toISOString()}/> : null}
           {connection.status === "connected" && owner ? <form method="post" action="/api/integrations/zoho-books/sync" className="space-y-3">
             <input type="hidden" name="connectionId" value={connection.id} />
             <DateRangeFields idPrefix="zoho-books-import" defaultStartDate={defaultRange.startDate} defaultEndDate={defaultRange.endDate} maxDate={maxDate} />
             <p className="text-xs text-slate-600">Import up to 366 calendar days at a time. Choose any older period; busy periods may need smaller ranges. Re-importing a period replaces its saved records and updates matching records without duplicates.</p>
-            <button type="submit" disabled={Boolean(connection.sync_lease_expires_at && Date.parse(connection.sync_lease_expires_at) > Date.now())}
+            <button type="submit" disabled={!available || Boolean(connection.sync_lease_expires_at && Date.parse(connection.sync_lease_expires_at) > Date.now()) || Boolean(recurring?.refreshNotBefore && Date.parse(recurring.refreshNotBefore) > Date.now())}
               className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-vaeroex-blue disabled:opacity-50">Import selected dates</button>
           </form> : null}
-          {connection.status === "reauthorization_required" && owner ? <form method="post" action="/api/integrations/zoho-books/connect">
+          {connection.status === "reauthorization_required" && owner && available ? <form method="post" action="/api/integrations/zoho-books/connect">
             <button type="submit" className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-vaeroex-blue">Reconnect Zoho Books</button>
           </form> : null}
           {owner ? <form method="post" action="/api/integrations/zoho-books/disconnect">
@@ -89,8 +100,7 @@ export default async function ZohoBooksPage({ searchParams }: PageProps) {
             <input type="hidden" name="confirmation" value="disconnect" />
             <button type="submit" className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-red-700">{connection.status === "pending" ? "Cancel connection attempt" : "Disconnect and remove history"}</button>
           </form> : null}
-          {connection.last_sync_at ? <p className="text-sm text-slate-600">Last sync: {new Date(connection.last_sync_at).toLocaleString("en-US", { timeZone: "UTC" })} UTC</p> : null}
-        </div> : owner ? <form method="post" action="/api/integrations/zoho-books/connect">
+        </div> : !available ? <p className="text-sm text-slate-600">Zoho Books setup is not complete yet.</p> : owner ? <form method="post" action="/api/integrations/zoho-books/connect">
           <button type="submit" className="min-h-11 rounded-md border border-line px-4 py-2 font-semibold text-vaeroex-blue">Connect Zoho Books</button>
         </form> : <p className="text-sm text-slate-600">The workspace owner can connect Zoho Books.</p>}
     </SectionCard>

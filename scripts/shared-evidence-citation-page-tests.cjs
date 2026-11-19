@@ -7,8 +7,9 @@ const { createClient } = require('@supabase/supabase-js');
 const { installLoader, id } = require('./qbo-customer-test-support.cjs');
 
 const workspace = id(1), actor = id(2), artifact = id(3), revision = 'a'.repeat(64);
+const conversation = id(61), qualifiedQuestion = 'Review the permitted source records.';
 const state = { enabled: true, user: actor, workspace, role: 'owner', memberStatus: 'active', subscribed: true,
-  mode: 'success', rpcCalls: 0, authCalls: 0, aborted: 0, networkCalls: 0 };
+  mode: 'success', rpcCalls: 0, authCalls: 0, aborted: 0, networkCalls: 0, exchangeUnavailable: false };
 global.fetch = () => { state.networkCalls++; throw new Error('unmocked_network_forbidden'); };
 require('node:net').Socket.prototype.connect = global.fetch;
 const projections = ['xero', 'google_sheets', 'google_sheets'].map((provider, index) => ({
@@ -68,10 +69,15 @@ const client = {
         assert(filters.some(([key, value]) => key === 'id' && value === state.workspace));
         data = { id: state.workspace, subscription_status: 'active', subscription_required: !state.subscribed };
       } else if (table === 'customer_subscriptions') data = [];
+      else if (table === 'vsi_exchanges') {
+        for (const pair of [['id', artifact], ['workspace_id', workspace], ['actor_user_id', actor], ['conversation_id', conversation]])
+          assert(filters.some(([key, value]) => key === pair[0] && value === pair[1]));
+        data = state.exchangeUnavailable ? null : { id: artifact, conversation_id: conversation, user_message: qualifiedQuestion };
+      }
       else throw new Error(`unexpected_auth_table:${table}`);
       return resolve({ data, error: null });
     } };
-    for (const method of ['select', 'order', 'or', 'maybeSingle']) query[method] = () => query;
+    for (const method of ['select', 'order', 'or', 'maybeSingle', 'single', 'abortSignal']) query[method] = () => query;
     query.eq = (key, value) => { filters.push([key, value]); return query; };
     return query;
   }
@@ -156,8 +162,33 @@ async function blocked(change, pattern) {
   }
   state.mode = 'success';
   assert.match(await html(), /Saved evidence/, 'a subsequent page invocation performs a fresh authorized read');
+  // Scoped qualification uses these same authenticated page/transport guards
+  // while the ordinary release gate remains disabled.
+  const { qualificationHash } = require('../lib/vsi/qualification.ts');
+  const start = Date.now(), campaign = { campaignId: id(60), startsAt: new Date(start - 1000).toISOString(),
+    expiresAt: new Date(start + 600000).toISOString(), inspectCitations: true,
+    slots: ['owner_private', 'demo_private', 'business_brief'].map((caseId, i) => ({ caseId,
+      actorUserId: i === 2 ? actor : id(70 + i), workspaceId: i === 2 ? workspace : id(80 + i),
+      conversationId: i === 2 ? conversation : id(90 + i), requestId: id(100 + i), questionHash: qualificationHash(qualifiedQuestion),
+      approvedSourceHashes: i === 2 ? projections.map(p => p.hash) : [] })) };
+  process.env.VERCEL_ENV = 'preview'; process.env.VAEROEX_VSI_QUALIFICATION = JSON.stringify(campaign); state.enabled = false;
+  assert.match(await html(), /Saved evidence/);
+  await blocked({ role: 'admin' }, /NEXT_NOT_FOUND/);
+  await blocked({ user: id(99) }, /NEXT_NOT_FOUND/);
+  state.exchangeUnavailable = true;
+  const beforeDeleted = state.rpcCalls;
+  assert.match(await html(), /Source unavailable/);
+  assert.equal(state.rpcCalls, beforeDeleted, 'deleted/unavailable exchange never reaches source reopen');
+  state.exchangeUnavailable = false; state.mode = 'changed_source';
+  assert.match(await html(), /Source unavailable/);
+  state.mode = 'success';
+  process.env.VAEROEX_VSI_QUALIFICATION = JSON.stringify({ ...campaign, expiresAt: new Date(start - 1).toISOString() });
+  await assert.rejects(html(), /NEXT_NOT_FOUND/);
+  delete process.env.VAEROEX_VSI_QUALIFICATION;
+  state.enabled = true;
   assert.equal(state.networkCalls, 0);
   console.log(JSON.stringify({ passed: true, actualPageAndSSR: true, actualAuthWorkspaceSubscriptionGuards: true,
+    scopedQualificationPageWithGlobalGateClosed: true, deletedExchangeAndExpiredCampaignDeny: true,
     actualPostgrestAbort: true, authorizedProviderSections: ['xero', 'google_sheets'], unavailableCases: 7, stalledCases: 2,
     authorizationAndGateNegatives: 8, rpcCalls: state.rpcCalls, rpcDeadlineMs: 10000, retries: 0, externalCalls: 0,
     liveDatabaseOrHostedRootCauseProved: false }));

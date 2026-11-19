@@ -1,0 +1,31 @@
+{
+  "status": "inactive candidate; no hosted execution authorized by publication",
+  "activation": "VAEROEX_VSI_QUALIFICATION is absent by default. A nonempty immutable JSON manifest is accepted only on VERCEL_ENV=preview during a <=60 minute window. Production rejects it. Shared evidence, qualitative synthesis and failure-accounting release gates remain OFF; any activation requires its own reviewed release decision.",
+  "manifest": {
+    "campaignId": "UUID",
+    "startsAt": "UTC ISO timestamp",
+    "expiresAt": "UTC ISO timestamp, <=60 minutes after startsAt",
+    "slots": "Exactly owner_private, demo_private, business_brief. Each slot requires actorUserId, workspaceId, conversationId, requestId (UUID), questionHash (SHA256), approvedSourceHashes (SHA256 array). Private cases require an empty source list; brief requires reviewed Xero and Sheets originals. All chats must be pinned; create/designate the new empty brief chat only after approval."
+  },
+  "budget": {
+    "model": "gpt-6-luna",
+    "slots": 3,
+    "callsPerSlot": 5,
+    "callsTotal": 15,
+    "reserveUsdPerSlot": 0.572,
+    "boundUsd": 1.716,
+    "approvalCapUsd": 2,
+    "webCalls": 0,
+    "retries": 0,
+    "fallback": 0,
+    "maxInputBytes": 192000,
+    "maxOutputTokens": 8000,
+    "formula": "3 * 5 * ((192000*0.25 + 8000*0.50)/1000000) * 2 * 1.1. Conservative byte-as-token, cache-write, Fast and regional premiums; verify rates before hosted approval. Not a provider billing hard cap."
+  },
+  "durability": "HTTP replaces browser IDs with immutable manifest request IDs. Existing actor/workspace advisory locks and request uniqueness serialize reservation. Pending/completed claims do not generate; attempt >1 cannot dispatch. IDs must never be rotated to retry or replenish a campaign. Any unknown outcome stops supervised execution, even though its full slot remains covered by the bound.",
+  "scope": "No new source mappings, imports, credentials, accounts, policy acceptance or permanent activation. A valid protected manifest does not alone authorize the campaign: approved original hashes are checked before sealing and at serialized dispatch. Ordinary source authority revalidation remains intact.",
+  "diagnostics": "Content-free hashes, byte counts, closed case IDs, request/manifest IDs, canary booleans and source approval boolean. No prompts, outputs, canary values, credentials or raw sources in receipts. Checks are at actual serialized transport; rejection is a failure, never an isolation pass.",
+  "presentation": "Only qualification preview hides citation markers/cards. Stored citations, validation and provenance remain unchanged. This is presentation, not an access-control mechanism.",
+  "cleanup": "Manifest expiry blocks new calls and bounds active transport timeout; it does NOT revoke membership or entitlement. Reserve cleanup time before access expiry, disable only approved temporary membership, expire only test entitlement, restore workspace locks/selections, retain chats/audit, and verify baseline. No production alias promotion or automatic deployment.",
+  "localTests": "Actual guard/engine and HTTP route with mocked transport/ledger outcomes, plus rendered citation view. No live model or database calls. Existing DB locking/idempotency contract is relied upon; local mocks are not hosted concurrency evidence."
+}

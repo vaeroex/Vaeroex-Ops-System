@@ -4,8 +4,9 @@ import { z } from "zod";
 import { oauthStateHash } from "@/lib/integrations/credentials/oauth-state";
 import { parseSquareOAuthCallback } from "@/lib/integrations/providers/square/account-connection-oauth";
 import { sealCredential, openCredential } from "./crypto";
-import { createDirectSquareProvider, directCallbackUri } from "./provider";
-import { DirectContextSchema, DirectViewSchema, DirectHistoricalWindowSchema, type DirectHistoricalWindow,
+import { createDirectSquareProvider, directCallbackUri, SquareDirectRateLimitError } from "./provider";
+import { readDirectSquarePage } from "./read-page";
+import { DirectContextSchema, DirectViewSchema, type DirectHistoricalWindow,
   type DirectActor, type DirectContext, type DirectRpc } from "./contracts";
 
 const stored = z.object({ stored: z.literal(true) }).strict();
@@ -39,7 +40,8 @@ export function createDirectSquareService(input: {
       ? "reauthorization_required" : "retry_required";
     // A failed fence is not retried; persisted lease/CAS still blocks a stale
     // result. Never expose provider/SQL errors or credential material.
-    try { await input.rpc("fail", { connectionId, leaseId, reason }); } catch { /* retain durable state */ }
+    try { await input.rpc("fail", { connectionId, leaseId, reason,
+      ...(error instanceof SquareDirectRateLimitError ? { retryAfterSeconds: error.retryAfterSeconds } : {}) }); } catch { /* retain durable state */ }
   }
   return Object.freeze({
     async view() { return DirectViewSchema.parse(await input.rpc("status", {})); },
@@ -81,38 +83,8 @@ export function createDirectSquareService(input: {
       z.object({ mapped: z.literal(true) }).strict().parse(await input.rpc("map", { connectionId, locationId }));
     },
     async read(connectionId: string, historical?: DirectHistoricalWindow) {
-      const leaseId = randomUUID();
-      const range = historical === undefined ? undefined : DirectHistoricalWindowSchema.parse(historical);
-      if (range && Date.parse(range.windowEnd) > now().getTime()) throw denied();
-      let row = context(await input.rpc(range ? "claim_history" : "claim", { connectionId, leaseId, ...range }), connectionId, leaseId);
-      try {
-        if (range && (row.readKind !== "created" || row.windowStart !== range.windowStart || row.windowEnd !== range.windowEnd)) throw denied();
-        if (!row.ciphertext || !row.merchantId || !row.locationId || !row.accessExpiresAt || !row.windowStart || !row.windowEnd) throw denied();
-        let credential = openCredential(row.ciphertext, input.encryptionKey, aad(row));
-        if (credential.externalAuthorizedEntityReference !== row.merchantId || credential.accessExpiresAt !== row.accessExpiresAt) throw denied();
-        const square = provider(connectionId, leaseId);
-        if (Date.parse(credential.accessExpiresAt) <= now().getTime() + 5 * 60_000) {
-          const renewed = await square.refresh(credential), version = row.credentialVersion + 1;
-          const ciphertext = sealCredential(renewed, input.encryptionKey, aad(row, version));
-          let receipt: unknown;
-          try { receipt = await input.rpc("commit_refresh", { connectionId, leaseId, credentialVersion: version,
-            ciphertext, accessExpiresAt: renewed.accessExpiresAt }); }
-          catch { receipt = await input.rpc("reconcile", { connectionId, leaseId }); }
-          const committed = context(receipt, connectionId, leaseId);
-          if (committed.credentialVersion !== version || committed.ciphertext !== ciphertext ||
-            committed.accessExpiresAt !== renewed.accessExpiresAt || committed.generation !== row.generation) throw denied();
-          row = committed; credential = renewed;
-        }
-        if (Date.parse(credential.accessExpiresAt) <= now().getTime()) throw denied();
-        const page = await square.payments({ credential, workspaceId: row.workspaceId, connectionId,
-          merchantId: row.merchantId!, locationId: row.locationId!, windowStart: row.windowStart!, windowEnd: row.windowEnd!,
-          readKind: row.readKind,
-          cursor: row.cursor, cursorBindingFingerprint: row.cursorBindingFingerprint, cursorFingerprint: row.cursorFingerprint });
-        z.object({ stored: z.literal(true), hasMore: z.boolean() }).strict().parse(await input.rpc("commit_page", {
-          connectionId, leaseId, ...page,
-          cursorBindingFingerprint: page.cursor ? page.cursorBindingFingerprint : null
-        }));
-      } catch (error) { await fail(connectionId, leaseId, error); throw denied(); }
+      return readDirectSquarePage({ workspaceId: input.actor.workspaceId, connectionId, historical,
+        encryptionKey: input.encryptionKey, rpc: input.rpc, provider: input.provider, now, fail });
     },
     async disconnect(connectionId: string) {
       const leaseId = randomUUID();

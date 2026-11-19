@@ -1,3 +1,6 @@
+import { prepareVsiSharedEvidence } from "./shared-preparation";
+import { assertVsiPreparationScope } from "./preparation-scope";
+import { authorizeVsiRead } from "./retrieval";
 import { beginGoogleSheetsRead, bindGoogleSheetsRead, googleSheetsReadSources } from "@/lib/integrations/google-sheets/read-authority";
 import "server-only";
 import { NextResponse } from "next/server";
@@ -7,9 +10,10 @@ import { readVsiJson } from "@/lib/vsi/request-boundary";
 import { hasProhibitedVsiIdentifiers, VSI_PROHIBITED_INPUT_MESSAGE } from "@/lib/vsi/sensitive-input";
 import { getVsiConfig } from "@/lib/vsi/config";
 import { runVsiAnswer, VsiEngineError } from "@/lib/vsi/engine";
+import { qualificationAccountingPermit, qualificationSlot, VSI_QUALIFICATION_LIMITS, VsiQualificationError } from "@/lib/vsi/qualification";
 import { confirmVsiNote, conversationView, listVsiConversations, loadVsiConversation, mutateVsi, settleFailedVsi, settleGeneratedVsi, questionHash, requireVsiAccess, updateVsiSummary, VsiHttpError, vsiUuid, type ConversationRow } from "@/lib/vsi/storage";
 
-type RouteAction = "list" | "create" | "detail" | "rename" | "delete" | "messages" | "continue" | "remember" | "usage";
+type RouteAction = "list" | "create" | "detail" | "rename" | "delete" | "messages" | "continue" | "remember" | "usage" | "prepare";
 const base = z.object({ expectedWorkspaceId: vsiUuid });
 const NO_STORE = { "Cache-Control": "private, no-store", "Vary": "Cookie" };
 function json(value: unknown, status = 200) { return NextResponse.json(value, { status, headers: NO_STORE }); }
@@ -39,6 +43,24 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
       if (!rate.allowed) throw new VsiHttpError(429, "burst_limit", rateLimitMessage(rate));
     }
     operation = action;
+    if (action === "prepare") {
+      const input = base.extend({ question: z.string().trim().min(1).max(getVsiConfig().maxQuestionChars) }).strict().parse(raw);
+      if (hasProhibitedVsiIdentifiers(input.question)) throw new VsiHttpError(422, "prohibited_identifiers", VSI_PROHIBITED_INPUT_MESSAGE);
+      const scope = { actorUserId: access.userId, workspaceId, question: input.question };
+      assertVsiPreparationScope(scope);
+      const authorized = await authorizeVsiRead({ ...scope, supabase: access.supabase });
+      if (authorized.membership.role !== "owner") throw new VsiHttpError(403, "owner_required", "Only the workspace owner can prepare qualification evidence.");
+      const ticket = await beginGoogleSheetsRead(access.supabase, workspaceId, access.userId);
+      await bindGoogleSheetsRead(access.supabase, ticket.ticketId, []);
+      const { window, prepared } = await prepareVsiSharedEvidence(access.supabase, workspaceId, input.question);
+      await bindGoogleSheetsRead(access.supabase, ticket.ticketId, prepared.rows.flatMap(row => row.roots));
+      assertVsiPreparationScope(scope);
+      // Never reserve a question, seal an answer manifest, save a chat, or invoke a model.
+      return json({ workspaceId, actorUserId: access.userId, questionHash: questionHash(input.question),
+        preparedAt: new Date().toISOString(), window, fingerprint: prepared.fingerprint,
+        sources: prepared.rows.map(row => ({ identity: row.identity, hash: row.hash, provider: row.provider,
+          scope: row.scope, factTimes: row.factTimes })), coverage: prepared.coverage, limitations: prepared.limitations });
+    }
     const readTicket = ["create", "rename", "continue", "remember", "messages"].includes(action)
       ? await beginGoogleSheetsRead(access.supabase, workspaceId, access.userId) : null;
     if (readTicket) await bindGoogleSheetsRead(access.supabase, readTicket.ticketId, []);
@@ -82,6 +104,12 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
     const input = base.extend({ message: z.string().trim().min(1).max(config.maxQuestionChars), requestId: vsiUuid }).strict().parse(raw);
     if (hasProhibitedVsiIdentifiers(input.message)) throw new VsiHttpError(422, "prohibited_identifiers", VSI_PROHIBITED_INPUT_MESSAGE);
     const chat = await loadVsiConversation(access, conversationId);
+    const qualification = qualificationSlot({ actorUserId: access.userId, workspaceId, conversationId, question: input.message });
+    if (qualification) {
+      input.requestId = qualification.requestId;
+      // Reserve the full conservative per-slot bound, including uncertain transport.
+      config.requestReserveUsd = VSI_QUALIFICATION_LIMITS.reserveUsd;
+    }
     // A continued chat may reuse a small, permission-checked context window
     // from its original transcript. No names are inferred from a prose summary.
     let inheritedExchanges: typeof chat.exchanges = [];
@@ -103,9 +131,10 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
       if (!exchange) throw new VsiHttpError(404, "not_found", "This chat has been deleted. Start a new chat.");
       return json({ ...common, conversation: saved.conversation, exchange, replayed: true });
     }
+    const accountingPermit = qualificationAccountingPermit(qualification, claim.request);
     let generated;
     try {
-      generated = await runVsiAnswer({ reservedRequest: claim.request, readTicket: readTicket!, supabase: access.supabase, workspaceId, actorUserId: access.userId, question: input.message,
+      generated = await runVsiAnswer({ conversationId, reservedRequest: claim.request, readTicket: readTicket!, supabase: access.supabase, workspaceId, actorUserId: access.userId, question: input.message,
         recentMessages: [...inheritedExchanges, ...chat.exchanges].flatMap((item) => [
           { role: "user" as const, content: item.userMessage },
           { role: "assistant" as const, content: item.answer, citations: item.citations, publicResearchTopics: item.publicResearchTopics }
@@ -115,16 +144,17 @@ export async function vsiRoute(request: Request, action: RouteAction, conversati
       const uncertainCost = !engineError || engineError.accountingUncertain || engineError.usage.costEstimated === true;
       const usage = { ...engineError?.usage, estimatedCostUsd: uncertainCost ? Math.max(config.requestReserveUsd, engineError?.usage.estimatedCostUsd || 0) : engineError.usage.estimatedCostUsd,
         failed: true, costEstimated: uncertainCost };
-      await settleFailedVsi(access, { conversationId, id: claim.request.id, attempt: claim.request.attempt, usage });
+      await settleFailedVsi(access, { conversationId, id: claim.request.id, attempt: claim.request.attempt, usage }, accountingPermit);
       if (engineError) throw new VsiHttpError(503, "answer_unavailable", engineError.message);
       throw new VsiHttpError(503, "answer_unavailable", "Vaeroex could not complete this answer. Please retry; this question was not counted.");
     }
     await settleGeneratedVsi(access, { conversationId, readTicketId: readTicket!.ticketId, id: claim.request.id, attempt: claim.request.attempt, question: input.message, answer: generated.content,
       citations: generated.citations, publicResearchTopics: generated.publicResearchTopics || [], rememberProposal: generated.noteDraft || null, usage: generated.usage,
-      summary: updateVsiSummary(chat.row.context_summary, input.message, generated.content) }, generated.sharedManifestId);
+      summary: updateVsiSummary(chat.row.context_summary, input.message, generated.content) }, generated.sharedManifestId, accountingPermit);
     const saved = await loadVsiConversation(access, conversationId);
     return json({ ...common, conversation: saved.conversation, exchange: saved.exchanges.find((item) => item.id === claim.request.id) });
   } catch (error) {
+    if (error instanceof VsiQualificationError) return json({ workspaceId, error: "This qualification request is not enabled. No model request was sent.", code: "qualification_blocked" }, 403);
     if (error instanceof VsiHttpError) return json({ workspaceId, error: error.message, code: error.code }, error.status);
     if (error instanceof z.ZodError) return json({ workspaceId, error: "Check your message and try again. Chat accepts text only.", code: "invalid_request" }, 400);
     console.error("[vsi-api]", { action, operation });

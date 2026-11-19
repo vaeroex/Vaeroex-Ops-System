@@ -16,6 +16,7 @@ function load(file, deps) {
   return loaded.exports;
 }
 const preparationDiagnostics = load('lib/ai/shared-evidence/preparation-diagnostics.ts', { zod: { z } });
+const sharedContracts = load('lib/ai/shared-evidence/contracts.ts', { zod: { z } });
 const authority = load('lib/integrations/google-sheets/read-authority.ts', { zod: { z },
   '@/lib/ai/shared-evidence/preparation-diagnostics': preparationDiagnostics });
 const workspaceId = '11111111-1111-4111-8111-111111111111';
@@ -43,6 +44,8 @@ class VsiHttpError extends Error { constructor(status, code, message) { super(me
 class VsiEngineError extends Error {}
 let staleDuringProvider = false, providerTicket;
 const deps = {
+  '@/lib/vsi/qualification': load('lib/vsi/qualification.ts', { zod: { z }, 'node:crypto': require('node:crypto'),
+    '@/lib/ai/shared-evidence/contracts': sharedContracts }),
   'next/server': { NextResponse: { json: (value, init) => Response.json(value, init) } }, zod: { z },
   '@/lib/integrations/google-sheets/read-authority': authority,
   '@/lib/security/rate-limit': { enforceRateLimit: async () => ({ allowed: true }) },
@@ -81,6 +84,10 @@ deps['@/lib/vsi/storage'].settleGeneratedVsi = async (access, input, manifestId)
 };
 deps['@/lib/vsi/storage'].settleFailedVsi = async (access, input) =>
   deps['@/lib/vsi/storage'].mutateVsi(access, 'settle', { ...input, usage: { ...input.usage, failed: true } });
+// These scenarios exercise chat settlement, never qualification preparation.
+for (const [name, method] of [['./shared-preparation', 'prepareVsiSharedEvidence'], ['./preparation-scope', 'assertVsiPreparationScope'], ['./retrieval', 'authorizeVsiRead']]) {
+  deps[name] = { [method]: () => { throw new Error('Unexpected qualification preparation in legacy authority fixture'); } };
+}
 const { vsiRoute } = load('lib/vsi/http.ts', deps);
 function request() { return new Request('https://synthetic.test/api/vsi/conversations/' + conversationId + '/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedWorkspaceId: workspaceId, message: 'Review our aggregate operations', requestId }) }); }
 (async () => {
