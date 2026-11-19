@@ -222,13 +222,13 @@ export function HomeJourney() {
       <div className={styles.vignette} />
     </div>
     <figcaption className={styles.caption}>
-      <span className={styles.label}>Connected by design <small>Illustrative sculpture</small>
+      <span className={styles.label}>Drug Discovery <small>Vaeroex sculpture</small>
       </span>
       <span id="home-journey-description" className="sr-only">A dimensional rendering of the Vaeroex logo, preserving the source mark’s outline, proportions, negative space, and detached upper-right stroke.</span>
       <nav aria-label="Explore Vaeroex offerings" className={styles.offerings}>
-        <a href="/intelligence-systems">Intelligence</a>
-        <a href="/custom-business-systems">Software</a>
-        <a href="/website-development">Websites</a>
+        <a href="/drug-discovery-intelligence/demo">Compounds</a>
+        <a href="/drug-discovery-intelligence#evidence">Evidence</a>
+        <a href="/drug-discovery-intelligence#approval">Shortlist</a>
       </nav>
       {allowed && !failed ? <button
         type="button"

@@ -127,11 +127,18 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
       <PublicSiteHeader />
       <PublicPageHero
         eyebrow="Trust at Vaeroex"
-        title="Intelligence you can inspect, understand, and control."
-        description="VSI is the intelligence behind Vaeroex. Its safeguards help reduce unsupported outputs and keep findings grounded in relevant evidence. Learn how to check its findings, protect your information, and stay in control."
+        title="How to check the evidence behind an answer"
+        description="Inspect the sources, separate observations from predictions, and check what the evidence leaves unresolved. The controls available depend on the product and the records you can access."
       />
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-7xl">
+          <section className="mb-10 space-y-4 border-b border-white/15 pb-9 text-slate-300" aria-labelledby="research-evidence">
+            <h2 className="text-2xl font-semibold text-white" id="research-evidence">Drug Discovery Intelligence</h2>
+            <p className="max-w-3xl leading-7">The public demo uses fixed, published experimental structures. Private research projects use organization membership to control access to runs, structures, files, and decisions. Reviewers can compare a published measurement, a model prediction, and the reason a colleague recorded for advancing a compound.</p>
+            <p className="max-w-3xl leading-7">VSI for Drug Discovery is planned. The design calls for factual claims to cite authorized project records and identify missing or conflicting evidence. Researchers will need to check whether the cited source supports each claim. NIST’s generative AI risk profile discusses confidently stated false content and informs that design.</p>
+            <a href="https://doi.org/10.6028/NIST.AI.600-1" className="vx-text-link">Read the NIST Generative AI Profile (PDF)</a>
+          </section>
+          <h2 className="mb-5 text-2xl font-semibold text-white">Executive Intelligence and VSI Chat</h2>
           <TrustContent inApp={false} />
         </div>
       </section>

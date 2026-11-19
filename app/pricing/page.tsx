@@ -16,9 +16,9 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 import styles from "@/components/marketing/IntelligencePages.module.css";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Product & Project Pricing | Vaeroex",
+  title: "Product Access & Pricing | Vaeroex",
   description:
-    "Executive Intelligence at $250/month, plus custom business systems and website projects quoted by scope with a development fee, upfront deposit, and scoped monthly maintenance.",
+    "Explore the free Drug Discovery sample or request private access. Review Executive Intelligence subscription pricing and how Vaeroex quotes custom software.",
   path: "/pricing",
 });
 
@@ -49,20 +49,18 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
         <div className={styles.container}>
           <p className={styles.eyebrow}>Pricing &amp; availability</p>
           <h1>
-            Choose the right fit.
+            Product access
             <br />
-            <em>Product or project.</em>
+            <em>and pricing.</em>
           </h1>
           <div className={styles.heroGrid}>
             <p className={styles.heroLead}>
-              Subscribe to Executive Intelligence for a private business workspace,
-              or commission a custom business system or website.
+              Explore Drug Discovery with public sample compounds, or request a private research walkthrough. Executive Intelligence has a separate monthly subscription.
             </p>
             <div className={styles.heroSide}>
-              <strong>Two ways to get started.</strong>
+              <strong>Commissioned projects</strong>
               <p>
-                The product has a monthly subscription. Custom systems and websites
-                have an individual written project agreement and scoped monthly maintenance.
+                Custom software and websites are quoted against an agreed scope and support plan.
               </p>
             </div>
           </div>
@@ -70,7 +68,6 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
       </section>
 
       <section
-        id="intelligence-pricing"
         className={styles.sectionTight}
         aria-label="Vaeroex intelligence availability and pricing"
       >
@@ -88,6 +85,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
           {PUBLIC_SYSTEMS.map((system) =>
             system.availability === "available" ? (
               <article
+                id="intelligence-pricing"
                 key={system.id}
                 data-pricing-system={system.id}
                 className={styles.priceGrid}
@@ -135,11 +133,26 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
                   </p>
                 </div>
               </article>
-            ) : null,
+            ) : (
+              <article key={system.id} data-pricing-system={system.id} className={styles.priceGrid}>
+                <div className={styles.priceOverview}>
+                  <span className={styles.status}>{system.statusLabel}</span>
+                  <h2>{system.name}</h2>
+                  <p className={styles.priceDescription}>{system.description}</p>
+                  <div className={styles.actions}>
+                    <Link href="/drug-discovery-intelligence/demo" className={styles.primary}>Explore sample compounds <ArrowRight aria-hidden="true" /></Link>
+                    <Link href="/contact?inquiry=drug-discovery" className={styles.textLink}>{system.pricing.ctaLabel}</Link>
+                  </div>
+                </div>
+                <div className={styles.priceInclusions}>
+                  <h3>What you can try</h3>
+                  <p className={styles.copy}>The public demo is free and opens without an account. Inspect two published structures, shortlist a compound, and download a sample CSV. Private project access is by invitation. Launch pricing has not been announced.</p>
+                </div>
+              </article>
+            ),
           )}
           <p className={styles.caption}>
-            Start with Vaeroex to review the required legal terms before
-            checkout.
+            Starting an Executive Intelligence subscription opens the required legal terms before checkout.
           </p>
 
         </div>

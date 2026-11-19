@@ -562,7 +562,19 @@
     padding: 24px;
     box-shadow: 0 30px 80px #000c;
   }
-  .vx-mobile-menu > span {
+  .vx-mobile-link-group {
+    display: grid;
+    gap: 1px;
+    padding-bottom: 12px;
+  }
+  .vx-mobile-link-group > a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 13px;
+    border-bottom: 1px solid #ffffff14;
+  }
+  .vx-mobile-link-group > span {
     font: 9px monospace;
     letter-spacing: 0.1em;
     color: var(--public-muted);

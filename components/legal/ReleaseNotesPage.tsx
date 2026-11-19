@@ -7,9 +7,9 @@ export function ReleaseNotesPage({ inApp = false }: { inApp?: boolean }) {
     <div className="space-y-6">
       <section className="rounded-lg border border-vaeroex-silver/80 bg-white p-6 shadow-panel">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Release Notes</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Vaeroex product updates</h1>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight">{inApp ? "Vaeroex product updates" : "Executive Intelligence product updates"}</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          Customer-friendly updates about features, improvements, security updates, and bug fixes. Internal commit hashes are intentionally not shown.
+          Published changes to features, security, and the business workspace.
         </p>
       </section>
 

@@ -31,6 +31,7 @@ function form(category = 'Custom Business Systems', extra = {}) {
   reset();
   const actions = load(path.resolve('app/support/actions.ts'));
   const {INQUIRY_CATEGORIES,inquiryCategory} = load(path.resolve('lib/contact/inquiries.ts'));
+  assert.equal(inquiryCategory('drug-discovery'), 'Drug Discovery Intelligence walkthrough');
   assert.equal(inquiryCategory('website-development'), 'Website Development / Enhancement');
   assert.equal(inquiryCategory('__proto__'), 'General Inquiry');
   for (const category of Object.values(INQUIRY_CATEGORIES)) {
@@ -59,5 +60,5 @@ function form(category = 'Custom Business Systems', extra = {}) {
   reset(); data = form('Support Request',{return_path:'https://attacker.invalid'});
   await assert.rejects(actions.createSupportRequestAction(data), error => error.url.startsWith('/support?message='));
   assert.equal(inserted.length,1);
-  console.log('Project inquiries: seven category destinations, scoped context, validation, duplicate/unknown fields, configuration/rate/database failures, and legacy redirects passed. No network requests or real submissions.');
+  console.log('Project inquiries: public category destinations, scoped context, validation, duplicate/unknown fields, configuration/rate/database failures, and legacy redirects passed. No network requests or real submissions.');
 })().catch(error => { console.error(error); process.exitCode=1; });

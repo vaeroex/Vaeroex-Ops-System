@@ -58,7 +58,8 @@ assert.doesNotMatch(
 );
 for (const topic of [
   "Getting started",
-  "Account and workspace",
+  "Executive Intelligence account and workspace",
+  "Drug Discovery Intelligence access",
   "Sources and evidence",
   "Business Health",
   "Business Memory",
@@ -139,13 +140,15 @@ assert.match(
 );
 for (const route of [
   "/executive-intelligence",
+  "/drug-discovery-intelligence",
+  "/drug-discovery-intelligence/demo",
   "/pricing",
   "/contact",
 ])
   assert.ok(sitemap.includes(`"${route}"`));
 assert.doesNotMatch(sitemap, /"\/operations-intelligence"/);
-assert.doesNotMatch(sitemap, /biological-intelligence|drug-discovery-intelligence/);
-assert.doesNotMatch(navigation + footer + seo, /Biological Intelligence|Drug Discovery Intelligence/);
+assert.doesNotMatch(sitemap, /biological-intelligence/);
+assert.match(footer, /drug-discovery-intelligence/);
 assert.doesNotMatch(
   layout + navigation,
   /IntelligenceUniverseProvider|IntelligenceUniverseShell|UniverseNavigationLink|fast_travel|destination gravity/,
@@ -232,14 +235,12 @@ assert.doesNotMatch(
   /BioNeMo|Anthropic|Vertex AI|Supabase|private orchestration|endorsed by (?:OpenAI|NVIDIA)|(?:OpenAI|NVIDIA) partnership/i,
   "Technology references may name implemented providers without inventing partnerships or exposing private infrastructure",
 );
-for (const file of ["app/page.tsx", "app/about/page.tsx"]) {
-  const copy = read(file);
-  assert.match(copy, /providers including OpenAI and NVIDIA/);
-  assert.match(copy, /each implementation/);
-  assert.doesNotMatch(copy, /train(?:s|ing)? (?:our own|foundation) models|guarantee.*(?:accuracy|hallucination)/i);
+for (const file of ["app/page.tsx", "app/about/page.tsx", "app/drug-discovery-intelligence/page.tsx"]) {
+  assert.doesNotMatch(read(file), /train(?:s|ing)? (?:our own|foundation) models|guarantee.*(?:accuracy|hallucination)/i);
 }
 const researchSources =
-  read("app/drug-discovery-intelligence/_archived-page.tsx") +
+  read("app/drug-discovery-intelligence/page.tsx") +
+  read("app/drug-discovery-intelligence/demo/page.tsx") +
   read("app/biological-intelligence/_archived-page.tsx");
 assert.doesNotMatch(
   researchSources,

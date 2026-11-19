@@ -1,4 +1,5 @@
 export const INQUIRY_CATEGORIES = {
+  "drug-discovery": "Drug Discovery Intelligence walkthrough",
   "executive-intelligence": "Executive Intelligence",
   "custom-business-systems": "Custom Business Systems",
   "website-development": "Website Development / Enhancement",

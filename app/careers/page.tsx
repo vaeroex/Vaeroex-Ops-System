@@ -25,7 +25,7 @@ export default function CareersPage() {
       <PublicPageHero
         eyebrow="Vaeroex Executive Intelligence"
         title="We are not currently listing open positions."
-        description="Vaeroex is building evidence-backed intelligence systems carefully. As the company grows, future work may require engineers, product thinkers, operators, and domain specialists who value clarity, evidence, and responsible execution."
+        description="Vaeroex builds Drug Discovery Intelligence, Executive Intelligence, and custom software. Future work may call for engineers, research domain specialists, and product designers."
         actions={
           <a href={VAEROEX_MAILTO_LINKS.careers} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
             Share future interest

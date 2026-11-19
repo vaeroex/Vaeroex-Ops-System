@@ -18,8 +18,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <AuthShell
-      title="Welcome to Vaeroex"
-      subtitle="Sign in to access your Vaeroex products and connected systems."
+      title="Executive Intelligence sign in"
+      subtitle="Sign in to your business workspace and connected systems."
     >
       <form action={signInAction} className="space-y-4">
         <AuthMessage error={params?.error} message={params?.message} />
@@ -49,7 +49,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           Log in
         </button>
       </form>
-      <Link href="/#solutions" className="mt-5 inline-flex min-h-11 items-center text-sm font-semibold text-vaeroex-blue">Explore Solutions</Link>
+      <Link href="/drug-discovery-intelligence" className="mt-5 inline-flex min-h-11 items-center text-sm font-semibold text-vaeroex-blue">Looking for Drug Discovery Intelligence?</Link>
       <div className="mt-5 flex flex-wrap justify-between gap-3 text-sm text-muted">
         <Link href="/forgot-password" className="text-vaeroex-blue">
           Forgot password?

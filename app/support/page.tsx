@@ -1,5 +1,5 @@
 import { publicPageMetadata } from "@/lib/seo/public-seo";
-export const metadata = publicPageMetadata({ title: "Contact Support | Vaeroex", description: "Contact Vaeroex about accounts, available products, setup, billing, and support. Find the existing support and billing contact routes.", path: "/support" });
+export const metadata = publicPageMetadata({ title: "Contact Support | Vaeroex", description: "Get help with a Vaeroex account, a private research project, or an Executive Intelligence subscription. Request a Drug Discovery walkthrough through the contact form.", path: "/support" });
 import Link from "next/link";
 import { createSupportRequestAction } from "@/app/support/actions";
 import { PublicFooter } from "@/components/legal/PublicFooter";
@@ -23,7 +23,7 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
         <Link href="/" className="text-sm font-semibold text-vaeroex-blue">Vaeroex</Link>
         <h1 className="mt-4 text-3xl font-semibold">Contact Vaeroex support</h1>
         <p className="mt-3 text-sm leading-6 text-muted">
-          Send account, billing, setup, or intelligence-result questions for review.
+          Send account, setup, billing, or result questions for review. To try your own compounds in Drug Discovery Intelligence, <Link href="/contact?inquiry=drug-discovery" className="text-vaeroex-blue underline">request a research walkthrough</Link>.
         </p>
         <div className="mt-4 grid gap-2 rounded-lg border border-line bg-slate-50 p-4 text-sm leading-6 text-muted">
           <p>

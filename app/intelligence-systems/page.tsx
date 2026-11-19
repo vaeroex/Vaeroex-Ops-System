@@ -6,12 +6,12 @@ import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { WorkspaceCapture } from "@/components/marketing/WorkspaceScreenshots";
 import { VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
-import { SYSTEM_CATALOG } from "@/lib/systems/catalog";
+import { DRUG_DISCOVERY_SYSTEM } from "@/lib/marketing/public-systems";
 import styles from "@/components/marketing/Solutions.module.css";
 export const metadata: Metadata = publicPageMetadata({
   title: "Intelligence Systems | Vaeroex",
   description:
-    "Explore Executive Intelligence, available now, and Biological Intelligence and Drug Discovery Intelligence, both in development for research.",
+    "Explore Drug Discovery Intelligence for compound review and Executive Intelligence for business evidence, reporting and VSI Chat.",
   path: "/intelligence-systems",
 });
 export default function IntelligenceSystemsPage() {
@@ -22,14 +22,24 @@ export default function IntelligenceSystemsPage() {
         <div className={styles.container}>
           <p className={styles.eyebrow}>Intelligence Systems</p>
           <h1>
-            Information with context.
+            Choose your workspace.
             <br />
-            <span>Analysis you can examine.</span>
+            <span>Inspect the evidence.</span>
           </h1>
           <p className={styles.lead}>
-            Vaeroex develops intelligence products for working with information.
-            Start with Executive Intelligence, our available business product.
+            Research teams review compounds for their next experiment. Business teams use a separate workspace to understand changes in operating performance.
           </p>
+        </div>
+      </section>
+      <section className={styles.section} aria-labelledby="discovery-product">
+        <div className={styles.container}>
+          <p className={styles.eyebrow}>Flagship research product</p>
+          <h2 id="discovery-product">{DRUG_DISCOVERY_SYSTEM.name}</h2>
+          <p className={styles.copy}>Inspect a compound on a saved protein chain, check its measured assay against the source, and record why it belongs in a test batch. Approving the batch preserves the decisions and evidence in an exportable snapshot.</p>
+          <div className={styles.actions}>
+            <Link href="/drug-discovery-intelligence/demo" className="vx-button vx-button--primary">Explore sample compounds <ArrowUpRight size={17} aria-hidden="true" /></Link>
+            <Link href="/drug-discovery-intelligence" className="vx-text-link">Explore the private workflow</Link>
+          </div>
         </div>
       </section>
       <section className={styles.section}>
@@ -40,8 +50,7 @@ export default function IntelligenceSystemsPage() {
             <p className={styles.copy}>
               Bring supported business records, uploaded reports, and Business
               Notes into one workspace. Investigate performance, review findings
-              and their evidence, and work through questions with Vaeroex Super
-              Intelligence (VSI).
+              and their evidence, and work through questions with VSI Chat, the conversational interface for Vaeroex Super Intelligence.
             </p>
             <ul className={styles.list}>
               <li>
@@ -73,76 +82,6 @@ export default function IntelligenceSystemsPage() {
           <div className={styles.preview}>
             <WorkspaceCapture view="intelligence" />
           </div>
-        </div>
-      </section>
-      <section className={styles.section}>
-        <div className={styles.container}>
-          <p className={styles.eyebrow}>Looking ahead</p>
-          <h2>Intelligence products in development.</h2>
-          <p className={styles.copy}>
-            These descriptions outline intended research capabilities of products
-            under development, not currently available products. They do not
-            establish clinical validation, proven discovery results, or suitability
-            for medical decisions. Release dates have not been announced.
-          </p>
-          <div className={styles.two}>
-            {SYSTEM_CATALOG.filter(system => system.status === "development").map(({ name, description }) => (
-              <article className={styles.planned} key={name}>
-                <span>In Development</span>
-                <h3>{name}</h3>
-                <p>{description}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className={styles.section}>
-        <div className={styles.container}>
-          <p className={styles.eyebrow}>The product family</p>
-          <h2>Continuously developed. Built to evolve.</h2>
-          <p className={styles.copy}>
-            Vaeroex intelligence systems are under continuous development, with
-            ongoing work to refine existing products, expand capabilities, and
-            develop specialized systems. New capabilities become available as
-            they are tested and released.
-          </p>
-        </div>
-      </section>
-      <section className={styles.section}>
-        <div className={`${styles.container} ${styles.split}`}>
-          <div>
-            <p className={styles.eyebrow}>Our approach</p>
-            <h2>
-              Evidence, uncertainty,
-              <br />
-              and human judgment.
-            </h2>
-            <p className={styles.copy}>
-              Useful analysis makes its basis and limits clear. People remain
-              responsible for reviewing recommendations and deciding what to do
-              next.
-            </p>
-            <div className={styles.actions}>
-              <Link href="/trust" className="vx-text-link">
-                Explore the Trust Center
-                <ArrowUpRight size={17} aria-hidden="true" />
-              </Link>
-            </div>
-          </div>
-          <ul className={styles.list}>
-            <li>
-              <strong>Keep evidence visible</strong>Connect supported findings
-              to the information behind them.
-            </li>
-            <li>
-              <strong>Respect uncertainty</strong>Distinguish observations from
-              interpretation and identify missing context.
-            </li>
-            <li>
-              <strong>Preserve human judgment</strong>Review drafts and
-              recommendations before acting.
-            </li>
-          </ul>
         </div>
       </section>
       <PublicFooter />

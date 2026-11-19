@@ -43,12 +43,12 @@ export default function OperationsIntelligencePage() {
               <p className={styles.copy}>{VAEROEX_PLAN_PRICE_LABEL} · Monthly subscription</p>
               <div className={styles.actions}>
                 <StartWithVaeroexMenu className={styles.primary} label="Start Executive Intelligence" />
-                <a href="#product-experience" className={styles.textLink}>Explore the workspace<ArrowRight aria-hidden="true" /></a>
+                <Link href="/login" className={styles.textLink}>Executive Intelligence sign in<ArrowRight aria-hidden="true" /></Link>
               </div>
             </div>
             <div className={styles.heroSide}>
               <strong>Turn everyday records into useful questions.</strong>
-              <p>Investigate changes in business performance with VSI. Ask follow-up questions, compare supported information, and examine the evidence and limitations behind an answer.</p>
+              <p>Investigate changes in business performance with VSI Chat. Ask follow-up questions, compare supported information, and examine the evidence and limitations behind an answer.</p>
               <a href="#vsi" className={styles.textLink}>Explore included VSI<ArrowRight aria-hidden="true" /></a>
             </div>
           </div>
@@ -120,7 +120,7 @@ export default function OperationsIntelligencePage() {
             <p className={story.aside}>A business conversation with room to investigate, compare, and refine.</p>
           </div>
           <div className={story.prose}>
-            <p className={story.lead}>VSI brings business calculations, evidence, and conversation together. Ask what changed, explore possible explanations, and identify the additional information needed to support a conclusion.</p>
+            <p className={story.lead}>VSI Chat is the conversational interface for Vaeroex Super Intelligence. It uses supported business calculations and workspace evidence. Ask what changed, explore possible explanations, and identify the additional information needed to support a conclusion.</p>
             <p>Explore business performance, investigate the evidence behind an insight, research market trends, develop marketing ideas, and draft plans, SOPs, or meeting agendas. Ask follow-up questions and refine your thinking with relevant business context.</p>
             <p>Review supporting evidence, source freshness, and missing context. Treat recommendations as drafts and apply your judgment before acting.</p>
           </div>

@@ -29,11 +29,11 @@ export async function PublicSiteHeader() {
         </Link>
         <PublicNavigation loggedIn={loggedIn} />
         <div className="vx-header-actions">
-          <Link href={(loggedIn ? "/systems" : "/login") as Route}>
-            {loggedIn ? "Your Systems" : "Log in"}
+          <Link href={(loggedIn ? "/systems" : "/login") as Route} aria-label={loggedIn ? "Your Executive Intelligence systems" : "Executive Intelligence sign in"}>
+            {loggedIn ? "Your systems" : "Sign in"}
           </Link>
-          <Link href="/contact?inquiry=custom-business-systems" className="vx-button vx-button--primary">
-            Discuss a Project
+          <Link href="/contact?inquiry=drug-discovery" className="vx-button vx-button--primary">
+            Request a walkthrough
             <ArrowUpRight size={15} aria-hidden="true" />
           </Link>
         </div>

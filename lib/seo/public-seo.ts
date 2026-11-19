@@ -12,6 +12,11 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
   const canonicalPath = path === "/" ? "/" : path;
   const canonical = `${PUBLIC_SITE_URL}${canonicalPath === "/" ? "" : canonicalPath}`;
 
+  const discovery = path === "/" || path === "/drug-discovery-intelligence" || path === "/drug-discovery-intelligence/demo";
+  const previewHost = typeof process !== "undefined" && process.env.VERCEL_ENV === "preview" ? process.env.VERCEL_URL : undefined;
+  const assetOrigin = previewHost ? `https://${previewHost}` : PUBLIC_SITE_URL;
+  const image = discovery ? `${assetOrigin}/brand/drug-discovery-social.png` : `${PUBLIC_SITE_URL}/brand/vaeroex-social.jpg`;
+
   return {
     title,
     description,
@@ -26,10 +31,10 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
       type: "website",
       images: [
         {
-          url: `${PUBLIC_SITE_URL}/brand/vaeroex-social.jpg`,
+          url: image,
           width: 1200,
           height: 630,
-          alt: "Vaeroex"
+          alt: discovery ? "Vaeroex Drug Discovery Intelligence. Acetazolamide bound to human carbonic anhydrase II, PDB 3HS4." : "Vaeroex"
         }
       ]
     },
@@ -38,7 +43,7 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
       card: "summary_large_image",
       title,
       description,
-      images: [`${PUBLIC_SITE_URL}/brand/vaeroex-social.jpg`]
+      images: [image]
     }
   };
 }
@@ -50,7 +55,7 @@ export const organizationJsonLd = {
   legalName: "Vaeroex LLC",
   url: PUBLIC_SITE_URL,
   logo: `${PUBLIC_SITE_URL}/brand/vaeroex-logo-white-wordmark.png`,
-  description: "Vaeroex develops software templates, intelligence systems, AI tools, custom business software, and new or enhanced websites.",
+  description: "Vaeroex builds Drug Discovery Intelligence for compound and evidence review, Executive Intelligence for business operations, and custom software for client workflows.",
   address: {
     "@type": "PostalAddress",
     streetAddress: "5319 University Dr, Unit 762",

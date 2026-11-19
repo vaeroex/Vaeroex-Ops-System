@@ -10,7 +10,7 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Contact Vaeroex",
-  description: "Contact Vaeroex about Executive Intelligence, a custom business system, website development, support, billing, or partnerships.",
+  description: "Request a Drug Discovery Intelligence walkthrough, scope a custom software project, or reach Executive Intelligence support and billing.",
   path: "/contact"
 });
 
@@ -28,14 +28,16 @@ type ContactPageProps = {
 
 export default async function ContactPage({ searchParams }: ContactPageProps) {
   const params = await searchParams;
+  const discovery = params?.inquiry === "drug-discovery";
+  const custom = params?.inquiry === "custom-business-systems";
 
   return (
     <main className="vaeroex-public-site min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
       <PublicPageHero
         eyebrow="Contact Vaeroex"
-        title="Let’s talk about your business."
-        description="Ask about Executive Intelligence, describe a custom system or website project, or contact us for support, billing, and partnerships."
+        title={discovery ? "Request a Drug Discovery walkthrough" : custom ? "Discuss a custom software project" : "Contact the Vaeroex team"}
+        description={discovery ? "Tell us which research decision you want to explore. We can walk through the private project workflow and discuss access for your team." : custom ? "Tell us what your team needs to build or connect, who will use it, and how the work happens today." : "Choose a Drug Discovery walkthrough, a custom software project, or help with an existing Executive Intelligence account."}
       />
 
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">

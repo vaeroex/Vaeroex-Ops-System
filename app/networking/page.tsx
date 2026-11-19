@@ -7,13 +7,13 @@ import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emai
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Vaeroex Network | Software, AI & Technology Relationships",
-  description: "Connect with Vaeroex around practical software, AI tools, integrations, websites, and strategic technology relationships.",
+  title: "Vaeroex Network | Research & Technology Partnerships",
+  description: "Connect with Vaeroex about research workflows, data integrations, and technology partnerships.",
   path: "/networking"
 });
 
 const relationshipTypes = [
-  ["Operators and domain experts", "People with practical experience in the work, needs, and challenges of their domain."],
+  ["Researchers, operators, and domain experts", "People with practical experience in the work, needs, and challenges of their domain."],
   ["Technology and integration relationships", "Organizations that can help connect Vaeroex with the external systems customers already use."],
   ["Software, AI, and website implementation relationships", "Professionals interested in building, connecting, or improving useful software and digital experiences."],
   ["Strategic relationships", "Industry experts and aligned organizations interested in the long-term Vaeroex direction."]
@@ -32,7 +32,7 @@ export default function NetworkingPage() {
       <PublicPageHero
         eyebrow="Vaeroex Network"
         title="Connect around what comes next."
-        description="The Vaeroex Network brings together operators, developers, domain experts, and technology organizations interested in practical software, AI tools, integrations, and digital experiences."
+        description="Vaeroex welcomes conversations with researchers, operators, and developers working on compound review, data integrations, or software for a specific team."
         actions={
           <a href={VAEROEX_MAILTO_LINKS.partners} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
             Start a partner conversation
@@ -90,10 +90,10 @@ export default function NetworkingPage() {
         eyebrow="Partner interest"
         title="Tell Vaeroex where your experience creates practical value."
         description={`Send a concise introduction to ${VAEROEX_CONTACT_EMAILS.partners}. Include your background, organization, and the relationship you want to explore.`}
-        primaryHref="/contact"
+        primaryHref="/contact?inquiry=partnership"
         primaryLabel="Contact Vaeroex"
-        secondaryHref="/#solutions"
-        secondaryLabel="Explore Solutions"
+        secondaryHref="/intelligence-systems"
+        secondaryLabel="Explore products"
       />
       <PublicFooter />
     </main>

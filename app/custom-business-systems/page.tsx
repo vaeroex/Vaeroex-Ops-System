@@ -11,9 +11,9 @@ import {
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 import styles from "@/components/marketing/Solutions.module.css";
 export const metadata: Metadata = publicPageMetadata({
-  title: "Custom Business Systems | Vaeroex",
+  title: "Custom Software Services | Vaeroex",
   description:
-    "Build a new business system or enhance existing software with custom features, integrations, automation, and AI. Scope and feasibility are defined through discovery.",
+    "Scope internal research tools, data integrations, dashboards, and workflow software for teams in research, services, and operations.",
   path: "/custom-business-systems",
 });
 export default function ServicePage() {
@@ -22,22 +22,19 @@ export default function ServicePage() {
       <PublicSiteHeader />
       <section className={styles.hero} data-offering="systems">
         <div className={styles.container}>
-          <p className={styles.eyebrow}>Custom Business Systems</p>
+          <p className={styles.eyebrow}>Custom software services</p>
           <h1>
             Built for the way <span>your business works.</span>
           </h1>
           <p className={styles.lead}>
-            Build a new system around the way your business works, or extend the
-            software you already use with custom features, integrations,
-            automation, and AI. Start with the people, information, and workflow
-            you want to support.
+            Commission internal research tools, data integrations, dashboards, or workflow software. We work with research groups and businesses across industries to connect the systems they already use.
           </p>
           <div className={styles.actions}>
             <Link
               href="/contact?inquiry=custom-business-systems"
               className="vx-button vx-button--primary"
             >
-              Discuss Your Project
+              Discuss a project
               <ArrowUpRight size={17} aria-hidden="true" />
             </Link>
           </div>
@@ -84,6 +81,9 @@ export default function ServicePage() {
                 <strong>Document recognition &amp; extraction</strong>Turn scanned
                 documents, receipts, and images into searchable text and structured
                 information for review.
+              </li>
+              <li>
+                <strong>Internal research tools</strong>Track reference records, route review requests, and retain the evidence behind a team decision.
               </li>
               <li>
                 <strong>Company knowledge search</strong>Help teams find answers

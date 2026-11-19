@@ -12,7 +12,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Help & Support | Vaeroex",
-  description: "Find help for Vaeroex accounts, available products, commissioned software and website projects, billing, and product-specific Executive Intelligence guides.",
+  description: "Find Drug Discovery sample compounds and walkthroughs, Executive Intelligence account and billing support, and help with commissioned software.",
   path: "/help"
 });
 
@@ -31,9 +31,10 @@ export default async function PublicHelpPage() {
   const workspaceHref = (loggedIn ? "/app/help" : "/login") as Route;
   const productGuideTitles = new Set(["Sources and evidence", "Plug-ins", "Business Notes", "Vaeroex Super Intelligence", "Business Health", "Intelligence and Explain Finding", "Saved Analyses", "Business Memory"]);
   const categories: HelpCategory[] = [
-    { title: "Commissioned systems and website projects", description: "For an existing project, use the support route and include your project reference. Support and responsibilities follow your individual agreement. Hosted product guides do not automatically apply to custom implementations.", links: [{ label: "Contact support", href: "/support" }, { label: "Discuss a project", href: "/contact" }] },
-    { title: "Getting started", description: "Learn what Vaeroex does, what it costs, and how to get started.", links: [{ label: "Explore Executive Intelligence", href: "/executive-intelligence" }, { label: "View pricing", href: "/pricing" }, { label: loggedIn ? "Open workspace guides" : "Login for workspace guides", href: workspaceHref }] },
-    { title: "Account and workspace", description: "Sign in, create an account, reset access, or return to workspace guidance.", links: [{ label: "Login", href: "/login" }, { label: "Create account", href: "/signup" }, { label: "Reset password", href: "/forgot-password" }] },
+    { title: "Drug Discovery Intelligence access", description: "Explore sample compounds without an account. Private research projects require an invitation. Request a walkthrough to discuss the workflow and access for your team.", links: [{ label: "Explore sample compounds", href: "/drug-discovery-intelligence/demo" }, { label: "Request a walkthrough", href: "/contact?inquiry=drug-discovery" }] },
+    { title: "Commissioned systems and website projects", description: "For an existing project, use the support route and include your project reference. Support and responsibilities follow your individual agreement. Hosted product guides do not automatically apply to custom implementations.", links: [{ label: "Contact support", href: "/support" }, { label: "Discuss a project", href: "/contact?inquiry=custom-business-systems" }] },
+    { title: "Getting started with Executive Intelligence", description: "Explore the subscription, pricing, and business workspace guides.", links: [{ label: "Explore Executive Intelligence", href: "/executive-intelligence" }, { label: "View pricing", href: "/pricing" }, { label: loggedIn ? "Open workspace guides" : "Login for workspace guides", href: workspaceHref }] },
+    { title: "Executive Intelligence account and workspace", description: "Sign in to the business workspace, create an account, or reset your password.", links: [{ label: "Login", href: "/login" }, { label: "Create account", href: "/signup" }, { label: "Reset password", href: "/forgot-password" }] },
     { title: "Sources and evidence", description: "Use Files & Notes to upload reports, review imported data, and check where an answer comes from.", links: [{ label: loggedIn ? "Open evidence guides" : "Login for evidence guides", href: workspaceHref }, { label: "Review Trust Center", href: "/trust" }] },
     { title: "Plug-ins", description: "Connect Square, QuickBooks Online, Zoho Books, or Loyverse. Check each plug-in’s requirements, available data, and connection status.", links: [{ label: loggedIn ? "Open plug-in guides" : "Login for plug-in guides", href: (loggedIn ? "/app/help?q=plug-ins" : "/login") as Route }, { label: "View supported plug-ins", href: "/executive-intelligence#plug-ins" }] },
     { title: "Business Notes", description: "Add the context reports miss: staffing changes, closures, goals, and decisions. Review extracted information before approving it.", links: [{ label: loggedIn ? "Open Business Notes guide" : "Login for Business Notes guides", href: (loggedIn ? "/app/help?q=Business%20Notes" : "/login") as Route }] },
@@ -53,7 +54,7 @@ export default async function PublicHelpPage() {
       <PublicPageHero
         eyebrow="Vaeroex Support"
         title="Find the answer or reach the right team."
-        description="Get help with your account, available products, commissioned systems, website projects, or billing. The workspace guides below are specific to Executive Intelligence; product access requirements apply. Custom project support follows the agreed scope."
+        description="Find Drug Discovery access, Executive Intelligence account and billing support, or the team responsible for your custom project."
         actions={
           <>
             <Link href="/support" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
@@ -67,7 +68,7 @@ export default async function PublicHelpPage() {
 
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-14 sm:px-6 sm:py-16">
         <div className="mx-auto max-w-7xl">
-          <PublicSectionHeading eyebrow="Help by task" title="Start with what you need to accomplish." description="Accounts, billing, and project contacts are shared entrances. Workspace, plug-in, evidence, and analysis guides are for Executive Intelligence." />
+          <PublicSectionHeading eyebrow="Help by task" title="Start with what you need to accomplish." description="Use the research access links for Drug Discovery. The business workspace, plug-in, and billing guides cover Executive Intelligence." />
           <GoogleSheetsPilotNotice className="mt-5 text-slate-300" showReconnect />
           <div className="mt-7 grid gap-3 md:grid-cols-2">
             {categories.map((category) => (

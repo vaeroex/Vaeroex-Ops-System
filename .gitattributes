@@ -5,3 +5,6 @@ scripts/science-sources/* -text -whitespace
 
 # Preserve raw audit logs, including terminal carriage returns and final newlines.
 docs/security/audit-evidence/**/*.log -text -whitespace
+
+# Deposited fixed-column PDB files retain their original bytes and padding.
+public/brand/compound-demo/*.pdb -text -whitespace

@@ -1,0 +1,63 @@
+.page {max-width:1280px; margin:auto; padding:clamp(22px,4vw,52px) clamp(18px,5vw,64px) 70px; color:#f2f8f5}
+.page a:not(:global(.vx-button)) {color:var(--public-interactive)}
+.back,.file,.evidence a,.decision a {display:inline-flex; align-items:center; gap:6px}
+.back,.decision a,.file,.evidence a {text-decoration:underline; text-underline-offset:4px; font-size:.9rem}
+.intro {margin:clamp(25px,4vw,48px) 0 20px}
+.kicker {color:var(--public-interactive); font:600 .71rem/1.4 Manrope, sans-serif; letter-spacing:.12em; text-transform:uppercase; margin:0 0 .65rem}
+.page h1,.page h2,.page h3 {line-height:1.12; letter-spacing:-.04em; font-weight:550}
+.intro h1 {font-size:clamp(2.25rem,5vw,4.4rem); margin:0 0 12px}
+.intro >p:last-child,.reviewHeading >p:last-child {max-width:68ch; color:#c1d1d5; line-height:1.65}
+.picker,.controls,.legend,.approval {display:flex; flex-wrap:wrap; gap:8px}
+.picker {margin:20px 0 16px}
+.picker a,.controls button,.primary {border-radius:4px; display:inline-flex; justify-content:center; align-items:center; min-height:44px; gap:8px; padding:9px 15px; border:1px solid #62828d; background:#172d39; font-size:.9rem; font-weight:650}
+.picker small {font:500 .68rem ui-monospace,monospace; letter-spacing:.02em}
+.page .picker a[aria-current=true],.primary {color:var(--public-navy); background:var(--public-blue); border-color:var(--public-blue)}
+.page .picker a[aria-current=true]:hover,.primary:hover:not(:disabled) {background:var(--public-interactive); color:var(--public-navy)}
+.picker a:hover,.controls button:hover {border-color:var(--public-interactive)}
+.research {display:grid; grid-template-columns:minmax(0,1.25fr) minmax(280px,1fr); border:1px solid #395662; border-radius:8px; overflow:clip; background:#142833}
+.viewer,.evidence {min-width:0}
+.viewer {padding:14px; align-self:center}
+.stage {position:relative; overflow:hidden; touch-action:none; user-select:none; cursor:grab; background:#101e2a; border:1px solid #395662; border-radius:5px}
+.stage:active {cursor:grabbing}
+.stage svg {display:block; width:100%; height:auto}
+.stageLabel {position:absolute; left:12px; top:10px; font:500 .67rem ui-monospace,monospace; color:#c8d6dd; background:#101e2ae0; padding:3px 6px; border-radius:2px; pointer-events:none}
+.controls {margin:12px 0 9px; gap:5px}
+.controls button {color:#eaf1f2; padding:6px 10px; min-width:44px}
+.help {font-size:.8rem; line-height:1.6; margin:4px 0 10px; color:#bbccd1}
+.legend {font-size:.72rem; color:#ccdade; padding:0; margin:0; list-style:none; column-gap:12px; row-gap:5px}
+.legend li {display:flex; align-items:center; gap:5px}
+.legend span {width:8px; height:8px; border-radius:50%}
+.evidence {border-left:1px solid #395662; padding:clamp(18px,3vw,34px)}
+.evidence h2,.review h2 {font-size:clamp(1.8rem,3vw,2.6rem); margin:0 0 6px}
+.target,.evidence p:not(.kicker),.decision,.approval p,.snapshot p,.snapshot li {color:#c2d1d4; line-height:1.6; font-size:.9rem}
+.fields {margin:14px 0; display:grid; gap:6px}
+.fields div {display:flex; align-items:baseline; justify-content:space-between; gap:9px; border-bottom:1px solid #395662; padding:5px 0}
+.fields dt,.measure span {font-size:.79rem; color:#bbccd1}
+.fields dd {margin:0; font-size:.9rem; font-weight:650}
+.measure {display:grid; gap:5px; margin:16px 0; border-left:2px solid #78979c; padding-left:12px}
+.measure span {display:block}
+.measure a {justify-self:start}
+.review {margin:clamp(30px,5vw,62px) 0 22px}
+.reviewHeading {margin-bottom:18px}
+.decisions {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px}
+.decision {border:1px solid #476673; border-radius:6px; background:#152a36; padding:clamp(14px,2vw,24px)}
+.check {display:flex; gap:10px; align-items:center; min-height:42px; color:#fff; font-weight:650}
+.check input {width:20px; height:20px; accent-color:var(--public-blue)}
+.note {display:grid; gap:6px; margin-top:15px; font-size:.84rem}
+.note textarea {width:100%; resize:vertical; min-height:65px; padding:8px; border-radius:3px; border:1px solid #66818a; background:#101e2a; color:#f2f8f5}
+.note textarea::placeholder {color:#acbec5}
+.approval {align-items:center; margin:15px 0}
+.primary:disabled {background:#28414c; color:#b4c6ca; border-color:#557079; cursor:default}
+.snapshot:not(:empty) {border:1px solid #54727e; border-radius:5px; background:#17323d; padding:20px}
+.snapshot h3 {font-size:1.3rem; margin:0 0 8px}
+.snapshot ul {padding-left:18px; list-style:disc; margin:8px 0 12px; overflow-wrap:anywhere}
+.snapshot p {margin:8px 0}
+.access {border-top:1px solid #395662; margin-top:30px; padding-top:26px}
+.page :is(a,button,input,textarea,[tabindex]):focus-visible {outline:3px solid var(--public-interactive); outline-offset:3px}
+@media(max-width:760px) {
+ .research,.decisions {grid-template-columns:1fr}
+ .evidence {border-left:0; border-top:1px solid #395662}
+ .intro {margin:23px 0 10px}
+ .viewer {padding:10px}
+ .picker a {padding:8px 11px}
+}

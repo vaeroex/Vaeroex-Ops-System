@@ -4,7 +4,7 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Trust and Security | Vaeroex",
-  description: "Learn how Vaeroex protects workspace access, uses evidence to help reduce unsupported outputs, explains missing information, and keeps decisions under your control.",
+  description: "Review current access and evidence controls for Drug Discovery Intelligence and VSI Chat in Executive Intelligence, and see what is planned for research.",
   path: "/trust"
 });
 

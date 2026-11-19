@@ -200,6 +200,7 @@ async function submitSupportRequest(formData: FormData): Promise<ContactFormStat
           "General Question",
           "General Inquiry",
           "Platform Questions",
+          "Drug Discovery Intelligence walkthrough",
           "Executive Intelligence",
           "Custom Business Systems",
           "Website Development / Enhancement",

@@ -33,6 +33,7 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
     if (state.error || state.message) feedback.current?.focus();
   }, [state]);
   const project = isProjectInquiry(category);
+  const discovery = category === INQUIRY_CATEGORIES["drug-discovery"];
   function field(
     name: string,
     label: string,
@@ -135,7 +136,7 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
         Contact form
       </p>
       <h2 className="mt-2 text-2xl font-semibold">
-        Tell us what you have in mind.
+        {discovery ? "Walkthrough request" : "Your inquiry"}
       </h2>
       <p className="mt-2 text-sm leading-6 text-slate-300">
         A brief description is enough to start. Fields marked * are required.
@@ -213,7 +214,7 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
               maxLength: 320,
             })}
             <div className="md:col-span-2">
-              {field("company", "Business name")}
+              {field("company", discovery ? "Organization or research group" : "Business name")}
             </div>
             <div className="md:col-span-2">
               {field(
@@ -225,7 +226,7 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
                   required: true,
                   multiline: true,
                   maxLength: 6000,
-                  hint: project
+                  hint: discovery ? "A general description is enough. Keep proprietary structures, compound lists, and patient information out of this form." : project
                     ? `Tell us whether you need a new ${category === "Custom Business Systems" ? "system" : "website"} or improvements to an existing one, and what you want it to do.`
                     : undefined,
                 },
