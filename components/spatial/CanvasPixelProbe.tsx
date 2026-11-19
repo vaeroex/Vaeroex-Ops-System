@@ -32,7 +32,7 @@ export function probeCanvasPixels(canvas: HTMLCanvasElement): Exclude<CanvasPixe
 }
 
 export function probeRenderedCanvas(
-  { camera, gl, scene }: RootState,
+  { camera, gl, scene }: Pick<RootState, "camera" | "gl" | "scene">,
   onResult: (result: Exclude<CanvasPixelProbeResult, "pending">) => void
 ) {
   gl.domElement.dataset.canvasProbe = "created";

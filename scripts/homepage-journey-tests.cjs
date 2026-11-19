@@ -318,7 +318,7 @@ finishA.dispose(); finishB.dispose();
 // actual World hooks with that same real Three camera; only scheduling/WebGL is
 // mocked, so a changed Canvas camera prop alone cannot satisfy this regression.
 function rendererLensFixture(source) {
-  const slots = [], effects = [];
+  const slots = [], effects = [], probes = [];
   let cursor = 0, frame, scene, scheduled = false, invalidations = 0, projectionUpdates = 0;
   const same = (a, b) => a && b && a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
   const memo = (create, deps) => {
@@ -343,16 +343,20 @@ function rendererLensFixture(source) {
   const update = camera.updateProjectionMatrix.bind(camera);
   camera.updateProjectionMatrix = () => { projectionUpdates++; update(); };
   const state = {
-    camera, size: { width: 1440, height: 900 },
+    camera, scene: {}, size: { width: 1440, height: 900 },
     gl: { domElement: { dataset: {} }, info: { render: { triangles: 0, calls: 0 } } },
     invalidate() { scheduled = true; invalidations++; },
   };
   const jsx = (type, props) => ({ type, props });
   const mocks = {
     react, 'react/jsx-runtime': { jsx, jsxs: jsx }, three: require('three'),
-    '@react-three/fiber': { Canvas: 'fixture-canvas', useThree: () => state, useFrame(callback) { frame = callback; } },
+    '@react-three/fiber': { Canvas: 'fixture-canvas', useThree: () => ({ ...state }), useFrame(callback) { frame = callback; } },
     '@/components/spatial/PublicSpatialCanvasGuard': { PublicSpatialContextGuard: () => null },
-    '@/components/spatial/CanvasPixelProbe': { probeRenderedCanvas: () => () => {} },
+    '@/components/spatial/CanvasPixelProbe': { probeRenderedCanvas({ camera, gl, scene }) {
+      const probe = { camera, gl, scene, cleaned: false };
+      probes.push(probe);
+      return () => { probe.cleaned = true; };
+    } },
     '@/components/spatial/SpatialResizeObserver': { SpatialResizeObserver: class {} },
     '../clarity/ClarityEngineWorld': { StudioEnvironment: () => null },
     './SculptureGeometry': loadTypeScript('components/marketing/journey/SculptureGeometry.ts'),
@@ -368,7 +372,7 @@ function rendererLensFixture(source) {
   } });
   const props = { progress: .5, finalShift: 0, active: true, compact: false, onReady() {}, onFailure() {} };
   return {
-    camera, state, get scene() { return scene; },
+    camera, state, probes, get scene() { return scene; },
     get invalidations() { return invalidations; }, get projectionUpdates() { return projectionUpdates; },
     render(changes = {}, width = state.size.width, height = state.size.height) {
       Object.assign(props, changes);
@@ -457,7 +461,16 @@ try {
   const settledUpdates = renderer.projectionUpdates, settledInvalidations = renderer.invalidations;
   renderer.render({ finalShift: 0 }); assert.equal(renderer.settle(), 0);
   assert.equal(renderer.projectionUpdates, settledUpdates); assert.equal(renderer.invalidations, settledInvalidations);
+  renderer.render({ progress: .5376 }); renderer.settle();
+  assert.equal(renderer.probes.length, 1, 'Scrolling and resizing a ready canvas must never restart its pixel probe');
+  assert.equal(renderer.probes[0].cleaned, false);
+  renderer.state.scene = {};
+  renderer.render();
+  assert.equal(renderer.probes.length, 2, 'Replacing the scene requests a fresh readiness check');
+  assert.equal(renderer.probes[0].cleaned, true);
+  assert.equal(renderer.probes[1].scene, renderer.state.scene);
 } finally { renderer.unmount(); }
+assert.equal(renderer.probes.at(-1).cleaned, true, 'Unmount cancels the active readiness check');
 console.log('Actual World hook fixture: same-camera 47° → 57° → 47° resize, rebuilt projection, responsive offsets/final CTA following, coalesced demand frames and no idle invalidation passed. React/R3F scheduling is mocked; no WebGL claim.');
 for (const result of results) console.log('Logo journey ' + result.label + ': ' + result.pathLength.toFixed(1) + ' camera units; ' + result.closest.toFixed(3) + ' minimum prism clearance ' + JSON.stringify(result.closestSample) + '; max step ' + result.maxCameraStep.toFixed(3) + ', max turn ' + result.maxTurn.toFixed(3) + '°; ' + result.world.parts.length + ' components / ' + result.triangles + ' triangles / ' + result.batches + ' batches.');
 for (const geometries of geometryByQuality.values()) Object.values(geometries).forEach(geometry => geometry.dispose());
