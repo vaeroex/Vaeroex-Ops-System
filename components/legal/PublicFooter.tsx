@@ -1,19 +1,14 @@
 import Link from "next/link";
-import type { Route } from "next";
 import "@/components/marketing/public-design.css";
 import { VAEROEX_COMPANY_ADDRESS_LINES, VAEROEX_CONTACT_EMAILS, VAEROEX_FOOTER_LOCATION, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { legalLinks } from "@/lib/legal/content";
 
-const platformLinks: Array<[string, Route]> = [
+const researchLinks = [
   ["Drug Discovery Intelligence", "/drug-discovery-intelligence"],
   ["Explore sample compounds", "/drug-discovery-intelligence/demo"],
+  ["AI in research and development", "/drug-discovery-intelligence#research"],
   ["Request a walkthrough", "/contact?inquiry=drug-discovery"],
-  ["Executive Intelligence", "/executive-intelligence"],
-  ["Executive pricing", "/pricing#intelligence-pricing"],
-  ["Custom software", "/custom-business-systems"],
-  ["Discuss a project", "/contact?inquiry=custom-business-systems"],
-  ["Website development", "/website-development"]
-] as Array<[string, Route]>;
+] as const;
 
 const companyLinks = [
   ["About", "/about"],
@@ -23,12 +18,6 @@ const companyLinks = [
   ["Contact", "/contact"],
   ["Careers", "/careers"],
   ["Network", "/networking"]
-] as const;
-
-const supportLinks = [
-  ["Help", "/help"],
-  ["Executive Intelligence sign in", "/login"],
-  ["Contact", "/contact"]
 ] as const;
 
 const emailLinks = [
@@ -74,21 +63,12 @@ export function PublicFooter() {
         </div>
         <div className="vx-footer-links grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
           <div>
-            <p className="font-semibold text-slate-200">Products &amp; services</p>
+            <p className="font-semibold text-slate-200">Research platform</p>
             <div className="mt-2 grid gap-1.5">
-              {platformLinks.map(([label, href]) => (
-                href === "/executive-intelligence" ? (
-                  <div key={href} className="vx-footer-product">
-                    <Link href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-                      {label}
-                    </Link>
-                    <p className="vx-footer-product-description">Includes VSI Chat.</p>
-                  </div>
-                ) : (
-                  <Link key={href} href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-                    {label}
-                  </Link>
-                )
+              {researchLinks.map(([label, href]) => (
+                <Link key={href} href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+                  {label}
+                </Link>
               ))}
             </div>
           </div>
@@ -105,11 +85,7 @@ export function PublicFooter() {
           <div className="vx-footer-support">
             <p className="font-semibold text-slate-200">Support</p>
             <div className="mt-2 grid gap-1.5">
-              {supportLinks.map(([label, href]) => (
-                <Link key={href} href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-                  {label}
-                </Link>
-              ))}
+              <Link href="/support">Customer support</Link>
               {emailLinks.map(([label, email, href]) => (
                 <a key={email} href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
                   {label}

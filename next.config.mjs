@@ -94,7 +94,7 @@ const nextConfig = {
         headers: securityHeaders()
       },
       // Authentication remains authoritative. Crawlers may read noindex even on redirects.
-      ...["/login", "/signup", "/forgot-password", "/reset-password", "/accept-invite", "/checkout/:path*", "/app/:path*", "/systems", "/access", "/billing-required", "/auth/:path*", "/admin/:path*"].map(source => ({ source, headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] })),
+      ...["/executive-intelligence", "/operations-intelligence", "/pricing", "/release-notes", "/help", "/login", "/signup", "/forgot-password", "/reset-password", "/accept-invite", "/checkout/:path*", "/app/:path*", "/systems", "/access", "/billing-required", "/auth/:path*", "/admin/:path*"].map(source => ({ source, headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] })),
       ...["/app/settings/storage/payment-return", "/api/storage-capacity/download"].map(source => ({
         // Configured headers take precedence over Route Handler headers. These
         // redirects can carry payment or signed-download credentials, so keep
@@ -147,15 +147,15 @@ const nextConfig = {
   async redirects() {
     return [
       { source: "/operations-intelligence", destination: "/executive-intelligence", statusCode: 301 },
-      { source: "/hourly-consulting", destination: "/contact", statusCode: 301 },
-      { source: "/full-support-retainer", destination: "/pricing", statusCode: 301 },
-      { source: "/shop/p/hourly-consulting", destination: "/contact", statusCode: 301 },
-      { source: "/shop/p/full-support-retainer", destination: "/pricing", statusCode: 301 },
-      { source: "/store/p/hourly-consulting", destination: "/contact", statusCode: 301 },
-      { source: "/store/p/full-support-retainer", destination: "/pricing", statusCode: 301 },
-      { source: "/services/hourly-consulting", destination: "/contact", statusCode: 301 },
-      { source: "/services/full-support-retainer", destination: "/pricing", statusCode: 301 },
-      { source: "/consulting", destination: "/contact", statusCode: 301 },
+      { source: "/hourly-consulting", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/full-support-retainer", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/shop/p/hourly-consulting", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/shop/p/full-support-retainer", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/store/p/hourly-consulting", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/store/p/full-support-retainer", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/services/hourly-consulting", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/services/full-support-retainer", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/consulting", destination: "/contact?inquiry=custom-software", statusCode: 301 },
       { source: "/network", destination: "/networking", statusCode: 301 }
     ];
   }

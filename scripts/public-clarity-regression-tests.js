@@ -79,11 +79,12 @@ async function renderPage(file, props = { searchParams: Promise.resolve({}) }) {
 }
 
 async function main() {
-  const systems = loadTs("lib/marketing/public-systems.ts").PUBLIC_SYSTEMS;
+  const { PUBLIC_SYSTEMS: systems, EXECUTIVE_INTELLIGENCE_SYSTEM } = loadTs("lib/marketing/public-systems.ts");
+  assert.equal(systems.length, 1);
   assert.equal(systems[0].id, "drug-discovery-intelligence", "Drug Discovery is the flagship");
   assert.equal(systems[0].availability, "research_preview");
   assert.equal(systems[0].pricing.behavior, "walkthrough");
-  const commerce = systems.filter(system => system.pricing.behavior === "checkout");
+  const commerce = [EXECUTIVE_INTELLIGENCE_SYSTEM];
   assert.deepEqual(Array.from(commerce, system => system.id), ["executive-intelligence"]);
   assert.equal(commerce[0].pricing.checkoutRoute, "/checkout/legal",
     "Commerce must preserve legal acceptance before checkout");
@@ -110,9 +111,6 @@ async function main() {
     "/",
     "/pricing",
     "/executive-intelligence",
-    "/intelligence-systems",
-    "/custom-business-systems",
-    "/website-development",
     "/drug-discovery-intelligence",
     "/drug-discovery-intelligence/demo",
     "/biological-intelligence",
@@ -374,11 +372,10 @@ async function main() {
     /does not automatically create one/,
     "Briefings must remain on-demand, not advertised as automatic on upload",
   );
-  assert.match(
-    executive,
-    /application\/ld\+json/,
-    "Executive structured metadata must remain present",
-  );
+  assert.doesNotMatch(executive, /application\/ld\+json/);
+  for (const route of ["executive-intelligence", "pricing", "help", "release-notes"]) {
+    assert.match(read(`app/${route}/page.tsx`), /robots: utilityRobots/);
+  }
 
   for (const route of [
     "/drug-discovery-intelligence",
@@ -456,10 +453,9 @@ async function main() {
   const home = htmlByRoute.get("/");
   const product = htmlByRoute.get("/drug-discovery-intelligence");
   const demo = htmlByRoute.get("/drug-discovery-intelligence/demo");
-  const lineup = htmlByRoute.get("/intelligence-systems");
   const demoRoute = '/drug-discovery-intelligence/demo';
   const inquiryRoute = '/contact?inquiry=drug-discovery';
-  for (const [html, links] of [[home, [demoRoute, inquiryRoute]], [product, [demoRoute, inquiryRoute]], [demo, [inquiryRoute]], [lineup, ['/drug-discovery-intelligence', '/executive-intelligence']]]) {
+  for (const [html, links] of [[home, [demoRoute, inquiryRoute]], [product, [demoRoute, inquiryRoute]], [demo, [inquiryRoute]]]) {
     for (const href of links) assert.ok(html.includes(`href="${href}"`), `Public link to ${href} is missing`);
   }
   for (const html of [product, demo]) {
@@ -481,17 +477,11 @@ async function main() {
   assert.equal((flag.match(/<polygon /g) || []).length, 50, "US flag has fifty stars");
   assert.doesNotMatch(home, /Coastal Kitchen/);
   assert.ok(executive.indexOf('id="product-experience"') < executive.indexOf('id="business-information"'));
-  for (const route of ["/custom-business-systems", "/website-development"]) {
-    const html = htmlByRoute.get(route);
-    assert.match(html, /one-time development fee with an upfront deposit/);
-    assert.match(html, /scoped monthly maintenance and support/);
-    assert.match(html, /They do not accept project payments/);
-    assert.match(html, /submitting an inquiry does not create a service contract/);
-    assert.match(html, /scope, fees, payment schedule, maintenance, ownership or licensing, delivery, cancellation, and handover/);
-    assert.match(html, /individual written project agreement/);
-    assert.match(html, /quoted separately/);
-    assert.match(html, /Not sure|Quoted per project/);
-    assert.match(html, new RegExp('href="/contact\\?inquiry=' + route.slice(1) + '"'));
+  assert.match(read("app/custom-business-systems/page.tsx"), /permanentRedirect\("\/contact\?inquiry=custom-software"\)/);
+  assert.match(read("app/intelligence-systems/page.tsx"), /permanentRedirect\("\/drug-discovery-intelligence"\)/);
+  assert.match(read("app/website-development/route.ts"), /status: 410/);
+  for (const html of [home, product, demo, companyAbout, companyWhy]) {
+    assert.doesNotMatch(html, /Executive Intelligence|Custom (?:software|business systems)|website (?:development|design|enhancement)|Coastal Kitchen/i);
   }
   assert.match(
     home,
@@ -501,7 +491,7 @@ async function main() {
   const navigation = renderToStaticMarkup(
     React.createElement(
       loadTs("components/marketing/PublicNavigation.tsx").PublicNavigation,
-      { loggedIn: false },
+      null,
     ),
   );
   for (const system of systems)
@@ -509,13 +499,13 @@ async function main() {
       navigation.includes(`href="${system.route}"`),
       `Navigation must reach ${system.route}`,
     );
-  for (const destination of ["/drug-discovery-intelligence", "/executive-intelligence", "/custom-business-systems"]) {
+  for (const destination of ["/drug-discovery-intelligence", "/drug-discovery-intelligence#research", "/about", "/contact"]) {
     assert.ok(navigation.split(`href="${destination}"`).length >= 3, `Desktop and mobile navigation must reach ${destination}`);
   }
-  assert.match(navigation, /Products/);
+  assert.doesNotMatch(navigation, /Products|Executive Intelligence|Custom Software|Sign in/i);
   assert.doesNotMatch(navigation, retiredPromotion);
   assert.match(navigation, /Open navigation menu/);
-  assert.match(navigation, /href="\/login"/);
+  assert.doesNotMatch(navigation, /href="\/login"/);
 
   const engine = read("components/marketing/clarity/ClarityEngine.tsx");
   const canvas = read("components/marketing/clarity/ClarityEngineCanvas.tsx");
@@ -606,7 +596,7 @@ async function main() {
   assert.match(googlePilotNotice, /Google account must be an approved test user/);
   assert.match(googlePilotNotice, /paid Vaeroex subscription does not grant pilot access/);
   assert.match(googlePilotNotice, /href="\/app\/sources"[^>]*>Upload supported spreadsheet files/);
-  assert.match(read("app/help/page.tsx"), /<GoogleSheetsPilotNotice/);
+  assert.match(read("app/help/page.tsx"), /href="\/support"/);
   assert.match(read("app/checkout/legal/page.tsx"), /<GoogleSheetsPilotNotice/);
   process.stdout.write(
     "Public clarity rendering, commerce, availability, and fallback regressions passed.\n",

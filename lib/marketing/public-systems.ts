@@ -90,4 +90,4 @@ export const DRUG_DISCOVERY_SYSTEM = {
   capabilities: ["Experimental structures", "Saved protein references", "Evidence review", "Approved shortlist exports"]
 } as const satisfies PublicSystemDefinition;
 
-export const PUBLIC_SYSTEMS = [DRUG_DISCOVERY_SYSTEM, EXECUTIVE_INTELLIGENCE_SYSTEM] as const;
+export const PUBLIC_SYSTEMS = [DRUG_DISCOVERY_SYSTEM] as const;

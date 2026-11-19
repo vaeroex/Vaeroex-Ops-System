@@ -34,6 +34,7 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
   }, [state]);
   const project = isProjectInquiry(category);
   const discovery = category === INQUIRY_CATEGORIES["drug-discovery"];
+  const partnership = category === INQUIRY_CATEGORIES["research-partnership"];
   function field(
     name: string,
     label: string,
@@ -214,7 +215,7 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
               maxLength: 320,
             })}
             <div className="md:col-span-2">
-              {field("company", discovery ? "Organization or research group" : "Business name")}
+              {field("company", project ? "Organization or business name" : "Organization or research group")}
             </div>
             <div className="md:col-span-2">
               {field(
@@ -227,27 +228,25 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
                   multiline: true,
                   maxLength: 6000,
                   hint: discovery ? "A general description is enough. Keep proprietary structures, compound lists, and patient information out of this form." : project
-                    ? `Tell us whether you need a new ${category === "Custom Business Systems" ? "system" : "website"} or improvements to an existing one, and what you want it to do.`
-                    : undefined,
+                    ? "Describe the workflow, tools, and software capabilities your team needs."
+                    : partnership ? "Describe the research question and the collaboration you have in mind." : undefined,
                 },
               )}
             </div>
             {project ? (
               <>
                 <div className="md:col-span-2">
-                  {field("existing_tools", "Existing software or website", {
+                  {field("existing_tools", "Existing software or tools", {
                     maxLength: 1000,
-                    hint: "Describe the tools you use today, include a website URL if relevant, and tell us what you want to keep or improve.",
+                    hint: "Tell us which systems your team uses now and what you want to keep, connect, or improve.",
                   })}
                 </div>
-                {category === "Custom Business Systems"
-                  ? choice("expected_users", "Approximate expected users", [
-                      "1–10",
-                      "11–50",
-                      "51–200",
-                      "More than 200",
-                    ])
-                  : null}
+                {choice("expected_users", "Approximate expected users", [
+                  "1–10",
+                  "11–50",
+                  "51–200",
+                  "More than 200",
+                ])}
                 {choice("project_budget", "Approximate budget", [
                   "Under $5,000",
                   "$5,000–$15,000",
@@ -261,8 +260,7 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
                   "More than 6 months",
                 ])}
                 <p className="text-xs leading-5 text-slate-400 md:col-span-2">
-                  Budget ranges help us understand your plans; they are not
-                  service prices or quotes.
+                  Budget ranges help us understand the project scope.
                 </p>
                 <p className="text-sm leading-6 text-slate-300 md:col-span-2">
                   {PROJECT_AGREEMENT_NOTICE}

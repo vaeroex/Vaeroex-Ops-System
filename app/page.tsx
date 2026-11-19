@@ -61,7 +61,7 @@ export default function HomePage() {
           <div className={styles.container}>
             <p className={styles.eyebrow}>Vaeroex Super Intelligence (VSI)</p>
             <h2>What evidence supported putting this compound on the shortlist?</h2>
-            <p className={styles.copy}>In Executive Intelligence, VSI Chat already helps users investigate supported business records. For Drug Discovery, we’re designing a research answer that links back to the assay, the structure, and the reviewer’s recorded reason.</p>
+            <p className={styles.copy}>VSI Chat for Drug Discovery is planned. A researcher would be able to follow an answer back to the assay, the structure, and the reviewer’s recorded reason.</p>
             <Link href="/drug-discovery-intelligence#vsi" className="vx-text-link">Inspect an illustrative VSI answer <ArrowUpRight size={16} aria-hidden="true" /></Link>
           </div>
         </section>
@@ -141,8 +141,8 @@ export default function HomePage() {
               <h2>How would your team review its next batch?</h2>
               <p className={styles.copy}>Explore two published structures on your own, or ask to see how a private research project takes a team from evidence review to an approved export.</p>
               <div className={styles.actions}>
-                <Link href={discoveryWalkthrough} className="vx-button vx-button--primary">Request a walkthrough <ArrowUpRight size={16} aria-hidden="true" /></Link>
-                <Link href="/drug-discovery-intelligence" className="vx-text-link">Explore Drug Discovery Intelligence</Link>
+                <Link href={discoveryDemo} className="vx-button vx-button--primary">Explore sample compounds <ArrowUpRight size={16} aria-hidden="true" /></Link>
+                <Link href={discoveryWalkthrough} className="vx-text-link">Request a walkthrough</Link>
               </div>
             </div>
           </section>

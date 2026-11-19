@@ -59,13 +59,13 @@ type PublicCtaBandProps = {
 };
 
 export function PublicCtaBand({
-  eyebrow = "Vaeroex Executive Intelligence",
+  eyebrow = "Drug Discovery Intelligence",
   title,
   description,
-  primaryHref = "/pricing",
-  primaryLabel = "Start With Vaeroex",
-  secondaryHref = "/contact",
-  secondaryLabel = "Contact Vaeroex"
+  primaryHref = "/drug-discovery-intelligence/demo",
+  primaryLabel = "Explore sample compounds",
+  secondaryHref = "/contact?inquiry=drug-discovery",
+  secondaryLabel = "Request a walkthrough"
 }: PublicCtaBandProps) {
   return (
     <section className="px-5 py-8 sm:px-6 sm:py-10">
@@ -76,7 +76,7 @@ export function PublicCtaBand({
           <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">{description}</p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-3">
-          <Link href={primaryHref} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+          <Link href={primaryHref} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-vaeroex-navy shadow-sm hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
             {primaryLabel}
           </Link>
           <Link href={secondaryHref} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] px-5 py-3 text-sm font-semibold text-slate-100 hover:border-cyan-300/50 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">

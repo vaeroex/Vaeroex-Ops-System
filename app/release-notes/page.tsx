@@ -1,12 +1,14 @@
 import { ReleaseNotesPage } from "@/components/legal/ReleaseNotesPage";
+import { publicPageMetadata, utilityRobots } from "@/lib/seo/public-seo";
 
-import { publicPageMetadata } from "@/lib/seo/public-seo";
-
-export const metadata = publicPageMetadata({
-  title: "Executive Intelligence Release Notes | Vaeroex",
-  description: "Read published updates to the Executive Intelligence business workspace, including product features, improvements, and security.",
-  path: "/release-notes",
-});
+export const metadata = {
+  ...publicPageMetadata({
+    title: "Executive Intelligence Release Notes | Vaeroex",
+    description: "Product and security updates for existing Executive Intelligence customers.",
+    path: "/release-notes",
+  }),
+  robots: utilityRobots,
+};
 
 export default function PublicReleaseNotesPage() {
   return <ReleaseNotesPage />;

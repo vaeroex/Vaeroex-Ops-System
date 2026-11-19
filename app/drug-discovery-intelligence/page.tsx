@@ -103,7 +103,7 @@ export default function DrugDiscoveryIntelligence() {
         <section id="vsi" className={styles.section}>
           <div className={styles.spread}>
             <div><p className={styles.source}>Vaeroex Super Intelligence</p><h2>What would a researcher be able to check in VSI Chat?</h2>
-              <p>VSI Chat in Executive Intelligence can answer supported questions using authorized business evidence and reopen supporting records. Integration with Drug Discovery is planned.</p>
+              <p>VSI Chat for Drug Discovery is planned. The research workspace already keeps the source records, measurements, and reviewer decisions that a future answer would need to cite.</p>
               <p>The research design aims to reduce unsupported answers. Factual claims should link to records the researcher can access. Measurements, model outputs, and review notes have different meanings. Missing records or conflicting evidence should be called out.</p>
               <a className="vx-text-link" href={nistProfile}>Design rationale · NIST AI 600-1 <ArrowUpRight size={15} aria-hidden="true" /></a>
             </div>
@@ -120,8 +120,8 @@ export default function DrugDiscoveryIntelligence() {
         <section className={styles.section}>
           <p className={styles.source}>Access and availability</p>
           <h2>Bring your team’s next review.</h2>
-          <p>The free sample runs in your browser with two fixed public structures. Request a walkthrough for the invitation-based project workspace, published structure import, and approved exports. New protein folding predictions, molecule generation, and cross-product VSI reasoning are planned. Customer-run production docking and its pricing are pending.</p>
-          <div className={shared.actions}><Link href={discoveryWalkthrough} className="vx-button vx-button--primary">Request a walkthrough <ArrowUpRight size={17} aria-hidden="true" /></Link><Link href={discoveryDemo} className="vx-text-link">Explore sample compounds</Link></div>
+          <p>The free sample runs in your browser with two fixed public structures. Request a walkthrough for the invitation-based project workspace, published structure import, and approved exports. New protein folding predictions, molecule generation, and research questions in VSI Chat are planned. Customer-run production docking and its pricing are pending.</p>
+          <div className={shared.actions}><Link href={discoveryDemo} className="vx-button vx-button--primary">Explore sample compounds <ArrowUpRight size={17} aria-hidden="true" /></Link><Link href={discoveryWalkthrough} className="vx-text-link">Request a walkthrough</Link></div>
         </section>
       </div>
       <PublicFooter />

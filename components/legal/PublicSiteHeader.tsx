@@ -1,22 +1,11 @@
 import Link from "next/link";
-import type { Route } from "next";
 import Image from "next/image";
 import { ArrowUpRight } from "lucide-react";
 import { PublicNavigation } from "@/components/marketing/PublicNavigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { discoveryDemo, discoveryWalkthrough } from "@/lib/marketing/discovery-evidence";
 import "@/components/marketing/public-design.css";
 
-async function isLoggedIn() {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return false;
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return Boolean(user);
-}
-
-export async function PublicSiteHeader() {
-  const loggedIn = await isLoggedIn();
+export function PublicSiteHeader() {
   return (
     <header className="vx-header">
       <a href="#public-content" className="vx-skip">
@@ -27,15 +16,12 @@ export async function PublicSiteHeader() {
           <Image src="/icon-192.png" width={31} height={31} alt="" priority />
           <span>VAEROEX</span>
         </Link>
-        <PublicNavigation loggedIn={loggedIn} />
+        <PublicNavigation />
         <div className="vx-header-actions">
-          <Link href={(loggedIn ? "/systems" : "/login") as Route} aria-label={loggedIn ? "Your Executive Intelligence systems" : "Executive Intelligence sign in"}>
-            {loggedIn ? "Your systems" : "Sign in"}
+          <Link href={discoveryDemo} className="vx-button vx-button--primary">
+            Explore sample compounds <ArrowUpRight size={15} aria-hidden="true" />
           </Link>
-          <Link href="/contact?inquiry=drug-discovery" className="vx-button vx-button--primary">
-            Request a walkthrough
-            <ArrowUpRight size={15} aria-hidden="true" />
-          </Link>
+          <Link href={discoveryWalkthrough} className="vx-text-link">Request a walkthrough</Link>
         </div>
       </div>
       <span id="public-content" tabIndex={-1} />

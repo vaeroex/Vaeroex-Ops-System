@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { inquiryCategory } from "@/lib/contact/inquiries";
+import { notFound, redirect } from "next/navigation";
+import { INQUIRY_CATEGORIES, inquiryCategory } from "@/lib/contact/inquiries";
 import { Clock3, Mail, MapPin } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicRequestForm } from "@/components/legal/PublicRequestForm";
@@ -10,10 +11,24 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Contact Vaeroex",
-  description: "Request a Drug Discovery Intelligence walkthrough, scope a custom software project, or reach Executive Intelligence support and billing.",
+  description: "Contact Vaeroex to request a Drug Discovery walkthrough or discuss a research partnership.",
   path: "/contact"
 });
 
+const inquiryIntroductions = {
+  [INQUIRY_CATEGORIES["drug-discovery"]]: {
+    title: "Request a Drug Discovery walkthrough",
+    description: "Tell us which research decision you want to explore. We can walk through the private project workflow and discuss access for your team."
+  },
+  [INQUIRY_CATEGORIES["custom-software"]]: {
+    title: "Discuss a custom software project",
+    description: "Tell us what your team needs to build or connect, who will use it, and how the work happens today."
+  },
+  [INQUIRY_CATEGORIES["research-partnership"]]: {
+    title: "Discuss a research partnership",
+    description: "Describe the research question, the evidence you work with, and how you would like to collaborate."
+  }
+} as const;
 
 const contactChannels = [
   ["Product and general questions", VAEROEX_CONTACT_EMAILS.general, VAEROEX_MAILTO_LINKS.general],
@@ -23,22 +38,24 @@ const contactChannels = [
 ] as const;
 
 type ContactPageProps = {
-  searchParams?: Promise<{ inquiry?: string }>;
+  searchParams?: Promise<{ inquiry?: string | string[] }>;
 };
 
 export default async function ContactPage({ searchParams }: ContactPageProps) {
   const params = await searchParams;
-  const discovery = params?.inquiry === "drug-discovery";
-  const custom = params?.inquiry === "custom-business-systems";
+  const key = params?.inquiry;
+  if (key === "support" || key === "billing" || key === "executive-intelligence") redirect("/support");
+  const category = inquiryCategory(key);
+  if (!category) notFound();
+  const introduction = key && key !== "general" ? inquiryIntroductions[category] : {
+    title: "Contact the Vaeroex team",
+    description: "Request a Drug Discovery walkthrough or tell us what your team would like to discuss."
+  };
 
   return (
     <main className="vaeroex-public-site min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
-      <PublicPageHero
-        eyebrow="Contact Vaeroex"
-        title={discovery ? "Request a Drug Discovery walkthrough" : custom ? "Discuss a custom software project" : "Contact the Vaeroex team"}
-        description={discovery ? "Tell us which research decision you want to explore. We can walk through the private project workflow and discuss access for your team." : custom ? "Tell us what your team needs to build or connect, who will use it, and how the work happens today." : "Choose a Drug Discovery walkthrough, a custom software project, or help with an existing Executive Intelligence account."}
-      />
+      <PublicPageHero eyebrow="Contact Vaeroex" {...introduction} />
 
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[minmax(0,.72fr)_minmax(30rem,1.28fr)] lg:items-start">
@@ -78,7 +95,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
             <p className="mt-5 text-xs leading-5 text-slate-500">Do not submit patient data, Social Security numbers, payment card numbers, government IDs, or regulated sensitive information through this form.</p>
           </div>
 
-          <PublicRequestForm key={inquiryCategory(params?.inquiry)} issueType={inquiryCategory(params?.inquiry)} />
+          <PublicRequestForm key={category} issueType={category} />
         </div>
       </section>
       <PublicFooter />

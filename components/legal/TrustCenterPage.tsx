@@ -56,6 +56,25 @@ const trustGroups = [
   }
 ] as const;
 
+function TrustNotes({ inApp = false }: { inApp?: boolean }) {
+  return (
+    <section className={`rounded-lg border p-5 ${inApp ? "border-line bg-white" : "border-amber-300/20 bg-amber-950/10"}`}>
+      <h2 className={`text-base font-semibold ${inApp ? "text-ink" : "text-white"}`}>Important trust notes</h2>
+      <ul className={`mt-3 grid gap-2 text-sm leading-6 ${inApp ? "text-muted" : "text-slate-400"}`}>
+        <li>Only supported file types can be uploaded. Vaeroex does not currently claim malware scanning or automatic detection of sensitive data in uploads. Check files before sharing them.</li>
+        <li>No online service can guarantee absolute security. Customers remain responsible for account access, workspace roles, and the data they enter.</li>
+        <li>Vaeroex outputs may be incomplete or inaccurate and require human review before making important decisions.</li>
+        <li>Do not enter patient data, PHI/ePHI, medical record numbers, insurance IDs, Social Security numbers, or other prohibited sensitive data in files, notes, chats, or support requests.</li>
+      </ul>
+      {inApp ? (
+        <Link href="/app/support" className="mt-5 inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Contact Support</Link>
+      ) : (
+        <p className="mt-4 text-sm text-slate-300">Security, privacy, or trust questions: <a href={VAEROEX_MAILTO_LINKS.support} className="font-semibold text-cyan-200 hover:text-white">{VAEROEX_CONTACT_EMAILS.support}</a></p>
+      )}
+    </section>
+  );
+}
+
 function TrustContent({ inApp }: { inApp: boolean }) {
   return (
     <div className="space-y-4">
@@ -99,20 +118,7 @@ function TrustContent({ inApp }: { inApp: boolean }) {
         })}
       </div>
 
-      <section className={`rounded-lg border p-5 ${inApp ? "border-line bg-white" : "border-amber-300/20 bg-amber-950/10"}`}>
-        <h2 className={`text-base font-semibold ${inApp ? "text-ink" : "text-white"}`}>Important trust notes</h2>
-        <ul className={`mt-3 grid gap-2 text-sm leading-6 ${inApp ? "text-muted" : "text-slate-400"}`}>
-          <li>Only supported file types can be uploaded. Vaeroex does not currently claim malware scanning or automatic detection of sensitive data in uploads. Check files before sharing them.</li>
-          <li>No online service can guarantee absolute security. Customers remain responsible for account access, workspace roles, and the data they enter.</li>
-          <li>Vaeroex outputs may be incomplete or inaccurate and require human review before important business action.</li>
-          <li>Do not enter patient data, PHI/ePHI, medical record numbers, insurance IDs, Social Security numbers, or other prohibited sensitive data in files, notes, chats, or support requests.</li>
-        </ul>
-        {inApp ? (
-          <Link href="/app/support" className="mt-5 inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Contact Support</Link>
-        ) : (
-          <p className="mt-4 text-sm text-slate-300">Security, privacy, or trust questions: <a href={VAEROEX_MAILTO_LINKS.support} className="font-semibold text-cyan-200 hover:text-white">{VAEROEX_CONTACT_EMAILS.support}</a></p>
-        )}
-      </section>
+      <TrustNotes inApp />
     </div>
   );
 }
@@ -128,18 +134,17 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
       <PublicPageHero
         eyebrow="Trust at Vaeroex"
         title="How to check the evidence behind an answer"
-        description="Inspect the sources, separate observations from predictions, and check what the evidence leaves unresolved. The controls available depend on the product and the records you can access."
+        description="Inspect the sources, separate observations from predictions, and check what the evidence leaves unresolved."
       />
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-7xl">
-          <section className="mb-10 space-y-4 border-b border-white/15 pb-9 text-slate-300" aria-labelledby="research-evidence">
+          <section className="space-y-4 text-slate-300" aria-labelledby="research-evidence">
             <h2 className="text-2xl font-semibold text-white" id="research-evidence">Drug Discovery Intelligence</h2>
             <p className="max-w-3xl leading-7">The public demo uses fixed, published experimental structures. Private research projects use organization membership to control access to runs, structures, files, and decisions. Reviewers can compare a published measurement, a model prediction, and the reason a colleague recorded for advancing a compound.</p>
             <p className="max-w-3xl leading-7">VSI for Drug Discovery is planned. The design calls for factual claims to cite authorized project records and identify missing or conflicting evidence. Researchers will need to check whether the cited source supports each claim. NIST’s generative AI risk profile discusses confidently stated false content and informs that design.</p>
             <a href="https://doi.org/10.6028/NIST.AI.600-1" className="vx-text-link">Read the NIST Generative AI Profile (PDF)</a>
           </section>
-          <h2 className="mb-5 text-2xl font-semibold text-white">Executive Intelligence and VSI Chat</h2>
-          <TrustContent inApp={false} />
+          <div className="mt-8"><TrustNotes /></div>
         </div>
       </section>
       <PublicCtaBand

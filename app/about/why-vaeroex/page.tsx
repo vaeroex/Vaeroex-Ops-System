@@ -38,7 +38,7 @@ export default function WhyVaeroexPage() {
       </div></section>
       <section className={styles.section}><div className={`${styles.container} ${styles.split}`}>
         <h2>Where does VSI fit?</h2>
-        <div><p className={styles.copy}>VSI Chat in Executive Intelligence already helps business users examine supported records. Research questions about a drug shortlist are a planned integration. Scientists can inspect the evidence and approve batches directly in the private research workspace today.</p>
+        <div><p className={styles.copy}>Scientists can inspect evidence and approve a batch in the private research workspace today. VSI Chat for Drug Discovery is planned. The goal is to let a researcher ask why a compound was advanced and open the sources behind the answer.</p>
           <Link href="/about#vsi" className={styles.textLink}>Explore Vaeroex Super Intelligence</Link></div>
       </div></section>
       <PublicFooter />

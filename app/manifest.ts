@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Vaeroex",
     short_name: "Vaeroex",
-    description: "Vaeroex Executive Intelligence",
+    description: "Vaeroex workspace",
     start_url: "/app",
     scope: "/",
     display: "standalone",

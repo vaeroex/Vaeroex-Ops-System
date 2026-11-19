@@ -4,7 +4,7 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Trust and Security | Vaeroex",
-  description: "Review current access and evidence controls for Drug Discovery Intelligence and VSI Chat in Executive Intelligence, and see what is planned for research.",
+  description: "See how researchers verify compound evidence, control access to private projects, and review plans for research questions in VSI Chat.",
   path: "/trust"
 });
 

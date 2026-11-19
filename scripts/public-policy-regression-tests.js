@@ -46,33 +46,31 @@ assert.match(
 );
 assert.match(seo, /name: "Vaeroex"/);
 assert.match(seo, /legalName: "Vaeroex LLC"/);
-assert.match(seo, /name: "Executive Intelligence"/);
+assert.match(seo, /Drug Discovery Intelligence/);
+assert.doesNotMatch(seo, /Executive Intelligence|website development|custom software/i);
+for (const file of ["app/terms/page.tsx", "app/refund-policy/page.tsx", "app/subscription-billing-terms/page.tsx"]) {
+  assert.doesNotMatch(read(file), /Executive Intelligence|website project|commissioned project/i, "Policy metadata should describe the policy without promoting products");
+}
 assert.match(
   read("app/careers/page.tsx"),
-  /not currently listing open positions/i,
+  /no open positions/i,
   "Careers must not fabricate hiring availability",
 );
 assert.doesNotMatch(
   read("app/about/page.tsx"),
   /consulting agency|operations consulting/,
 );
-for (const topic of [
-  "Getting started",
-  "Executive Intelligence account and workspace",
-  "Drug Discovery Intelligence access",
-  "Sources and evidence",
-  "Business Health",
-  "Business Memory",
-  "Billing",
-  "Privacy and trust",
-  "Contact support",
-  "Intelligence and Explain Finding",
-  "Saved Analyses",
-]) {
-  assert.ok(
-    read("app/help/page.tsx").includes(topic),
-    `Help must retain the ${topic} topic`,
-  );
+const publicHelp = read("app/help/page.tsx");
+for (const topic of ["Account and workspace questions", "Billing questions", "Contact support"]) {
+  assert.ok(publicHelp.includes(topic), `Customer help must retain ${topic}`);
+}
+assert.doesNotMatch(publicHelp, /Executive Intelligence|href="\/pricing"|website projects|commissioned systems/i);
+const workspaceHelp = read("app/app/help/page.tsx");
+assert.match(workspaceHelp, /@\/lib\/help\/content/);
+assert.match(workspaceHelp, /href="\/app\/support"/);
+const privateArticles = read("lib/help/content.ts");
+for (const topic of ["Getting Started", "Business Health", "Business Memory", "Explain Finding", "Saved Analyses"]) {
+  assert.ok(privateArticles.includes(topic), `Signed-in customer guides must retain ${topic}`);
 }
 for (const boundary of [
   "Infrastructure & Security",
@@ -139,14 +137,19 @@ assert.match(
   /source: "\/operations-intelligence"[^\n]+destination: "\/executive-intelligence"[^\n]+statusCode: 301/,
 );
 for (const route of [
-  "/executive-intelligence",
   "/drug-discovery-intelligence",
   "/drug-discovery-intelligence/demo",
-  "/pricing",
   "/contact",
 ])
   assert.ok(sitemap.includes(`"${route}"`));
-assert.doesNotMatch(sitemap, /"\/operations-intelligence"/);
+for (const route of ["/executive-intelligence", "/pricing", "/release-notes", "/help"]) {
+  assert.ok(!sitemap.includes(`"${route}"`), `Unlisted customer marketing or help route in sitemap: ${route}`);
+  assert.match(read(`app${route}/page.tsx`), /robots: utilityRobots/);
+}
+assert.match(seo, /utilityRobots = \{ index: false, follow: false \}/);
+for (const retired of ["/operations-intelligence", "/intelligence-systems", "/website-development", "/custom-business-systems"]) {
+  assert.ok(!sitemap.includes(`"${retired}"`), `Retired sales route in sitemap: ${retired}`);
+}
 assert.doesNotMatch(sitemap, /biological-intelligence/);
 assert.match(footer, /drug-discovery-intelligence/);
 assert.doesNotMatch(

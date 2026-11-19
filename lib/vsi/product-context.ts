@@ -9,7 +9,7 @@ import { normalizePlanLimits, normalizePlanSlug, VAEROEX_PLAN_FEATURES, VAEROEX_
 import { helpArticles } from "@/lib/help/content";
 import { IntegrationDashboardSchema, integrationDashboardStatus } from "@/lib/integrations/dashboard/model";
 import { loadIntegrationDashboard } from "@/lib/integrations/dashboard/server";
-import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
+import { DRUG_DISCOVERY_SYSTEM, EXECUTIVE_INTELLIGENCE_SYSTEM } from "@/lib/marketing/public-systems";
 import { organizationJsonLd, PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
 import type { WorkspaceAccess } from "@/lib/security/types";
 import { isDemoWorkspaceRecord } from "@/lib/workspaces/demo-compatibility";
@@ -80,7 +80,7 @@ export async function loadVsiProductContext(access: WorkspaceAccess, inheritedTi
     assistant: { name: "Vaeroex", feature: "Vaeroex Super Intelligence", modelDisclosure: "Vaeroex does not publish its exact model configuration.", foundationModel: "Vaeroex uses externally provided models. Vaeroex builds the application, business retrieval and safeguards; it does not train the underlying foundation model or host its inference on Vaeroex-owned servers.", description: "Vaeroex Super Intelligence helps with general questions and, when relevant, information you are permitted to access in your workspace.",
       capabilities: "Writing, planning, explanations, calculations, ideas and research, with permitted business evidence. This request's tools establish research availability.",
       actions: "No external account actions. Business Notes require explicit confirmation and normal review permissions." },
-    productSystems: PUBLIC_SYSTEMS.map(system => ({ name: system.name, availability: system.availability, href: system.route })),
+    productSystems: [DRUG_DISCOVERY_SYSTEM, EXECUTIVE_INTELLIGENCE_SYSTEM].map(system => ({ name: system.name, availability: system.availability, href: system.route })),
     publishedPlan: { name: VAEROEX_PLAN_NAME, price: VAEROEX_PLAN_PRICE_LABEL, advertisedFeatures: [...VAEROEX_PLAN_FEATURES],
       limits: { ...VAEROEX_PLAN_LIMITS }, meaning: "Published subscription offer; not this workspace's invoice or remaining allowance." },
     workspace: { name: boundedText(current.workspace.name, 120), industry: boundedText(current.workspace.industry, 80),

@@ -1,5 +1,5 @@
 import { publicPageMetadata } from "@/lib/seo/public-seo";
-export const metadata = publicPageMetadata({ title: "Contact Support | Vaeroex", description: "Get help with a Vaeroex account, a private research project, or an Executive Intelligence subscription. Request a Drug Discovery walkthrough through the contact form.", path: "/support" });
+export const metadata = publicPageMetadata({ title: "Contact Support | Vaeroex", description: "Contact Vaeroex for help with a private research project, an existing account, or a billing question.", path: "/support" });
 import Link from "next/link";
 import { createSupportRequestAction } from "@/app/support/actions";
 import { PublicFooter } from "@/components/legal/PublicFooter";
@@ -50,7 +50,7 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
           <TextInput label="Name" name="name" required />
           <TextInput label="Email" name="email" type="email" required />
           <TextInput label="Workspace" name="workspace" placeholder="Workspace name or ID" />
-          <TextInput label="Page/module" name="page_module" placeholder="Overview, Evidence, Saved Analyses, Billing..." />
+          <TextInput label="Page/module" name="page_module" placeholder="Project, saved run, or billing" />
           <SelectInput label="Issue type" name="issue_type" required options={["Subscription access", "Workspace setup", "Intelligence result", "Bug or error", "Billing question", "Other"]} />
           <SelectInput label="Priority" name="priority" required defaultValue="Medium" options={["Low", "Medium", "High", "Urgent"]} />
           <div className="md:col-span-2">
