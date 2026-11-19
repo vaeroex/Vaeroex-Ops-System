@@ -108,9 +108,11 @@ assert.match(providerHealth, /export async function GET\(\)/, "provider-health G
 assert.doesNotMatch(providerHealth, /export async function POST|runAIProviderSmokeTest|workspaceId/, "the retired demo provider POST must remain absent");
 assert.match(read("app/api/internal/nvidia-qualification/route.ts"), /VAEROEX_AI_SMOKE_TEST_ENABLED/, "the shared NVIDIA qualification gate must remain active");
 
-assert.match(read("app/demo/page.tsx"), /permanentRedirect\("\/contact"\)/, "old demo links must redirect to contact");
+assert.match(read("app/demo/page.tsx"), /permanentRedirect\("\/drug-discovery-intelligence#compound-explorer"\)/, "old demo links must open the public compound explorer");
 assert.doesNotMatch(read("app/sitemap.ts"), /"\/demo"/, "the retired demo request page must not be advertised in the sitemap");
-assert.doesNotMatch(read("app/contact/page.tsx"), /Product Demo|walkthrough/, "contact must not offer demos or walkthroughs");
+const contact = read("app/contact/page.tsx");
+assert.match(contact, /Request a Drug Discovery walkthrough/);
+assert.doesNotMatch(contact, /Product Demo|Demo Workspace|Executive Intelligence walkthrough/i, "contact must not offer a retired seeded workspace");
 assert.equal(exists("components/motion/OperationsIntelligenceEngineDemo.tsx"), true, "the public product visualization must remain active");
 assert.match(read("components/motion/OperationsIntelligenceEngineDemo.tsx"), /operations-intelligence-demo-tab/);
 
