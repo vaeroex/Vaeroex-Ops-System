@@ -19,9 +19,11 @@ type Props = {
   onFailure: () => void;
 };
 
+const sceneBackground = "#101e2a";
+
 const materials = [
   { color: "#557f9f", metalness: .78, roughness: .29 },
-  { color: "#659abb", metalness: .82, roughness: .27 },
+  { color: "#00a8d6", metalness: .82, roughness: .27 },
 ];
 
 function World({ progress, finalShift = 0, active, compact, onReady, onFailure }: Props) {
@@ -130,13 +132,13 @@ function World({ progress, finalShift = 0, active, compact, onReady, onFailure }
   });
 
   return <>
-    <color attach="background" args={["#080d16"]} />
-    <fog attach="fog" args={["#080d16", 150, 320]} />
+    <color attach="background" args={[sceneBackground]} />
+    <fog attach="fog" args={[sceneBackground, 150, 320]} />
     <StudioEnvironment />
     <hemisphereLight args={["#d6e4f2", "#131e2a", .9]} />
     <directionalLight position={[-22, 36, 32]} intensity={3} color="#e0ebfa" />
     <directionalLight position={[25, 15, -32]} intensity={2.2} color="#7b9fc8" />
-    <pointLight ref={seamLight} position={[0, 7, 8]} intensity={30} color="#9abfff" distance={65} />
+    <pointLight ref={seamLight} position={[0, 7, 8]} intensity={30} color="#62d8ef" distance={65} />
     <pointLight position={[8, 5, -29]} intensity={80} color="#97b6d7" distance={35} />
     {batches.map((batch, index) => <instancedMesh
       key={batch.geometry + "-" + batch.material}

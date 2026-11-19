@@ -16,6 +16,7 @@ const company = [
 export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
   const container = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const currentPage = (href: string) => pathname === href ? "page" : undefined;
   useEffect(() => {
     const close = (event: MouseEvent | KeyboardEvent) => {
       if (event instanceof KeyboardEvent && event.key !== "Escape") return;
@@ -62,13 +63,13 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
           <div className="vx-dropdown">
             {SOLUTIONS.map((system) => (
               <div key={system.route} className="vx-nav-product" role="group" aria-label={system.name}>
-                <Link href={system.route}>
+                <Link href={system.route} aria-current={currentPage(system.route)}>
                   <strong>{system.name}</strong>
                   <small className="vx-nav-description">{system.description}</small>
                 </Link>
               </div>
             ))}
-            <Link href="/executive-intelligence" className="vx-dropdown-overview">
+            <Link href="/executive-intelligence" aria-current={currentPage("/executive-intelligence")} className="vx-dropdown-overview">
               Executive Intelligence
               <ArrowUpRight size={14} aria-hidden="true" />
             </Link>
@@ -76,13 +77,13 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
         </details>
         <Link
           href="/pricing"
-          aria-current={pathname === "/pricing" ? "page" : undefined}
+          aria-current={currentPage("/pricing")}
         >
           Pricing
         </Link>
         <Link
           href="/trust"
-          aria-current={pathname === "/trust" ? "page" : undefined}
+          aria-current={currentPage("/trust")}
         >
           Trust
         </Link>
@@ -93,7 +94,7 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
           </summary>
           <div className="vx-dropdown vx-dropdown--small">
             {company.map(([label, href]) => (
-              <Link key={href} href={href}>
+              <Link key={href} href={href} aria-current={currentPage(href)}>
                 {label}
               </Link>
             ))}
@@ -110,24 +111,24 @@ export function PublicNavigation({ loggedIn }: { loggedIn: boolean }) {
           </summary>
           <nav className="vx-mobile-menu" aria-label="Public navigation mobile">
             <span>EXPLORE VAEROEX</span>
-            <Link href="/">Home</Link>
+            <Link href="/" aria-current={currentPage("/")}>Home</Link>
             {SOLUTIONS.map((system) => (
               <div key={system.route} className="vx-nav-product" role="group" aria-label={system.name}>
-                <Link href={system.route}>
+                <Link href={system.route} aria-current={currentPage(system.route)}>
                   {system.name}
                   <small className="vx-nav-description">{system.description}</small>
                 </Link>
               </div>
             ))}
-            <Link href="/executive-intelligence">Executive Intelligence</Link>
-            <Link href="/pricing">Pricing</Link>
-            <Link href="/trust">Trust Center</Link>
+            <Link href="/executive-intelligence" aria-current={currentPage("/executive-intelligence")}>Executive Intelligence</Link>
+            <Link href="/pricing" aria-current={currentPage("/pricing")}>Pricing</Link>
+            <Link href="/trust" aria-current={currentPage("/trust")}>Trust Center</Link>
             {company.map(([label, href]) => (
-              <Link key={href} href={href}>
+              <Link key={href} href={href} aria-current={currentPage(href)}>
                 {label}
               </Link>
             ))}
-            <Link href="/help">Help</Link>
+            <Link href="/help" aria-current={currentPage("/help")}>Help</Link>
             <Link
               href="/contact?inquiry=custom-business-systems"
               className="vx-button vx-button--primary"

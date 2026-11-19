@@ -10,7 +10,7 @@ import {
 } from "@/lib/contact/inquiries";
 
 const controlClass =
-  "mt-2 min-h-11 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-blue-300";
+  "mt-2 min-h-11 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-slate-100";
 const initialState: ContactFormState = {};
 export function PublicRequestForm({ issueType }: { issueType: string }) {
   const [category, setCategory] = useState(issueType);
@@ -131,7 +131,7 @@ export function PublicRequestForm({ issueType }: { issueType: string }) {
   }
   return (
     <div className="vx-request-form rounded-lg border border-white/20 bg-[#10151e] p-6">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--public-blue)]">
         Contact form
       </p>
       <h2 className="mt-2 text-2xl font-semibold">

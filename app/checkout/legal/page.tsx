@@ -35,7 +35,7 @@ export default async function CheckoutLegalPage({ searchParams }: CheckoutLegalP
     : false;
 
   return (
-    <main className="min-h-screen bg-slate-50 text-ink">
+    <main className="vaeroex-public-site vx-utility min-h-screen">
       <PublicSiteHeader />
       <section className="mx-auto grid max-w-5xl gap-6 px-6 py-10">
         <div className="rounded-lg border border-line bg-white p-6 shadow-command sm:p-8">
@@ -121,7 +121,7 @@ export default async function CheckoutLegalPage({ searchParams }: CheckoutLegalP
           <form action={acceptPreCheckoutLegalPoliciesAction} className="mt-6 space-y-4">
             <input type="hidden" name="required_policy_hash" value={snapshot.requiredPolicyHash} />
             <label className="flex gap-3 rounded-lg border border-line p-4 text-sm leading-6">
-              <input name="accept_pre_checkout_legal" type="checkbox" required className="mt-1 h-4 w-4 shrink-0 accent-vaeroex-blue" />
+              <input name="accept_pre_checkout_legal" type="checkbox" required className="mt-1 h-4 w-4 shrink-0 accent-[color:var(--public-blue)]" />
               <span>
                 I have reviewed and agree to the Vaeroex Terms of Service, Privacy Policy, Subscription and Billing Terms, Refund Policy, and the incorporated responsible-use, AI, sensitive-data, data-retention, and human-review policies listed above.
               </span>

@@ -149,13 +149,6 @@ button.bg-vaeroex-blue:hover {
   background: rgba(19, 46, 66, 0.22);
 }
 
-.vaeroex-public-site {
-  --public-blue: #5dd8ff;
-  --public-white: #f4f9fc;
-  --public-muted: #9baab8;
-  background: #02050a;
-}
-
 .vaeroex-public-header {
   border-bottom: 1px solid rgba(160, 193, 214, 0.14);
   background: rgba(2, 6, 11, 0.82);

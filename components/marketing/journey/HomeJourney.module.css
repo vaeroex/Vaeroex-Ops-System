@@ -16,7 +16,7 @@
   height: 100svh;
   z-index: 0;
   overflow: hidden;
-  background: #080d16;
+  background: var(--public-navy);
   contain: layout paint;
 }
 .poster, .canvas, .vignette {
@@ -54,7 +54,7 @@
   gap: 24px;
   color: #d8e0f2;
   background: #0b111bf5;
-  border: 1px solid #9bbaff40;
+  border: 1px solid color-mix(in srgb, var(--public-interactive) 25%, transparent);
   border-radius: 6px;
   box-shadow: 0 8px 32px #0006;
   font-size: 12px;
@@ -76,7 +76,11 @@
   cursor: pointer;
 }
 .caption a { padding-block: 12px; }
-.caption a:focus-visible,.caption button:focus-visible { outline: 2px solid #d2dfff; outline-offset: 3px; }
+.caption a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.caption button:hover { color: var(--public-interactive); border-color: var(--public-interactive); }
+.caption button[aria-pressed="true"] { color: var(--public-navy); background: var(--public-blue); border-color: var(--public-blue); }
+.caption button[aria-pressed="true"]:hover { background: var(--public-interactive); border-color: var(--public-interactive); }
+.caption a:focus-visible,.caption button:focus-visible { outline: 2px solid var(--public-interactive); outline-offset: 3px; }
 .static { color: #b9c4d8; }
 .root > :not(.journey) { position: relative; z-index: 1; }
 .root :is(section[id],h2[id],div[id]) { scroll-margin-top: 130px; }
@@ -87,7 +91,7 @@
   align-items: center;
   padding-block: 90px 120px;
   border: 0;
-  background: linear-gradient(90deg,#050a12de,#050a129c 48%,transparent 76%);
+  background: linear-gradient(90deg,color-mix(in srgb, var(--public-navy) 87%, transparent),color-mix(in srgb, var(--public-navy) 61%, transparent) 48%,transparent 76%);
 }
 .hero > div { width: 100%; }
 .root .hero h1 { max-width: 760px; font-size: clamp(44px,5.2vw,74px); }
@@ -97,7 +101,7 @@
   min-height: 90svh;
   padding-block: 100px 130px;
   border: 0;
-  background: linear-gradient(0deg,transparent,#060a12a0 25%,#060a12a0 75%,transparent);
+  background: linear-gradient(0deg,transparent,color-mix(in srgb, var(--public-navy) 63%, transparent) 25%,color-mix(in srgb, var(--public-navy) 63%, transparent) 75%,transparent);
 }
 .overview h2, .overview > div > p { text-shadow: 0 2px 12px #000; }
 .root .chapter {
@@ -112,8 +116,8 @@
   margin: 0 auto 0 max(40px,calc((100% - 1216px)/2));
   padding: 34px;
   display: block;
-  background: #070d17e8;
-  border: 1px solid #9cb5ff30;
+  background: color-mix(in srgb, var(--public-navy) 91%, transparent);
+  border: 1px solid color-mix(in srgb, var(--public-interactive) 19%, transparent);
   border-radius: 8px;
   box-shadow: 0 20px 70px #0003;
 }
@@ -125,8 +129,8 @@
   max-width: 1216px;
   width: calc(100% - 80px);
   padding: 34px;
-  background: #070d17e8;
-  border: 1px solid #9cb5ff30;
+  background: color-mix(in srgb, var(--public-navy) 91%, transparent);
+  border: 1px solid color-mix(in srgb, var(--public-interactive) 19%, transparent);
   border-radius: 8px;
 }
 .root .credentials {
@@ -134,8 +138,8 @@
   width: calc(100% - 80px);
   padding-inline: 34px;
   margin-block: 60px;
-  background: #070d17ec;
-  border: 1px solid #9cb5ff30;
+  background: color-mix(in srgb, var(--public-navy) 93%, transparent);
+  border: 1px solid color-mix(in srgb, var(--public-interactive) 19%, transparent);
   border-radius: 8px;
 }
 .finish { min-height: 100svh; display: flex; align-items: center; padding-block: 90px; }
@@ -144,8 +148,8 @@
   width: min(560px,42%);
   margin: 0 auto 0 max(40px,calc((100% - 1216px)/2));
   padding: 34px;
-  background: #070d17e8;
-  border: 1px solid #9cb5ff30;
+  background: color-mix(in srgb, var(--public-navy) 91%, transparent);
+  border: 1px solid color-mix(in srgb, var(--public-interactive) 19%, transparent);
   border-radius: 8px;
 }
 .finish h2 { font-size: clamp(30px,3.1vw,44px); }
@@ -157,15 +161,15 @@
 }
 @media(max-width:760px) {
   .vignette { background: linear-gradient(90deg,#03070c60,#03070c20),linear-gradient(0deg,#03070c50,transparent 40%); }
-  .root .hero { padding-block: 80px 110px; min-height: calc(100svh - 69px); background: linear-gradient(90deg,#050a1280,#050a1220); }
+  .root .hero { padding-block: 80px 110px; min-height: calc(100svh - 69px); background: linear-gradient(90deg,color-mix(in srgb, var(--public-navy) 50%, transparent),color-mix(in srgb, var(--public-navy) 13%, transparent)); }
   .root .hero h1 { font-size: clamp(38px,9vw,58px); text-shadow: 0 2px 20px #000; }
-  .hero > div { background: linear-gradient(90deg,#060b14a0,#060b1440); padding-block: 22px; }
+  .hero > div { background: linear-gradient(90deg,color-mix(in srgb, var(--public-navy) 63%, transparent),color-mix(in srgb, var(--public-navy) 25%, transparent)); padding-block: 22px; }
   .root .overview { padding-block: 60px 100px; }
   .root .chapter { min-height: 0; padding-block: 100px 130px; }
-  .root .chapter > div { width: calc(100% - 36px); margin-inline: 18px; padding: 24px; background: #070d17d4; }
+  .root .chapter > div { width: calc(100% - 36px); margin-inline: 18px; padding: 24px; background: color-mix(in srgb, var(--public-navy) 83%, transparent); }
   .root .chapter h2 { font-size: 32px; }
   .process { padding-block: 80px; }
-  .process > section > div,.root .credentials { width: calc(100% - 36px); padding-inline: 24px; background: #070d17db; }
+  .process > section > div,.root .credentials { width: calc(100% - 36px); padding-inline: 24px; background: color-mix(in srgb, var(--public-navy) 86%, transparent); }
   .finish > section > div { margin-left: 18px; padding: 24px; }
   .caption { top: calc(100svh - 60px); margin-right: 12px; max-width: calc(100% - 24px); width: calc(100% - 24px); padding-inline: 12px; gap: 10px; font-size: 11px; }
   .label { display: none; }
@@ -182,7 +186,7 @@
     width: calc(100% - 36px);
     margin-inline: 18px;
     padding: 24px;
-    background: #070d17f0;
+    background: color-mix(in srgb, var(--public-navy) 94%, transparent);
   }
 }
 @media(max-height:550px) {
@@ -193,7 +197,7 @@
 
 /* A compact technology interlude, not a fourth offering or new camera chapter. */
 .root .technology { padding-block: 28px; border: 0; }
-.technology > div { width: min(1216px, calc(100% - 80px)); padding: 28px 34px; background: #070d17ed; border: 1px solid #9cb5ff30; border-radius: 8px; }
+.technology > div { width: min(1216px, calc(100% - 80px)); padding: 28px 34px; background: color-mix(in srgb, var(--public-navy) 93%, transparent); border: 1px solid color-mix(in srgb, var(--public-interactive) 19%, transparent); border-radius: 8px; }
 .technology h2 { max-width: 800px; font-size: clamp(26px, 2.6vw, 36px); }
 .technology p { max-width: 920px; }
 @media(max-width:760px) { .technology > div { width: calc(100% - 36px); padding: 24px; } }

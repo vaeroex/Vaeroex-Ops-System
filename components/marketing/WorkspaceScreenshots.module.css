@@ -1,9 +1,10 @@
 .tour { min-width: 0; width: 100%; max-width: 900px; margin-inline: auto; }
 .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-.tabs button { min-height: 44px; padding: 9px 15px; border: 1px solid #394352; border-radius: 5px; background: #111720; color: #cdd5e2; font: inherit; font-size: 14px; cursor: pointer; }
-.tabs button[aria-selected="true"] { color: #fff; background: #23334d; border-color: #8bafff; }
-.tabs button:hover { background: #263144; }
-.tabs button:focus-visible, .imageLink:focus-visible { outline: 2px solid #9ebfff; outline-offset: 4px; }
+.tabs button { min-height: 44px; padding: 9px 15px; border: 1px solid #647989; border-radius: 5px; background: #111720; color: #cdd5e2; font: inherit; font-size: 14px; cursor: pointer; }
+.tabs button[aria-selected="true"] { color: var(--public-navy); background: var(--public-blue); border-color: var(--public-blue); font-weight: 700; }
+.tabs button:hover { color: var(--public-interactive); border-color: var(--public-interactive); }
+.tabs button[aria-selected="true"]:hover { color: var(--public-navy); background: var(--public-interactive); }
+.tabs button:focus-visible, .imageLink:focus-visible { outline: 2px solid var(--public-interactive); outline-offset: 4px; }
 .capture { margin: 0 auto; min-width: 0; width: 100%; max-width: 900px; }
 .capture[data-workspace-capture="findings"], .capture[data-workspace-capture="evidence"] { max-width: 720px; }
 .caption { display: grid; gap: 10px; margin-bottom: 18px; color: #b6c0cf; font-size: 14px; line-height: 1.65; }

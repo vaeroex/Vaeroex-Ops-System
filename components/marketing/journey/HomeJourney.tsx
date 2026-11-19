@@ -45,9 +45,9 @@ function Poster() {
         <stop offset="1" stopColor="#9bb6cd" />
       </linearGradient>
       <linearGradient id="journey-logo-blue" x1="700" y1="250" x2="1300" y2="800" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#a2cbe8" />
-        <stop offset=".45" stopColor="#477da8" />
-        <stop offset="1" stopColor="#163655" />
+        <stop stopColor="var(--public-interactive)" />
+        <stop offset=".45" stopColor="var(--public-blue)" />
+        <stop offset="1" stopColor="#07516a" />
       </linearGradient>
       <linearGradient id="journey-logo-edge" x1="400" y1="200" x2="1150" y2="800" gradientUnits="userSpaceOnUse">
         <stop stopColor="#263b50" />
