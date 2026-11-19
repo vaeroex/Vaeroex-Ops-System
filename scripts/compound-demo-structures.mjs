@@ -58,7 +58,20 @@ function bindingSite(entry) {
       return [indexOf(zinc.serial),indexOf(a.serial)];
     });
   const center = [0,1,2].map(i => (zinc.xyz[i] + ligand.reduce((n,a) => n+a.xyz[i],0) / ligand.length) / 2);
+  const ranges = lines.filter(l => l.startsWith("HELIX ") || l.startsWith("SHEET ")).flatMap(line => {
+    const helix = line.startsWith("HELIX");
+    const chain = helix ? line[19] : line[21];
+    if (chain !== "A") return [];
+    return [{ start: Number(line.slice(helix ? 21 : 22, helix ? 25 : 26)),
+      end: Number(line.slice(33, 37)), shape: helix ? "helix" : "sheet" }];
+  });
   const backbone = atoms.filter(a => a.name === "CA" && a.element === "C");
+  const chain = backbone.map(a => {
+    const oxygen = atoms.find(b => b.number === a.number && b.name === "O" && b.residue === a.residue);
+    const shape = ranges.find(r => a.number >= r.start && a.number <= r.end)?.shape || "loop";
+    return { number: a.number, xyz: a.xyz, oxygen: oxygen?.xyz ?? null, shape };
+  });
+  assert(chain.length > 245 && chain.some(r => r.shape === "sheet") && chain.some(r => r.shape === "helix"));
   const trace = [];
   for (let i=1; i<backbone.length; i++) {
     const prev=backbone[i-1], next=backbone[i];
@@ -67,7 +80,7 @@ function bindingSite(entry) {
     trace.push([prev.xyz,next.xyz]);
   }
   return { atoms: siteAtoms.map(a => ({ name: a.name, element: a.element, xyz: a.xyz, residue: a.residue, number: a.number })),
-    bonds, contacts, trace, center, sha256: entry.sha };
+    bonds, contacts, trace, chain, center, sha256: entry.sha };
 }
 const json = JSON.stringify(Object.fromEntries(entries.map(e => [e.id,bindingSite(e)]))) + "\n";
 if (process.argv.includes("--check")) assert.equal(readFileSync(output,"utf8"),json);

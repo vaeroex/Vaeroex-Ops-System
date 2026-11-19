@@ -5,6 +5,7 @@ import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { PublicCtaBand, PublicPageHero } from "@/components/marketing/PublicPagePrimitives";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { trustSections } from "@/lib/legal/content";
+import { nistProfile } from "@/lib/marketing/discovery-evidence";
 
 function trustSection(title: (typeof trustSections)[number][0]) {
   if (title === "Deterministic Business Intelligence") return [title, "VSI uses calculation checks and supporting information to help reduce unsupported figures. Relevant, up-to-date records matter; missing information and important outputs require review."] as const;
@@ -141,8 +142,9 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
           <section className="space-y-4 text-slate-300" aria-labelledby="research-evidence">
             <h2 className="text-2xl font-semibold text-white" id="research-evidence">Drug Discovery Intelligence</h2>
             <p className="max-w-3xl leading-7">The public demo uses fixed, published experimental structures. Private research projects use organization membership to control access to runs, structures, files, and decisions. Reviewers can compare a published measurement, a model prediction, and the reason a colleague recorded for advancing a compound.</p>
-            <p className="max-w-3xl leading-7">VSI for Drug Discovery is planned. The design calls for factual claims to cite authorized project records and identify missing or conflicting evidence. Researchers will need to check whether the cited source supports each claim. NIST’s generative AI risk profile discusses confidently stated false content and informs that design.</p>
-            <a href="https://doi.org/10.6028/NIST.AI.600-1" className="vx-text-link">Read the NIST Generative AI Profile (PDF)</a>
+            <h2 className="pt-4 text-2xl font-semibold text-white">Checking a VSI answer</h2>
+            <p className="max-w-3xl leading-7">Vaeroex Super Intelligence (VSI) checks cited references against the sources available for an answer. Open a citation to see whether the source supports the claim. NIST’s generative AI risk profile explains how an AI system can express an incorrect answer with confidence.</p>
+            <a href={nistProfile} className="vx-text-link">Read the NIST Generative AI Profile (PDF)</a>
           </section>
           <div className="mt-8"><TrustNotes /></div>
         </div>

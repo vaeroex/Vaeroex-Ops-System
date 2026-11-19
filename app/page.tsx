@@ -60,22 +60,17 @@ export default function HomePage() {
         <section className={`${styles.section} ${journeyStyles.technology}`}>
           <div className={styles.container}>
             <p className={styles.eyebrow}>Vaeroex Super Intelligence (VSI)</p>
-            <h2>What evidence supported putting this compound on the shortlist?</h2>
-            <p className={styles.copy}>VSI Chat for Drug Discovery is planned. A researcher would be able to follow an answer back to the assay, the structure, and the reviewer’s recorded reason.</p>
-            <Link href="/drug-discovery-intelligence#vsi" className="vx-text-link">Inspect an illustrative VSI answer <ArrowUpRight size={16} aria-hidden="true" /></Link>
+            <h2>Where did that answer come from?</h2>
+            <p className={styles.copy}>Vaeroex Super Intelligence (VSI) is the AI system behind Vaeroex software. It is designed to reduce unsupported answers by grounding responses in available evidence and making sources and uncertainty visible.</p>
+            <Link href="/drug-discovery-intelligence#vsi" className="vx-text-link">Read a saved example and check its sources <ArrowUpRight size={16} aria-hidden="true" /></Link>
           </div>
         </section>
 
         <section className={`${styles.section} ${journeyStyles.chapter}`} aria-labelledby="home-custom">
           <div className={styles.container}>
-            <p className={styles.eyebrow}>Experimental structure · PDB 3HS4</p>
-            <h2 id="home-custom">Look at the zinc-bound position.</h2>
-            <p className={styles.copy}>This crystal structure shows acetazolamide at the enzyme’s catalytic zinc. A docking pose is a model’s proposed placement. To compare one with experiment, first verify that both structures share the same coordinates.</p>
-            <figure className={research.figure}>
-              <Image src="/brand/compound-demo/3hs4-site.svg" width={520} height={346} unoptimized alt="Acetazolamide’s observed binding site with a lavender zinc ion and surrounding protein atoms" />
-              <figcaption>Acetazolamide · Chain A <a href="https://www.rcsb.org/structure/3HS4">Source at RCSB PDB</a></figcaption>
-            </figure>
-            <Link href={discoveryDemo} className="vx-text-link">Rotate the experimental structure <ArrowUpRight size={16} aria-hidden="true" /></Link>
+            <h2 id="home-custom">Explore two compounds in 3D.</h2>
+            <p className={styles.copy}>See where each binds, inspect the evidence, and build a sample shortlist.</p>
+            <Link href={discoveryDemo} className="vx-text-link">Explore sample compounds <ArrowUpRight size={16} aria-hidden="true" /></Link>
           </div>
         </section>
 

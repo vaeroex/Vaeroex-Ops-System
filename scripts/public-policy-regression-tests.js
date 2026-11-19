@@ -138,7 +138,6 @@ assert.match(
 );
 for (const route of [
   "/drug-discovery-intelligence",
-  "/drug-discovery-intelligence/demo",
   "/contact",
 ])
   assert.ok(sitemap.includes(`"${route}"`));
@@ -243,7 +242,7 @@ for (const file of ["app/page.tsx", "app/about/page.tsx", "app/drug-discovery-in
 }
 const researchSources =
   read("app/drug-discovery-intelligence/page.tsx") +
-  read("app/drug-discovery-intelligence/demo/page.tsx") +
+  read("app/drug-discovery-intelligence/demo/CompoundDemo.tsx") +
   read("app/biological-intelligence/_archived-page.tsx");
 assert.doesNotMatch(
   researchSources,

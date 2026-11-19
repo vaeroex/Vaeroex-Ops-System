@@ -44,7 +44,7 @@ function loadTs(file) {
     if (specifier === "next/image") return { __esModule: true, default: image };
     if (specifier === "next/dynamic")
       return { __esModule: true, default: () => () => null };
-    if (specifier === "next/navigation") return { usePathname: () => "/", notFound: () => { throw new Error("NEXT_HTTP_ERROR_FALLBACK;404"); } };
+    if (specifier === "next/navigation") return { usePathname: () => "/", permanentRedirect: href => { throw new Error("permanent redirect to " + href); }, notFound: () => { throw new Error("NEXT_HTTP_ERROR_FALLBACK;404"); } };
     if (specifier === "@/components/legal/PublicSiteHeader")
       return { PublicSiteHeader: () => React.createElement("header", null) };
     if (specifier === "@/components/legal/PublicFooter")
@@ -104,15 +104,14 @@ async function main() {
   for (const html of [companyAbout, companyWhy]) {
     assert.equal((html.match(/<h1(?:\s|>)/g) || []).length, 1);
     assert.match(html, /Drug Discovery Intelligence/i);
-    assert.match(html, /VSI Chat/);
-    assert.match(html, /planned/i);
+    assert.match(html, /VSI/);
+    assert.doesNotMatch(html, /VSI[^<]{0,100}(planned|coming soon|in development)/i);
   }
   const routes = [
     "/",
     "/pricing",
     "/executive-intelligence",
     "/drug-discovery-intelligence",
-    "/drug-discovery-intelligence/demo",
     "/biological-intelligence",
   ];
   const retiredRoutes = new Set(["/biological-intelligence"]);
@@ -452,20 +451,24 @@ async function main() {
 
   const home = htmlByRoute.get("/");
   const product = htmlByRoute.get("/drug-discovery-intelligence");
-  const demo = htmlByRoute.get("/drug-discovery-intelligence/demo");
-  const demoRoute = '/drug-discovery-intelligence/demo';
-  const inquiryRoute = '/contact?inquiry=drug-discovery';
-  for (const [html, links] of [[home, [demoRoute, inquiryRoute]], [product, [demoRoute, inquiryRoute]], [demo, [inquiryRoute]]]) {
-    for (const href of links) assert.ok(html.includes(`href="${href}"`), `Public link to ${href} is missing`);
+  const explorer = "/drug-discovery-intelligence#compound-explorer";
+  const walkthrough = "/contact?inquiry=drug-discovery";
+  for (const html of [home, product]) {
+    for (const href of [explorer, walkthrough]) assert.ok(html.includes(`href="${href}"`), `Missing link to ${href}`);
   }
-  for (const html of [product, demo]) {
-    assert.doesNotMatch(html, /href="\/(?:checkout|signup)/i, "Drug Discovery access is separate from Executive Intelligence checkout");
-  }
-  assert.match(product + demo, /Experimental structure/i);
+  assert.doesNotMatch(product, /href="\/(?:checkout|signup)|illustrative score|−0\.50/i);
+  assert.match(product, /id="compound-explorer"/);
+  assert.match(product, /Experimental structure/i);
+  assert.match(product, /Saved example/i);
+  assert.match(product, /carbonic anhydrase II/i);
   for (const accession of ["3HS4", "4M2U"]) {
-    assert.ok((home + product + demo).includes(`https://www.rcsb.org/structure/${accession}`), `The public example needs a source link to PDB ${accession}`);
+    assert.ok(product.includes(`https://www.rcsb.org/structure/${accession}`), `Missing source link to PDB ${accession}`);
   }
-  assert.match(product + demo, /carbonic anhydrase II/i);
+
+  const legacy = loadTs("app/drug-discovery-intelligence/demo/page.tsx");
+  for (const [query, target] of [[{}, explorer], [{ compound: "unknown" }, explorer], [{ compound: "dorzolamide" }, "/drug-discovery-intelligence?compound=dorzolamide#compound-explorer"]]) {
+    await assert.rejects(legacy.default({searchParams: Promise.resolve(query)}), {message: "permanent redirect to " + target});
+  }
   const headline = home.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
   assert.equal(headline, "Which compounds should your team test next?");
   assert.match(home, /Explore sample compounds/);
@@ -480,7 +483,7 @@ async function main() {
   assert.match(read("app/custom-business-systems/page.tsx"), /permanentRedirect\("\/contact\?inquiry=custom-software"\)/);
   assert.match(read("app/intelligence-systems/page.tsx"), /permanentRedirect\("\/drug-discovery-intelligence"\)/);
   assert.match(read("app/website-development/route.ts"), /status: 410/);
-  for (const html of [home, product, demo, companyAbout, companyWhy]) {
+  for (const html of [home, product, companyAbout, companyWhy]) {
     assert.doesNotMatch(html, /Executive Intelligence|Custom (?:software|business systems)|website (?:development|design|enhancement)|Coastal Kitchen/i);
   }
   assert.match(

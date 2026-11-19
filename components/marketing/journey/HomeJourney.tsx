@@ -226,7 +226,7 @@ export function HomeJourney() {
       </span>
       <span id="home-journey-description" className="sr-only">A dimensional rendering of the Vaeroex logo, preserving the source mark’s outline, proportions, negative space, and detached upper-right stroke.</span>
       <nav aria-label="Explore Vaeroex offerings" className={styles.offerings}>
-        <a href="/drug-discovery-intelligence/demo">Compounds</a>
+        <a href="/drug-discovery-intelligence#compound-explorer">Compounds</a>
         <a href="/drug-discovery-intelligence#evidence">Evidence</a>
         <a href="/drug-discovery-intelligence#approval">Shortlist</a>
       </nav>

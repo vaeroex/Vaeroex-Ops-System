@@ -3,8 +3,9 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { CompoundDemo } from "./demo/CompoundDemo";
 import { ResearchStudies } from "@/components/marketing/discovery/ResearchStudies";
-import { assayTable, diffDockGuide, discoveryDemo, discoveryWalkthrough, nistProfile } from "@/lib/marketing/discovery-evidence";
+import { assayTable, discoveryDemo, discoveryWalkthrough } from "@/lib/marketing/discovery-evidence";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 import shared from "@/components/marketing/Solutions.module.css";
 import styles from "@/components/marketing/discovery/Discovery.module.css";
@@ -15,26 +16,23 @@ export const metadata = publicPageMetadata({
   path: "/drug-discovery-intelligence",
 });
 
-export default function DrugDiscoveryIntelligence() {
+type PageProps = { searchParams: Promise<{ compound?: string | string[] }> };
+
+export default async function DrugDiscoveryIntelligence({ searchParams }: PageProps) {
+  const { compound } = await searchParams;
+  const initialId = compound === "dorzolamide" ? "dorzolamide" : "acetazolamide";
   return (
     <main className={`vaeroex-public-site ${styles.product}`}>
       <PublicSiteHeader />
       <div className={styles.shell}>
         <header className={styles.productHero}>
-          <div>
-            <p className={styles.source}>Vaeroex · Research workspace</p>
-            <h1>Drug Discovery Intelligence</h1>
-            <p>Bring a compound’s assay, protein structure, and review history into the same decision. Start with two glaucoma drugs bound to human carbonic anhydrase II, an enzyme involved in producing fluid in the eye.</p>
-            <div className={shared.actions}>
-              <Link className="vx-button vx-button--primary" href={discoveryDemo}>Explore sample compounds <ArrowUpRight size={17} aria-hidden="true" /></Link>
-              <Link className="vx-text-link" href={discoveryWalkthrough}>Request a walkthrough</Link>
-            </div>
-          </div>
-          <figure className={styles.figure}>
-            <Image unoptimized priority src="/brand/compound-demo/4m2u-site.svg" width={520} height={346} alt="Dorzolamide beside the catalytic zinc in its experimentally determined binding site" />
-            <figcaption><span>Dorzolamide · Experimental structure · Chain A</span><a href="https://www.rcsb.org/structure/4M2U">PDB 4M2U</a></figcaption>
-          </figure>
+          <h1>Drug Discovery Intelligence</h1>
+          <p>Explore how two glaucoma drugs bind to human carbonic anhydrase II. Inspect each experimental structure alongside its published assay, then choose which compounds to shortlist.</p>
         </header>
+        <section id="compound-explorer" className={styles.explorer} aria-labelledby="explorer-title">
+          <h2 id="explorer-title">Compound explorer</h2>
+          <CompoundDemo key={initialId} initialId={initialId} />
+        </section>
         <section id="evidence" className={styles.section}>
           <div className={styles.spread}>
             <div>
@@ -48,12 +46,6 @@ export default function DrugDiscoveryIntelligence() {
                 <strong>12 nM / 9 nM</strong>
                 <p>Table 1 reports inhibition constants (Kᵢ) of 12 nanomolar for acetazolamide and 9 nanomolar for dorzolamide. These are measurements under the reported enzyme assay conditions.</p>
                 <a className="vx-text-link" href={assayTable}>Read Table 1 and its methods <ArrowUpRight size={15} aria-hidden="true" /></a>
-              </div>
-              <div className={styles.fact}>
-                <p className={styles.source}>Model confidence · Illustrative score</p>
-                <strong>−0.50</strong>
-                <p>For a typical drug-like input, this example falls in the DiffDock authors’ approximate moderate-confidence band for a proposed pose. It is a teaching example, independent of either compound. Pose confidence cannot establish potency or clinical efficacy.</p>
-                <a className="vx-text-link" href={diffDockGuide}>DiffDock authors’ interpretation guide <ArrowUpRight size={15} aria-hidden="true" /></a>
               </div>
             </div>
           </div>
@@ -81,7 +73,7 @@ export default function DrugDiscoveryIntelligence() {
               </tbody>
             </table>
             <p>One ångström (Å) is one ten-billionth of a meter.</p>
-            <Link className="vx-text-link" href="/drug-discovery-intelligence/demo?compound=dorzolamide">Open the dorzolamide binding site <ArrowUpRight size={15} aria-hidden="true" /></Link>
+            <Link className="vx-text-link" href="/drug-discovery-intelligence?compound=dorzolamide#compound-explorer">Open the dorzolamide binding site <ArrowUpRight size={15} aria-hidden="true" /></Link>
           </div>
         </section>
         <section id="approval" className={styles.section}>
@@ -102,14 +94,17 @@ export default function DrugDiscoveryIntelligence() {
         </section>
         <section id="vsi" className={styles.section}>
           <div className={styles.spread}>
-            <div><p className={styles.source}>Vaeroex Super Intelligence</p><h2>What would a researcher be able to check in VSI Chat?</h2>
-              <p>VSI Chat for Drug Discovery is planned. The research workspace already keeps the source records, measurements, and reviewer decisions that a future answer would need to cite.</p>
-              <p>The research design aims to reduce unsupported answers. Factual claims should link to records the researcher can access. Measurements, model outputs, and review notes have different meanings. Missing records or conflicting evidence should be called out.</p>
-              <a className="vx-text-link" href={nistProfile}>Design rationale · NIST AI 600-1 <ArrowUpRight size={15} aria-hidden="true" /></a>
+            <div><p className={styles.source}>Vaeroex Super Intelligence</p><h2>Trace an answer to its sources.</h2>
+              <p>VSI is Vaeroex’s AI system. It checks cited references against the sources available for an answer and identifies gaps when a review covers only part of the evidence.</p>
+              <p>This saved research example pairs each observation with the public record that supports it.</p>
             </div>
-            <div><p className={styles.source}>Illustrative future interaction</p><h3>“What evidence supported putting this compound on the shortlist?”</h3>
-              <blockquote className={styles.note}>“The reviewer selected acetazolamide as a reference control. The cited table reports a Kᵢ of 12 nM, and PDB 3HS4 records its position near zinc in chain A.”</blockquote>
-              <p>You could check the assay row, the experimental chain, and the original approval note. If the approved record contained no model result, the answer should say so.</p>
+            <div><p className={styles.source}>Saved example</p><h3>What do we know about acetazolamide at this binding site?</h3>
+              <blockquote className={styles.note}>The crystal structure shows acetazolamide bound to zinc in chain A of human carbonic anhydrase II. In a separate enzyme assay, its reported inhibition constant (Kᵢ) was 12 nM.</blockquote>
+              <p>The structure shows where the compound binds. The assay measures inhibition under its test conditions. A conclusion about patient outcomes requires clinical evidence.</p>
+              <div className={shared.actions}>
+                <a className="vx-text-link" href="https://www.rcsb.org/structure/3HS4">Crystal structure · PDB 3HS4 <ArrowUpRight size={15} aria-hidden="true" /></a>
+                <a className="vx-text-link" href={assayTable}>Inhibition constant · Table 1, hCA II <ArrowUpRight size={15} aria-hidden="true" /></a>
+              </div>
             </div>
           </div>
         </section>
@@ -120,7 +115,7 @@ export default function DrugDiscoveryIntelligence() {
         <section className={styles.section}>
           <p className={styles.source}>Access and availability</p>
           <h2>Bring your team’s next review.</h2>
-          <p>The free sample runs in your browser with two fixed public structures. Request a walkthrough for the invitation-based project workspace, published structure import, and approved exports. New protein folding predictions, molecule generation, and research questions in VSI Chat are planned. Customer-run production docking and its pricing are pending.</p>
+          <p>The free sample runs in your browser with two fixed public structures. Request a walkthrough for the invitation-based project workspace, published structure import, and approved exports.</p>
           <div className={shared.actions}><Link href={discoveryDemo} className="vx-button vx-button--primary">Explore sample compounds <ArrowUpRight size={17} aria-hidden="true" /></Link><Link href={discoveryWalkthrough} className="vx-text-link">Request a walkthrough</Link></div>
         </section>
       </div>

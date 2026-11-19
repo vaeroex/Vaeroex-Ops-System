@@ -24,6 +24,7 @@ export function CompoundDemo({ initialId }: { initialId: CompoundId }) {
     event.preventDefault();
     const url = new URL(window.location.href);
     url.searchParams.set("compound",id);
+    url.hash="compound-explorer";
     window.history.replaceState(window.history.state, "", url);
     setActiveId(id);
   }
@@ -38,14 +39,19 @@ export function CompoundDemo({ initialId }: { initialId: CompoundId }) {
     document.body.append(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
-  const chip = (c: Compound) => <a key={c.id} href={`?compound=${c.id}`} aria-current={activeId===c.id?"true":undefined} onClick={e=>inspect(e,c.id)}>
+  const chip = (c: Compound) => <a key={c.id} href={`?compound=${c.id}#compound-explorer`} aria-current={activeId===c.id?"true":undefined} onClick={e=>inspect(e,c.id)}>
     {c.name} <small>{c.pdb}</small>
   </a>;
-  return <>
-    <nav className={styles.picker} aria-label="Choose a sample compound">{compounds.map(chip)}</nav>
-    <section className={styles.research} aria-label="Experimental structure and evidence">
+  return <div className={styles.explorer}>
+    <div className={styles.instrument}>
+      <div className={styles.selector}>
+        <p className={styles.controlTitle}>Compound</p>
+        <nav className={styles.picker} aria-label="Choose a sample compound">{compounds.map(chip)}</nav>
+      </div>
       <BindingSiteViewer key={activeId} compound={compound}/>
-      <div className={styles.evidence}>
+    </div>
+    <section className={styles.evidence} aria-label="Selected compound evidence">
+      <div className={styles.record}>
         <p className={styles.kicker}>Experimental structure</p>
         <h2>{compound.name}</h2>
         <p className={styles.target}>Human carbonic anhydrase II · Chain A</p>
@@ -54,14 +60,19 @@ export function CompoundDemo({ initialId }: { initialId: CompoundId }) {
           <div><dt>Ligand in chain A</dt><dd>{compound.ligand} {compound.residue}</dd></div>
           <div><dt>X-ray resolution</dt><dd>{compound.resolution} Å</dd></div>
         </dl>
-        <p>The deposited structure places the ligand’s {compound.nitrogen} nitrogen {compound.distance} ångströms (Å) from zinc. Dashed lines mark zinc coordination in the binding site.</p>
-        <div className={styles.measure}>
-          <span>Published lab measurement</span>
-          <strong>Inhibition constant (K<sub>i</sub>) · {compound.ki} nM</strong>
-          <p>K<sub>i</sub> measures inhibitor binding under the assay conditions. The value here is in nanomoles per litre.</p>
-          <a href={assaySource}>Read assay table 1 <ArrowUpRight size={14}/></a>
-        </div>
         <a className={styles.file} href={`/brand/compound-demo/${compound.pdb}.pdb`} download>Download source PDB <ArrowDownToLine size={14}/></a>
+      </div>
+      <div className={styles.measure}>
+        <p className={styles.kicker}>Published lab measurement</p>
+        <h3>Inhibition constant (K<sub>i</sub>) <strong>{compound.ki} nM</strong></h3>
+        <p>K<sub>i</sub> measures inhibitor binding under the published assay conditions.</p>
+        <a href={assaySource}>Read assay table 1 <ArrowUpRight size={14}/></a>
+      </div>
+      <div className={styles.measure}>
+        <p className={styles.kicker}>Binding site</p>
+        <h3>Zinc–nitrogen distance <strong>{compound.distance} Å</strong></h3>
+        <p>Measured between the deposited zinc and {compound.name.toLowerCase()} atom {compound.nitrogen}. Dashed lines in the binding site show zinc coordination.</p>
+        <a href={pdbUrl(compound.pdb)}>Inspect PDB {compound.pdb} <ArrowUpRight size={14}/></a>
       </div>
     </section>
     <section className={styles.review} aria-labelledby="shortlist-heading">
@@ -71,7 +82,7 @@ export function CompoundDemo({ initialId }: { initialId: CompoundId }) {
         {compounds.map(c=><div className={styles.decision} key={c.id}>
           <label className={styles.check}><input type="checkbox" checked={draft[c.id].included} onChange={e=>edit(c.id,{included:e.target.checked})}/>
             <span>Shortlist {c.name.toLowerCase()}</span></label>
-          <a href={`?compound=${c.id}#sample-compounds`} onClick={e=>{inspect(e,c.id); if(e.defaultPrevented) document.getElementById("sample-compounds")?.scrollIntoView();}}>Inspect {c.pdb} <ArrowUpRight size={14}/></a>
+          <a href={`?compound=${c.id}#compound-explorer`} onClick={e=>{inspect(e,c.id); if(e.defaultPrevented) document.getElementById("compound-explorer")?.scrollIntoView();}}>Inspect {c.pdb} <ArrowUpRight size={14}/></a>
           <label className={styles.note}>Reason for {c.name.toLowerCase()}
             <textarea rows={2} maxLength={400} placeholder="Record the evidence behind your choice." value={draft[c.id].reason} onChange={e=>edit(c.id,{reason:e.target.value})}/></label>
         </div>)}
@@ -89,5 +100,5 @@ export function CompoundDemo({ initialId }: { initialId: CompoundId }) {
       </>}</div>
     </section>
     <div className={styles.access}><Link className="vx-button vx-button--primary" href="/contact?inquiry=drug-discovery">Request access to use your own compounds <ArrowUpRight size={18}/></Link></div>
-  </>;
+  </div>;
 }

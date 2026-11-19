@@ -20,7 +20,7 @@ export default function AboutPage() {
       <PublicSiteHeader />
       <PublicPageHero eyebrow="About Vaeroex" title="Research decisions that a colleague can trace."
         description="Vaeroex builds Drug Discovery Intelligence so researchers can review compound evidence together, record their reasoning, and hand an approved batch to the next team."
-        actions={<Link href="/drug-discovery-intelligence/demo" className={styles.primary}>Explore sample compounds <ArrowRight size={17} aria-hidden="true" /></Link>}
+        actions={<Link href="/drug-discovery-intelligence#compound-explorer" className={styles.primary}>Explore sample compounds <ArrowRight size={17} aria-hidden="true" /></Link>}
       />
       <section className={styles.section} aria-labelledby="founder-title">
         <div className={`${styles.container} ${story.vsiLayout}`}>
@@ -41,11 +41,11 @@ export default function AboutPage() {
         <div className={`${styles.container} ${story.vsiLayout}`}>
           <div>
             <p className={styles.sectionLabel}>Vaeroex Super Intelligence</p>
-            <h2 id="vsi-title" className={story.headline}>VSI in research</h2>
+            <h2 id="vsi-title" className={story.headline}>How VSI uses evidence</h2>
           </div>
           <div className={story.prose}>
-            <p>VSI Chat for Drug Discovery is planned. A researcher could ask why a compound was shortlisted and check the cited assay, the experimental structure, and the reviewer’s reason.</p>
-            <Link href="/drug-discovery-intelligence#vsi" className={styles.textLink}>Explore the illustrative research question <ArrowRight size={16} aria-hidden="true" /></Link>
+            <p>Vaeroex Super Intelligence (VSI) is the AI system behind Vaeroex software. When VSI cites a source, it checks that the citation belongs to the records available for the answer. Readers can inspect those sources and see when a review covered only part of the available evidence.</p>
+            <Link href="/drug-discovery-intelligence#vsi" className={styles.textLink}>Check the sources in a saved example <ArrowRight size={16} aria-hidden="true" /></Link>
           </div>
         </div>
       </section>

@@ -62,7 +62,7 @@ export function PublicCtaBand({
   eyebrow = "Drug Discovery Intelligence",
   title,
   description,
-  primaryHref = "/drug-discovery-intelligence/demo",
+  primaryHref = "/drug-discovery-intelligence#compound-explorer",
   primaryLabel = "Explore sample compounds",
   secondaryHref = "/contact?inquiry=drug-discovery",
   secondaryLabel = "Request a walkthrough"

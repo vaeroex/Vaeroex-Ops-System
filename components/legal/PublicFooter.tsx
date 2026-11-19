@@ -5,7 +5,7 @@ import { legalLinks } from "@/lib/legal/content";
 
 const researchLinks = [
   ["Drug Discovery Intelligence", "/drug-discovery-intelligence"],
-  ["Explore sample compounds", "/drug-discovery-intelligence/demo"],
+  ["Explore sample compounds", "/drug-discovery-intelligence#compound-explorer"],
   ["AI in research and development", "/drug-discovery-intelligence#research"],
   ["Request a walkthrough", "/contact?inquiry=drug-discovery"],
 ] as const;

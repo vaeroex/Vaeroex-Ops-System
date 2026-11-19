@@ -1,8 +1,20 @@
 .product { background: var(--public-navy); }
 .product :is(h1,h2,h3) { font-weight: 500; line-height: 1.12; letter-spacing: -.045em; }
 .shell { max-width: 1296px; margin: auto; padding: 0 clamp(22px,5vw,68px); }
-.productHero, .spread { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: clamp(24px,5vw,72px); align-items: center; }
-.productHero { padding-block: clamp(40px,7vw,100px); }
+.spread { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: clamp(24px,5vw,72px); align-items: center; }
+.productHero { padding-block: clamp(30px,4.5vw,64px) clamp(25px,3vw,42px); }
+.productHero h1 { margin-top: 0; }
+.productHero p { max-width: 70ch; }
+.explorer { padding: clamp(14px,2.4vw,30px) 0 clamp(32px,5vw,64px); border-top: 1px solid #395662; }
+.product section.explorer[id] { scroll-margin-top: 87px; }
+@media (max-width: 1000px) {
+  .product section.explorer[id] { scroll-margin-top: 75px; }
+}
+@media (max-width: 760px) {
+  .product section.explorer[id] { scroll-margin-top: 73px; }
+}
+.product .explorer > h2 { margin: 0 0 16px; font-size: clamp(26px,3.2vw,42px); }
+
 .product h1 { font-size: clamp(44px,5.3vw,78px); margin: 18px 0; }
 .product h2 { font-size: clamp(32px,3.5vw,50px); margin: 12px 0 20px; }
 .product h3,.studies h3 { font-size: clamp(20px,2vw,28px); margin: 12px 0; }
@@ -31,8 +43,7 @@
 .records dt { color: var(--public-interactive); font-size: 13px; }
 .records dd { margin: 5px 0 0; }
 @media(max-width:760px) {
-  .productHero,.spread,.studies,.roles { grid-template-columns: minmax(0,1fr); }
-  .productHero { gap: 26px; }
+  .spread,.studies,.roles { grid-template-columns: minmax(0,1fr); }
   .roles,.studies { gap: 14px; }
 }
 

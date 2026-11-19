@@ -1,7 +1,6 @@
-export const discoveryDemo = "/drug-discovery-intelligence/demo";
+export const discoveryDemo = "/drug-discovery-intelligence#compound-explorer";
 export const discoveryWalkthrough = "/contact?inquiry=drug-discovery";
 export const assayTable = "https://pmc.ncbi.nlm.nih.gov/articles/PMC7011996/#t0001";
-export const diffDockGuide = "https://github.com/gcorso/DiffDock#faq";
 export const nistProfile = "https://doi.org/10.6028/NIST.AI.600-1";
 
 export const researchStudies = [
