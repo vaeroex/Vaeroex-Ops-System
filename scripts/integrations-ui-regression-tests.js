@@ -22,19 +22,18 @@ test("Sheets pilot eligibility is disclosed before purchase and connection, with
     "@/lib/legal/pre-checkout-acceptance": { hasAcceptedCurrentPreCheckoutPolicies: async () => false,
       preCheckoutAcceptanceSnapshot: () => ({ requiredPolicies: [], requiredPolicyHash: "synthetic" }) }
   };
+  const publicHelp = renderToStaticMarkup(await loadSource("app/help/page.tsx", mocks).default({}));
+  assert.match(publicHelp, /href="\/support"[^>]*>Contact support</);
+  assert.doesNotMatch(publicHelp, /Google Sheets/, "the public help page directs customers to support without promoting business connectors");
   for (const signedIn of [false, true]) {
     user = signedIn ? { id: "synthetic", email_confirmed_at: "2026-10-12T00:00:00Z" } : null;
-    for (const file of ["app/help/page.tsx", "app/checkout/legal/page.tsx"]) {
-      const html = renderToStaticMarkup(await loadSource(file, mocks).default({}));
-      assert.match(html, /Google Sheets limited pilot/);
-      assert.match(html, /Google account must be an approved test user/);
-      assert.match(html, /paid Vaeroex subscription does not grant pilot access/);
-      assert.match(html, /href="\/app\/sources"[^>]*>Upload supported spreadsheet files/);
-      if (file.includes("checkout")) {
-        assert(html.indexOf("data-google-sheets-pilot") < html.indexOf('name="accept_pre_checkout_legal"'));
-        assert.match(html, /\$250\/month/);
-      }
-    }
+    const html = renderToStaticMarkup(await loadSource("app/checkout/legal/page.tsx", mocks).default({}));
+    assert.match(html, /Google Sheets limited pilot/);
+    assert.match(html, /Google account must be an approved test user/);
+    assert.match(html, /paid Vaeroex subscription does not grant pilot access/);
+    assert.match(html, /href="\/app\/sources"[^>]*>Upload supported spreadsheet files/);
+    assert.match(html, /data-google-sheets-pilot[\s\S]*name="accept_pre_checkout_legal"/);
+    assert.match(html, /\$250\/month/);
   }
   const { searchHelpArticles } = loadSource("lib/help/content.ts");
   const guide = searchHelpArticles("Google Sheets").find(article => article.id === "google-sheets-pilot");
