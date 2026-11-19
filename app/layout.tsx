@@ -9,8 +9,8 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || PUBLIC_SITE_URL),
   ...publicPageMetadata({title: "Vaeroex | Drug Discovery Intelligence", description: "Inspect published compound structures and assay evidence, review a research shortlist, and export an approved test batch. Explore Vaeroex Drug Discovery Intelligence."}),
   icons: {
-    apple: "/apple-touch-icon.png",
-    icon: "/favicon.png"
+    apple: "/brand/official/apple-touch-icon.png",
+    icon: [{ url: "/brand/official/favicon.ico", sizes: "any" }, { url: "/brand/official/icon-192.png", sizes: "192x192", type: "image/png" }]
   },
   manifest: "/manifest.webmanifest",
   appleWebApp: {

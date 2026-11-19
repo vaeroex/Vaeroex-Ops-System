@@ -11,7 +11,6 @@ const PAGE_HEIGHT = 792;
 const MARGIN = 54;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const NAVY = rgb(0.025, 0.067, 0.12);
-const CYAN = rgb(0.05, 0.65, 0.8);
 const INK = rgb(0.08, 0.12, 0.18);
 const MUTED = rgb(0.34, 0.4, 0.48);
 const LINE = rgb(0.82, 0.85, 0.89);
@@ -153,7 +152,9 @@ export async function generateWorkspaceAgreementPdf({
     y -= 4;
   };
 
-  page.drawText("VAEROEX", { x: MARGIN, y, size: 11, font: fonts.bold, color: CYAN });
+  const wordmark = await document.embedPng(await readFile(path.join(process.cwd(), "public/brand/official/wordmark.png")));
+  const logo = wordmark.scaleToFit(102, 19);
+  page.drawImage(wordmark, { x: MARGIN, y, width: logo.width, height: logo.height });
   y -= 28;
   page.drawText("Workspace Agreement", { x: MARGIN, y, size: 24, font: fonts.bold, color: NAVY });
   y -= 24;

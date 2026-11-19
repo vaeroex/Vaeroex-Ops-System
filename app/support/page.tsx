@@ -20,7 +20,7 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
       <PublicSiteHeader />
       <section className="mx-auto max-w-3xl px-6 py-10">
       <div className="vx-request-form rounded-lg border border-line bg-white p-7 shadow-panel">
-        <Link href="/" className="text-sm font-semibold text-vaeroex-blue">Vaeroex</Link>
+        <Link href="/" className="text-sm font-semibold text-vaeroex-blue">Vaeroex home</Link>
         <h1 className="mt-4 text-3xl font-semibold">Contact Vaeroex support</h1>
         <p className="mt-3 text-sm leading-6 text-muted">
           Send account, setup, billing, or result questions for review. To try your own compounds in Drug Discovery Intelligence, <Link href="/contact?inquiry=drug-discovery" className="text-vaeroex-blue underline">request a research walkthrough</Link>.

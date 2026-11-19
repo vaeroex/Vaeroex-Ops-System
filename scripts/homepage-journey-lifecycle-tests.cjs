@@ -82,6 +82,29 @@ function fixture({reduced=false,compact=false,saveData=false,missing=[]}={}) {
   };
 }
 
+// The server-rendered reduced-motion poster uses the same traced faces at the same
+// proportions as the assembled 3D mark, including the gap between the lower pieces.
+{
+  const h = fixture({ reduced: true });
+  const posterComponent = h.poster().props.children;
+  const svg = posterComponent.type(posterComponent.props);
+  const front = walk(svg, node => node.type === 'polygon' && node.props['data-logo-piece']);
+  assert.equal(front.length, logoOutline.logoPieces.length);
+  const { logoBounds, logoToWorld } = logoOutline;
+  for (const piece of logoOutline.logoPieces) {
+    const face = front.find(node => node.props['data-logo-piece'] === piece.id);
+    assert.ok(face, 'Reduced-motion poster includes ' + piece.id);
+    const vertices = face.props.points.split(' ').map(pair => pair.split(',').map(Number));
+    assert.equal(vertices.length, piece.points.length);
+    piece.points.forEach((p, i) => {
+      const [x, y] = logoToWorld(p);
+      assert.ok(Math.abs(vertices[i][0] - (x + logoBounds.worldWidth / 2)) < 1e-8);
+      assert.ok(Math.abs(vertices[i][1] - (logoBounds.worldHeight / 2 - y)) < 1e-8);
+    });
+  }
+  h.unmount();
+}
+
 for(const compact of [false,true]) {
   const h=fixture({compact});h.intersect(true);h.flush();
   const sampled=[];

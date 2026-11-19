@@ -1,3 +1,4 @@
+import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import Link from "next/link";
 import "@/components/marketing/public-design.css";
 import { VAEROEX_COMPANY_ADDRESS_LINES, VAEROEX_CONTACT_EMAILS, VAEROEX_FOOTER_LOCATION, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
@@ -46,7 +47,7 @@ export function PublicFooter() {
       <div className="mx-auto grid max-w-[86rem] gap-10 lg:grid-cols-[1.1fr_1.5fr] lg:items-start">
         <div>
           <Link href="/" className="inline-flex items-center gap-3 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60" aria-label="Vaeroex home">
-            <span className="vx-footer-wordmark">VAEROEX</span>
+            <VaeroexLogo variant="stacked" size="md" />
           </Link>
           <p className="mt-4 max-w-sm text-base leading-7 text-slate-300">Drug Discovery Intelligence connects compound evidence to the decision about what to test next.</p>
           <p className="mt-3 text-xs">{VAEROEX_FOOTER_LOCATION}</p>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { ArrowUpRight } from "lucide-react";
 import { PublicNavigation } from "@/components/marketing/PublicNavigation";
 import { discoveryDemo, discoveryWalkthrough } from "@/lib/marketing/discovery-evidence";
@@ -13,8 +13,7 @@ export function PublicSiteHeader() {
       </a>
       <div className="vx-header-inner">
         <Link href="/" className="vx-wordmark" aria-label="Vaeroex home">
-          <Image src="/icon-192.png" width={31} height={31} alt="" priority />
-          <span>VAEROEX</span>
+          <VaeroexLogo compact priority />
         </Link>
         <PublicNavigation />
         <div className="vx-header-actions">

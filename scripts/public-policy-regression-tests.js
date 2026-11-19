@@ -1,6 +1,6 @@
+const crypto = require("node:crypto");
 /* Policy and product contracts retained from the superseded public art-direction suites. */
 const assert = require("node:assert/strict");
-const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const ts = require("typescript");
@@ -104,21 +104,21 @@ assert.doesNotMatch(
   /GDPR certification|GDPR certified|enterprise compliance certification for Vaeroex itself/i,
 );
 
-assert.match(logo, /\/brand\/vaeroex-logo-white-wordmark\.png/);
-assert.match(logo, /variant === "symbol" \? "\/icon-192\.png"/);
-const logoHash = crypto
-  .createHash("sha256")
-  .update(
-    fs.readFileSync(
-      path.join(root, "public/brand/vaeroex-logo-white-wordmark.png"),
-    ),
-  )
-  .digest("hex");
-assert.equal(
-  logoHash,
-  "03f57e14ec55969a00d67face54d72d7774c3a0f1d0b84c8cd11fc79f51a13fa",
-  "Canonical supplied logo asset must remain unchanged",
-);
+const approvedBrand = [
+  ["wordmark", "VAEROEX-Wordmark-Miami-Blue.png", "ac99d24276efdb9da173aa0198ba507cd94e8c6067b30aaeb238e54883422e9b", "ff166e64289b855ced471860a756fc6a55b9d8acd0b87a53e27cc315ca6da1d6"],
+  ["symbol", "VX-Miami-Blue.png", "d926e88e89b25438b0412d909919dc423a374d83727a41445325d1657d994901", "f77d082e029899f044e95ea4e665edea3f5e299be4ac7453b994e400c3dcd109"],
+  ["stacked", "Vaeroex-Combined-Miami-Blue.png", "61d87317513de5f4d048182d24ea4eb6ae3646e69dd9259a443886cce18c79f4", "375cf48a901b98209e906b528163059eccde9b69dc7a63c088ea2cffc390c84a"],
+];
+for (const [variant, source, sourceDigest, displayDigest] of approvedBrand) {
+  const original = fs.readFileSync(path.join(root, "assets/brand/originals", source));
+  assert.equal(crypto.createHash("sha256").update(original).digest("hex"), sourceDigest);
+  const asset = `/brand/official/${variant}.png`;
+  assert.ok(logo.includes(asset), `the shared identity must use the official ${variant}`);
+  const png = fs.readFileSync(path.join(root, "public", asset));
+  assert.equal(crypto.createHash("sha256").update(png).digest("hex"), displayDigest);
+  assert.equal(png.subarray(1, 4).toString(), "PNG");
+  assert.equal(png[25], 6, `official ${variant} must retain its transparent RGBA channel`);
+}
 assert.equal(
   fs.existsSync(path.join(root, "public/brand/vaeroex-logo.png")),
   false,

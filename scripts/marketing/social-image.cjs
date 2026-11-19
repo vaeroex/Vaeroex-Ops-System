@@ -5,7 +5,7 @@ const sharp = require(require.resolve('sharp', { paths: [path.dirname(require.re
 (async () => {
   const output = 'public/brand/vaeroex-social.jpg';
   // Existing shares may still request the historical JPEG URL.
-  await sharp('public/brand/drug-discovery-social.png').jpeg({quality: 82, mozjpeg: true}).toFile(output);
+  await sharp('public/brand/official/social.png').jpeg({quality: 82, mozjpeg: true}).toFile(output);
   const {width, height} = await sharp(output).metadata();
   console.log(JSON.stringify({width, height, bytes: fs.statSync(output).size}));
 })();

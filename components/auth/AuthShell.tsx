@@ -15,7 +15,7 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_12%_8%,rgba(30,107,255,0.20),transparent_30%),radial-gradient(circle_at_86%_12%,rgba(56,189,248,0.16),transparent_26%),linear-gradient(135deg,#030712_0%,#07111f_46%,#11112b_100%)]" />
       <div className="mx-auto grid min-h-[calc(100dvh-3rem)] max-w-6xl items-center gap-8 lg:grid-cols-[minmax(0,1fr)_430px]">
         <section className="relative hidden rounded-2xl border border-cyan-300/20 bg-vaeroex-navy p-10 text-white shadow-command lg:block">
-          <Link href="/" aria-label="Vaeroex home"><VaeroexLogo variant="full" size="lg" priority /></Link>
+          <Link href="/" aria-label="Vaeroex home"><VaeroexLogo variant="wordmark" size="lg" priority /></Link>
           <p className="mt-16 text-xs font-semibold uppercase tracking-widest text-cyan-200">Your Vaeroex account</p>
           <h2 className="mt-4 text-4xl font-semibold leading-tight">Products and connected systems.<br />One place to begin.</h2>
           <p className="mt-6 text-base leading-8 text-slate-200">Access the systems available to your account. Workspace permissions and product requirements apply when you open a system.</p>
@@ -24,7 +24,7 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
         <section className="rounded-2xl border border-line/80 bg-white/95 p-5 shadow-panel backdrop-blur sm:p-6 md:p-7">
           <div className="mb-7">
             <div className="mb-5 flex justify-center">
-              <VaeroexLogo variant="full" size="hero" priority className="max-w-full" />
+              <VaeroexLogo variant="stacked" size="md" priority />
             </div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-vaeroex-blue">Vaeroex account</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">{title}</h1>

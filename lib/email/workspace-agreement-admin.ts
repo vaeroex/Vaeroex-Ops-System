@@ -1,4 +1,5 @@
 import "server-only";
+import { emailBrandImage, emailBrandAttachment } from "./brand";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
@@ -81,7 +82,8 @@ This secure administrative link requires authorized Vaeroex administrator access
       <tr><td align="center">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;border:1px solid #243247;background:#0b1626;">
           <tr><td style="padding:28px;border-bottom:1px solid #243247;">
-            <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#22d3ee;font-weight:700;">VAEROEX · LEGAL RECORDS</div>
+            ${emailBrandImage}
+            <p style="margin:12px 0 0;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#22d3ee;font-weight:700;">Legal records</p>
             <h1 style="margin:10px 0 0;font-size:26px;color:#fff;">Workspace Agreement finalized</h1>
           </td></tr>
           <tr><td style="padding:28px;color:#cbd5e1;font-size:15px;line-height:1.7;">
@@ -108,6 +110,7 @@ This secure administrative link requires authorized Vaeroex administrator access
         "Idempotency-Key": `workspace-agreement-admin-${input.agreementId}-${attemptCount}`
       },
       body: JSON.stringify({
+        attachments: [await emailBrandAttachment()],
         from: process.env.RESEND_FROM_EMAIL || DEFAULT_FROM_EMAIL,
         to: [WORKSPACE_AGREEMENT_ADMIN_EMAIL],
         subject: `Workspace Agreement finalized: ${input.organizationName}`,

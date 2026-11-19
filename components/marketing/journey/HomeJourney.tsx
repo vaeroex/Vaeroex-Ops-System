@@ -31,44 +31,46 @@ class Boundary extends Component<{
 function Poster() {
   // The front faces use the shared source-image trace without altering any edge.
   // A shallow extrusion supplies depth while preserving the completed mark.
-  const point = ([x,y]: LogoPoint, depth = 0) => `${x + depth * 18},${y + depth * 22}`;
+  const scale = logoBounds.worldWidth / logoBounds.width;
+  const point = ([x,y]: LogoPoint, depth = 0) =>
+    `${(x - logoBounds.minX) * scale + depth * .77},${(y - logoBounds.minY) * scale + depth * .94}`;
   const points = (vertices: LogoPoint[], depth = 0) => vertices.map(vertex => point(vertex,depth)).join(" ");
   return <svg
-    viewBox={`${logoBounds.minX - 24} ${logoBounds.minY - 24} ${logoBounds.width + 72} ${logoBounds.height + 72}`}
+    viewBox={`-1.03 -1.03 51.08 ${logoBounds.worldHeight + 3.08}`}
     fill="none" aria-hidden="true" preserveAspectRatio="xMidYMid meet"
   >
     <defs>
-      <linearGradient id="journey-logo-metal" x1="250" y1="50" x2="1050" y2="790" gradientUnits="userSpaceOnUse">
+      <linearGradient id="journey-logo-metal" x1="3.25" y1="-.04" x2="37.48" y2="31.62" gradientUnits="userSpaceOnUse">
         <stop stopColor="#c4d5e2" />
         <stop offset=".28" stopColor="#608aa7" />
         <stop offset=".64" stopColor="#334c64" />
         <stop offset="1" stopColor="#9bb6cd" />
       </linearGradient>
-      <linearGradient id="journey-logo-blue" x1="700" y1="250" x2="1300" y2="800" gradientUnits="userSpaceOnUse">
+      <linearGradient id="journey-logo-blue" x1="22.50" y1="8.51" x2="48.17" y2="32.04" gradientUnits="userSpaceOnUse">
         <stop stopColor="var(--public-interactive)" />
         <stop offset=".45" stopColor="var(--public-blue)" />
         <stop offset="1" stopColor="#07516a" />
       </linearGradient>
-      <linearGradient id="journey-logo-edge" x1="400" y1="200" x2="1150" y2="800" gradientUnits="userSpaceOnUse">
+      <linearGradient id="journey-logo-edge" x1="9.67" y1="6.37" x2="41.75" y2="32.04" gradientUnits="userSpaceOnUse">
         <stop stopColor="#263b50" />
         <stop offset=".55" stopColor="#0d1926" />
         <stop offset="1" stopColor="#3b5268" />
       </linearGradient>
     </defs>
     {logoPieces.map(piece => <g key={piece.id} strokeLinejoin="round">
-      <polygon points={points(piece.points,1)} fill="#101e2d" stroke="#34485c" strokeWidth="1" />
+      <polygon points={points(piece.points,1)} fill="#101e2d" stroke="#34485c" strokeWidth=".043" />
       {piece.points.map((vertex,index) => {
         const next = piece.points[(index+1)%piece.points.length];
         return <polygon key={index}
           points={`${point(vertex)} ${point(next)} ${point(next,1)} ${point(vertex,1)}`}
-          fill="url(#journey-logo-edge)" stroke="#3f5970" strokeWidth=".8" />;
+          fill="url(#journey-logo-edge)" stroke="#3f5970" strokeWidth=".034" />;
       })}
     </g>)}
     {logoPieces.map(piece => <polygon key={piece.id}
       data-logo-piece={piece.id}
       points={points(piece.points)}
-      fill={piece.id === "right-diagonal" || piece.id === "detached-wing" ? "url(#journey-logo-blue)" : "url(#journey-logo-metal)"}
-      stroke="#a9cbe4" strokeWidth="1.4" strokeLinejoin="round"
+      fill={piece.id === "right-base" || piece.id === "right-rail" ? "url(#journey-logo-blue)" : "url(#journey-logo-metal)"}
+      stroke="#a9cbe4" strokeWidth=".060" strokeLinejoin="round"
     />)}
   </svg>;
 }
@@ -224,7 +226,7 @@ export function HomeJourney() {
     <figcaption className={styles.caption}>
       <span className={styles.label}>Drug Discovery <small>Vaeroex sculpture</small>
       </span>
-      <span id="home-journey-description" className="sr-only">A dimensional rendering of the Vaeroex logo, preserving the source mark’s outline, proportions, negative space, and detached upper-right stroke.</span>
+      <span id="home-journey-description" className="sr-only">The Vaeroex VX symbol in 3D. Its two capped arms meet around a diamond-shaped opening.</span>
       <nav aria-label="Explore Vaeroex offerings" className={styles.offerings}>
         <a href="/drug-discovery-intelligence#compound-explorer">Compounds</a>
         <a href="/drug-discovery-intelligence#evidence">Evidence</a>

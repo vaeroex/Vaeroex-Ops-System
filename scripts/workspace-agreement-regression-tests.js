@@ -168,7 +168,11 @@ assert.match(setupAction + adminActions, /\/app\/admin\/workspace-agreements\//,
 assert.match(adminEmail, /VERCEL_ENV === "production"/, "automatic administrative email must be Production-only");
 assert.match(adminEmail, /AbortSignal\.timeout\(15_000\)/, "the provider attempt must have a bounded deadline");
 assert.doesNotMatch(adminEmail, /for\s*\(|while\s*\(|setInterval|setTimeout/, "administrative email delivery must not create an automatic retry loop");
-assert.doesNotMatch(adminEmail, /attachments?\s*:/i, "administrative email must use the secure link rather than attach the PDF");
+assert.doesNotMatch(adminEmail.replace("attachments: [await emailBrandAttachment()]", ""), /attachments?\s*:/i, "only the fixed brand image may be attached to the administrative email");
+const emailBrand = read("lib/email/brand.ts");
+assert.match(emailBrand, /public\/brand\/official\/wordmark\.png/);
+assert.match(emailBrand, /content_type: "image\/png"/);
+assert.doesNotMatch(emailBrand, /\bpdf\b|agreementId|fetch\(/i, "the inline brand image must never include an agreement or use a remote URL");
 
 assert.match(adminEmailMigration, /create table if not exists public\.workspace_agreement_admin_email_deliveries/, "administrative delivery status must use a separate table");
 for (const status of ["pending", "sent", "failed", "skipped"]) {

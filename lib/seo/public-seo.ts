@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 export const PUBLIC_SITE_URL = "https://www.vaeroex.com";
+const previewHost = typeof process !== "undefined" && process.env.VERCEL_ENV === "preview" ? process.env.VERCEL_URL : undefined;
+const assetOrigin = previewHost ? `https://${previewHost}` : PUBLIC_SITE_URL;
 
 type PublicMetadataInput = {
   title: string;
@@ -12,9 +14,7 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
   const canonicalPath = path === "/" ? "/" : path;
   const canonical = `${PUBLIC_SITE_URL}${canonicalPath === "/" ? "" : canonicalPath}`;
 
-  const previewHost = typeof process !== "undefined" && process.env.VERCEL_ENV === "preview" ? process.env.VERCEL_URL : undefined;
-  const assetOrigin = previewHost ? `https://${previewHost}` : PUBLIC_SITE_URL;
-  const image = `${assetOrigin}/brand/drug-discovery-social.png`;
+  const image = `${assetOrigin}/brand/official/social.png`;
 
   return {
     title,
@@ -33,7 +33,7 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
           url: image,
           width: 1200,
           height: 630,
-          alt: "Vaeroex Drug Discovery Intelligence. Acetazolamide bound to human carbonic anhydrase II, PDB 3HS4."
+          alt: "Vaeroex"
         }
       ]
     },
@@ -53,7 +53,7 @@ export const organizationJsonLd = {
   name: "Vaeroex",
   legalName: "Vaeroex LLC",
   url: PUBLIC_SITE_URL,
-  logo: `${PUBLIC_SITE_URL}/brand/vaeroex-logo-white-wordmark.png`,
+  logo: `${assetOrigin}/brand/official/stacked.png`,
   description: "Vaeroex builds Drug Discovery Intelligence to help research teams inspect compound evidence, document decisions, and export approved test batches.",
   address: {
     "@type": "PostalAddress",

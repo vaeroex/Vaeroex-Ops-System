@@ -69,18 +69,6 @@
   gap: 12px;
   flex-shrink: 0;
 }
-.vx-wordmark > span {
-  font-size: 21px;
-  letter-spacing: 0.13em;
-  font-weight: 600;
-}
-.vx-wordmark img {
-  width: 31px;
-  height: 31px;
-  object-fit: contain;
-  filter: hue-rotate(-18deg);
-  border-radius: 0;
-}
 .vx-navigation {
   margin-left: auto;
 }
@@ -198,11 +186,6 @@
 .vx-footer > div:first-child {
   grid-template-columns: 0.7fr 1.9fr;
   gap: 48px;
-}
-.vx-footer-wordmark {
-  font-size: 28px;
-  letter-spacing: 0.16em;
-  font-weight: 500;
 }
 .vx-footer a {
   color: var(--public-interactive);
@@ -419,9 +402,6 @@
     gap: 18px;
     margin-left: 0;
   }
-  .vx-wordmark > span {
-    font-size: 18px;
-  }
   .vx-footer {
     padding-left: 32px !important;
     padding-right: 32px !important;
@@ -503,14 +483,6 @@
   .vx-wordmark {
     gap: 8px;
   }
-  .vx-wordmark > span {
-    font-size: 17px;
-    letter-spacing: 0.11em;
-  }
-  .vx-wordmark img {
-    width: 27px;
-    height: 27px;
-  }
   .vx-mobile-nav {
     gap: 14px;
   }
@@ -536,9 +508,6 @@
   }
   .vx-footer .text-base {
     max-width: 320px;
-  }
-  .vx-footer-wordmark {
-    font-size: 24px;
   }
   .vx-footer a {
     min-height: 34px;

@@ -79,8 +79,12 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/app/setup": [
       "./public/fonts/NotoSans-Regular.ttf",
-      "./public/fonts/NotoSans-Bold.ttf"
-    ]
+      "./public/fonts/NotoSans-Bold.ttf",
+      "./public/brand/official/wordmark.png"
+    ],
+    "/api/stripe/webhook": ["./public/brand/official/wordmark.png"],
+    "/app/admin/workspace-agreements": ["./public/brand/official/wordmark.png"],
+    "/app/admin/workspace-agreements/**": ["./public/brand/official/wordmark.png"]
   },
   experimental: {
     serverActions: {
@@ -146,6 +150,12 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      { source: "/favicon.ico", destination: "/brand/official/favicon.ico", permanent: true },
+      { source: "/favicon.png", destination: "/brand/official/icon-512.png", permanent: true },
+      { source: "/icon-192.png", destination: "/brand/official/icon-192.png", permanent: true },
+      { source: "/apple-touch-icon.png", destination: "/brand/official/apple-touch-icon.png", permanent: true },
+      { source: "/brand/vaeroex-logo-white-wordmark.png", destination: "/brand/official/wordmark.png", permanent: true },
+      { source: "/brand/drug-discovery-social.png", destination: "/brand/official/social.png", permanent: true },
       { source: "/operations-intelligence", destination: "/executive-intelligence", statusCode: 301 },
       { source: "/hourly-consulting", destination: "/contact?inquiry=custom-software", statusCode: 301 },
       { source: "/full-support-retainer", destination: "/contact?inquiry=custom-software", statusCode: 301 },

@@ -11,7 +11,7 @@ export default function OfflinePage() {
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_12%_8%,rgba(30,107,255,0.22),transparent_32%),radial-gradient(circle_at_88%_12%,rgba(56,189,248,0.14),transparent_28%),linear-gradient(135deg,#030712_0%,#07111f_48%,#11112b_100%)]" />
       <section className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-xl flex-col items-center justify-center text-center">
         <div className="rounded-2xl border border-cyan-300/20 bg-white/[0.055] p-5 shadow-command backdrop-blur">
-          <VaeroexLogo variant="full" size="hero" priority />
+          <VaeroexLogo variant="stacked" size="lg" priority />
         </div>
         <p className="mt-8 text-xs font-semibold uppercase tracking-[0.22em] text-vaeroex-accent">Offline</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">Vaeroex is waiting for a connection.</h1>

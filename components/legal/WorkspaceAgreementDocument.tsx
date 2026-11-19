@@ -1,3 +1,4 @@
+import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import type { WorkspaceAgreementSnapshot } from "@/lib/legal/workspace-agreement";
 
 function formatSignedAt(value: string) {
@@ -18,7 +19,7 @@ export function WorkspaceAgreementDocument({
   return (
     <article className="rounded-lg border border-line bg-white p-5 text-ink shadow-panel sm:p-7 print:border-0 print:p-0 print:shadow-none">
       <header className="border-b border-line pb-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Vaeroex</p>
+        <VaeroexLogo size="sm" />
         <h1 className="mt-2 text-2xl font-semibold">Workspace Agreement</h1>
         <p className="mt-2 text-sm leading-6 text-muted">Electronically signed agreement for an Executive Intelligence Workspace.</p>
       </header>

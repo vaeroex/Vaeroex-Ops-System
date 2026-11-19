@@ -1,4 +1,5 @@
 import "server-only";
+import { emailBrandImage, emailBrandAttachment } from "./brand";
 
 import { VAEROEX_CONTACT_EMAILS } from "@/lib/contact/emails";
 
@@ -63,7 +64,7 @@ www.vaeroex.com`;
       <tr><td align="center">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;border:1px solid #243247;background:#0b1626;">
           <tr><td style="padding:28px;border-bottom:1px solid #243247;">
-            <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#22d3ee;font-weight:700;">VAEROEX</div>
+            ${emailBrandImage}
             <h1 style="margin:10px 0 0;font-size:26px;color:#fff;">Your Workspace Agreement</h1>
           </td></tr>
           <tr><td style="padding:28px;color:#cbd5e1;font-size:15px;line-height:1.7;">
@@ -88,6 +89,7 @@ www.vaeroex.com`;
         "Idempotency-Key": `workspace-agreement-${input.agreementId}`
       },
       body: JSON.stringify({
+        attachments: [await emailBrandAttachment()],
         from: process.env.RESEND_FROM_EMAIL || DEFAULT_FROM_EMAIL,
         to: [input.to],
         subject: "Your Vaeroex Workspace Agreement",

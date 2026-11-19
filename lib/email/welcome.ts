@@ -1,4 +1,5 @@
 import "server-only";
+import { emailBrandImage, emailBrandAttachment } from "./brand";
 
 import { VAEROEX_CONTACT_EMAILS } from "@/lib/contact/emails";
 
@@ -78,7 +79,7 @@ function welcomeEmailHtml() {
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#111827;border:1px solid #253041;border-radius:16px;overflow:hidden;">
             <tr>
               <td style="padding:28px 28px 20px;background:linear-gradient(135deg,#0b1f4d 0%,#111827 62%,#07111f 100%);border-bottom:1px solid #253041;">
-                <div style="font-size:13px;letter-spacing:0.14em;text-transform:uppercase;color:#38bdf8;font-weight:700;">Vaeroex</div>
+                ${emailBrandImage}
                 <h1 style="margin:10px 0 0;font-size:28px;line-height:1.18;color:#ffffff;">Welcome to Vaeroex</h1>
                 <p style="margin:12px 0 0;color:#cbd5e1;font-size:15px;line-height:1.6;">The Advantage of Knowing First.</p>
               </td>
@@ -130,6 +131,7 @@ export async function sendVaeroexWelcomeEmail(input: SendWelcomeEmailInput): Pro
         ...(input.stripeSubscriptionId ? { "Idempotency-Key": `vaeroex-welcome-${input.stripeSubscriptionId}` } : {})
       },
       body: JSON.stringify({
+        attachments: [await emailBrandAttachment()],
         from: fromEmail(),
         to: [input.to],
         subject: "Welcome to Vaeroex",
