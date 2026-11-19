@@ -1,5 +1,5 @@
 .site {
-  background: #08090b;
+  background: var(--public-navy);
   color: #f0f2f6;
 }
 .container {
@@ -10,7 +10,7 @@
 .hero {
   padding-block: 100px 80px;
   border-bottom: 1px solid #ffffff1c;
-  background: radial-gradient(ellipse at 90% 0%, #172241 0%, transparent 56%);
+  background: radial-gradient(ellipse at 90% 0%, color-mix(in srgb, var(--public-navy) 82%, var(--public-blue)) 0%, transparent 56%);
 }
 .hero h1 {
   max-width: 1030px;
@@ -21,10 +21,10 @@
   letter-spacing: -0.055em;
 }
 .hero h1 span {
-  color: #93aaff;
+  color: var(--public-blue);
 }
 .eyebrow {
-  color: #a3b6ff;
+  color: var(--public-interactive);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.16em;
@@ -169,11 +169,11 @@
 }
 .process li {
   padding-top: 18px;
-  border-top: 1px solid #8b9fce66;
+  border-top: 1px solid color-mix(in srgb, var(--public-interactive) 32%, transparent);
 }
 .process span {
   font: 12px monospace;
-  color: #99afff;
+  color: var(--public-blue);
 }
 .process h3 {
   font-size: 18px;
@@ -207,7 +207,7 @@
 }
 .closing {
   padding-block: 80px;
-  background: linear-gradient(120deg, #151d30, #08090b);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--public-navy) 90%, var(--public-blue)), var(--public-navy));
 }
 .credibility {
   display: flex;

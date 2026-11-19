@@ -14,7 +14,7 @@ export const metadata: Metadata = publicPageMetadata({
   path: "/about/why-vaeroex"
 });
 
-const textLink = "inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#8299ff] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8299ff]";
+const textLink = "inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[color:var(--public-interactive)] underline-offset-4 hover:underline";
 
 export default function WhyVaeroexPage() {
   return (
@@ -42,7 +42,7 @@ export default function WhyVaeroexPage() {
         {companyApproach.map((item, index) => (
           <section key={item.id} id={item.id} aria-labelledby={`${item.id}-title`} className="scroll-mt-28 border-b border-white/10 py-12 sm:py-16">
             <div className="grid gap-6 lg:grid-cols-2 lg:gap-14">
-              <div><p className="mb-4 font-mono text-sm text-[#8299ff]">0{index + 1}</p><h2 id={`${item.id}-title`} className="text-3xl font-medium leading-tight sm:text-4xl">{item.title}</h2></div>
+              <div><p className="mb-4 font-mono text-sm text-[color:var(--public-blue)]">0{index + 1}</p><h2 id={`${item.id}-title`} className="text-3xl font-medium leading-tight sm:text-4xl">{item.title}</h2></div>
               <div className="space-y-4 text-base leading-7 text-slate-300">{item.paragraphs.map(paragraph => <p key={paragraph}>{paragraph}</p>)}</div>
             </div>
             {index === 3 ? (
@@ -60,19 +60,19 @@ export default function WhyVaeroexPage() {
 
       <section className="px-5 py-14 sm:px-6 sm:py-20" aria-labelledby="questions-title">
         <div className="mx-auto max-w-4xl">
-          <p className="text-xs font-medium uppercase tracking-wider text-[#8299ff]">A few more answers</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-[color:var(--public-blue)]">A few more answers</p>
           <h2 id="questions-title" className="mt-3 text-3xl font-medium sm:text-4xl">Questions you may be asking</h2>
           <div className="mt-8 divide-y divide-white/10 border-y border-white/10">
             {whyVaeroexFaqs.map(([question, answer]) => (
               <details key={question} className="group py-2">
-                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-5 rounded-sm py-4 text-base font-medium leading-7 text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8299ff]">
-                  {question}<ChevronDown className="h-5 w-5 shrink-0 text-[#8299ff] group-open:rotate-180" aria-hidden="true" />
+                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-5 rounded-sm py-4 text-base font-medium leading-7 text-slate-100">
+                  {question}<ChevronDown className="h-5 w-5 shrink-0 text-[color:var(--public-interactive)] group-open:rotate-180" aria-hidden="true" />
                 </summary>
                 <p className="max-w-3xl pb-5 text-base leading-7 text-slate-300">{answer}</p>
               </details>
             ))}
             <details className="group py-2">
-              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-5 rounded-sm py-4 text-base font-medium leading-7 text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8299ff]">Where can I learn about security and data handling?<ChevronDown className="h-5 w-5 shrink-0 text-[#8299ff] group-open:rotate-180" aria-hidden="true" /></summary>
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-5 rounded-sm py-4 text-base font-medium leading-7 text-slate-100">Where can I learn about security and data handling?<ChevronDown className="h-5 w-5 shrink-0 text-[color:var(--public-interactive)] group-open:rotate-180" aria-hidden="true" /></summary>
               <div className="pb-5 text-base leading-7 text-slate-300"><p>Visit the Trust Center for published product controls and data-handling information. Custom implementation requirements and controls are defined for each project; they may differ from the published product controls.</p><Link href="/trust" className={textLink}>Trust Center <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link></div>
             </details>
           </div>

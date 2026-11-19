@@ -105,7 +105,7 @@ export default async function CheckoutSuccessPage({ searchParams }: CheckoutSucc
         : "Vaeroex did not find a completed subscription belonging to this signed-in account. No access was granted from the URL alone.";
 
   return (
-    <main className="min-h-screen bg-slate-50 text-ink">
+    <main className="vaeroex-public-site vx-utility min-h-screen">
       <PublicSiteHeader />
       <section className="mx-auto grid max-w-4xl gap-6 px-6 py-16">
         <div className="rounded-lg border border-line bg-white p-8 shadow-command">

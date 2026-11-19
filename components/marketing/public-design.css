@@ -12,12 +12,15 @@
   font-family: Manrope, Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   color: #f0f2f6;
-  --public-blue: #7797ff;
+  --public-blue: #00a8d6;
+  --public-interactive: #62d8ef;
+  --public-navy: #101e2a;
+  --public-panel: #17323d;
   --public-muted: #99a2b4;
   --public-white: #f0f2f6;
 }
 .vaeroex-public-site {
-  background: #08090b !important;
+  background: var(--public-navy) !important;
   color: #f0f2f6;
 }
 .vaeroex-public-site h1,
@@ -32,7 +35,7 @@
   :where(a, button, summary, input, textarea, select):focus-visible,
 .vx-header :where(a, summary):focus-visible,
 .vx-footer a:focus-visible {
-  outline: 2px solid #92acff;
+  outline: 3px solid var(--public-interactive);
   outline-offset: 5px;
   box-shadow: none;
 }
@@ -46,7 +49,7 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  background: #08090bf2;
+  background: rgb(16 30 42 / 95%);
   border-bottom: 1px solid #ffffff16;
   backdrop-filter: blur(14px);
   isolation: isolate;
@@ -75,6 +78,7 @@
   width: 31px;
   height: 31px;
   object-fit: contain;
+  filter: hue-rotate(-18deg);
   border-radius: 0;
 }
 .vx-navigation {
@@ -104,23 +108,26 @@
 .vx-mobile-nav summary::-webkit-details-marker {
   display: none;
 }
-.vx-desktop-nav > a:hover,
-.vx-desktop-nav summary:hover,
-.vx-desktop-nav > [aria-current="page"] {
-  color: #f4f6fa;
+.vx-header :is(a:not(.vx-button), summary):hover,
+.vx-desktop-nav details[open] > summary {
+  color: var(--public-interactive);
 }
 .vx-desktop-nav details {
   position: relative;
 }
-.vx-desktop-nav details[open] > summary {
-  color: #f4f6fa;
+.vx-header nav a[aria-current="page"],
+.vx-desktop-nav details:has(a[aria-current="page"]) > summary {
+  color: var(--public-interactive);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
 }
 .vx-dropdown {
   position: absolute;
   top: 100%;
   left: -22px;
   width: 294px;
-  background: #111318;
+  background: var(--public-panel);
   border: 1px solid #ffffff26;
   padding: 10px;
   box-shadow: 0 22px 60px #0009;
@@ -145,7 +152,7 @@
   display: block;
   font: 8px monospace;
   text-transform: uppercase;
-  color: #9cace4;
+  color: var(--public-interactive);
   margin-top: 6px;
   letter-spacing: 0.06em;
 }
@@ -153,7 +160,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #8ea8ff;
+  color: var(--public-interactive);
   padding-bottom: 18px;
 }
 .vx-dropdown .vx-nav-product > a:first-child {
@@ -163,6 +170,9 @@
 .vx-dropdown .vx-nav-product strong {
   color: #edf0f8;
   font-size: 14px;
+}
+.vx-nav-product a:is(:hover, [aria-current="page"]) strong {
+  color: var(--public-interactive);
 }
 .vx-dropdown .vx-nav-description {
   margin-top: 6px;
@@ -212,14 +222,14 @@
   flex-shrink: 0;
 }
 .vx-button--primary {
-  background: #4168ed;
-  border-color: #6482f0;
-  color: #fff;
+  background: var(--public-blue);
+  border-color: var(--public-blue);
+  color: var(--public-navy);
   box-shadow: inset 0 1px 0 #ffffff15;
 }
 .vx-button--primary:hover {
-  background: #527aff;
-  color: #fff;
+  background: var(--public-interactive);
+  color: var(--public-navy);
   transform: translateY(-1px);
 }
 .vx-header-actions .vx-button {
@@ -235,10 +245,11 @@
   min-height: 44px;
   font-size: 12px;
   font-weight: 500;
-  color: #d5dceb;
+  color: var(--public-interactive);
 }
 .vx-text-link:hover {
-  color: #93acff;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .vx-text-link svg {
   transition: transform 0.2s;
@@ -253,8 +264,8 @@
   position: absolute;
   left: 20px;
   top: -100px;
-  background: #4168ed;
-  color: white;
+  background: var(--public-blue);
+  color: var(--public-navy);
   padding: 15px;
   z-index: 100;
   font-size: 13px;
@@ -269,7 +280,7 @@
   pointer-events: none;
 }
 .vx-footer {
-  background: #060709;
+  background: var(--public-navy);
   border-top: 1px solid #ffffff1c;
   padding: 64px 56px 30px !important;
 }
@@ -286,7 +297,7 @@
   font-weight: 500;
 }
 .vx-footer a {
-  color: #959dab;
+  color: var(--public-interactive);
   font-size: 11px;
   line-height: 1.7;
   min-height: 28px;
@@ -295,12 +306,13 @@
 }
 .vx-footer .vx-footer-product-description {
   margin: 0 0 5px;
-  color: #818b9c;
+  color: #a2adbf;
   font-size: 10px;
   line-height: 1.6;
 }
 .vx-footer a:hover {
-  color: #a9baff;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .vx-footer .text-base {
   font-size: 13px;
@@ -310,7 +322,7 @@
 }
 .vx-footer .text-xs {
   font-size: 10px;
-  color: #818b9c;
+  color: #a2adbf;
 }
 .vx-footer .font-semibold {
   font-weight: 500;
@@ -331,7 +343,7 @@
 /* Secondary marketing and policy pages inherit the same quieter material palette. */
 .vaeroex-public-site .vx-page-hero {
   min-height: 0;
-  background: #08090b;
+  background: var(--public-navy);
   background-image: none;
   padding: 90px 56px 70px;
   border-bottom: 1px solid #ffffff1c;
@@ -355,7 +367,7 @@
 .vaeroex-public-site .vx-page-hero p:first-child {
   font: 10px monospace;
   letter-spacing: 0.14em;
-  color: #8da6fa;
+  color: var(--public-interactive);
 }
 .vaeroex-public-site .vx-page-hero p:not(:first-child) {
   max-width: 690px;
@@ -366,7 +378,7 @@
 .vx-page-hero-rule {
   width: 40px;
   height: 2px;
-  background: #6283f2;
+  background: var(--public-blue);
   position: absolute;
   right: 56px;
   bottom: 70px;
@@ -374,7 +386,7 @@
 .vaeroex-public-site > section:not(.vx-page-hero)[class*="px-5"] {
   padding-left: 56px;
   padding-right: 56px;
-  background-color: #08090b;
+  background-color: var(--public-navy);
 }
 .vaeroex-public-site > section[class*="px-5"] > div {
   max-width: 1328px;
@@ -383,12 +395,11 @@
   :where(.bg-\[\#07111f\], .bg-\[\#050b18\], .bg-\[\#030712\]) {
   background-color: #0d0f13;
 }
-.vaeroex-public-site
-  :where(.text-cyan-200, .text-vaeroex-accent, .text-teal-200) {
-  color: #97b0ff;
+.vaeroex-public-site :is(.text-cyan-200, .text-vaeroex-blue, .text-vaeroex-accent, .text-teal-200) {
+  color: var(--public-interactive) !important;
 }
 .vaeroex-public-site :where(.border-cyan-300\/20, .border-cyan-300\/30) {
-  border-color: #8ea6ee40;
+  border-color: rgb(0 168 214 / 35%);
 }
 .vaeroex-public-site .rounded-lg {
   border-radius: 3px;
@@ -401,14 +412,15 @@
 }
 .vaeroex-public-site a.bg-vaeroex-blue,
 .vaeroex-public-site button.bg-vaeroex-blue {
-  background: #4168ed;
+  background: var(--public-blue) !important;
+  color: var(--public-navy) !important;
   border-radius: 2px;
   font-weight: 500;
 }
 .vaeroex-public-site a.bg-vaeroex-blue:hover,
 .vaeroex-public-site button.bg-vaeroex-blue:hover {
-  background: #527aff;
-  color: white;
+  background: var(--public-interactive) !important;
+  color: var(--public-navy) !important;
 }
 .vaeroex-public-site .vaeroex-cta-band {
   padding: 45px 0;
@@ -427,7 +439,7 @@
   color: #8993a7;
 }
 .vaeroex-public-site .vx-request-form {
-  background: #111318;
+  background: var(--public-panel);
   border-color: #ffffff24;
   box-shadow: none;
   padding: 35px;
@@ -445,7 +457,7 @@
 }
 .vaeroex-public-site .vx-request-form :where(input, textarea, select) {
   color: #e9edf5;
-  background: #080a0e;
+  background: var(--public-navy);
   border: 1px solid #ffffff2b;
   border-radius: 2px;
   padding: 12px;
@@ -453,7 +465,7 @@
 }
 .vaeroex-public-site .vx-request-form input::placeholder,
 .vaeroex-public-site .vx-request-form textarea::placeholder {
-  color: #78849a;
+  color: #a1afbc;
 }
 .vaeroex-public-site.vx-legal > section {
   padding: 75px 30px;
@@ -478,7 +490,7 @@
   border-color: #ffffff26;
 }
 .vaeroex-public-site.vx-legal .text-vaeroex-blue {
-  color: #92abff;
+  color: var(--public-interactive);
 }
 .vaeroex-public-site.vx-legal h2 {
   font-size: 22px;
@@ -542,7 +554,7 @@
     position: absolute;
     right: 0;
     top: calc(100% + 16px);
-    background: #111318;
+    background: var(--public-panel);
     border: 1px solid #ffffff25;
     width: min(360px, calc(100vw - 48px));
     max-height: calc(100dvh - 100px);
@@ -553,7 +565,7 @@
   .vx-mobile-menu > span {
     font: 9px monospace;
     letter-spacing: 0.1em;
-    color: #8193c2;
+    color: var(--public-muted);
   }
   .vx-mobile-menu > a {
     display: block;
@@ -586,15 +598,16 @@
     display: block;
     font: 8px monospace;
     text-transform: uppercase;
-    color: #8da6f1;
+    color: var(--public-interactive);
     margin-top: 7px;
   }
   .vx-mobile-menu > a.vx-button {
+    color: var(--public-navy);
     display: flex;
     margin-top: 20px;
     padding: 13px;
     font-size: 12px;
-    border: 1px solid #6482f0;
+    border: 1px solid var(--public-blue);
   }
   .vx-footer > div:first-child {
     grid-template-columns: 1fr;
@@ -702,9 +715,12 @@
   padding-bottom: 70px;
 }
 .vaeroex-public-site.vx-utility .bg-white {
-  background: #111318;
+  background: var(--public-panel);
   border-color: #ffffff24;
   box-shadow: none;
+}
+.vaeroex-public-site.vx-utility .bg-vaeroex-soft {
+  background: var(--public-panel) !important;
 }
 .vaeroex-public-site.vx-utility .bg-slate-50 {
   background: #0b0d12;
@@ -719,7 +735,7 @@
   color: #a0aabb;
 }
 .vaeroex-public-site.vx-utility .text-vaeroex-blue {
-  color: #92aaff;
+  color: var(--public-interactive);
 }
 .vaeroex-public-site.vx-utility .border-line {
   border-color: #ffffff22;

@@ -46,8 +46,8 @@ export default function AboutPage() {
             <h2 id="vaeroex-name" className={story.headline}>Vaeroex</h2>
             <p className={story.founderRole}>Pronounced VAIR-oh-ex</p>
             <dl className="mt-8 grid gap-6 border-t border-white/10 pt-6 sm:grid-cols-2">
-              <div><dt className="text-xl font-medium text-[#8299ff]">Vaero</dt><dd className="mt-2 text-base leading-7 text-[#aeb7c8]">Inspired by the Latin root <em>ver-</em>, meaning “true.”</dd></div>
-              <div><dt className="text-xl font-medium text-[#8299ff]">Ex</dt><dd className="mt-2 text-base leading-7 text-[#aeb7c8]">Drawn from “executive.”</dd></div>
+              <div><dt className="text-xl font-medium text-[color:var(--public-blue)]">Vaero</dt><dd className="mt-2 text-base leading-7 text-[#aeb7c8]">Inspired by the Latin root <em>ver-</em>, meaning “true.”</dd></div>
+              <div><dt className="text-xl font-medium text-[color:var(--public-blue)]">Ex</dt><dd className="mt-2 text-base leading-7 text-[#aeb7c8]">Drawn from “executive.”</dd></div>
             </dl>
           </div>
           <div className={story.prose}>
