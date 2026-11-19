@@ -361,6 +361,7 @@ function rendererLensFixture(source) {
     '../clarity/ClarityEngineWorld': { StudioEnvironment: () => null },
     './SculptureGeometry': loadTypeScript('components/marketing/journey/SculptureGeometry.ts'),
     './journeyMotion': loadTypeScript('components/marketing/journey/journeyMotion.ts'),
+    './probeJourneyOverview': loadTypeScript('components/marketing/journey/probeJourneyOverview.ts'),
   };
   const result = { exports: {} };
   vm.runInNewContext(ts.transpileModule(source, {

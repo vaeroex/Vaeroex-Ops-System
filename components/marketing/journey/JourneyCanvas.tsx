@@ -9,6 +9,7 @@ import { SpatialResizeObserver } from "@/components/spatial/SpatialResizeObserve
 import { StudioEnvironment } from "../clarity/ClarityEngineWorld";
 import { createSculptureFinish, createSculptureGeometries } from "./SculptureGeometry";
 import { createJourneyWorld, journeyAssembly, journeyCamera, journeyLens, journeyPart } from "./journeyMotion";
+import { probeJourneyOverview } from "./probeJourneyOverview";
 
 type Props = {
   progress: number;
@@ -96,7 +97,7 @@ function World({ progress, finalShift = 0, active, compact, onReady, onFailure }
   useEffect(() => probeRenderedCanvas({ camera, gl, scene }, result => {
     if (result === "nonblank") onReady();
     else onFailure();
-  }), [camera, gl, scene, onReady, onFailure]);
+  }, () => probeJourneyOverview(gl, scene)), [camera, gl, scene, onReady, onFailure]);
 
   useFrame((_, delta) => {
     if (!active && painted.current) return;
