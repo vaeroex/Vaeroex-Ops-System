@@ -1,11 +1,9 @@
 const assert = require("node:assert/strict");
-const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
-const sha256 = (file) => crypto.createHash("sha256").update(fs.readFileSync(path.join(root, file))).digest("hex");
 
 const homepage = read("app/page.tsx");
 const intelligenceSystems = read("app/intelligence-systems/page.tsx");
@@ -116,11 +114,11 @@ assert.doesNotMatch([trust, trustContent].join("\n"), /does not currently claim 
 
 assert.match(seo, /name: "Vaeroex"/, "public SEO must use Vaeroex as the organization identity");
 assert.match(layout, /Vaeroex \| Intelligence Systems/, "global metadata must retain the authoritative company-level title");
-assert.match(logo, /\/brand\/vaeroex-logo-white-wordmark\.png/, "shared logo component must use the canonical white-wordmark PNG");
-assert.match(logo, /variant === "symbol" \? "\/icon-192\.png"/, "compact logo variants must preserve the approved symbol-only asset");
+for (const variant of ["wordmark", "symbol", "stacked"]) {
+  const asset = `/brand/official/${variant}.png`;
+  assert.ok(logo.includes(asset) && fs.existsSync(path.join(root, "public", asset)), `official ${variant} must be available`);
+}
 assert.match(logo, /alt="Vaeroex"/, "shared logo must preserve concise accessible alt text");
-assert.equal(fs.existsSync(path.join(root, "public/brand/vaeroex-logo-white-wordmark.png")), true, "canonical Vaeroex white-wordmark logo must exist");
-assert.equal(sha256("public/brand/vaeroex-logo-white-wordmark.png"), "03f57e14ec55969a00d67face54d72d7774c3a0f1d0b84c8cd11fc79f51a13fa", "canonical Vaeroex logo must remain byte-for-byte identical to the supplied asset");
 assert.equal(fs.existsSync(path.join(root, "public/brand/vaeroex-logo.png")), false, "legacy blue-EX logo asset must be removed");
 assert.match(futureDomains, /permanentRedirect\("\/about"\)/, "legacy future-domain categories must redirect to the broad company story");
 assert.doesNotMatch(futureDomains, /Governance|Industrial Intelligence|Infrastructure Intelligence|Security Intelligence|Organizational Intelligence/, "unreleased product categories must not remain public");

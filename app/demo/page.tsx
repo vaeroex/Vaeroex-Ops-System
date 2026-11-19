@@ -1,5 +1,5 @@
 import { permanentRedirect } from "next/navigation";
 
 export default function DemoPage() {
-  permanentRedirect("/contact");
+  permanentRedirect("/drug-discovery-intelligence#compound-explorer");
 }

@@ -5,7 +5,7 @@ import styles from "./PublicSystemsPortfolio.module.css";
 
 export function PublicSystemsPortfolio() {
   return (
-    <div className={styles.portfolio} aria-label="Vaeroex Executive Intelligence">
+    <div className={styles.portfolio} aria-label="Vaeroex intelligence products">
       {PUBLIC_SYSTEMS.map((system) => (
         <article
           className={styles.system}

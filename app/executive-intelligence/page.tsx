@@ -9,18 +9,17 @@ import { IntegrationScreenshotTour } from "@/components/marketing/IntegrationScr
 import { WorkspaceScreenshotTour } from "@/components/marketing/WorkspaceScreenshots";
 import story from "@/components/marketing/ExecutiveStory.module.css";
 import { VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
-import {
-  operationsIntelligenceJsonLd,
-  publicPageMetadata,
-} from "@/lib/seo/public-seo";
+import { publicPageMetadata, utilityRobots } from "@/lib/seo/public-seo";
 import styles from "@/components/marketing/IntelligencePages.module.css";
 
-export const metadata: Metadata = publicPageMetadata({
-  title: "Executive Intelligence | Vaeroex",
-  description:
-    "Executive Intelligence for restaurants, breweries, retailers, and other businesses. Explore connected records, uploads, Business Notes, and Vaeroex Super Intelligence (VSI).",
-  path: "/executive-intelligence",
-});
+export const metadata: Metadata = {
+  ...publicPageMetadata({
+    title: "Executive Intelligence | Vaeroex",
+    description: "Product information for Executive Intelligence customers.",
+    path: "/executive-intelligence",
+  }),
+  robots: utilityRobots,
+};
 
 const capabilities = [
   ["Business Health & KPIs", "See performance against confirmed targets and changes that deserve attention."],
@@ -31,7 +30,6 @@ const capabilities = [
 export default function OperationsIntelligencePage() {
   return (
     <main className={`${styles.site} vaeroex-public-site`}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(operationsIntelligenceJsonLd) }} />
       <PublicSiteHeader />
       <section id="executive-opening" className={styles.hero}>
         <div className={styles.container}>
@@ -39,16 +37,16 @@ export default function OperationsIntelligencePage() {
           <h1>See the business.<br /><em>Know what matters.</em></h1>
           <div className={styles.heroGrid}>
             <div>
-              <p className={styles.heroLead}>For restaurants, breweries, retailers, and other businesses. Understand performance, investigate change, and prepare clearer next steps with evidence you can review.</p>
+              <p className={styles.heroLead}>Understand performance, investigate change, and prepare clearer next steps with evidence you can review.</p>
               <p className={styles.copy}>{VAEROEX_PLAN_PRICE_LABEL} · Monthly subscription</p>
               <div className={styles.actions}>
                 <StartWithVaeroexMenu className={styles.primary} label="Start Executive Intelligence" />
-                <a href="#product-experience" className={styles.textLink}>Explore the workspace<ArrowRight aria-hidden="true" /></a>
+                <Link href="/login" className={styles.textLink}>Executive Intelligence sign in<ArrowRight aria-hidden="true" /></Link>
               </div>
             </div>
             <div className={styles.heroSide}>
               <strong>Turn everyday records into useful questions.</strong>
-              <p>Investigate changes in business performance with VSI. Ask follow-up questions, compare supported information, and examine the evidence and limitations behind an answer.</p>
+              <p>Investigate changes in business performance with VSI Chat. Ask follow-up questions, compare supported information, and examine the evidence and limitations behind an answer.</p>
               <a href="#vsi" className={styles.textLink}>Explore included VSI<ArrowRight aria-hidden="true" /></a>
             </div>
           </div>
@@ -120,7 +118,7 @@ export default function OperationsIntelligencePage() {
             <p className={story.aside}>A business conversation with room to investigate, compare, and refine.</p>
           </div>
           <div className={story.prose}>
-            <p className={story.lead}>VSI brings business calculations, evidence, and conversation together. Ask what changed, explore possible explanations, and identify the additional information needed to support a conclusion.</p>
+            <p className={story.lead}>VSI Chat is the conversational interface for Vaeroex Super Intelligence. It uses supported business calculations and workspace evidence. Ask what changed, explore possible explanations, and identify the additional information needed to support a conclusion.</p>
             <p>Explore business performance, investigate the evidence behind an insight, research market trends, develop marketing ideas, and draft plans, SOPs, or meeting agendas. Ask follow-up questions and refine your thinking with relevant business context.</p>
             <p>Review supporting evidence, source freshness, and missing context. Treat recommendations as drafts and apply your judgment before acting.</p>
           </div>
@@ -135,7 +133,7 @@ export default function OperationsIntelligencePage() {
             <h2 id="getting-started-title">Build a clearer picture<br />of your business.</h2>
             <div className={styles.actions}>
               <Link href="/pricing" className={styles.primary}>View pricing<ArrowRight aria-hidden="true" /></Link>
-              <Link href="/contact?inquiry=executive-intelligence" className={styles.secondary}>Talk with Vaeroex</Link>
+              <Link href="/support" className={styles.secondary}>Contact support</Link>
             </div>
           </div>
           <ol className={story.steps}>

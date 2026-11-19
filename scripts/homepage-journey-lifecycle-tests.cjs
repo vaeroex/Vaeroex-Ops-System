@@ -82,6 +82,29 @@ function fixture({reduced=false,compact=false,saveData=false,missing=[]}={}) {
   };
 }
 
+// The server-rendered reduced-motion poster uses the same traced faces at the same
+// proportions as the assembled 3D mark, including the gap between the lower pieces.
+{
+  const h = fixture({ reduced: true });
+  const posterComponent = h.poster().props.children;
+  const svg = posterComponent.type(posterComponent.props);
+  const front = walk(svg, node => node.type === 'polygon' && node.props['data-logo-piece']);
+  assert.equal(front.length, logoOutline.logoPieces.length);
+  const { logoBounds, logoToWorld } = logoOutline;
+  for (const piece of logoOutline.logoPieces) {
+    const face = front.find(node => node.props['data-logo-piece'] === piece.id);
+    assert.ok(face, 'Reduced-motion poster includes ' + piece.id);
+    const vertices = face.props.points.split(' ').map(pair => pair.split(',').map(Number));
+    assert.equal(vertices.length, piece.points.length);
+    piece.points.forEach((p, i) => {
+      const [x, y] = logoToWorld(p);
+      assert.ok(Math.abs(vertices[i][0] - (x + logoBounds.worldWidth / 2)) < 1e-8);
+      assert.ok(Math.abs(vertices[i][1] - (logoBounds.worldHeight / 2 - y)) < 1e-8);
+    });
+  }
+  h.unmount();
+}
+
 for(const compact of [false,true]) {
   const h=fixture({compact});h.intersect(true);h.flush();
   const sampled=[];
@@ -206,5 +229,58 @@ for(const cancelAfterFirst of [false,true]) {
   if(cancelAfterFirst){const next=[...frames.values()];frames.clear();next.forEach(fn=>fn());}
   assert.equal(frames.size,1);cleanup();assert.equal(frames.size,0,'Probe cleanup cancels either pending frame');
   assert.equal(renders,0);assert.equal(callbacks,0,'Unmounted probe cannot call the owner');
+}
+// A cold load in the sculpture's empty passage needs a second view of actual
+// geometry. The diagnostic must never draw that view into the public canvas.
+{
+  const three=require('three');
+  const {probeJourneyOverview}=load('components/marketing/journey/probeJourneyOverview.ts',{three});
+  const {probeRenderedCanvas}=load('components/spatial/CanvasPixelProbe.tsx',{},{
+    requestAnimationFrame(fn){queue.push(fn);return queue.length;},cancelAnimationFrame(){},
+  });
+  const scene=new three.Scene(), geometry=new three.BoxGeometry(), material=new three.MeshStandardMaterial();
+  const part=new three.InstancedMesh(geometry,material,1);
+  scene.add(part); part.computeBoundingBox();
+  part.setMatrixAt(0,new three.Matrix4().makeTranslation(30,5,-12));
+  const userCamera=new three.PerspectiveCamera(), queue=[];
+  for (const scenario of ['visible','sparse','blank','driver error']) {
+    const previousTarget = {}, results=[], targets=[], overviewCameras=[];
+    let active=previousTarget,disposed=0;
+    const gl={
+      domElement:{dataset:{},closest:()=>null,getContext:()=>({
+        drawingBufferWidth:8,drawingBufferHeight:8,RGBA:6408,UNSIGNED_BYTE:5121,
+        readPixels(_x,_y,w,h,_format,_type,bytes){if (scenario==='visible' && w*h>1) bytes.fill(255);},
+      })},
+      getRenderTarget:()=>active,getActiveCubeFace:()=>2,getActiveMipmapLevel:()=>1,
+      setRenderTarget(target,face,level){
+        targets.push(target);active=target;
+        if(target===previousTarget){assert.equal(face,2);assert.equal(level,1);}
+        else target.addEventListener('dispose',()=>{disposed++;});
+      },
+      render(s,c){
+        assert.equal(s,scene);
+        if(active===previousTarget){assert.equal(c,userCamera);return;}
+        assert.ok(c.isOrthographicCamera);overviewCameras.push(c);
+        c.updateMatrixWorld();
+        const center=new three.Vector3(30,5,-12).project(c);
+        assert.ok(Math.abs(center.x)<1e-10 && Math.abs(center.y)<1e-10,'Overview uses the current instance bounds');
+        if(scenario==='driver error')throw new Error('Synthetic offscreen error');
+      },
+      readRenderTargetPixels(target,_x,_y,_w,_h,bytes){
+        assert.equal(target,active);
+        if(scenario==='sparse')bytes.fill(120,8,128);
+      },
+    };
+    probeRenderedCanvas({gl,scene,camera:userCamera},result=>results.push(result),()=>probeJourneyOverview(gl,scene));
+    while(queue.length)queue.shift()();
+    const healthy=scenario==='visible'||scenario==='sparse';
+    assert.deepEqual(results,[healthy?'nonblank':'blank']);
+    assert.equal(gl.domElement.dataset.canvasProbeView,scenario==='visible'?'visible':'offscreen');
+    assert.equal(overviewCameras.length,scenario==='visible'?0:1);
+    assert.equal(targets.length,scenario==='visible'?0:2);
+    assert.equal(disposed,scenario==='visible'?0:1,'Dispose the target even when its render throws');
+    assert.equal(active,previousTarget);
+  }
+  geometry.dispose();material.dispose();part.dispose();
 }
 console.log('Homepage journey mocked lifecycle: seven exact content milestones, interpolation/reversal, viewport resize, missing anchors, deferred mount, reduced motion/data-saving, offscreen/hidden pause, responsive quality, portrait final CTA following/root cancellation, static shift reset, static toggle, context-loss and driver-exception fallback, HTML links, and listener/observer/frame cleanup passed. No browser or WebGL rendering is claimed.');

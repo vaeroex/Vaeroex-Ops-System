@@ -220,9 +220,7 @@ for (const { width, height, compact, label } of viewports) {
   }
 }
 
-// Independent reference: decode the existing favicon pixels, not logoOutline.ts.
-// Its flat background separates the original mark (including its dark side faces)
-// from the background without tracing the generated polygons back into themselves.
+// Compare the rendered triangles against the alpha channel of the supplied VX artwork.
 function readPng(filename) {
   const bytes = fs.readFileSync(filename), chunks = [];
   assert.equal(bytes.subarray(1, 4).toString(), 'PNG');
@@ -249,17 +247,24 @@ function readPng(filename) {
   }
   assert.equal(offset, raw.length); return { width, height, channels, pixels };
 }
-const reference = readPng('public/favicon.png'), mask = new Uint8Array(reference.width * reference.height);
+const supplied = fs.readFileSync('assets/brand/originals/VX-Miami-Blue.png');
+assert.equal(require('node:crypto').createHash('sha256').update(supplied).digest('hex'),
+  'd926e88e89b25438b0412d909919dc423a374d83727a41445325d1657d994901', 'The approved VX source is preserved.');
+const reference = readPng('public/brand/official/symbol.png'), mask = new Uint8Array(reference.width * reference.height);
+assert.equal(reference.channels, 4, 'The official mark has a transparent background');
 let minX = reference.width, minY = reference.height, maxX = 0, maxY = 0;
 for (let y = 0; y < reference.height; y++) for (let x = 0; x < reference.width; x++) {
-  const i = (y * reference.width + x) * reference.channels;
-  const change = [0, 1, 2].reduce((sum, channel) => sum + Math.abs(reference.pixels[i + channel] - reference.pixels[channel]), 0);
-  if (change > 12) {
-    mask[y * reference.width + x] = 1;
+  const index = y * reference.width + x;
+  const offset = index * 4;
+  if (reference.pixels[offset + 3] > 0) {
+    assert.ok(reference.pixels[offset] === 0 && reference.pixels[offset + 1] === 168 && reference.pixels[offset + 2] === 214,
+      'Every visible source pixel uses the approved Miami Blue');
+  }
+  if (reference.pixels[offset + 3] >= 128) {
+    mask[index] = 1;
     minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
   }
 }
-assert.deepEqual([minX, minY, maxX, maxY], [60, 128, 432, 373], 'Independent original emblem pixel bounds remain stable');
 const triangleArea = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
 const renderedTriangles = [], seenTriangles = new Set();
 for (const part of fullWorld.parts) {
@@ -282,23 +287,29 @@ function renderedAt(point) {
     return signs.every(sign => sign >= -1e-8) || signs.every(sign => sign <= 1e-8);
   });
 }
-// These proportions and independent sample coordinates come from the original
-// 1536×1024 source image; they are deliberately not imported from the vector trace.
-const sourcePoint = ([x, y]) => [(x - 735) * 48 / 1122, (420.5 - y) * 48 / 1122];
-for (const point of [[290, 120], [723, 750], [890, 760], [1200, 340]]) assert.ok(renderedAt(sourcePoint(point)), 'The original stem, lower tip/spur and detached wing remain present: ' + point);
-for (const point of [[750, 420], [1010, 760], [1090, 380]]) assert.equal(renderedAt(sourcePoint(point)), false, 'The original negative space stays empty: ' + point);
-let union = 0, intersection = 0, actualCount = 0, renderedCount = 0;
-for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
-  const point = [(x + .5 - minX) / (maxX - minX + 1) * 48 - 24,
-    (0.5 - (y + .5 - minY) / (maxY - minY + 1)) * 739 * 48 / 1122];
-  const actual = Boolean(mask[y * reference.width + x]), rendered = renderedAt(point);
-  if (actual || rendered) union++; if (actual && rendered) intersection++;
-  if (actual) actualCount++; if (rendered) renderedCount++;
+// Fractional coordinates are relative to the independent artwork’s tight pixel bounds.
+// Include the central counter and both open channels as well as the outer bars and crossing.
+const referenceWidth = maxX - minX + 1, referenceHeight = maxY - minY + 1;
+// The 577px cap-to-base span is preferable for registration: diagonal top corners
+// taper below 50% opacity before reaching their geometric horizontal extent.
+const worldHeight = 48 * 577 / 850.77;
+const sourcePoint = (x, y) => [(x - .5) * worldHeight * referenceWidth / referenceHeight, (.5 - y) * worldHeight];
+for (const [x, y] of [[.12, .05], [.88, .05], [.5, .54], [.5, .96]]) {
+  assert.ok(renderedAt(sourcePoint(x, y)), 'The capped arms, crossing and base remain present');
 }
-assert.ok(actualCount > 20000 && actualCount < 30000, 'The independent reference mask isolates the emblem');
-assert.ok(intersection / union > .94 && intersection / renderedCount > .98 && intersection / actualCount > .95,
-  'Actual finished geometry agrees with independent source pixels, allowing raster antialiasing: ' + JSON.stringify({ iou: intersection / union, precision: intersection / renderedCount, recall: intersection / actualCount }));
-console.log('Original emblem pixel comparison: ' + (100 * intersection / union).toFixed(2) + '% intersection-over-union; lower spur, detached stroke and negative-space probes retained.');
+for (const [x, y] of [[.5, .74], [.27, .26], [.73, .26], [.5, .08]]) {
+  assert.equal(renderedAt(sourcePoint(x, y)), false, 'The diamond and open channels retain their negative space');
+}
+let union = 0, intersection = 0, actualCount = 0;
+for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
+  const actual = Boolean(mask[y * reference.width + x]);
+  const rendered = renderedAt(sourcePoint((x + .5 - minX) / referenceWidth, (y + .5 - minY) / referenceHeight));
+  if (actual || rendered) union++; if (actual && rendered) intersection++;
+  if (actual) actualCount++;
+}
+assert.ok(actualCount > referenceWidth * referenceHeight * .3 && actualCount < referenceWidth * referenceHeight * .4);
+assert.ok(intersection / union > .99, 'Seated mesh must reproduce the official VX: ' + (intersection / union));
+console.log('Official VX pixel comparison: ' + (100 * intersection / union).toFixed(2) + '% intersection-over-union; central diamond and open channels retained.');
 const finishA = createSculptureFinish(), finishB = createSculptureFinish();
 assert.equal(finishA.image.data.byteLength, 64 * 64 * 4);
 assert.deepEqual(finishA.image.data, finishB.image.data);
@@ -307,7 +318,7 @@ finishA.dispose(); finishB.dispose();
 // actual World hooks with that same real Three camera; only scheduling/WebGL is
 // mocked, so a changed Canvas camera prop alone cannot satisfy this regression.
 function rendererLensFixture(source) {
-  const slots = [], effects = [];
+  const slots = [], effects = [], probes = [];
   let cursor = 0, frame, scene, scheduled = false, invalidations = 0, projectionUpdates = 0;
   const same = (a, b) => a && b && a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
   const memo = (create, deps) => {
@@ -332,20 +343,25 @@ function rendererLensFixture(source) {
   const update = camera.updateProjectionMatrix.bind(camera);
   camera.updateProjectionMatrix = () => { projectionUpdates++; update(); };
   const state = {
-    camera, size: { width: 1440, height: 900 },
+    camera, scene: {}, size: { width: 1440, height: 900 },
     gl: { domElement: { dataset: {} }, info: { render: { triangles: 0, calls: 0 } } },
     invalidate() { scheduled = true; invalidations++; },
   };
   const jsx = (type, props) => ({ type, props });
   const mocks = {
     react, 'react/jsx-runtime': { jsx, jsxs: jsx }, three: require('three'),
-    '@react-three/fiber': { Canvas: 'fixture-canvas', useThree: () => state, useFrame(callback) { frame = callback; } },
+    '@react-three/fiber': { Canvas: 'fixture-canvas', useThree: () => ({ ...state }), useFrame(callback) { frame = callback; } },
     '@/components/spatial/PublicSpatialCanvasGuard': { PublicSpatialContextGuard: () => null },
-    '@/components/spatial/CanvasPixelProbe': { probeRenderedCanvas: () => () => {} },
+    '@/components/spatial/CanvasPixelProbe': { probeRenderedCanvas({ camera, gl, scene }) {
+      const probe = { camera, gl, scene, cleaned: false };
+      probes.push(probe);
+      return () => { probe.cleaned = true; };
+    } },
     '@/components/spatial/SpatialResizeObserver': { SpatialResizeObserver: class {} },
     '../clarity/ClarityEngineWorld': { StudioEnvironment: () => null },
     './SculptureGeometry': loadTypeScript('components/marketing/journey/SculptureGeometry.ts'),
     './journeyMotion': loadTypeScript('components/marketing/journey/journeyMotion.ts'),
+    './probeJourneyOverview': loadTypeScript('components/marketing/journey/probeJourneyOverview.ts'),
   };
   const result = { exports: {} };
   vm.runInNewContext(ts.transpileModule(source, {
@@ -357,7 +373,7 @@ function rendererLensFixture(source) {
   } });
   const props = { progress: .5, finalShift: 0, active: true, compact: false, onReady() {}, onFailure() {} };
   return {
-    camera, state, get scene() { return scene; },
+    camera, state, probes, get scene() { return scene; },
     get invalidations() { return invalidations; }, get projectionUpdates() { return projectionUpdates; },
     render(changes = {}, width = state.size.width, height = state.size.height) {
       Object.assign(props, changes);
@@ -446,7 +462,16 @@ try {
   const settledUpdates = renderer.projectionUpdates, settledInvalidations = renderer.invalidations;
   renderer.render({ finalShift: 0 }); assert.equal(renderer.settle(), 0);
   assert.equal(renderer.projectionUpdates, settledUpdates); assert.equal(renderer.invalidations, settledInvalidations);
+  renderer.render({ progress: .5376 }); renderer.settle();
+  assert.equal(renderer.probes.length, 1, 'Scrolling and resizing a ready canvas must never restart its pixel probe');
+  assert.equal(renderer.probes[0].cleaned, false);
+  renderer.state.scene = {};
+  renderer.render();
+  assert.equal(renderer.probes.length, 2, 'Replacing the scene requests a fresh readiness check');
+  assert.equal(renderer.probes[0].cleaned, true);
+  assert.equal(renderer.probes[1].scene, renderer.state.scene);
 } finally { renderer.unmount(); }
+assert.equal(renderer.probes.at(-1).cleaned, true, 'Unmount cancels the active readiness check');
 console.log('Actual World hook fixture: same-camera 47° → 57° → 47° resize, rebuilt projection, responsive offsets/final CTA following, coalesced demand frames and no idle invalidation passed. React/R3F scheduling is mocked; no WebGL claim.');
 for (const result of results) console.log('Logo journey ' + result.label + ': ' + result.pathLength.toFixed(1) + ' camera units; ' + result.closest.toFixed(3) + ' minimum prism clearance ' + JSON.stringify(result.closestSample) + '; max step ' + result.maxCameraStep.toFixed(3) + ', max turn ' + result.maxTurn.toFixed(3) + '°; ' + result.world.parts.length + ' components / ' + result.triangles + ' triangles / ' + result.batches + ' batches.');
 for (const geometries of geometryByQuality.values()) Object.values(geometries).forEach(geometry => geometry.dispose());

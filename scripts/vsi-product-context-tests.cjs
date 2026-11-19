@@ -33,7 +33,10 @@ async function main(){
  assert.deepEqual(result.authoritative.publishedPlan.advertisedFeatures,[...VAEROEX_PLAN_FEATURES]);assertions++;
  assert.deepEqual(result.authoritative.publishedPlan.limits,VAEROEX_PLAN_LIMITS);assertions++;
  check(result.authoritative.entitlement.actualChargeOrDiscount.includes('Unknown'),'published price is not invoice');
- assert.deepEqual(result.authoritative.productSystems,[{name:'Executive Intelligence',availability:'available',href:'/executive-intelligence'}],'product context promotes only the currently offered Executive Intelligence catalog');assertions++;
+ assert.deepEqual(result.authoritative.productSystems, [
+   { name: 'Drug Discovery Intelligence', availability: 'research_preview', href: '/drug-discovery-intelligence' },
+   { name: 'Executive Intelligence', availability: 'available', href: '/executive-intelligence' },
+ ], 'signed-in product context distinguishes the research preview from the available business product');assertions++;
  check(result.sources.some(s=>s.id==='P2'&&s.url==='https://www.vaeroex.com/pricing'),'price citation');
  check(result.sources.every(s=>s.id.startsWith('P')&&s.retrievedAt&&s.evidenceDate===null),'product sources are lookup dated, not invented publication dates');
  check(result.publicResearchProfile===null&&result.publicResearchProfileStatus==='not_configured','no implied public export authority');

@@ -79,8 +79,12 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/app/setup": [
       "./public/fonts/NotoSans-Regular.ttf",
-      "./public/fonts/NotoSans-Bold.ttf"
-    ]
+      "./public/fonts/NotoSans-Bold.ttf",
+      "./public/brand/official/wordmark.png"
+    ],
+    "/api/stripe/webhook": ["./public/brand/official/wordmark.png"],
+    "/app/admin/workspace-agreements": ["./public/brand/official/wordmark.png"],
+    "/app/admin/workspace-agreements/**": ["./public/brand/official/wordmark.png"]
   },
   experimental: {
     serverActions: {
@@ -94,7 +98,7 @@ const nextConfig = {
         headers: securityHeaders()
       },
       // Authentication remains authoritative. Crawlers may read noindex even on redirects.
-      ...["/login", "/signup", "/forgot-password", "/reset-password", "/accept-invite", "/checkout/:path*", "/app/:path*", "/systems", "/access", "/billing-required", "/auth/:path*", "/admin/:path*"].map(source => ({ source, headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] })),
+      ...["/executive-intelligence", "/operations-intelligence", "/pricing", "/release-notes", "/help", "/offline", "/login", "/signup", "/forgot-password", "/reset-password", "/accept-invite", "/checkout/:path*", "/app/:path*", "/systems", "/access", "/billing-required", "/auth/:path*", "/admin/:path*"].map(source => ({ source, headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] })),
       ...["/app/settings/storage/payment-return", "/api/storage-capacity/download"].map(source => ({
         // Configured headers take precedence over Route Handler headers. These
         // redirects can carry payment or signed-download credentials, so keep
@@ -146,16 +150,22 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      { source: "/favicon.ico", destination: "/brand/official/favicon.ico", permanent: true },
+      { source: "/favicon.png", destination: "/brand/official/icon-512.png", permanent: true },
+      { source: "/icon-192.png", destination: "/brand/official/icon-192.png", permanent: true },
+      { source: "/apple-touch-icon.png", destination: "/brand/official/apple-touch-icon.png", permanent: true },
+      { source: "/brand/vaeroex-logo-white-wordmark.png", destination: "/brand/official/wordmark.png", permanent: true },
+      { source: "/brand/drug-discovery-social.png", destination: "/brand/official/social.png", permanent: true },
       { source: "/operations-intelligence", destination: "/executive-intelligence", statusCode: 301 },
-      { source: "/hourly-consulting", destination: "/contact", statusCode: 301 },
-      { source: "/full-support-retainer", destination: "/pricing", statusCode: 301 },
-      { source: "/shop/p/hourly-consulting", destination: "/contact", statusCode: 301 },
-      { source: "/shop/p/full-support-retainer", destination: "/pricing", statusCode: 301 },
-      { source: "/store/p/hourly-consulting", destination: "/contact", statusCode: 301 },
-      { source: "/store/p/full-support-retainer", destination: "/pricing", statusCode: 301 },
-      { source: "/services/hourly-consulting", destination: "/contact", statusCode: 301 },
-      { source: "/services/full-support-retainer", destination: "/pricing", statusCode: 301 },
-      { source: "/consulting", destination: "/contact", statusCode: 301 },
+      { source: "/hourly-consulting", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/full-support-retainer", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/shop/p/hourly-consulting", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/shop/p/full-support-retainer", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/store/p/hourly-consulting", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/store/p/full-support-retainer", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/services/hourly-consulting", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/services/full-support-retainer", destination: "/contact?inquiry=custom-software", statusCode: 301 },
+      { source: "/consulting", destination: "/contact?inquiry=custom-software", statusCode: 301 },
       { source: "/network", destination: "/networking", statusCode: 301 }
     ];
   }

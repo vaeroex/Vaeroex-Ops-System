@@ -3,14 +3,9 @@ import { PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
 
 const publicPages = [
   "/",
-  "/intelligence-systems",
-  "/custom-business-systems",
-  "/website-development",
-  "/executive-intelligence",
-  "/pricing",
+  "/drug-discovery-intelligence",
   "/networking",
   "/trust",
-  "/help",
   "/contact",
   "/about",
   "/about/why-vaeroex",
@@ -34,7 +29,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return publicPages.map((path) => ({
     url: `${PUBLIC_SITE_URL}${path === "/" ? "" : path}`,
     lastModified: now,
-    changeFrequency: path === "/" || path === "/executive-intelligence" ? "weekly" : "monthly",
-    priority: path === "/" ? 1 : path === "/executive-intelligence" ? 0.9 : 0.7
+    changeFrequency: path === "/" || path === "/drug-discovery-intelligence" ? "weekly" : "monthly",
+    priority: path === "/" ? 1 : path.startsWith("/drug-discovery-intelligence") ? 0.9 : 0.7
   }));
 }

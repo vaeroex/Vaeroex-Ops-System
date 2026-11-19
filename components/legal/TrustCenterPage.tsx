@@ -5,6 +5,7 @@ import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { PublicCtaBand, PublicPageHero } from "@/components/marketing/PublicPagePrimitives";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { trustSections } from "@/lib/legal/content";
+import { nistProfile } from "@/lib/marketing/discovery-evidence";
 
 function trustSection(title: (typeof trustSections)[number][0]) {
   if (title === "Deterministic Business Intelligence") return [title, "VSI uses calculation checks and supporting information to help reduce unsupported figures. Relevant, up-to-date records matter; missing information and important outputs require review."] as const;
@@ -56,6 +57,25 @@ const trustGroups = [
   }
 ] as const;
 
+function TrustNotes({ inApp = false }: { inApp?: boolean }) {
+  return (
+    <section className={`rounded-lg border p-5 ${inApp ? "border-line bg-white" : "border-amber-300/20 bg-amber-950/10"}`}>
+      <h2 className={`text-base font-semibold ${inApp ? "text-ink" : "text-white"}`}>Important trust notes</h2>
+      <ul className={`mt-3 grid gap-2 text-sm leading-6 ${inApp ? "text-muted" : "text-slate-400"}`}>
+        <li>Only supported file types can be uploaded. Vaeroex does not currently claim malware scanning or automatic detection of sensitive data in uploads. Check files before sharing them.</li>
+        <li>No online service can guarantee absolute security. Customers remain responsible for account access, workspace roles, and the data they enter.</li>
+        <li>Vaeroex outputs may be incomplete or inaccurate and require human review before making important decisions.</li>
+        <li>Do not enter patient data, PHI/ePHI, medical record numbers, insurance IDs, Social Security numbers, or other prohibited sensitive data in files, notes, chats, or support requests.</li>
+      </ul>
+      {inApp ? (
+        <Link href="/app/support" className="mt-5 inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Contact Support</Link>
+      ) : (
+        <p className="mt-4 text-sm text-slate-300">Security, privacy, or trust questions: <a href={VAEROEX_MAILTO_LINKS.support} className="font-semibold text-cyan-200 hover:text-white">{VAEROEX_CONTACT_EMAILS.support}</a></p>
+      )}
+    </section>
+  );
+}
+
 function TrustContent({ inApp }: { inApp: boolean }) {
   return (
     <div className="space-y-4">
@@ -99,20 +119,7 @@ function TrustContent({ inApp }: { inApp: boolean }) {
         })}
       </div>
 
-      <section className={`rounded-lg border p-5 ${inApp ? "border-line bg-white" : "border-amber-300/20 bg-amber-950/10"}`}>
-        <h2 className={`text-base font-semibold ${inApp ? "text-ink" : "text-white"}`}>Important trust notes</h2>
-        <ul className={`mt-3 grid gap-2 text-sm leading-6 ${inApp ? "text-muted" : "text-slate-400"}`}>
-          <li>Only supported file types can be uploaded. Vaeroex does not currently claim malware scanning or automatic detection of sensitive data in uploads. Check files before sharing them.</li>
-          <li>No online service can guarantee absolute security. Customers remain responsible for account access, workspace roles, and the data they enter.</li>
-          <li>Vaeroex outputs may be incomplete or inaccurate and require human review before important business action.</li>
-          <li>Do not enter patient data, PHI/ePHI, medical record numbers, insurance IDs, Social Security numbers, or other prohibited sensitive data in files, notes, chats, or support requests.</li>
-        </ul>
-        {inApp ? (
-          <Link href="/app/support" className="mt-5 inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Contact Support</Link>
-        ) : (
-          <p className="mt-4 text-sm text-slate-300">Security, privacy, or trust questions: <a href={VAEROEX_MAILTO_LINKS.support} className="font-semibold text-cyan-200 hover:text-white">{VAEROEX_CONTACT_EMAILS.support}</a></p>
-        )}
-      </section>
+      <TrustNotes inApp />
     </div>
   );
 }
@@ -127,12 +134,19 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
       <PublicSiteHeader />
       <PublicPageHero
         eyebrow="Trust at Vaeroex"
-        title="Intelligence you can inspect, understand, and control."
-        description="VSI is the intelligence behind Vaeroex. Its safeguards help reduce unsupported outputs and keep findings grounded in relevant evidence. Learn how to check its findings, protect your information, and stay in control."
+        title="How to check the evidence behind an answer"
+        description="Inspect the sources, separate observations from predictions, and check what the evidence leaves unresolved."
       />
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-7xl">
-          <TrustContent inApp={false} />
+          <section className="space-y-4 text-slate-300" aria-labelledby="research-evidence">
+            <h2 className="text-2xl font-semibold text-white" id="research-evidence">Drug Discovery Intelligence</h2>
+            <p className="max-w-3xl leading-7">The public demo uses fixed, published experimental structures. Private research projects use organization membership to control access to runs, structures, files, and decisions. Reviewers can compare a published measurement, a model prediction, and the reason a colleague recorded for advancing a compound.</p>
+            <h2 className="pt-4 text-2xl font-semibold text-white">Checking a VSI answer</h2>
+            <p className="max-w-3xl leading-7">Vaeroex Super Intelligence (VSI) checks cited references against the sources available for an answer. Open a citation to see whether the source supports the claim. NIST’s generative AI risk profile explains how an AI system can express an incorrect answer with confidence.</p>
+            <a href={nistProfile} className="vx-text-link">Read the NIST Generative AI Profile (PDF)</a>
+          </section>
+          <div className="mt-8"><TrustNotes /></div>
         </div>
       </section>
       <PublicCtaBand

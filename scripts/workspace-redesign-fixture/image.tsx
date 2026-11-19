@@ -1,7 +1,9 @@
 import React from "react";
-export default function Image({ priority, alt, ...props }: React.ComponentProps<"img"> & { priority?: boolean }) {
+export default function Image({ priority, unoptimized, alt, ...props }: React.ComponentProps<"img"> & { priority?: boolean; unoptimized?: boolean }) {
   void priority;
-  if (!["/icon-192.png", "/brand/vaeroex-logo-white-wordmark.png"].includes(String(props.src))) throw new Error("Unreviewed image source");
+  void unoptimized;
+  if (!["/brand/official/symbol.png", "/brand/official/wordmark.png", "/brand/official/stacked.png"].includes(String(props.src))) throw new Error("Unreviewed image source");
   // The fixture serves the reviewed static image directly; no Next image endpoint exists.
-  return <picture><img {...props} alt={alt} /></picture>;
+  // eslint-disable-next-line @next/next/no-img-element -- This is the image stand-in for the loopback fixture.
+  return <img {...props} alt={alt} />;
 }

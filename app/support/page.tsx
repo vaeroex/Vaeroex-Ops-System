@@ -1,5 +1,5 @@
 import { publicPageMetadata } from "@/lib/seo/public-seo";
-export const metadata = publicPageMetadata({ title: "Contact Support | Vaeroex", description: "Contact Vaeroex about accounts, available products, setup, billing, and support. Find the existing support and billing contact routes.", path: "/support" });
+export const metadata = publicPageMetadata({ title: "Contact Support | Vaeroex", description: "Contact Vaeroex for help with a private research project, an existing account, or a billing question.", path: "/support" });
 import Link from "next/link";
 import { createSupportRequestAction } from "@/app/support/actions";
 import { PublicFooter } from "@/components/legal/PublicFooter";
@@ -20,10 +20,10 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
       <PublicSiteHeader />
       <section className="mx-auto max-w-3xl px-6 py-10">
       <div className="vx-request-form rounded-lg border border-line bg-white p-7 shadow-panel">
-        <Link href="/" className="text-sm font-semibold text-vaeroex-blue">Vaeroex</Link>
+        <Link href="/" className="text-sm font-semibold text-vaeroex-blue">Vaeroex home</Link>
         <h1 className="mt-4 text-3xl font-semibold">Contact Vaeroex support</h1>
         <p className="mt-3 text-sm leading-6 text-muted">
-          Send account, billing, setup, or intelligence-result questions for review.
+          Send account, setup, billing, or result questions for review. To try your own compounds in Drug Discovery Intelligence, <Link href="/contact?inquiry=drug-discovery" className="text-vaeroex-blue underline">request a research walkthrough</Link>.
         </p>
         <div className="mt-4 grid gap-2 rounded-lg border border-line bg-slate-50 p-4 text-sm leading-6 text-muted">
           <p>
@@ -50,7 +50,7 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
           <TextInput label="Name" name="name" required />
           <TextInput label="Email" name="email" type="email" required />
           <TextInput label="Workspace" name="workspace" placeholder="Workspace name or ID" />
-          <TextInput label="Page/module" name="page_module" placeholder="Overview, Evidence, Saved Analyses, Billing..." />
+          <TextInput label="Page/module" name="page_module" placeholder="Project, saved run, or billing" />
           <SelectInput label="Issue type" name="issue_type" required options={["Subscription access", "Workspace setup", "Intelligence result", "Bug or error", "Billing question", "Other"]} />
           <SelectInput label="Priority" name="priority" required defaultValue="Medium" options={["Low", "Medium", "High", "Urgent"]} />
           <div className="md:col-span-2">

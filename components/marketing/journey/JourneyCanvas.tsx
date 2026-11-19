@@ -9,6 +9,7 @@ import { SpatialResizeObserver } from "@/components/spatial/SpatialResizeObserve
 import { StudioEnvironment } from "../clarity/ClarityEngineWorld";
 import { createSculptureFinish, createSculptureGeometries } from "./SculptureGeometry";
 import { createJourneyWorld, journeyAssembly, journeyCamera, journeyLens, journeyPart } from "./journeyMotion";
+import { probeJourneyOverview } from "./probeJourneyOverview";
 
 type Props = {
   progress: number;
@@ -27,8 +28,7 @@ const materials = [
 ];
 
 function World({ progress, finalShift = 0, active, compact, onReady, onFailure }: Props) {
-  const state = useThree();
-  const { gl, camera, invalidate, size } = state;
+  const { gl, camera, scene, invalidate, size } = useThree();
   const current = useRef(progress);
   const painted = useRef(false);
   const frames = useRef(0);
@@ -93,10 +93,11 @@ function World({ progress, finalShift = 0, active, compact, onReady, onFailure }
     if (active || !painted.current) invalidate();
   }, [progress, finalShift, active, compact, size.width, size.height, invalidate]);
 
-  useEffect(() => probeRenderedCanvas(state, result => {
+  // Sample once when the renderer starts. Later camera positions may see only background.
+  useEffect(() => probeRenderedCanvas({ camera, gl, scene }, result => {
     if (result === "nonblank") onReady();
     else onFailure();
-  }), [state, onReady, onFailure]);
+  }, () => probeJourneyOverview(gl, scene)), [camera, gl, scene, onReady, onFailure]);
 
   useFrame((_, delta) => {
     if (!active && painted.current) return;

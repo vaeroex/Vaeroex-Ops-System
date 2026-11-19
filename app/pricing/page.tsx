@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { ProjectPricing } from "@/components/marketing/ProjectSections";
-import solutions from "@/components/marketing/Solutions.module.css";
 import type { Metadata } from "next";
 import { ArrowRight, Check } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
@@ -11,16 +9,18 @@ import {
   VAEROEX_CONTACT_EMAILS,
   VAEROEX_MAILTO_LINKS,
 } from "@/lib/contact/emails";
-import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
-import { publicPageMetadata } from "@/lib/seo/public-seo";
+import { EXECUTIVE_INTELLIGENCE_SYSTEM } from "@/lib/marketing/public-systems";
+import { publicPageMetadata, utilityRobots } from "@/lib/seo/public-seo";
 import styles from "@/components/marketing/IntelligencePages.module.css";
 
-export const metadata: Metadata = publicPageMetadata({
-  title: "Product & Project Pricing | Vaeroex",
-  description:
-    "Executive Intelligence at $250/month, plus custom business systems and website projects quoted by scope with a development fee, upfront deposit, and scoped monthly maintenance.",
-  path: "/pricing",
-});
+export const metadata: Metadata = {
+  ...publicPageMetadata({
+    title: "Executive Intelligence Subscription | Vaeroex",
+    description: "Subscription, renewal, and billing information for Executive Intelligence customers.",
+    path: "/pricing",
+  }),
+  robots: utilityRobots,
+};
 
 const executiveInclusions = [
   "Private business workspace",
@@ -38,6 +38,7 @@ type PricingPageProps = {
 };
 
 export default async function PricingPage({ searchParams }: PricingPageProps) {
+  const system = EXECUTIVE_INTELLIGENCE_SYSTEM;
   const params = await searchParams;
   const checkoutError = params?.checkout_error;
   const checkoutCancelled = params?.checkout === "cancelled";
@@ -47,32 +48,15 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
       <PublicSiteHeader />
       <section className={`${styles.hero} ${styles.pricingHero}`}>
         <div className={styles.container}>
-          <p className={styles.eyebrow}>Pricing &amp; availability</p>
-          <h1>
-            Choose the right fit.
-            <br />
-            <em>Product or project.</em>
-          </h1>
-          <div className={styles.heroGrid}>
-            <p className={styles.heroLead}>
-              Subscribe to Executive Intelligence for a private business workspace,
-              or commission a custom business system or website.
-            </p>
-            <div className={styles.heroSide}>
-              <strong>Two ways to get started.</strong>
-              <p>
-                The product has a monthly subscription. Custom systems and websites
-                have an individual written project agreement and scoped monthly maintenance.
-              </p>
-            </div>
-          </div>
+          <p className={styles.eyebrow}>Customer billing</p>
+          <h1>Subscription details</h1>
+          <p className={styles.heroLead}>Review the monthly plan, storage allowance, and renewal terms for your Executive Intelligence workspace.</p>
         </div>
       </section>
 
       <section
-        id="intelligence-pricing"
         className={styles.sectionTight}
-        aria-label="Vaeroex intelligence availability and pricing"
+        aria-label="Executive Intelligence subscription"
       >
         <div className={styles.container}>
           {checkoutError ? (
@@ -85,61 +69,56 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
               Checkout was cancelled. You can restart when you are ready.
             </div>
           ) : null}
-          {PUBLIC_SYSTEMS.map((system) =>
-            system.availability === "available" ? (
-              <article
-                key={system.id}
-                data-pricing-system={system.id}
-                className={styles.priceGrid}
-              >
-                <div className={styles.priceOverview}>
-                  <span className={styles.status}>{system.statusLabel}</span>
-                  <h2>{system.name}</h2>
-                  <p className={styles.priceDescription}>{system.tagline}</p>
-                  <p className={styles.price}>{VAEROEX_PLAN_PRICE_LABEL}</p>
-                  <p className={styles.pricePeriod}>Monthly subscription</p>
-                  <div className={styles.actions}>
-                    <StartWithVaeroexMenu
-                      className={styles.primary}
-                      label="Start Executive Intelligence"
-                    />
-                  </div>
-                  <div className={styles.actions}>
-                    <Link href={system.route} className={styles.textLink}>
-                      Explore the product
-                      <ArrowRight aria-hidden="true" />
-                    </Link>
-                  </div>
-                </div>
-                <div className={styles.priceInclusions}>
-                  <h3>What&apos;s included</h3>
-                  <ul>
-                    {executiveInclusions.map((item) => (
-                      <li key={item}>
-                        <Check aria-hidden="true" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className={styles.billingFine}>
-                    Each workspace includes 15 GB of uploaded-file storage and 500 file slots.
-                    Optional capacity packs are $5/month each for another 10 GB and 500 slots,
-                    purchased explicitly in Settings → Usage &amp; Storage. No automatic overage charges.
-                  </p>
-                  <p className={styles.billingFine}>
-                    Renews monthly unless canceled through Manage billing.
-                    Cancellation takes effect at the end of the current paid
-                    billing period and prevents the next renewal. Payments are
-                    final and non-refundable except where required by applicable
-                    law.
-                  </p>
-                </div>
-              </article>
-            ) : null,
-          )}
+          <article
+            id="intelligence-pricing"
+            data-pricing-system={system.id}
+            className={styles.priceGrid}
+          >
+            <div className={styles.priceOverview}>
+              <span className={styles.status}>{system.statusLabel}</span>
+              <h2>{system.name}</h2>
+              <p className={styles.priceDescription}>{system.tagline}</p>
+              <p className={styles.price}>{VAEROEX_PLAN_PRICE_LABEL}</p>
+              <p className={styles.pricePeriod}>Monthly subscription</p>
+              <div className={styles.actions}>
+                <StartWithVaeroexMenu
+                  className={styles.primary}
+                  label="Start Executive Intelligence"
+                />
+              </div>
+              <div className={styles.actions}>
+                <Link href={system.route} className={styles.textLink}>
+                  Explore the product
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+              </div>
+            </div>
+            <div className={styles.priceInclusions}>
+              <h3>What&apos;s included</h3>
+              <ul>
+                {executiveInclusions.map((item) => (
+                  <li key={item}>
+                    <Check aria-hidden="true" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className={styles.billingFine}>
+                Each workspace includes 15 GB of uploaded-file storage and 500 file slots.
+                Optional capacity packs are $5/month each for another 10 GB and 500 slots,
+                purchased explicitly in Settings → Usage &amp; Storage. No automatic overage charges.
+              </p>
+              <p className={styles.billingFine}>
+                Renews monthly unless canceled through Manage billing.
+                Cancellation takes effect at the end of the current paid
+                billing period and prevents the next renewal. Payments are
+                final and non-refundable except where required by applicable
+                law.
+              </p>
+            </div>
+          </article>
           <p className={styles.caption}>
-            Start with Vaeroex to review the required legal terms before
-            checkout.
+            Starting an Executive Intelligence subscription opens the required legal terms before checkout.
           </p>
 
         </div>
@@ -185,7 +164,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
             <details className={styles.disclosure}>
               <summary>How are refunds handled?</summary>
               <p>
-                Executive Intelligence subscription payments follow the existing <Link href="/subscription-billing-terms">Subscription and Billing Terms</Link> and <Link href="/refund-policy">Refund Policy</Link>. Optional workspace capacity payments follow the <Link href="/workspace-capacity-terms">Workspace Capacity Terms</Link> and applicable Refund Policy provisions. Commissioned-project payment, cancellation, and refund terms are defined in the individual written project agreement.
+                Executive Intelligence subscription payments follow the existing <Link href="/subscription-billing-terms">Subscription and Billing Terms</Link> and <Link href="/refund-policy">Refund Policy</Link>. Optional workspace capacity payments follow the <Link href="/workspace-capacity-terms">Workspace Capacity Terms</Link> and applicable Refund Policy provisions.
               </p>
             </details>
             <details className={styles.disclosure}>
@@ -213,7 +192,6 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
           </div>
         </div>
       </section>
-      <section className={styles.section} aria-labelledby="project-pricing"><div className={styles.container}><p className={styles.sectionLabel}>Custom projects</p><h2 id="project-pricing">Development and ongoing support.</h2><p className={styles.copy}>Every project begins with a written agreement defining the scope, pricing, deliverables, and ongoing support. The subscription details above describe Executive Intelligence.</p><div className={solutions.two}><ProjectPricing /><ProjectPricing website showAgreementDetails={false} /></div></div></section>
       <PublicFooter />
     </main>
   );

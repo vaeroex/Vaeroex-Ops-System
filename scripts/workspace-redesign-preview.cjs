@@ -99,7 +99,7 @@ function createServer({ output, componentRoot, port }) {
     if (["/preview.js", "/preview.css"].includes(pathname)) {
       response.setHeader("Content-Type", pathname.endsWith(".js") ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8");
       response.end(fs.readFileSync(path.join(output, pathname.slice(1))));
-    } else if (["/icon-192.png", "/brand/vaeroex-logo-white-wordmark.png"].includes(pathname)) {
+    } else if (["/brand/official/symbol.png", "/brand/official/wordmark.png", "/brand/official/stacked.png"].includes(pathname)) {
       response.setHeader("Content-Type", "image/png"); response.end(fs.readFileSync(path.join(componentRoot, "public", pathname)));
     } else if (pathname === "/" || pathname === "/app" || pathname.startsWith("/app/")) {
       response.setHeader("Content-Type", "text/html; charset=utf-8"); response.end(html);

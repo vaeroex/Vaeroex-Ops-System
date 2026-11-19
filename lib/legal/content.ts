@@ -79,7 +79,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "Description of Service",
         body: [
-          "Vaeroex LLC builds intelligence systems, including Executive Intelligence, its flagship evidence-backed platform.",
+          "Vaeroex LLC builds intelligence systems, including Executive Intelligence.",
           "Executive Intelligence may include Business Health, KPI records, Intelligence, Explain Finding, Evidence, Business Memory, Saved Analyses, and evidence-backed recommendations."
         ]
       },

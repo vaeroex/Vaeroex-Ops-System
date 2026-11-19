@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 export const PUBLIC_SITE_URL = "https://www.vaeroex.com";
+const previewHost = typeof process !== "undefined" && process.env.VERCEL_ENV === "preview" ? process.env.VERCEL_URL : undefined;
+const assetOrigin = previewHost ? `https://${previewHost}` : PUBLIC_SITE_URL;
 
 type PublicMetadataInput = {
   title: string;
@@ -11,6 +13,8 @@ type PublicMetadataInput = {
 export function publicPageMetadata({ title, description, path = "/" }: PublicMetadataInput): Metadata {
   const canonicalPath = path === "/" ? "/" : path;
   const canonical = `${PUBLIC_SITE_URL}${canonicalPath === "/" ? "" : canonicalPath}`;
+
+  const image = `${assetOrigin}/brand/official/social.png`;
 
   return {
     title,
@@ -26,7 +30,7 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
       type: "website",
       images: [
         {
-          url: `${PUBLIC_SITE_URL}/brand/vaeroex-social.jpg`,
+          url: image,
           width: 1200,
           height: 630,
           alt: "Vaeroex"
@@ -38,7 +42,7 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
       card: "summary_large_image",
       title,
       description,
-      images: [`${PUBLIC_SITE_URL}/brand/vaeroex-social.jpg`]
+      images: [image]
     }
   };
 }
@@ -49,8 +53,8 @@ export const organizationJsonLd = {
   name: "Vaeroex",
   legalName: "Vaeroex LLC",
   url: PUBLIC_SITE_URL,
-  logo: `${PUBLIC_SITE_URL}/brand/vaeroex-logo-white-wordmark.png`,
-  description: "Vaeroex develops software templates, intelligence systems, AI tools, custom business software, and new or enhanced websites.",
+  logo: `${assetOrigin}/brand/official/stacked.png`,
+  description: "Vaeroex builds Drug Discovery Intelligence to help research teams inspect compound evidence, document decisions, and export approved test batches.",
   address: {
     "@type": "PostalAddress",
     streetAddress: "5319 University Dr, Unit 762",
@@ -67,21 +71,6 @@ export const organizationJsonLd = {
       url: `${PUBLIC_SITE_URL}/support`
     }
   ]
-};
-
-export const operationsIntelligenceJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  name: "Executive Intelligence",
-  applicationCategory: "BusinessApplication",
-  operatingSystem: "Web",
-  url: `${PUBLIC_SITE_URL}/executive-intelligence`,
-  publisher: {
-    "@type": "Organization",
-    name: "Vaeroex",
-    url: PUBLIC_SITE_URL
-  },
-  description: "Executive Intelligence helps restaurants, breweries, retailers, and other businesses explore performance, inspect business evidence, and ask deeper questions with Vaeroex Super Intelligence."
 };
 
 export const utilityRobots = { index: false, follow: false } as const;

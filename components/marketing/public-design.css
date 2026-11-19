@@ -69,18 +69,6 @@
   gap: 12px;
   flex-shrink: 0;
 }
-.vx-wordmark > span {
-  font-size: 21px;
-  letter-spacing: 0.13em;
-  font-weight: 600;
-}
-.vx-wordmark img {
-  width: 31px;
-  height: 31px;
-  object-fit: contain;
-  filter: hue-rotate(-18deg);
-  border-radius: 0;
-}
 .vx-navigation {
   margin-left: auto;
 }
@@ -89,106 +77,20 @@
   gap: 29px;
   align-items: center;
 }
-.vx-desktop-nav > a,
-.vx-desktop-nav summary {
+.vx-desktop-nav > a {
   font-size: 12px;
   font-weight: 500;
   color: #acb2be;
   padding: 16px 0;
   min-height: 44px;
 }
-.vx-desktop-nav summary {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  cursor: pointer;
-  list-style: none;
-}
-.vx-desktop-nav summary::-webkit-details-marker,
-.vx-mobile-nav summary::-webkit-details-marker {
-  display: none;
-}
+.vx-mobile-nav summary::-webkit-details-marker { display: none; }
 .vx-header :is(a:not(.vx-button), summary):hover,
-.vx-desktop-nav details[open] > summary {
-  color: var(--public-interactive);
-}
-.vx-desktop-nav details {
-  position: relative;
-}
-.vx-header nav a[aria-current="page"],
-.vx-desktop-nav details:has(a[aria-current="page"]) > summary {
-  color: var(--public-interactive);
+.vx-header nav a[aria-current] { color: var(--public-interactive); }
+.vx-header nav a[aria-current] {
   text-decoration: underline;
   text-decoration-thickness: 2px;
   text-underline-offset: 5px;
-}
-.vx-dropdown {
-  position: absolute;
-  top: 100%;
-  left: -22px;
-  width: 294px;
-  background: var(--public-panel);
-  border: 1px solid #ffffff26;
-  padding: 10px;
-  box-shadow: 0 22px 60px #0009;
-}
-.vx-dropdown a {
-  display: block;
-  padding: 14px 13px;
-  border-bottom: 1px solid #ffffff10;
-  color: #d4d8e2;
-  font-size: 12px;
-}
-.vx-dropdown a:last-child {
-  border: 0;
-}
-.vx-dropdown a:hover {
-  background: #ffffff07;
-}
-.vx-dropdown strong {
-  font-weight: 500;
-}
-.vx-dropdown small {
-  display: block;
-  font: 8px monospace;
-  text-transform: uppercase;
-  color: var(--public-interactive);
-  margin-top: 6px;
-  letter-spacing: 0.06em;
-}
-.vx-dropdown .vx-dropdown-overview {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: var(--public-interactive);
-  padding-bottom: 18px;
-}
-.vx-dropdown .vx-nav-product > a:first-child {
-  border: 0;
-  padding-bottom: 14px;
-}
-.vx-dropdown .vx-nav-product strong {
-  color: #edf0f8;
-  font-size: 14px;
-}
-.vx-nav-product a:is(:hover, [aria-current="page"]) strong {
-  color: var(--public-interactive);
-}
-.vx-dropdown .vx-nav-description {
-  margin-top: 6px;
-  color: #a2b0cd;
-  font: inherit;
-  font-size: 12px;
-  line-height: 1.65;
-  text-transform: none;
-  letter-spacing: normal;
-}
-.vx-dropdown > .vx-dropdown-overview:last-child {
-  border-top: 1px solid #ffffff1c;
-  padding-top: 16px;
-}
-.vx-dropdown--small {
-  width: 170px;
 }
 .vx-header-actions {
   display: flex;
@@ -196,12 +98,6 @@
   gap: 25px;
   margin-left: 10px;
   font-size: 12px;
-}
-.vx-header-actions > a:first-child {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  color: #cbd0db;
 }
 .vx-button {
   min-height: 49px;
@@ -290,11 +186,6 @@
 .vx-footer > div:first-child {
   grid-template-columns: 0.7fr 1.9fr;
   gap: 48px;
-}
-.vx-footer-wordmark {
-  font-size: 28px;
-  letter-spacing: 0.16em;
-  font-weight: 500;
 }
 .vx-footer a {
   color: var(--public-interactive);
@@ -511,9 +402,6 @@
     gap: 18px;
     margin-left: 0;
   }
-  .vx-wordmark > span {
-    font-size: 18px;
-  }
   .vx-footer {
     padding-left: 32px !important;
     padding-right: 32px !important;
@@ -562,11 +450,6 @@
     padding: 24px;
     box-shadow: 0 30px 80px #000c;
   }
-  .vx-mobile-menu > span {
-    font: 9px monospace;
-    letter-spacing: 0.1em;
-    color: var(--public-muted);
-  }
   .vx-mobile-menu > a {
     display: block;
     font-size: 13px;
@@ -575,31 +458,9 @@
     color: #dce2ef;
     min-height: 44px;
   }
-  .vx-mobile-menu .vx-nav-product {
-    padding: 5px 0;
-    border-bottom: 1px solid #ffffff14;
-  }
-  .vx-mobile-menu .vx-nav-product > a {
-    display: block;
-    min-height: 44px;
-    padding: 13px 0;
-    color: #dce2ef;
-    font-size: 13px;
-  }
-  .vx-mobile-menu .vx-nav-description {
-    margin-top: 6px;
-    color: #a2b0cd;
-    font: inherit;
-    font-size: 12px;
-    line-height: 1.7;
-    text-transform: none;
-  }
-  .vx-mobile-menu small {
-    display: block;
-    font: 8px monospace;
-    text-transform: uppercase;
+  .vx-mobile-menu > a.vx-text-link {
     color: var(--public-interactive);
-    margin-top: 7px;
+    text-align: center;
   }
   .vx-mobile-menu > a.vx-button {
     color: var(--public-navy);
@@ -621,14 +482,6 @@
   }
   .vx-wordmark {
     gap: 8px;
-  }
-  .vx-wordmark > span {
-    font-size: 17px;
-    letter-spacing: 0.11em;
-  }
-  .vx-wordmark img {
-    width: 27px;
-    height: 27px;
   }
   .vx-mobile-nav {
     gap: 14px;
@@ -655,9 +508,6 @@
   }
   .vx-footer .text-base {
     max-width: 320px;
-  }
-  .vx-footer-wordmark {
-    font-size: 24px;
   }
   .vx-footer a {
     min-height: 34px;

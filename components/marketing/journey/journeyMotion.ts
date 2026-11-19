@@ -1,4 +1,4 @@
-import { logoPieces, logoToWorld } from "./logoOutline";
+import { logoBounds, logoPieces, logoToWorld } from "./logoOutline";
 
 export type JourneyPoint = [number, number, number];
 export type SculpturePart = {
@@ -26,7 +26,7 @@ export const sculptureShapes = Object.fromEntries(logoPieces.map(piece => {
     bevel: .10,
   }];
 }));
-export const sculptureEnvelope = { min: [-24, -15.81, -1.6] as JourneyPoint, max: [24, 15.81, 1.6] as JourneyPoint };
+export const sculptureEnvelope = { min: [-24, -logoBounds.worldHeight / 2, -1.6] as JourneyPoint, max: [24, logoBounds.worldHeight / 2, 1.6] as JourneyPoint };
 export const sculpturePassages = {
   entry: { progress: .28, center: [-3, 3, 8] as JourneyPoint, normal: [0, 0, 1] as JourneyPoint },
   exit: { progress: .57, center: [3, 8, -64] as JourneyPoint, normal: [0, 0, 1] as JourneyPoint },
@@ -64,7 +64,7 @@ export function journeyPart(part: SculpturePart, progress: number): SculpturePos
   let turn = turns[index] * aligned;
   if (index === 4) turn += (turns[3] * aligned - turn) * state.docking;
   if (index === 3 || index === 4) turn *= 1 - state.docking;
-  // The detached upper stroke articulates outward, then returns to its profile.
+  // The right rail articulates outward, then returns to its profile.
   const unfold = index === 5 ? state.unfolding * -.30 : 0;
   return { position, rotation: [0, turn * state.opening + unfold, 0], size: [...sculptureShapes[part.geometry].size] };
 }

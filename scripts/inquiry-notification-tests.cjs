@@ -7,7 +7,7 @@ const admin={};
 admin.from=()=>({update:values=>({eq:()=>({eq:()=>({select:()=>({maybeSingle:async()=>{if(row.notification_status!=='pending')return{data:null,error:null};Object.assign(row,values);return{data:{id:row.id},error:null};}})}),then:resolve=>{Object.assign(row,values);resolve({error:null});}})})});
 const mod={exports:{}};
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/email/inquiry-notification.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:mod,exports:mod.exports,process:{env},console,URL,AbortSignal,require:s=>s==='server-only'?{}:s==='@/lib/supabase/config'?{getAppUrl:()=>env.NEXT_PUBLIC_APP_URL||'http://localhost:3000'}:{VAEROEX_CONTACT_EMAILS:{general:'hq@vaeroex.com',support:'support@vaeroex.com',billing:'billing@vaeroex.com'}},fetch:async(url,opts)=>{calls.push(JSON.parse(opts.body));assert.equal(row.notification_status,'attempting');if(mode==='timeout')throw Error('timeout');return{ok:mode!=='reject',status:503,json:async()=>({id:'synthetic-provider-id'})};}});
-const input={id:'synthetic-request',email:'synthetic@example.invalid',name:'<img src=x onerror=alert(1)>',category:'Custom Business Systems',message:'<script>bad</script>'.repeat(100)};
+const input={id:'synthetic-request',email:'synthetic@example.invalid',name:'<img src=x onerror=alert(1)>',category:'Custom software inquiry',message:'<script>bad</script>'.repeat(100)};
 async function configurationCases(){
   const saved={...env};
   for(const scenario of [

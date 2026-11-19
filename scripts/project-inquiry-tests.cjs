@@ -22,7 +22,7 @@ function load(file) {
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop:true } }).outputText, { module:loadedModule, exports:loadedModule.exports, FormData, TextEncoder, console, require: spec => spec in mocks ? mocks[spec] : spec.startsWith('@/') ? load(path.join(process.cwd(), spec.slice(2)+'.ts')) : require(spec) }, { filename:file });
   return loadedModule.exports;
 }
-function form(category = 'Custom Business Systems', extra = {}) {
+function form(category = 'Custom software inquiry', extra = {}) {
   const data = new FormData();
   for (const [key,value] of Object.entries({name:'Test User',email:'test@example.invalid',issue_type:category,message:'Local synthetic project inquiry',company:'Example only',existing_tools:'Inventory spreadsheet',expected_users:'11–50',project_budget:'Not sure yet',project_timeline:'Not sure yet',...extra})) data.append(key,value);
   return data;
@@ -31,25 +31,35 @@ function form(category = 'Custom Business Systems', extra = {}) {
   reset();
   const actions = load(path.resolve('app/support/actions.ts'));
   const {INQUIRY_CATEGORIES,inquiryCategory} = load(path.resolve('lib/contact/inquiries.ts'));
-  assert.equal(inquiryCategory('website-development'), 'Website Development / Enhancement');
-  assert.equal(inquiryCategory('__proto__'), 'General Inquiry');
+  assert.deepEqual(Object.values(INQUIRY_CATEGORIES), ['Drug Discovery walkthrough', 'Research partnership', 'Custom software inquiry']);
+  assert.equal(inquiryCategory(), 'Drug Discovery walkthrough');
+  assert.equal(inquiryCategory('drug-discovery'), 'Drug Discovery walkthrough');
+  assert.equal(inquiryCategory('research-partnership'), 'Research partnership');
+  assert.equal(inquiryCategory('partnership'), 'Research partnership');
+  assert.equal(inquiryCategory('custom-software'), 'Custom software inquiry');
+  assert.equal(inquiryCategory('custom-business-systems'), 'Custom software inquiry');
+  for(const key of ['website-development','website-design','website-enhancement','__proto__',['website-development','drug-discovery']]) {
+    assert.equal(inquiryCategory(key), undefined);
+  }
   for (const category of Object.values(INQUIRY_CATEGORIES)) {
     reset(); const result = await actions.createContactRequestAction({},form(category));
     assert.ok(result.message); assert.equal(inserted.length,1); assert.equal(audit.length,1);
     assert.equal(inserted[0].issue_type,category); assert.equal(inserted[0].workspace_id,null);
     assert.equal(inserted[0].user_id,null); assert.equal(inserted[0].status,'open');
     assert.match(inserted[0].message, /Page\/module:/);
-    if(category === 'Custom Business Systems') assert.match(inserted[0].message,/Approximate expected users: 11–50/);
+    if(category === 'Custom software inquiry') assert.match(inserted[0].message,/Approximate expected users: 11–50/);
     else assert.doesNotMatch(inserted[0].message,/Approximate expected users:/);
-    if(['Custom Business Systems','Website Development / Enhancement'].includes(category)) assert.match(inserted[0].message,/Existing tools or website: Inventory spreadsheet/);
-    else assert.doesNotMatch(inserted[0].message,/Existing tools or website:|Approximate budget:/);
+    if(category === 'Custom software inquiry') assert.match(inserted[0].message,/Existing software or tools: Inventory spreadsheet/);
+    else assert.doesNotMatch(inserted[0].message,/Existing software or tools:|Approximate budget:/);
   }
   for(const extra of [{name:' '},{email:'invalid'},{message:''},{message:'x'.repeat(6001)},{existing_tools:'x'.repeat(1001)}]) {
     reset(); const result = await actions.createContactRequestAction({},form(undefined,extra)); assert.ok(result.error); assert.ok(result.fieldErrors); assert.equal(inserted.length,0);
   }
   reset(); let data = form(); data.append('email','duplicate@example.invalid'); assert.ok((await actions.createContactRequestAction({},data)).error); assert.equal(inserted.length,0);
   reset(); data = form(); data.append('unexpected','payload'); assert.ok((await actions.createContactRequestAction({},data)).error); assert.equal(inserted.length,0);
-  reset(); assert.ok((await actions.createContactRequestAction({},form('unrecognized'))).error); assert.equal(inserted.length,0);
+  for(const old of ['unrecognized','Executive Intelligence','Website Development / Enhancement','Custom Business Systems','General Inquiry']) {
+    reset(); assert.ok((await actions.createContactRequestAction({},form(old))).error); assert.equal(inserted.length,0);
+  }
   for (const settings of [{admin:false},{allowed:false},{rateError:true},{result:{data:null,error:{message:'db error'}}},{result:{data:null,error:null}},{insertThrows:true}]) {
     reset(settings); const result = await actions.createContactRequestAction({},form()); assert.ok(result.error); assert.equal(result.message,undefined); assert.equal(audit.length,0);
   }
@@ -59,5 +69,5 @@ function form(category = 'Custom Business Systems', extra = {}) {
   reset(); data = form('Support Request',{return_path:'https://attacker.invalid'});
   await assert.rejects(actions.createSupportRequestAction(data), error => error.url.startsWith('/support?message='));
   assert.equal(inserted.length,1);
-  console.log('Project inquiries: seven category destinations, scoped context, validation, duplicate/unknown fields, configuration/rate/database failures, and legacy redirects passed. No network requests or real submissions.');
+  console.log('Project inquiries: public category destinations, scoped context, validation, duplicate/unknown fields, configuration/rate/database failures, and legacy redirects passed. No network requests or real submissions.');
 })().catch(error => { console.error(error); process.exitCode=1; });

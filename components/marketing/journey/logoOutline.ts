@@ -1,80 +1,57 @@
-/** Source-image coordinates use the usual raster convention: X right, Y down. */
+/** Pixel coordinates in the supplied 1080×1080 official VX symbol, with Y down. */
 export type LogoPoint = [number, number];
 
-export const logoAsset = {
-  path: "/brand/vaeroex-logo-white-wordmark.png",
-  width: 1536,
-  height: 1024,
-  comparisonAssets: [
-    { path: "/favicon.png", width: 512, height: 512 },
-    { path: "/apple-touch-icon.png", width: 180, height: 180 },
-  ],
-  trace: "Manual vector trace of the existing emblem's outer dark outline, excluding the wordmark, illumination and background.",
-} as const;
+// Straight edges were fitted to the half-opacity boundary of the supplied symbol.
+// Source: assets/brand/originals/VX-Miami-Blue.png, SHA-256 d926e88e89b25438b0412d909919dc423a374d83727a41445325d1657d994901.
+// Shared vertices close the construction seams exactly when all six pieces return.
+const leftTip: LogoPoint = [114.58, 251];
+const leftShoulder: LogoPoint = [441.96, 611.10];
+const leftElbow: LogoPoint = [401.50, 665.95];
+const rightTip: LogoPoint = [965.35, 251];
+const rightShoulder: LogoPoint = [637.77, 611.14];
+const rightElbow: LogoPoint = [678.57, 666.68];
+const crossing: LogoPoint = [539.77, 525.9];
+const openingTop: LogoPoint = [539.84, 594.53];
+const openingLeft: LogoPoint = [479.59, 675.41];
+const openingRight: LogoPoint = [599.93, 675.46];
+const openingBottom: LogoPoint = [540.04, 768.77];
+const baseSeam: LogoPoint = [540.04, 828];
 
-/**
- * The source is a shaded, antialiased raster rather than an original vector file.
- * These pixel-center vertices follow its straight outer edges, including the dark
- * side faces. The lower spur and detached upper-right stroke are both intentional
- * parts of the source mark. Internal highlights are not additional silhouette edges.
- *
- * The two favicon variants were inspected to distinguish the emblem from the
- * large source image's blue illumination and to confirm those two small strokes.
- */
-const a: LogoPoint = [174, 51];
-const b: LogoPoint = [380, 54];
-const c: LogoPoint = [740, 592];
-const d: LogoPoint = [872, 401];
-const e: LogoPoint = [973, 404];
-const f: LogoPoint = [1255, 788];
-const g: LogoPoint = [1139, 788];
-const h: LogoPoint = [1029, 642];
-const i: LogoPoint = [920, 788];
-const j: LogoPoint = [815, 788];
-const k: LogoPoint = [980, 579];
-const l: LogoPoint = [925, 502];
-const m: LogoPoint = [722, 790];
-
-export const logoOutline: LogoPoint[] = [a, b, c, d, e, f, g, h, i, j, k, l, m];
-export const logoDetachedStroke: LogoPoint[] = [
-  [1064, 453], [1191, 286], [1296, 286], [1119, 521],
-];
-
+const width = rightTip[0] - leftTip[0];
+const height = baseSeam[1] - leftTip[1];
 export const logoBounds = {
-  minX: 174,
-  minY: 51,
-  maxX: 1296,
-  maxY: 790,
-  width: 1122,
-  height: 739,
-  center: [735, 420.5] as LogoPoint,
-  worldWidth: 48,
-  worldHeight: 739 * 48 / 1122,
+  minX: leftTip[0], maxX: rightTip[0], minY: leftTip[1], maxY: baseSeam[1],
+  width, height,
+  center: [(leftTip[0] + rightTip[0]) / 2, (leftTip[1] + baseSeam[1]) / 2] as LogoPoint,
+  worldWidth: 48, worldHeight: height * 48 / width,
 } as const;
 
-/** Center the complete emblem, preserve its proportions, and turn raster Y upward. */
 export function logoToWorld([x, y]: LogoPoint): LogoPoint {
-  const scale = logoBounds.worldWidth / logoBounds.width;
+  const scale = logoBounds.worldWidth / width;
   return [(x - logoBounds.center[0]) * scale, (logoBounds.center[1] - y) * scale];
 }
 
-// This one new construction seam divides the long stroke at Y=300. Interpolate
-// on the traced edges rather than round the seam endpoints off their boundaries.
-const cutY = 300;
-const cutLeft: LogoPoint = [a[0] + (m[0] - a[0]) * (cutY - a[1]) / (m[1] - a[1]), cutY];
-const cutRight: LogoPoint = [b[0] + (c[0] - b[0]) * (cutY - b[1]) / (c[1] - b[1]), cutY];
-
-/**
- * Six closed-outline components tile the emblem. Adjacent pieces share the exact
- * same cut vertices; all original negative space remains empty. Only the authored
- * upper-right stroke is detached in the completed mark. Point lists omit a repeated
- * last point because Three Shape and SVG polygons close them automatically.
- */
+// The six solids tile one connected VX. Each stops at the edge of the central
+// diamond, so both the extrusion and the static SVG leave that opening empty.
 export const logoPieces: { id: string; points: LogoPoint[] }[] = [
-  { id: "descending-upper", points: [a, b, cutRight, cutLeft] },
-  { id: "descending-lower", points: [cutLeft, cutRight, c, m] },
-  { id: "rising-return", points: [c, d, l, m] },
-  { id: "right-diagonal", points: [d, e, f, g, h, k, l] },
-  { id: "lower-spur", points: [h, i, j, k] },
-  { id: "detached-wing", points: logoDetachedStroke },
+  { id: "left-rail", points: [
+    leftTip, [294, 251], [294, 309], [244.55, 309], leftShoulder, leftElbow,
+  ] },
+  { id: "left-base", points: [
+    leftElbow, leftShoulder, openingLeft, openingBottom, baseSeam,
+    [502.92, 828], [440.26, 729.44], [419.65, 756], [337.41, 756],
+  ] },
+  { id: "left-crossing", points: [
+    leftShoulder, [477.08, 564.29], [307.62, 338], [406.23, 338], crossing, openingTop, openingLeft,
+  ] },
+  { id: "right-base", points: [
+    rightShoulder, rightElbow, [742.20, 756], [660.09, 756], [639.64, 729.74],
+    [576.87, 828], baseSeam, openingBottom, openingRight,
+  ] },
+  { id: "right-crossing", points: [
+    crossing, [673.89, 338], [772.35, 338], [602.57, 564.19], rightShoulder, openingRight, openingTop,
+  ] },
+  { id: "right-rail", points: [
+    rightShoulder, [835.01, 309], [785.90, 309], [785.49, 251], rightTip, rightElbow,
+  ] },
 ];

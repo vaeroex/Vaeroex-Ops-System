@@ -1,31 +1,24 @@
+import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import Link from "next/link";
-import type { Route } from "next";
 import "@/components/marketing/public-design.css";
 import { VAEROEX_COMPANY_ADDRESS_LINES, VAEROEX_CONTACT_EMAILS, VAEROEX_FOOTER_LOCATION, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { legalLinks } from "@/lib/legal/content";
 
-const platformLinks: Array<[string, Route]> = [
-  ["Home", "/"],
-  ["Intelligence Systems", "/intelligence-systems"],
-  ["Custom Business Systems", "/custom-business-systems"],
-  ["Website Development & Enhancement", "/website-development"],
-  ["Executive Intelligence", "/executive-intelligence"],
-  ["Pricing", "/pricing"],
-  ["Trust", "/trust"]
-] as Array<[string, Route]>;
+const researchLinks = [
+  ["Drug Discovery Intelligence", "/drug-discovery-intelligence"],
+  ["Explore sample compounds", "/drug-discovery-intelligence#compound-explorer"],
+  ["AI in research and development", "/drug-discovery-intelligence#research"],
+  ["Request a walkthrough", "/contact?inquiry=drug-discovery"],
+] as const;
 
 const companyLinks = [
   ["About", "/about"],
   ["Why Vaeroex", "/about/why-vaeroex"],
+  ["Vaeroex Super Intelligence", "/about#vsi"],
+  ["Trust Center", "/trust"],
   ["Contact", "/contact"],
   ["Careers", "/careers"],
   ["Network", "/networking"]
-] as const;
-
-const supportLinks = [
-  ["Help", "/help"],
-  ["Login", "/login"],
-  ["Contact", "/contact"]
 ] as const;
 
 const emailLinks = [
@@ -54,9 +47,9 @@ export function PublicFooter() {
       <div className="mx-auto grid max-w-[86rem] gap-10 lg:grid-cols-[1.1fr_1.5fr] lg:items-start">
         <div>
           <Link href="/" className="inline-flex items-center gap-3 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60" aria-label="Vaeroex home">
-            <span className="vx-footer-wordmark">VAEROEX</span>
+            <VaeroexLogo variant="stacked" size="md" />
           </Link>
-          <p className="mt-4 max-w-sm text-base leading-7 text-slate-300">Software templates, intelligence systems, AI tools, custom business software, and websites built around your business.</p>
+          <p className="mt-4 max-w-sm text-base leading-7 text-slate-300">Drug Discovery Intelligence connects compound evidence to the decision about what to test next.</p>
           <p className="mt-3 text-xs">{VAEROEX_FOOTER_LOCATION}</p>
           <div className="mt-4 text-xs leading-5">
             <p className="font-semibold text-slate-200">Business Address</p>
@@ -71,21 +64,12 @@ export function PublicFooter() {
         </div>
         <div className="vx-footer-links grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
           <div>
-            <p className="font-semibold text-slate-200">Solutions</p>
+            <p className="font-semibold text-slate-200">Research platform</p>
             <div className="mt-2 grid gap-1.5">
-              {platformLinks.map(([label, href]) => (
-                href === "/executive-intelligence" ? (
-                  <div key={href} className="vx-footer-product">
-                    <Link href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-                      {label}
-                    </Link>
-                    <p className="vx-footer-product-description">Featuring Vaeroex Super Intelligence.</p>
-                  </div>
-                ) : (
-                  <Link key={href} href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-                    {label}
-                  </Link>
-                )
+              {researchLinks.map(([label, href]) => (
+                <Link key={href} href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+                  {label}
+                </Link>
               ))}
             </div>
           </div>
@@ -102,11 +86,7 @@ export function PublicFooter() {
           <div className="vx-footer-support">
             <p className="font-semibold text-slate-200">Support</p>
             <div className="mt-2 grid gap-1.5">
-              {supportLinks.map(([label, href]) => (
-                <Link key={href} href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-                  {label}
-                </Link>
-              ))}
+              <Link href="/support">Customer support</Link>
               {emailLinks.map(([label, email, href]) => (
                 <a key={email} href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
                   {label}
@@ -130,7 +110,6 @@ export function PublicFooter() {
       </div>
       <div className="mx-auto mt-10 flex max-w-[86rem] flex-col gap-2 border-t border-white/10 pt-5 text-xs sm:flex-row sm:items-center sm:justify-between">
         <p>© {new Date().getFullYear()} Vaeroex LLC. All rights reserved.</p>
-        <p>The Advantage of Knowing First.</p>
       </div>
     </footer>
   );

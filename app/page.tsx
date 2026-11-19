@@ -1,34 +1,22 @@
-import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowUpRight,
-  ChartNoAxesCombined,
-  Workflow,
-  PanelsTopLeft,
-} from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
-import { WorkspaceCapture } from "@/components/marketing/WorkspaceScreenshots";
-import {
-  ProjectProcess,
-  ProjectCta,
-} from "@/components/marketing/ProjectSections";
-import { SOLUTIONS } from "@/lib/marketing/solutions";
-import { VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
-import { publicPageMetadata } from "@/lib/seo/public-seo";
 import { HomeJourney } from "@/components/marketing/journey/HomeJourney";
-import journeyStyles from "@/components/marketing/journey/HomeJourney.module.css";
 import { VeteranOwned } from "@/components/marketing/VeteranOwned";
+import { assayTable, discoveryDemo, discoveryWalkthrough } from "@/lib/marketing/discovery-evidence";
+import { publicPageMetadata } from "@/lib/seo/public-seo";
+import journeyStyles from "@/components/marketing/journey/HomeJourney.module.css";
 import styles from "@/components/marketing/Solutions.module.css";
+import research from "@/components/marketing/discovery/Discovery.module.css";
 
-export const metadata: Metadata = publicPageMetadata({
-  title: "Vaeroex | AI Tools, Intelligence, Software & Websites",
-  description:
-    "Explore software templates, intelligence systems, AI tools, custom business software, and new or enhanced websites from Vaeroex.",
+export const metadata = publicPageMetadata({
+  title: "Vaeroex | Drug Discovery Intelligence",
+  description: "Inspect experimental compound structures, check published assay evidence, and export a shortlist with your reasons. Explore the free Vaeroex Drug Discovery Intelligence demo.",
   path: "/",
 });
-const icons = [ChartNoAxesCombined, Workflow, PanelsTopLeft];
+
 export default function HomePage() {
   return (
     <main className={`vaeroex-public-site ${styles.site}`}>
@@ -37,185 +25,77 @@ export default function HomePage() {
         <HomeJourney />
         <section id="home-opening" className={`${styles.hero} ${journeyStyles.hero}`}>
           <div className={styles.container}>
-            <p className={styles.eyebrow}>
-              Intelligence products · Custom software · Websites
-            </p>
-            <h1>
-              Intelligence and software <span>built around your business.</span>
-            </h1>
-            <p className={styles.lead}>Vaeroex develops intelligence products, AI tools, custom business software, and websites. Explore our available systems, bring a new idea to life, or enhance the tools you already use with custom features, integrations, and AI.</p>
+            <Link className={styles.eyebrow} href="/drug-discovery-intelligence">Drug Discovery Intelligence</Link>
+            <h1>Which compounds should your team <span>test next?</span></h1>
+            <p className={styles.lead}>Inspect docking poses, compare them with published experimental evidence, and export a shortlist that records why each compound was selected.</p>
             <div className={styles.actions}>
-              <Link href="#solutions" className="vx-button vx-button--primary">
-                Explore Solutions
-                <ArrowUpRight size={17} aria-hidden="true" />
-              </Link>
-              <Link href="/contact" className="vx-text-link">
-                Discuss a Project
-                <ArrowUpRight size={17} aria-hidden="true" />
-              </Link>
+              <Link href={discoveryDemo} className="vx-button vx-button--primary">Explore sample compounds <ArrowUpRight size={17} aria-hidden="true" /></Link>
+              <Link href={discoveryWalkthrough} className="vx-text-link">Request a walkthrough <ArrowUpRight size={17} aria-hidden="true" /></Link>
             </div>
           </div>
         </section>
+
         <section id="solutions" className={`${styles.section} ${journeyStyles.overview}`}>
           <div className={styles.container}>
-            <p className={styles.eyebrow}>Three ways to work with Vaeroex</p>
-            <h2>Start with what your business needs.</h2>
-            <div className={styles.grid}>
-              {SOLUTIONS.map((solution, index) => {
-                const Icon = icons[index];
-                return (
-                  <article
-                    className={styles.card}
-                    data-kind={solution.kind}
-                    key={solution.route}
-                  >
-                    <span className={styles.eyebrow}>{solution.label}</span>
-                    <div className={styles.icon}>
-                      <Icon size={30} strokeWidth={1.3} aria-hidden="true" />
-                    </div>
-                    <h3>{solution.name}</h3>
-                    <p>{solution.description}</p>
-                    <Link
-                      href={solution.route}
-                      className="vx-text-link"
-                      aria-label={`Explore ${solution.name}`}
-                    >
-                      Explore offering
-                      <ArrowUpRight size={17} aria-hidden="true" />
-                    </Link>
-                  </article>
-                );
-              })}
+            <p className={styles.eyebrow}>Glaucoma controls · Human carbonic anhydrase II</p>
+            <h2>Two compounds. Three questions about the same shortlist.</h2>
+            <div className={research.roles}>
+              <article><p className={research.source}>Medicinal chemistry</p><h3>Where did the inhibition value come from?</h3><p>Check the enzyme, units, and assay table for acetazolamide and dorzolamide before comparing their reported activity.</p></article>
+              <article><p className={research.source}>Structural biology</p><h3>Which chain shows the binding site?</h3><p>Inspect each compound in its own crystal structure. Use the catalytic zinc to orient yourself in chain A.</p></article>
+              <article><p className={research.source}>R&amp;D leadership</p><h3>Why did the team advance this compound?</h3><p>Open the approved shortlist to see the reviewer’s reason alongside the evidence they had when they made the decision.</p></article>
             </div>
           </div>
         </section>
+
         <section className={`${styles.section} ${journeyStyles.chapter}`} aria-labelledby="featured-product">
-          <div className={`${styles.container} ${styles.split}`}>
-            <div>
-              <span className={styles.badge}>Available now</span>
-              <p className={styles.eyebrow}>
-                Featured product / Executive Intelligence
-              </p>
-              <h2 id="featured-product">
-                A clearer view of your business information.
-              </h2>
-              <p className={styles.copy}>
-                Bring supported records, reports, and Business Notes into one
-                workspace. Investigate performance, ask follow-up questions with
-                VSI, and review the evidence behind supported findings.
-              </p>
-              <p className={styles.price}>{VAEROEX_PLAN_PRICE_LABEL}</p>
-              <div className={styles.actions}>
-                <Link href="/executive-intelligence" className="vx-text-link">
-                  Explore Executive Intelligence
-                  <ArrowUpRight size={17} aria-hidden="true" />
-                </Link>
-                <Link
-                  href="/checkout/legal"
-                  className="vx-button vx-button--primary"
-                >
-                  Get Executive Intelligence
-                </Link>
-              </div>
-              <div className={styles.actions}>
-                <Link href="/pricing" className="vx-text-link">
-                  Subscription details
-                </Link>
-              </div>
-            </div>
-            <div className={styles.preview}>
-              <WorkspaceCapture view="intelligence" />
-            </div>
-          </div>
-        </section>
-        <section aria-labelledby="home-vsi" className={`${styles.section} ${journeyStyles.technology}`}>
           <div className={styles.container}>
-            <p className={styles.eyebrow}>Vaeroex Super Intelligence</p>
-            <h2 id="home-vsi">The AI behind Vaeroex. From focused tools to complex systems.</h2>
-            <p className={styles.copy}>VSI brings intelligent capabilities to our software templates and custom implementations—connecting information, conversation, and automation around what users need to accomplish.</p>
-            <p className={styles.copy}>We combine Vaeroex-developed technology with tools from providers including OpenAI and NVIDIA, selecting the technologies appropriate to each implementation.</p>
-            <div className={styles.actions}>
-              <Link href="/about#vsi" className="vx-text-link">About Our Technology<ArrowUpRight size={17} aria-hidden="true" /></Link>
-              <Link href="/contact?inquiry=custom-business-systems" className="vx-text-link">Discuss Your Project<ArrowUpRight size={17} aria-hidden="true" /></Link>
-            </div>
+            <p className={styles.eyebrow}>Published lab measurement</p>
+            <h2 id="featured-product">Start with what the assay measured.</h2>
+            <p className={styles.copy}>An inhibition constant (Kᵢ) describes how strongly a compound inhibits an enzyme under the assay conditions. Read the column for the human enzyme you are studying.</p>
+            <div className={research.homeEvidence}><span>Acetazolamide · Human carbonic anhydrase II</span><strong>Kᵢ 12 nM</strong><span>nM = nanomoles per liter</span></div>
+            <a href={assayTable} className="vx-text-link">Read the published assay table <ArrowUpRight size={16} aria-hidden="true" /></a>
           </div>
         </section>
-        <section className={`${styles.section} ${journeyStyles.chapter}`}>
-          <div className={`${styles.container} ${styles.split}`}>
-            <div>
-              <p className={styles.eyebrow}>Custom Business Systems</p>
-              <h2 id="home-custom">Software for the work between your tools.</h2>
-              <p className={styles.copy}>
-                Equipment tracked in a spreadsheet. Requests buried in email.
-                Reports assembled by hand. Build a new system around your business,
-                or enhance the software you already use with custom features,
-                integrations, automation, and AI.
-              </p>
-              <div className={styles.actions}>
-                <Link href="/custom-business-systems" className="vx-text-link">
-                  Explore Custom Business Systems
-                  <ArrowUpRight size={17} aria-hidden="true" />
-                </Link>
-              </div>
-            </div>
-            <ul className={styles.list}>
-              <li>
-                <strong>Track day-to-day operations</strong>Equipment checkout,
-                inventory, tasks, and requests.
-              </li>
-              <li>
-                <strong>Give people a shared place to work</strong>Customer and
-                employee portals, dashboards, and reporting.
-              </li>
-              <li>
-                <strong>Connect supported tools</strong>Integrations, automation,
-                document search, and AI-assisted workflows with review where
-                appropriate.
-              </li>
-              <li>
-                Illustrative capabilities. Scope and feasibility are established
-                during discovery.
-              </li>
-            </ul>
+
+        <section className={`${styles.section} ${journeyStyles.technology}`}>
+          <div className={styles.container}>
+            <p className={styles.eyebrow}>Vaeroex Super Intelligence (VSI)</p>
+            <h2>Where did that answer come from?</h2>
+            <p className={styles.copy}>Vaeroex Super Intelligence (VSI) is the AI system behind Vaeroex software. It is designed to reduce unsupported answers by grounding responses in available evidence and making sources and uncertainty visible.</p>
+            <Link href="/drug-discovery-intelligence#vsi" className="vx-text-link">Read a saved example and check its sources <ArrowUpRight size={16} aria-hidden="true" /></Link>
           </div>
         </section>
-        <section className={`${styles.section} ${journeyStyles.chapter}`}>
-          <div className={`${styles.container} ${styles.split}`}>
-            <div>
-              <p className={styles.eyebrow}>
-                Website Development &amp; Enhancement
-              </p>
-              <h2 id="home-websites">A useful home for your business online.</h2>
-              <p className={styles.copy}>
-                Build a new business website or improve an existing one. Make
-                information easier to find, help visitors get in touch, and
-                connect the site to the tools your team uses.
-              </p>
-              <div className={styles.actions}>
-                <Link href="/website-development" className="vx-text-link">
-                  Explore Website Development &amp; Enhancement
-                  <ArrowUpRight size={17} aria-hidden="true" />
-                </Link>
-              </div>
-            </div>
-            <ul className={styles.list}>
-              <li>
-                <strong>Build a new website</strong>Business websites and focused
-                landing pages.
-              </li>
-              <li>
-                <strong>Improve an existing website</strong>Custom features,
-                AI-assisted inquiries, knowledge search, and connected business tools.
-              </li>
-              <li>
-                <strong>Keep it working</strong>Booking integrations,
-                business-tool connections, and scoped maintenance.
-              </li>
-            </ul>
+
+        <section className={`${styles.section} ${journeyStyles.chapter}`} aria-labelledby="home-custom">
+          <div className={styles.container}>
+            <h2 id="home-custom">Explore two compounds in 3D.</h2>
+            <p className={styles.copy}>See where each binds, inspect the evidence, and build a sample shortlist.</p>
+            <Link href={discoveryDemo} className="vx-text-link">Explore sample compounds <ArrowUpRight size={16} aria-hidden="true" /></Link>
           </div>
         </section>
+
+        <section className={`${styles.section} ${journeyStyles.chapter}`} aria-labelledby="home-websites">
+          <div className={styles.container}>
+            <p className={styles.eyebrow}>Researcher decision · Illustrative example</p>
+            <h2 id="home-websites">Write the reason your colleague will need.</h2>
+            <blockquote className={research.note}>“Test acetazolamide next as a reference control. We can check its published inhibition value and inspect the zinc-bound structure in chain A.”</blockquote>
+            <p className={styles.copy}>In the project, a researcher can choose Test next, Needs review, or Hold. The decision records who made it and when. Model scores and measurements retain their own labels.</p>
+            <Link href={discoveryDemo} className="vx-text-link">Write your own shortlist reason <ArrowUpRight size={16} aria-hidden="true" /></Link>
+          </div>
+        </section>
+
         <div className={journeyStyles.process}>
-          <ProjectProcess />
+          <section className={styles.section}>
+            <div>
+              <p className={styles.eyebrow}>Approved test batch</p>
+              <h2 id="project-process-title">Give the next team the same evidence you reviewed.</h2>
+              <p className={styles.copy}>Review the draft, approve the selected compounds, and download the CSV. The approved snapshot retains each compound ID, reason, and available evidence links even if someone later revises the working shortlist.</p>
+              <div className={styles.actions}>
+                <Link href={discoveryDemo} className="vx-text-link">Try a sample export <ArrowUpRight size={16} aria-hidden="true" /></Link>
+                <Link href="/drug-discovery-intelligence#research" className="vx-text-link">AI in research and development <ArrowUpRight size={16} aria-hidden="true" /></Link>
+              </div>
+            </div>
+          </section>
         </div>
         <section
           className={`${styles.container} ${journeyStyles.credentials}`}
@@ -251,7 +131,16 @@ export default function HomePage() {
           </div>
         </section>
         <div id="home-finish" className={journeyStyles.finish}>
-          <ProjectCta />
+          <section className={styles.closing}>
+            <div>
+              <h2>How would your team review its next batch?</h2>
+              <p className={styles.copy}>Explore two published structures on your own, or ask to see how a private research project takes a team from evidence review to an approved export.</p>
+              <div className={styles.actions}>
+                <Link href={discoveryDemo} className="vx-button vx-button--primary">Explore sample compounds <ArrowUpRight size={16} aria-hidden="true" /></Link>
+                <Link href={discoveryWalkthrough} className="vx-text-link">Request a walkthrough</Link>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
       <PublicFooter />

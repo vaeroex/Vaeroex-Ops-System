@@ -84,10 +84,18 @@ assert.equal((await callback.GET({url:'https://fixture.invalid/auth/callback?cod
  calls=[];selection.set('workspace_id','foreign');await assert.rejects(selectWorkspaceAction(selection),e=>e.url.startsWith('/app/intelligence?error='));assert.equal(calls.length,0);
  // Destination gates and workspace switch keep their established authority.
  const read=f=>fs.readFileSync(path.join(root,f),'utf8');assert.match(read('app/app/layout.tsx'),/hasAcceptedLatestLegalPolicies[\s\S]*LegalAcceptanceGate/);assert.match(read('lib/security/require-workspace-access.ts'),/getCurrentWorkspace[\s\S]*requireActiveSubscription/);assert.match(read('lib/workspaces/actions.ts'),/\.eq\("user_id", user.id\)[\s\S]*\.eq\("status", "active"\)/);
- for(const file of ['components/legal/PublicSiteHeader.tsx','components/marketing/PublicNavigation.tsx'])assert.match(read(file),/loggedIn \? "\/systems" : "\/login"/);
  assert.doesNotMatch(read('app/systems/page.tsx'),/redirect\(|useRouter|router\.push/);
- assert.match(read('app/(auth)/login/page.tsx'),/Welcome to Vaeroex/);assert.doesNotMatch(read('app/(auth)/login/page.tsx')+read('components/auth/AuthShell.tsx'),/Executive Intelligence|SYSTEM_CATALOG|SystemsCatalog/);
- for(const file of ['components/legal/PublicSiteHeader.tsx','components/marketing/PublicNavigation.tsx']){assert.match(read(file),/Discuss a Project/);assert.doesNotMatch(read(file),/Get Executive Intelligence/)}
- assert.match(read('app/page.tsx'),/Get Executive Intelligence/);assert.match(read('app/executive-intelligence/page.tsx'),/Start Executive Intelligence/);
+ const loginPage = read('app/(auth)/login/page.tsx');
+ assert.match(loginPage, /Executive Intelligence sign in/);
+ assert.match(loginPage, /action=\{signInAction\}/);
+ assert.match(loginPage, /name="next" value=\{params\?\.next \|\| "\/systems"\}/);
+ assert.doesNotMatch(loginPage + read('components/auth/AuthShell.tsx'), /SYSTEM_CATALOG|SystemsCatalog/);
+ for (const file of ['components/legal/PublicSiteHeader.tsx', 'components/marketing/PublicNavigation.tsx', 'app/page.tsx']) {
+   const publicPage = read(file);
+   assert.match(publicPage, /href=\{discoveryDemo\}[^>]*>\s*Explore sample compounds/);
+   assert.match(publicPage, /href=\{discoveryWalkthrough\}[^>]*>\s*Request a walkthrough/);
+   assert.doesNotMatch(publicPage, /["']\/(?:login|systems)["']|Get Executive Intelligence/);
+ }
+ assert.match(read('app/executive-intelligence/page.tsx'), /Start Executive Intelligence/);
  console.log(JSON.stringify({passed:true,accessMatrix:results.length,zeroOneMultiple:true,noninteractiveDevelopmentCards:2,actualServerResolvers:true,actualAuthHandlers:true,actualCallback:true,transport:'synthetic SDK/database responses',emailsSent:0,networkCalls:0,hostedWrites:0}));
 })().catch(e=>{console.error(e);process.exitCode=1});

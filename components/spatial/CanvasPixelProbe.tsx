@@ -32,10 +32,12 @@ export function probeCanvasPixels(canvas: HTMLCanvasElement): Exclude<CanvasPixe
 }
 
 export function probeRenderedCanvas(
-  { camera, gl, scene }: RootState,
-  onResult: (result: Exclude<CanvasPixelProbeResult, "pending">) => void
+  { camera, gl, scene }: Pick<RootState, "camera" | "gl" | "scene">,
+  onResult: (result: Exclude<CanvasPixelProbeResult, "pending">) => void,
+  checkOffscreen?: () => boolean
 ) {
   gl.domElement.dataset.canvasProbe = "created";
+  if (checkOffscreen) gl.domElement.dataset.canvasProbeView = "visible";
   let secondFrame = 0;
   const firstFrame = requestAnimationFrame(() => {
     secondFrame = requestAnimationFrame(() => {
@@ -43,6 +45,10 @@ export function probeRenderedCanvas(
       try {
         gl.render(scene, camera);
         result = probeCanvasPixels(gl.domElement);
+        if (result === "blank" && checkOffscreen) {
+          gl.domElement.dataset.canvasProbeView = "offscreen";
+          if (checkOffscreen()) result = "nonblank";
+        }
       } catch {
         // Driver/context errors occur outside React's error boundary here.
         // Report a failed probe so the owning view restores its HTML poster.

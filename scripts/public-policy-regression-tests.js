@@ -1,6 +1,6 @@
+const crypto = require("node:crypto");
 /* Policy and product contracts retained from the superseded public art-direction suites. */
 const assert = require("node:assert/strict");
-const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const ts = require("typescript");
@@ -46,32 +46,31 @@ assert.match(
 );
 assert.match(seo, /name: "Vaeroex"/);
 assert.match(seo, /legalName: "Vaeroex LLC"/);
-assert.match(seo, /name: "Executive Intelligence"/);
+assert.match(seo, /Drug Discovery Intelligence/);
+assert.doesNotMatch(seo, /Executive Intelligence|website development|custom software/i);
+for (const file of ["app/terms/page.tsx", "app/refund-policy/page.tsx", "app/subscription-billing-terms/page.tsx"]) {
+  assert.doesNotMatch(read(file), /Executive Intelligence|website project|commissioned project/i, "Policy metadata should describe the policy without promoting products");
+}
 assert.match(
   read("app/careers/page.tsx"),
-  /not currently listing open positions/i,
+  /no open positions/i,
   "Careers must not fabricate hiring availability",
 );
 assert.doesNotMatch(
   read("app/about/page.tsx"),
   /consulting agency|operations consulting/,
 );
-for (const topic of [
-  "Getting started",
-  "Account and workspace",
-  "Sources and evidence",
-  "Business Health",
-  "Business Memory",
-  "Billing",
-  "Privacy and trust",
-  "Contact support",
-  "Intelligence and Explain Finding",
-  "Saved Analyses",
-]) {
-  assert.ok(
-    read("app/help/page.tsx").includes(topic),
-    `Help must retain the ${topic} topic`,
-  );
+const publicHelp = read("app/help/page.tsx");
+for (const topic of ["Account and workspace questions", "Billing questions", "Contact support"]) {
+  assert.ok(publicHelp.includes(topic), `Customer help must retain ${topic}`);
+}
+assert.doesNotMatch(publicHelp, /Executive Intelligence|href="\/pricing"|website projects|commissioned systems/i);
+const workspaceHelp = read("app/app/help/page.tsx");
+assert.match(workspaceHelp, /@\/lib\/help\/content/);
+assert.match(workspaceHelp, /href="\/app\/support"/);
+const privateArticles = read("lib/help/content.ts");
+for (const topic of ["Getting Started", "Business Health", "Business Memory", "Explain Finding", "Saved Analyses"]) {
+  assert.ok(privateArticles.includes(topic), `Signed-in customer guides must retain ${topic}`);
 }
 for (const boundary of [
   "Infrastructure & Security",
@@ -105,21 +104,21 @@ assert.doesNotMatch(
   /GDPR certification|GDPR certified|enterprise compliance certification for Vaeroex itself/i,
 );
 
-assert.match(logo, /\/brand\/vaeroex-logo-white-wordmark\.png/);
-assert.match(logo, /variant === "symbol" \? "\/icon-192\.png"/);
-const logoHash = crypto
-  .createHash("sha256")
-  .update(
-    fs.readFileSync(
-      path.join(root, "public/brand/vaeroex-logo-white-wordmark.png"),
-    ),
-  )
-  .digest("hex");
-assert.equal(
-  logoHash,
-  "03f57e14ec55969a00d67face54d72d7774c3a0f1d0b84c8cd11fc79f51a13fa",
-  "Canonical supplied logo asset must remain unchanged",
-);
+const approvedBrand = [
+  ["wordmark", "VAEROEX-Wordmark-Miami-Blue.png", "ac99d24276efdb9da173aa0198ba507cd94e8c6067b30aaeb238e54883422e9b", "ff166e64289b855ced471860a756fc6a55b9d8acd0b87a53e27cc315ca6da1d6"],
+  ["symbol", "VX-Miami-Blue.png", "d926e88e89b25438b0412d909919dc423a374d83727a41445325d1657d994901", "f77d082e029899f044e95ea4e665edea3f5e299be4ac7453b994e400c3dcd109"],
+  ["stacked", "Vaeroex-Combined-Miami-Blue.png", "61d87317513de5f4d048182d24ea4eb6ae3646e69dd9259a443886cce18c79f4", "375cf48a901b98209e906b528163059eccde9b69dc7a63c088ea2cffc390c84a"],
+];
+for (const [variant, source, sourceDigest, displayDigest] of approvedBrand) {
+  const original = fs.readFileSync(path.join(root, "assets/brand/originals", source));
+  assert.equal(crypto.createHash("sha256").update(original).digest("hex"), sourceDigest);
+  const asset = `/brand/official/${variant}.png`;
+  assert.ok(logo.includes(asset), `the shared identity must use the official ${variant}`);
+  const png = fs.readFileSync(path.join(root, "public", asset));
+  assert.equal(crypto.createHash("sha256").update(png).digest("hex"), displayDigest);
+  assert.equal(png.subarray(1, 4).toString(), "PNG");
+  assert.equal(png[25], 6, `official ${variant} must retain its transparent RGBA channel`);
+}
 assert.equal(
   fs.existsSync(path.join(root, "public/brand/vaeroex-logo.png")),
   false,
@@ -138,14 +137,20 @@ assert.match(
   /source: "\/operations-intelligence"[^\n]+destination: "\/executive-intelligence"[^\n]+statusCode: 301/,
 );
 for (const route of [
-  "/executive-intelligence",
-  "/pricing",
+  "/drug-discovery-intelligence",
   "/contact",
 ])
   assert.ok(sitemap.includes(`"${route}"`));
-assert.doesNotMatch(sitemap, /"\/operations-intelligence"/);
-assert.doesNotMatch(sitemap, /biological-intelligence|drug-discovery-intelligence/);
-assert.doesNotMatch(navigation + footer + seo, /Biological Intelligence|Drug Discovery Intelligence/);
+for (const route of ["/executive-intelligence", "/pricing", "/release-notes", "/help"]) {
+  assert.ok(!sitemap.includes(`"${route}"`), `Unlisted customer marketing or help route in sitemap: ${route}`);
+  assert.match(read(`app${route}/page.tsx`), /robots: utilityRobots/);
+}
+assert.match(seo, /utilityRobots = \{ index: false, follow: false \}/);
+for (const retired of ["/operations-intelligence", "/intelligence-systems", "/website-development", "/custom-business-systems"]) {
+  assert.ok(!sitemap.includes(`"${retired}"`), `Retired sales route in sitemap: ${retired}`);
+}
+assert.doesNotMatch(sitemap, /biological-intelligence/);
+assert.match(footer, /drug-discovery-intelligence/);
 assert.doesNotMatch(
   layout + navigation,
   /IntelligenceUniverseProvider|IntelligenceUniverseShell|UniverseNavigationLink|fast_travel|destination gravity/,
@@ -232,14 +237,12 @@ assert.doesNotMatch(
   /BioNeMo|Anthropic|Vertex AI|Supabase|private orchestration|endorsed by (?:OpenAI|NVIDIA)|(?:OpenAI|NVIDIA) partnership/i,
   "Technology references may name implemented providers without inventing partnerships or exposing private infrastructure",
 );
-for (const file of ["app/page.tsx", "app/about/page.tsx"]) {
-  const copy = read(file);
-  assert.match(copy, /providers including OpenAI and NVIDIA/);
-  assert.match(copy, /each implementation/);
-  assert.doesNotMatch(copy, /train(?:s|ing)? (?:our own|foundation) models|guarantee.*(?:accuracy|hallucination)/i);
+for (const file of ["app/page.tsx", "app/about/page.tsx", "app/drug-discovery-intelligence/page.tsx"]) {
+  assert.doesNotMatch(read(file), /train(?:s|ing)? (?:our own|foundation) models|guarantee.*(?:accuracy|hallucination)/i);
 }
 const researchSources =
-  read("app/drug-discovery-intelligence/_archived-page.tsx") +
+  read("app/drug-discovery-intelligence/page.tsx") +
+  read("app/drug-discovery-intelligence/demo/CompoundDemo.tsx") +
   read("app/biological-intelligence/_archived-page.tsx");
 assert.doesNotMatch(
   researchSources,

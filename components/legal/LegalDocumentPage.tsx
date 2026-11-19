@@ -11,7 +11,7 @@ export function LegalDocumentPage({ documentId }: { documentId: LegalDocumentId 
       <PublicSiteHeader />
 
       <section className="mx-auto max-w-4xl px-6 py-10">
-        <Link href="/" className="text-sm font-semibold text-vaeroex-blue">Vaeroex</Link>
+        <Link href="/" className="text-sm font-semibold text-vaeroex-blue">Vaeroex home</Link>
         <p className="mt-5 text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Legal Center</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">{document.title}</h1>
         <p className="mt-3 text-sm leading-6 text-muted">{document.summary}</p>

@@ -14,10 +14,11 @@ assert.equal(fs.existsSync(path.join(root, "app/operations-intelligence/page.tsx
 assert.match(canonicalPage, /title: "Executive Intelligence \| Vaeroex"/, "the canonical product page must use the approved browser title");
 assert.match(canonicalPage, /path: "\/executive-intelligence"/, "the canonical product metadata must use the new URL");
 assert.match(redirects, /source: "\/operations-intelligence"[^\n]+destination: "\/executive-intelligence"[^\n]+statusCode: 301/, "the former product URL must permanently redirect");
-assert.match(sitemap, /"\/executive-intelligence"/, "the sitemap must include the canonical product URL");
+assert.match(canonicalPage, /robots: utilityRobots/, "the retained customer route must be unlisted");
+assert.match(seo, /utilityRobots = \{ index: false, follow: false \}/);
+assert.doesNotMatch(sitemap, /"\/executive-intelligence"/, "the sitemap must omit the unlisted customer route");
 assert.doesNotMatch(sitemap, /"\/operations-intelligence"/, "the sitemap must not advertise the former product URL");
-assert.match(seo, /name: "Executive Intelligence"/, "structured data must use the approved product name");
-assert.match(seo, /\/executive-intelligence/, "structured data must use the canonical product URL");
+assert.doesNotMatch(seo, /Executive Intelligence|\/executive-intelligence/, "public structured data must omit the unlisted product");
 
 const customerFacingFiles = [
   "app/page.tsx",
