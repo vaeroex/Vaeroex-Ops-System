@@ -8,7 +8,7 @@ for(const slug of slugs){const m=load(`app/${slug}/page.tsx`).metadata;assert.ok
 assert.equal(titles.size,10);assert.equal(descriptions.size,10);
 const robots=load('app/robots.ts').default();for(const p of ['/login','/signup','/app','/checkout','/systems'])assert.ok(!robots.rules.disallow.includes(p));
 const sitemap=load('app/sitemap.ts').default();for(const s of slugs)assert.ok(sitemap.some(x=>x.url===`https://www.vaeroex.com/${s}`));for(const p of ['/systems','/access','/login','/signup','/checkout/legal','/app','/executive-intelligence','/operations-intelligence','/pricing','/release-notes','/help','/custom-business-systems','/website-development','/intelligence-systems'])assert.ok(!sitemap.some(x=>x.url===`https://www.vaeroex.com${p}`));
-for(const p of ['app/(auth)/layout.tsx','app/checkout/layout.tsx','app/app/layout.tsx','app/access/page.tsx','app/billing-required/page.tsx'])assert.match(read(p),/robots: utilityRobots/);
+for(const p of ['app/(auth)/layout.tsx','app/checkout/layout.tsx','app/app/layout.tsx','app/access/page.tsx','app/offline/page.tsx','app/billing-required/page.tsx'])assert.match(read(p),/robots: utilityRobots/);
 assert.match(read('next.config.mjs'),/X-Robots-Tag/);assert.doesNotMatch(read('app/pricing/page.tsx'),/All purchases and subscription payments/);assert.doesNotMatch(read('app/pricing/page.tsx'),/commissioned project|website development/i);
 assert.equal((read('components/legal/PublicRequestForm.tsx').match(/PROJECT_AGREEMENT_NOTICE\}/g)||[]).length,1);
 for (const route of ["/", "/drug-discovery-intelligence", "/drug-discovery-intelligence/demo", "/about", "/contact", "/about/why-vaeroex"]) {
