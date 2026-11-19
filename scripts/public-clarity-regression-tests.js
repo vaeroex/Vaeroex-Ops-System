@@ -458,6 +458,13 @@ async function main() {
   }
   assert.doesNotMatch(product, /href="\/(?:checkout|signup)|illustrative score|−0\.50/i);
   assert.match(product, /id="compound-explorer"/);
+  const workspaceFeature = product.match(/<section id="research-workspace"[^>]*>([\s\S]*?)<\/section>/)?.[1];
+  assert.ok(workspaceFeature, "Describe saved pose comparison in the signed-in workspace section");
+  assert.match(workspaceFeature, /Compare predicted binding poses/);
+  assert.ok(workspaceFeature.includes(`href="${walkthrough}"`));
+  assert.match(workspaceFeature, /Request workspace access/);
+  const freeExplorer = product.match(/<section id="compound-explorer"[^>]*>([\s\S]*?)<\/section>/)?.[1];
+  assert.doesNotMatch(freeExplorer, /Compare predicted binding poses|Request workspace access/);
   assert.match(product, /Experimental structure/i);
   assert.match(product, /Saved example/i);
   assert.match(product, /carbonic anhydrase II/i);

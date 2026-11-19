@@ -58,7 +58,7 @@ export default async function DrugDiscoveryIntelligence({ searchParams }: PagePr
             </figure>
             <div><p className={styles.source}>Protein Structures</p><h2>Check the reference before comparing a pose.</h2>
               <p>In the research workspace, import an experimental structure from the Protein Data Bank (PDB) and select a chain. The project saves the source revision and a checksum so a colleague can reopen the same file and chain.</p>
-              <p>A saved prediction can be placed on the protein when the receptor and pose share a verified coordinate frame. An overlay also needs an aligned experimental reference. The public sample displays the deposited experimental coordinates for each compound.</p>
+              <p>A saved prediction can be placed on the protein when the receptor and pose share a verified coordinate frame. Comparing it with an experimental structure also requires a verified alignment. The public sample displays the deposited experimental coordinates for each compound.</p>
               <Link href={discoveryDemo} className="vx-text-link">Inspect the two binding sites <ArrowUpRight size={15} aria-hidden="true" /></Link>
             </div>
           </div>
@@ -74,6 +74,19 @@ export default async function DrugDiscoveryIntelligence({ searchParams }: PagePr
             </table>
             <p>One ångström (Å) is one ten-billionth of a meter.</p>
             <Link className="vx-text-link" href="/drug-discovery-intelligence?compound=dorzolamide#compound-explorer">Open the dorzolamide binding site <ArrowUpRight size={15} aria-hidden="true" /></Link>
+          </div>
+        </section>
+        <section id="research-workspace" className={styles.section} aria-labelledby="compare-poses">
+          <div className={styles.spread}>
+            <div>
+              <p className={styles.source}>Research workspace</p>
+              <h2 id="compare-poses">Compare predicted binding poses</h2>
+            </div>
+            <div>
+              <p>Open a saved DiffDock run in the signed-in workspace. Switch between a compound’s ranked poses while the camera stays still, or overlay poses that share the same verified protein coordinates.</p>
+              <p>Each rank shows its confidence score when available. Reviewing saved poses uses no additional inference requests or workspace allowance.</p>
+              <Link href={discoveryWalkthrough} className="vx-text-link">Request workspace access <ArrowUpRight size={15} aria-hidden="true" /></Link>
+            </div>
           </div>
         </section>
         <section id="approval" className={styles.section}>
